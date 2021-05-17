@@ -2,10 +2,12 @@
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 
+import construct
 from construct import Array, Struct, Int32ub, PrefixedArray, Int64ub, Float32b, Int16ub, CString, Const, Int8ub, \
-    PaddedString
+    PaddedString, Rebuild, len_, FocusedSeq
 
-from data_structures.guid import GUID
+from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
+from retro_data_structures.guid import GUID
 
 Vector3 = Array(3, Float32b)
 
@@ -30,6 +32,7 @@ MLVLAreaLayerFlags = Struct(
     layer_count=Int32ub,
     layer_flags=Int64ub,
 )
+
 
 def create_area(version: int, asset_id):
     MLVLAreaDependency = Struct(
@@ -110,14 +113,16 @@ def create(version: int, asset_id):
         # Memory Relays connected to multiple objects are listed multiple times.
         fields.append("memory_relays" / PrefixedArray(Int32ub, MLVLMemoryRelay))
 
-    fields.append("areas_count" / Int32ub)
-
     # Prime 1
     if version <= 0x11:
-        # Unknown, always 1
-        fields.append(Const(1, Int32ub))
-
-    fields.append("areas" / Array(lambda this: this.areas_count, area))
+        # Extra field is unknown, always 1
+        fields.append(
+            "areas" / PrefixedArrayWithExtra(Int32ub, Const(1, Int32ub), area)
+        )
+    else:
+        fields.append(
+            "areas" / PrefixedArray(Int32ub, area)
+        )
 
     # DKCR
     if version <= 0x1B:
