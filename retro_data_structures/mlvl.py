@@ -129,7 +129,7 @@ def create(version: int, asset_id):
         fields.append("world_map_id" / asset_id)
 
         # This is presumably the same unknown value as at the beginning of the SCLY format. Always 0.
-        fields.append(Const(0, Int8ub))
+        fields.append("unknown_scly_field" / Const(0, Int8ub))
 
         # The MLVL format embeds a script layer. This script layer is used in the MP1 demo for storing Dock instances,
         # but it's unused in all retail builds, so this is always 0.
