@@ -1,12 +1,28 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
+import math
 import sys
 
 import construct
+import lzokay
 from construct import (
-    Int32ub, Struct, Const, Float32b, Array, Aligned, Bytes
+    Int32ub, Struct, Const, Float32b, Array, Aligned, Int16sb
 )
+
+
+class LZOSegment(construct.Construct):
+    def __init__(self, segment_size: int):
+        super().__init__()
+        self.segment_size = segment_size
+
+    def _parse(self, stream, context, path):
+        segment_size = Int16sb._parsereport(stream, context, path)
+        data = construct.stream_read(stream, abs(segment_size), path)
+        if segment_size < 0:
+            return data
+        else:
+            return lzokay.decompress(data, self.segment_size)
 
 
 class MaybeCompressedBytes(construct.Construct):
@@ -25,7 +41,22 @@ class MaybeCompressedBytes(construct.Construct):
             if start_offset != 32:
                 construct.stream_read(stream, start_offset, path)
 
-        return construct.stream_read(stream, length, path)
+        if compressed:
+            block = context.compressed_blocks[context._index]
+            num_segments = block.uncompressed_size / 0x4000
+
+            size_left = block.uncompressed_size
+            segments = []
+            for _ in range(math.ceil(num_segments)):
+                new_segment = LZOSegment(min(0x4000, size_left))._parsereport(stream, context, path)
+                size_left -= len(new_segment)
+                segments.append(new_segment)
+
+            assert size_left == 0
+
+            return b"".join(segments)
+        else:
+            return construct.stream_read(stream, length, path)
 
     def _build(self, obj, stream, context, path):
         length, compressed = self.length(context)
@@ -48,13 +79,6 @@ class MaybeCompressedBytes(construct.Construct):
 
 
 def create(version: int, asset_id):
-    def lol(this):
-        block = this.compressed_blocks[this._index]
-        if block.compressed_size == 0:
-            return block.uncompressed_size
-        else:
-            return block.compressed_size
-
     fields = [
         "magic" / Const(0xDEADBEEF, Int32ub),
         "version" / Const(version, Int32ub),
@@ -118,7 +142,7 @@ def create(version: int, asset_id):
             "data_section_count" / Int32ub,
         ))),
 
-        "compressed_bytes" / Array(construct.this.compressed_block_counth, MaybeCompressedBytes()),
+        "compressed_bytes" / Array(construct.this.compressed_block_count, MaybeCompressedBytes()),
     ]
 
     return Struct(*fields)
@@ -127,7 +151,10 @@ def create(version: int, asset_id):
 Prime2MREA = create(0x19, Int32ub)
 
 
+def main():
+    mrea = Prime2MREA.parse_file(sys.argv[1])
+    print(mrea)
+
+
 if __name__ == '__main__':
-    result = Prime2MREA.parse_file(sys.argv[1])
-    for item in result['compressed_bytes']:
-        print(list(item[:50]))
+    main()
