@@ -2,7 +2,7 @@ from typing import Any
 
 from construct import (
     FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
-    EnumIntegerString, Container, Adapter, Enum
+    EnumIntegerString, Container, Adapter, Enum, If
 )
 
 
@@ -74,3 +74,18 @@ def convert_to_raw_python(value) -> Any:
         return str(value)
 
     return value
+
+
+def get_version(this):
+    if 'version' not in this:
+        return get_version(this['_'])
+    else:
+        return this.version
+
+
+def WithVersion(version, subcon):
+    return If(lambda this: get_version(this) >= version, subcon)
+
+
+def BeforeVersion(version, subcon):
+    return If(lambda this: get_version(this) < version, subcon)
