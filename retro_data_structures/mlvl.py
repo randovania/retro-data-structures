@@ -7,10 +7,9 @@ from construct import (
     PaddedString
 )
 
+from retro_data_structures.common_types import Vector3
 from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
 from retro_data_structures.guid import GUID
-
-Vector3 = Array(3, Float32b)
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,
