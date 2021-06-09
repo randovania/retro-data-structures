@@ -1,13 +1,13 @@
 """
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
-
+import construct
 from construct import (
     Array, Struct, Int32ub, PrefixedArray, Int64ub, Float32b, Int16ub, CString, Const, Int8ub,
-    PaddedString
+    PaddedString, Switch, Peek, Sequence, FocusedSeq
 )
 
-from retro_data_structures.common_types import Vector3
+from retro_data_structures.common_types import Vector3, AssetId32, AssetId64
 from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
 from retro_data_structures.guid import GUID
 
@@ -162,9 +162,23 @@ def create(version: int, asset_id):
     return Struct(*fields)
 
 
-Prime1MLVL = create(0x11, Int32ub)
-Prime2MLVL = create(0x17, Int32ub)
-Prime3MLVL = create(0x19, Int64ub)
+Prime1MLVL = create(0x11, AssetId32)
+Prime2MLVL = create(0x17, AssetId32)
+Prime3MLVL = create(0x19, AssetId64)
+
+MLVL = FocusedSeq(
+    "mlvl",
+    header=Peek(Sequence(Int32ub, Int32ub)),
+    mlvl=Switch(
+        construct.this.header[1],
+        {
+            0x11: Prime1MLVL,
+            0x17: Prime2MLVL,
+            0x19: Prime3MLVL,
+        },
+        construct.Error,
+    )
+)
 
 
 def main():
@@ -172,7 +186,7 @@ def main():
     import sys
     from retro_data_structures import construct_extensions
 
-    mlvl = Prime2MLVL.parse_file(sys.argv[1])
+    mlvl = MLVL.parse_file(sys.argv[1])
     d = construct_extensions.convert_to_raw_python(mlvl)
 
     for area in d["areas"]:
