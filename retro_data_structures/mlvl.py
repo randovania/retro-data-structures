@@ -42,8 +42,9 @@ def create_area(version: int, asset_id):
     )
 
     MLVLAreaDependencies = Struct(
-        unknown=Int32ub,
-        dependencies=PrefixedArray(Int32ub, MLVLAreaDependency),
+        # Always empty
+        dependencies_a=PrefixedArray(Int32ub, MLVLAreaDependency),
+        dependencies_b=PrefixedArray(Int32ub, MLVLAreaDependency),
         dependencies_offset=PrefixedArray(Int32ub, Int32ub),
     )
 
@@ -165,3 +166,21 @@ def create(version: int, asset_id):
 Prime1MLVL = create(0x11, Int32ub)
 Prime2MLVL = create(0x17, Int32ub)
 Prime3MLVL = create(0x19, Int64ub)
+
+
+def main():
+    import pprint
+    import sys
+    from retro_data_structures import construct_extensions
+
+    mlvl = Prime2MLVL.parse_file(sys.argv[1])
+    d = construct_extensions.convert_to_raw_python(mlvl)
+
+    for area in d["areas"]:
+        area["dependencies"]["dependencies_b_len"] = len(area["dependencies"].pop("dependencies_b"))
+
+    pprint.pprint(d)
+
+
+if __name__ == '__main__':
+    main()
