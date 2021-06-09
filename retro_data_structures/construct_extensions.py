@@ -2,7 +2,7 @@ from typing import Any
 
 from construct import (
     FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
-    EnumIntegerString, Container
+    EnumIntegerString, Container, Adapter, Enum
 )
 
 
@@ -45,6 +45,15 @@ def PrefixedArrayWithExtra(countfield, extrafield, subcon):
     macro._emitseq = _emitseq
 
     return macro
+
+
+class EnumAdapter(Adapter):
+    def __init__(self, enum_class, subcon=Int32ub):
+        super().__init__(Enum(subcon, enum_class))
+        self._enum_class = enum_class
+
+    def _decode(self, obj, context, path):
+        return self._enum_class[obj]
 
 
 def convert_to_raw_python(value) -> Any:
