@@ -60,10 +60,10 @@ SoundPOINode = Struct(
     fall_off=Float32b,
     max_distance=Float32b,
     echoes=If(hacked_version_check.is_prime2, Struct(
-        Int32ub,
-        Int16ub,
-        Int16ub,
-        Float32b,
+        unk_a=Int32ub,
+        unk_b=Int16ub,
+        unk_c=Int16ub,
+        unk_d=Float32b,
     ))
 )
 
