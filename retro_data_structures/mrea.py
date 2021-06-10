@@ -1,52 +1,14 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
-import math
 
 import construct
-import lzokay
 from construct import (
-    Int32ub, Struct, Const, Float32b, Array, Aligned, Int16sb, Computed, Switch, Peek, FocusedSeq, Sequence
+    Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence
 )
 
 from retro_data_structures.common_types import AssetId32
-
-
-class LZOSegment(construct.Construct):
-    def __init__(self, segment_size: int):
-        super().__init__()
-        self.segment_size = segment_size
-
-    def _parse(self, stream, context, path):
-        segment_size = Int16sb._parsereport(stream, context, path)
-        data = construct.stream_read(stream, abs(segment_size), path)
-        if segment_size < 0:
-            return data
-        else:
-            return lzokay.decompress(data, self.segment_size)
-
-
-class LZOCompressedBlock(construct.Construct):
-    def __init__(self, compressed_size, uncompressed_size):
-        super().__init__()
-        self.compressed_size = compressed_size
-        self.uncompressed_size = uncompressed_size
-
-    def _parse(self, stream, context, path):
-        start_offset = 32 - (self.compressed_size % 32)
-        if start_offset != 32:
-            construct.stream_read(stream, start_offset, path)
-
-        num_segments = self.uncompressed_size / 0x4000
-        size_left = self.uncompressed_size
-        segments = []
-        for _ in range(math.ceil(num_segments)):
-            new_segment = LZOSegment(min(0x4000, size_left))._parsereport(stream, context, path)
-            size_left -= len(new_segment)
-            segments.append(new_segment)
-
-        assert size_left == 0
-        return b"".join(segments)
+from retro_data_structures.compression import LZOCompressedBlock
 
 
 class CompressedBlocks(construct.Construct):
