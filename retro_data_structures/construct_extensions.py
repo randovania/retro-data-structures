@@ -56,6 +56,9 @@ class EnumAdapter(Adapter):
     def _decode(self, obj, context, path):
         return self._enum_class[obj]
 
+    def _encode(self, obj, context, path):
+        return obj.name
+
 
 def convert_to_raw_python(value) -> Any:
     if isinstance(value, ListContainer):
