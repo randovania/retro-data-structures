@@ -3,10 +3,10 @@ Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b, Computed
+from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b
 
-from retro_data_structures import hacked_version_check
-from retro_data_structures.common_types import AABox, FourCC, String, ObjectTag_32
+from retro_data_structures import game_check
+from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions import WithVersion, BeforeVersion
 from retro_data_structures.evnt import EVNT
 from retro_data_structures.meta_animation import MetaAnimation_AssetId32
@@ -14,7 +14,7 @@ from retro_data_structures.meta_transition import MetaTransition_v1
 from retro_data_structures.pas_database import PASDatabase
 
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
-AssetId = Int32ub
+AssetId = AssetId32
 
 AnimationName = Struct(
     animation_id=Int32ub,
@@ -115,33 +115,12 @@ AnimationSet = Struct(
         default_fade_out_time=Float32b,
     )),
     half_transitions=If(construct.this.table_count >= 3, PrefixedArray(Int32ub, HalfTransitions)),
-    animation_resources=If(hacked_version_check.is_prime1, PrefixedArray(Int32ub, AnimationResourcePair)),
-    event_sets=If(hacked_version_check.is_prime2, PrefixedArray(Int32ub, EVNT)),
+    animation_resources=If(game_check.is_prime1, PrefixedArray(Int32ub, AnimationResourcePair)),
+    event_sets=If(game_check.is_prime2, PrefixedArray(Int32ub, EVNT)),
 )
-
-
-def _game_hack(context):
-    """CharacterSets for Echoes start at 10, so if at least one if version 10 or more then this ANCS is for Echoes.
-    This is needed due to unversioned format changes in AnimationSet."""
-    if any(char.version >= 10 for char in context.character_set.characters):
-        return 2
-    return 1
-
 
 ANCS = Struct(
     version=Const(1, Int16ub),
     character_set=CharacterSet,
-    _game_hack=Computed(_game_hack),
     animation_set=AnimationSet,
 )
-
-
-def main():
-    import sys
-    data = ANCS.parse_file(sys.argv[1])
-    print(data)
-    # pprint.pprint(data)
-
-
-if __name__ == '__main__':
-    main()

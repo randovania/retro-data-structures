@@ -1,14 +1,14 @@
 from construct import Struct, PrefixedArray, Int32ub, If
 
-from retro_data_structures import hacked_version_check
+from retro_data_structures import game_check
 from retro_data_structures.common_types import String, Vector3, Quaternion
 
 Bone = Struct(
     id=Int32ub,
     parent_id=Int32ub,
     position=Vector3,
-    rotation=If(hacked_version_check.is_prime2, Quaternion),
-    local_rotation=If(hacked_version_check.is_prime2, Quaternion),
+    rotation=If(game_check.is_prime2, Quaternion),
+    local_rotation=If(game_check.is_prime2, Quaternion),
     linked_bone_id_array=PrefixedArray(Int32ub, Int32ub),
 )
 

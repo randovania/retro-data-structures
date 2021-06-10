@@ -184,19 +184,3 @@ CMDL = Struct(
         DataSection(Surface),
     ),
 )
-
-
-def main():
-    import sys
-    data = CMDL.parse_file(sys.argv[1])
-    # print(data)
-
-    new_binary = CMDL.build(data)
-    from pathlib import Path
-    old_binary = Path(sys.argv[1]).read_bytes()
-    if new_binary == old_binary:
-        print("THEY MATCH!")
-
-
-if __name__ == '__main__':
-    main()

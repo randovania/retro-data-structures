@@ -7,7 +7,7 @@ from construct import (
     PaddedString, Switch, Peek, Sequence, FocusedSeq
 )
 
-from retro_data_structures.common_types import Vector3, AssetId32, AssetId64
+from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
 from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
 from retro_data_structures.guid import GUID
 
@@ -37,7 +37,7 @@ MLVLAreaLayerFlags = Struct(
 def create_area(version: int, asset_id):
     MLVLAreaDependency = Struct(
         asset_id=asset_id,
-        asset_type=PaddedString(4, "utf-8")
+        asset_type=FourCC,
     )
 
     MLVLAreaDependencies = Struct(
@@ -179,21 +179,3 @@ MLVL = FocusedSeq(
         construct.Error,
     )
 )
-
-
-def main():
-    import pprint
-    import sys
-    from retro_data_structures import construct_extensions
-
-    mlvl = MLVL.parse_file(sys.argv[1])
-    d = construct_extensions.convert_to_raw_python(mlvl)
-
-    for area in d["areas"]:
-        area["dependencies"]["dependencies_b_len"] = len(area["dependencies"].pop("dependencies_b"))
-
-    pprint.pprint(d)
-
-
-if __name__ == '__main__':
-    main()

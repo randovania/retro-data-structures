@@ -1,9 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
-import hashlib
 import math
-import sys
 
 import construct
 import lzokay
@@ -11,7 +9,6 @@ from construct import (
     Int32ub, Struct, Const, Float32b, Array, Aligned, Int16sb, Computed, Switch, Peek, FocusedSeq, Sequence
 )
 
-from retro_data_structures import construct_extensions
 from retro_data_structures.common_types import AssetId32
 
 
@@ -173,20 +170,3 @@ MREA = FocusedSeq(
         construct.Error,
     )
 )
-
-
-def main():
-    import pprint
-    mrea = MREA.parse_file(sys.argv[1])
-    d = construct_extensions.convert_to_raw_python(mrea)
-
-    for block in d["compressed_blocks"]:
-        block["data_hash"] = hashlib.sha256(block.pop("data")).hexdigest()
-
-    d["uncompressed_data"] = hashlib.sha256(d["uncompressed_data"]).hexdigest()
-    d["data_sections"] = [hashlib.sha256(it).hexdigest() for it in d["data_sections"]]
-    pprint.pprint(d)
-
-
-if __name__ == '__main__':
-    main()
