@@ -1,8 +1,9 @@
 from typing import Any
 
+import construct
 from construct import (
     FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
-    EnumIntegerString, Container, Adapter, Enum, If
+    EnumIntegerString, Container, Adapter, Enum, If, Pass, Subconstruct, Construct
 )
 
 
@@ -89,3 +90,22 @@ def WithVersion(version, subcon):
 
 def BeforeVersion(version, subcon):
     return If(lambda this: get_version(this) < version, subcon)
+
+
+class AlignTo(Construct):
+    def __init__(self, modulus):
+        super().__init__()
+        self.modulus = modulus
+        self.pattern = b"\x00"
+
+    def _parse(self, stream, context, path):
+        modulus = construct.evaluate(self.modulus, context)
+        position = stream_tell(stream, path)
+        pad = modulus - (position % modulus)
+        return construct.stream_read(stream, pad, path)
+
+    def _build(self, obj, stream, context, path):
+        modulus = construct.evaluate(self.modulus, context)
+        position = stream_tell(stream, path)
+        pad = modulus - (position % modulus)
+        construct.stream_write(stream, self.pattern * pad, pad, path)
