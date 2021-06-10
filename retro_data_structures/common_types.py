@@ -1,4 +1,4 @@
-from construct import Array, Struct, Float32b, PaddedString, CString, Int32ub, Int64ub
+from construct import Array, Struct, Float32b, PaddedString, CString, Int32ub, Int64ub, Hex
 
 Vector2f = Array(2, Float32b)
 Vector3 = Array(3, Float32b)
@@ -15,8 +15,8 @@ CharAnimTime = Struct(
     differential_state=Int32ub,  # TODO: use enum
 )
 
-AssetId32 = Int32ub
-AssetId64 = Int64ub
+AssetId32 = Hex(Int32ub)
+AssetId64 = Hex(Int64ub)
 ObjectTag_32 = Struct(
     type=FourCC,
     id=AssetId32,
