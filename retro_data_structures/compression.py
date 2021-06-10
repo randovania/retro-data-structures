@@ -62,3 +62,7 @@ class LZOCompressedBlock(construct.Construct):
 
         assert size_left == 0
         return b"".join(segments)
+
+
+def ZlibCompressedBlock(compressed_size, uncompressed_size):
+    return construct.FixedSized(compressed_size, construct.Compressed(construct.GreedyBytes, "zlib"))

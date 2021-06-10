@@ -30,7 +30,7 @@ def create_parser():
     ksy_export.add_argument("output_path", type=Path)
 
     decode = subparser.add_parser("decode")
-    decode.add_argument("--game", help="Hint the game of the file")
+    decode.add_argument("--game", help="Hint the game of the file", type=int)
     decode.add_argument("--format", help="Hint the format of the file. Defaults to extension.")
     decode.add_argument("input_path", type=Path, help="Path to the file")
 
@@ -50,6 +50,7 @@ def do_ksy_export(args):
 def do_decode(args):
     input_path: Path = args.input_path
     file_format = args.format
+    game = args.game
 
     if file_format is None:
         file_format = input_path.suffix[1:]
@@ -62,12 +63,9 @@ def do_decode(args):
         "pak": PAK,
     }
     construct_class = formats[file_format.lower()]
-    data = construct_class.parse_file(input_path, game_hack=1)
-
-    # print(len(data.named_resources))
-    # print(len(data.resources))
-    #
-    print(data)
+    with input_path.open("rb") as input_file:
+        data = construct_class.parse_stream(input_file, game_hack=game)
+        print(data)
 
 
 def main():

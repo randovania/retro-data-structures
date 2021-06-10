@@ -1,10 +1,10 @@
 import construct
-from construct import Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalString, IfThenElse, \
-    FocusedSeq, Array, Bytes, Seek, Computed
+from construct import (Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalString, IfThenElse,
+                       FocusedSeq, Bytes, Lazy, Pointer)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, AssetId32, AssetId64
-from retro_data_structures.compression import LZOCompressedBlock
+from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),
@@ -27,7 +27,7 @@ def create(asset_id):
             asset_id=asset_id,
             size=Int32ub,
             offset=Int32ub,
-            data=construct.Pointer(
+            data=Lazy(Pointer(
                 construct.this.offset,
                 IfThenElse(
                     construct.this.compressed > 0,
@@ -37,12 +37,12 @@ def create(asset_id):
                         data=IfThenElse(
                             game_check.uses_lzo,
                             LZOCompressedBlock(construct.this._.size, construct.this.decompressed_size),
-                            Bytes(construct.this._.size)
+                            ZlibCompressedBlock(construct.this._.size, construct.this.decompressed_size),
                         ),
                     ),
                     Bytes(construct.this.size),
                 ),
-            ),
+            )),
         )),
     )
 

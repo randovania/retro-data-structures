@@ -12,7 +12,7 @@ is_prime1 = (get_current_game == 1)
 is_prime2 = (get_current_game == 2)
 is_prime3 = (get_current_game == 3)
 uses_asset_id_32 = (get_current_game < 3)
-uses_lzo = (2 <= get_current_game <= 3)
+uses_lzo = (get_current_game >= 2)
 
 AssetIdCorrect = IfThenElse(uses_asset_id_32, common_types.AssetId32, common_types.AssetId64)
 ObjectTagCorrect = IfThenElse(uses_asset_id_32, common_types.ObjectTag_32, common_types.ObjectTag_64)
