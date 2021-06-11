@@ -1,6 +1,7 @@
 import construct
-from construct import Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b, \
-    FixedSized, GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Prefixed, Pointer, FocusedSeq, Tell
+from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b,
+                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Prefixed, Pointer,
+                       FocusedSeq, Tell)
 
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion
@@ -160,12 +161,16 @@ CMDL = Struct(
     version=Int32ub,
     flags=Int32ub,
     aabox=AABox,
-    data_section_count=Rebuild(
+    _data_section_count=Rebuild(
         Int32ub,
-        lambda context: len(context.material_sets) + len(context.attrib_arrays) + len(context.surfaces),
+        lambda context: (len(context.material_sets)
+                         + sum(1 for k, v in context.attrib_arrays.items()
+                               if not k.startswith("_") and v is not None)
+                         + 1
+                         + len(context.surfaces)),
     ),
     _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
-    _data_section_sizes=DataSectionSizes(construct.this.data_section_count),
+    _data_section_sizes=DataSectionSizes(construct.this._data_section_count),
     _=AlignTo(32),
     _current_section=construct.Computed(lambda this: 0),
     material_sets=Array(construct.this._material_set_count, DataSection(Aligned(32, MaterialSet))),
