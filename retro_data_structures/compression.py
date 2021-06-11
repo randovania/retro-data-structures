@@ -40,13 +40,12 @@ def LZOSegment(decompressed_size):
 
 
 class LZOCompressedBlock(construct.Construct):
-    def __init__(self, compressed_size, uncompressed_size):
+    def __init__(self, uncompressed_size):
         super().__init__()
-        self.compressed_size = compressed_size
         self.uncompressed_size = uncompressed_size
 
     def _parse(self, stream, context, path):
-        compressed_size = construct.evaluate(self.compressed_size, context)
+        compressed_size = construct.stream_size(stream)
         start_offset = 32 - (compressed_size % 32)
         if start_offset != 32:
             construct.stream_read(stream, start_offset, path)
@@ -64,5 +63,4 @@ class LZOCompressedBlock(construct.Construct):
         return b"".join(segments)
 
 
-def ZlibCompressedBlock(compressed_size, uncompressed_size):
-    return construct.FixedSized(compressed_size, construct.Compressed(construct.GreedyBytes, "zlib"))
+ZlibCompressedBlock = construct.Compressed(construct.GreedyBytes, "zlib", level=9)

@@ -4,7 +4,7 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 
 import construct
 from construct import (
-    Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence
+    Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence, Prefixed, FixedSized
 )
 
 from retro_data_structures.common_types import AssetId32
@@ -31,10 +31,9 @@ class CompressedBlocks(construct.Construct):
             if block.compressed_size == 0:
                 item = construct.stream_read(stream, block.uncompressed_size, path)
             else:
-                item = LZOCompressedBlock(
-                    block.compressed_size,
+                item = FixedSized(block.compressed_size, LZOCompressedBlock(
                     block.uncompressed_size
-                )._parsereport(stream, context, path)
+                ))._parsereport(stream, context, path)
 
             e = construct.Container()
             e["header"] = block
