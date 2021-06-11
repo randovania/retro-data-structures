@@ -1,10 +1,10 @@
 import construct
 from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b,
-                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Prefixed, Pointer,
-                       FocusedSeq, Tell)
+                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild)
 
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion
+from retro_data_structures.data_section import DataSectionSizes, DataSection
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -133,25 +133,6 @@ Surface = Struct(
         ))
     )),
 )
-
-
-def DataSectionSizes(section_count):
-    return Array(section_count, FocusedSeq(
-        "address",
-        address=Tell,
-        value=construct.Seek(4, 1),
-    ))
-
-
-def DataSection(subcon):
-    def get_section_length_address(context):
-        root = context["_root"]
-        index = root["_current_section"]
-        root["_current_section"] += 1
-        return root._data_section_sizes[index]
-
-    return Prefixed(Pointer(get_section_length_address, Int32ub), subcon)
-
 
 # 0x2 = Prime 1
 # 0x4 = Prime 2
