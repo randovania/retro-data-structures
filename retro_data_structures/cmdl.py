@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b, \
-    FixedSized, GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub
+    FixedSized, GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Prefixed, Pointer, FocusedSeq, Tell
 
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion
@@ -70,16 +70,6 @@ MaterialSet = Struct(
 )
 
 
-def DataSection(subcon):
-    def get_section_length(context):
-        root = context["_root"]
-        index = root["_current_section"]
-        root["_current_section"] += 1
-        return root.data_section_sizes[index]
-
-    return FixedSized(get_section_length, subcon)
-
-
 def get_material(context):
     surface = context
     while 'header' not in surface:
@@ -88,9 +78,6 @@ def get_material(context):
 
 
 def VertexAttrib(flag):
-    # TODO: In Echoes, the game supports having 8-bit indices if the flag value is 2 instead of 3.
-    # But that isn't used by the game, so it's fine
-
     if not flag:
         raise ValueError("Invalid flag!")
 
@@ -146,6 +133,25 @@ Surface = Struct(
     )),
 )
 
+
+def DataSectionSizes(section_count):
+    return Array(section_count, FocusedSeq(
+        "address",
+        address=Tell,
+        value=construct.Seek(4, 1),
+    ))
+
+
+def DataSection(subcon):
+    def get_section_length_address(context):
+        root = context["_root"]
+        index = root["_current_section"]
+        root["_current_section"] += 1
+        return root._data_section_sizes[index]
+
+    return Prefixed(Pointer(get_section_length_address, Int32ub), subcon)
+
+
 # 0x2 = Prime 1
 # 0x4 = Prime 2
 # 0x5 = Prime 3
@@ -154,13 +160,15 @@ CMDL = Struct(
     version=Int32ub,
     flags=Int32ub,
     aabox=AABox,
-    data_section_count=Int32ub,
-    material_set_count=Int32ub,
-    data_section_sizes=Array(construct.this.data_section_count, Int32ub),
+    data_section_count=Rebuild(
+        Int32ub,
+        lambda context: len(context.material_sets) + len(context.attrib_arrays) + len(context.surfaces),
+    ),
+    _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
+    _data_section_sizes=DataSectionSizes(construct.this.data_section_count),
     _=AlignTo(32),
     _current_section=construct.Computed(lambda this: 0),
-    _first_section=construct.Tell,
-    material_sets=Array(construct.this.material_set_count, DataSection(MaterialSet)),
+    material_sets=Array(construct.this._material_set_count, DataSection(Aligned(32, MaterialSet))),
     attrib_arrays=Struct(
         positions=DataSection(GreedyRange(Vector3)),
         normals=DataSection(
@@ -178,9 +186,12 @@ CMDL = Struct(
             DataSection(GreedyRange(Array(2, Float16b))),
         ),
     ),
-    surface_offsets=DataSection(PrefixedArray(Int32ub, Int32ub)),
+    surface_header=DataSection(Aligned(32, Struct(
+        _num_surfaces=Rebuild(Int32ub, construct.len_(construct.this["_"].surfaces)),
+        offsets=Array(construct.this._num_surfaces, Int32ub),
+    ))),
     surfaces=Array(
-        construct.len_(construct.this.surface_offsets),
-        DataSection(Surface),
+        construct.this.surface_header._num_surfaces,
+        DataSection(Aligned(32, Surface)),
     ),
 )
