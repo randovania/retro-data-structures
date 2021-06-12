@@ -4,43 +4,13 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 
 import construct
 from construct import (
-    Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence, Prefixed, FixedSized
+    Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence, IfThenElse,
+    Prefixed, GreedyBytes, Adapter, ListContainer
 )
 
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
-
-
-class CompressedBlocks(construct.Construct):
-    def __init__(self, count):
-        super().__init__()
-        self.count = count
-
-    def _parse(self, stream, context, path):
-        count = construct.evaluate(self.count, context)
-
-        headers = Array(count, Struct(
-            "buffer_size" / Int32ub,
-            "uncompressed_size" / Int32ub,
-            "compressed_size" / Int32ub,
-            "data_section_count" / Int32ub,
-        ))._parsereport(stream, context, path)
-
-        obj = construct.ListContainer()
-        for block in headers:
-            if block.compressed_size == 0:
-                item = construct.stream_read(stream, block.uncompressed_size, path)
-            else:
-                item = FixedSized(block.compressed_size, LZOCompressedBlock(
-                    block.uncompressed_size
-                ))._parsereport(stream, context, path)
-
-            e = construct.Container()
-            e["header"] = block
-            e["data"] = item
-            obj.append(e)
-
-        return obj
+from retro_data_structures.data_section import DataSectionSizes
 
 
 def create(version: int, asset_id):
@@ -98,21 +68,55 @@ def create(version: int, asset_id):
         "compressed_block_count" / Aligned(16, Int32ub),
 
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "data_section_sizes" / Aligned(32, Array(construct.this.data_section_count, Int32ub)),
-
-        "compressed_blocks" / Aligned(32, CompressedBlocks(construct.this.compressed_block_count)),
+        "data_section_sizes" / Aligned(32, DataSectionSizes(construct.this.data_section_count)),
     ]
 
-    # And now the computed fields
+    class DataSectionInBlocks(Adapter):
+        def _decode(self, compressed_blocks, context, path):
+            uncompressed_data = b"".join(block.data for block in compressed_blocks)
 
-    def data_section(this):
-        index = this["_index"]
-        initial_offset = sum(this.data_section_sizes[:index])
-        return this.uncompressed_data[initial_offset:initial_offset + this.data_section_sizes[this["_index"]]]
+            sections = []
+            offset = 0
+            for section_size in context.data_section_sizes:
+                sections.append(uncompressed_data[offset:offset + section_size.value])
+                offset += section_size.value
+
+            return ListContainer(sections)
+
+        def _encode(self, sections, context, path):
+            if sections:
+                raise NotImplementedError
+
+            compressed_blocks = []
+
+            return ListContainer(compressed_blocks)
 
     fields.extend([
-        "uncompressed_data" / Computed(lambda this: b"".join(block.data for block in this.compressed_blocks)),
-        "data_sections" / Array(construct.this.data_section_count, Computed(data_section)),
+        "data_sections" / DataSectionInBlocks(Aligned(32, FocusedSeq(
+            "blocks",
+            headers=Array(
+                construct.this._.compressed_block_count,
+                Struct(
+                    "buffer_size" / Int32ub,
+                    "uncompressed_size" / Int32ub,
+                    "compressed_size" / Int32ub,
+                    "section_count" / Int32ub,
+                )
+            ),
+            blocks=Array(
+                construct.this._.compressed_block_count,
+                Struct(
+                    header=Computed(lambda this: this._.headers[this._index]),
+                    data=IfThenElse(
+                        construct.this.header.compressed_size == 0,
+                        Prefixed(Computed(construct.this.header.uncompressed_size), GreedyBytes),
+                        Prefixed(Computed(lambda this: (this.header.compressed_size + 31) & ~31),
+                                 LZOCompressedBlock(construct.this.header.uncompressed_size,
+                                                    lambda this: 32 - (this.header.compressed_size % 32))),
+                    )
+                ),
+            ),
+        ))),
     ])
 
     return Struct(*fields)

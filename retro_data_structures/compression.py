@@ -40,15 +40,17 @@ def LZOSegment(decompressed_size):
 
 
 class LZOCompressedBlock(construct.Construct):
-    def __init__(self, uncompressed_size):
+    def __init__(self, uncompressed_size, start_offset=None):
         super().__init__()
         self.uncompressed_size = uncompressed_size
+        self.start_offset = start_offset
 
     def _parse(self, stream, context, path):
-        compressed_size = construct.stream_size(stream)
-        start_offset = 32 - (compressed_size % 32)
-        if start_offset != 32:
-            construct.stream_read(stream, start_offset, path)
+        if self.start_offset is None:
+            if construct.stream_size(stream) % 32:
+                raise ValueError("stream size must be a multiple of 32 when start_offset is None")
+        else:
+            construct.stream_read(stream, construct.evaluate(self.start_offset, context), path)
 
         uncompressed_size = construct.evaluate(self.uncompressed_size, context)
         num_segments = uncompressed_size / 0x4000
