@@ -4,6 +4,7 @@ from pathlib import Path
 
 from retro_data_structures import mlvl, construct_extensions
 from retro_data_structures.ancs import ANCS
+from retro_data_structures.anim import ANIM
 from retro_data_structures.cmdl import CMDL
 from retro_data_structures.mlvl import MLVL
 from retro_data_structures.mrea import MREA, Prime2MREA
@@ -77,6 +78,7 @@ def do_decode(args):
         "mlvl": MLVL,
         "mrea": MREA,
         "pak": PAK,
+        "anim": ANIM,
     }
     construct_class = formats[file_format.lower()]
     with input_path.open("rb") as input_file:
