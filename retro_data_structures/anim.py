@@ -1,6 +1,8 @@
+import struct
+
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitStruct, GreedyBytes, BitsInteger
+    IfThenElse, BitsInteger, ExprAdapter, BitStruct, Bit, Bitwise
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -20,47 +22,50 @@ UncompressedAnimation = Struct(
     event_id=If(game_check.is_prime1, Int32ub),
 )
 
-def ReadCompressedAnimData(keyCount):
-    BoneChannelBits = Struct(
-        "initial_x" / Int16ub,
-        "delta_x" / Int8ub,
-        "initial_y" / Int16ub,
-        "delta_y" / Int8ub,
-        "initial_z" / Int16ub,
-        "delta_z" / Int8ub,
+BoneChannelBits = Struct(
+    "initial_x" / Int16ub,
+    "delta_x" / Int8ub,
+    "initial_y" / Int16ub,
+    "delta_y" / Int8ub,
+    "initial_z" / Int16ub,
+    "delta_z" / Int8ub,
+)
+
+BoneChannelDescriptor = Struct(
+    "bone_id" / IfThenElse(game_check.is_prime2, Int8ub, Int32ub),
+    "rotation_keys_count" / Int16ub,
+    "rotation_keys" / If(construct.this.rotation_keys_count != 0, BoneChannelBits),
+    "translation_keys_count" / Int16ub,
+    "translation_keys" / If(construct.this.translation_keys_count != 0, BoneChannelBits),
+    "scale_keys_count" / If(game_check.is_prime2, Int16ub),
+    "scale_keys" / If(game_check.is_prime2, If(construct.this.scale_keys_count != 0, BoneChannelBits)),
+)
+
+
+def create_bits_field(descriptor):
+    return Struct(
+        x=BitsInteger(lambda this: descriptor(this).delta_x),
+        y=BitsInteger(lambda this: descriptor(this).delta_y),
+        z=BitsInteger(lambda this: descriptor(this).delta_z),
     )
 
-    BoneChannelDescriptor = Struct(
-        "bone_id" / IfThenElse(game_check.is_prime2, Int8ub, Int32ub),
-        "rotation_keys_count" / Int16ub,
-        "rotation_keys" / If(construct.this.rotation_keys_count != 0, BoneChannelBits),
-        "translation_keys_count" / Int16ub,
-        "translation_keys" / If(construct.this.translation_keys_count != 0, BoneChannelBits),
-        "scale_keys_count" / If(game_check.is_prime2, Int16ub),
-        "scale_keys" / If(game_check.is_prime2, If(construct.this.scale_keys_count != 0, BoneChannelBits)),
-    )
 
-    bone_channel_descriptor_table = PrefixedArray(Int32ub, BoneChannelDescriptor)
-    for i in keyCount:
-        if construct.this.bone_channel_descriptor_table[i].rotation_keys_count > 0:
-            rotation_bit_struct=BitStruct(
-                                "w" / BitsInteger(1),
-                                "x" / BitsInteger(construct.this.bone_channel_descriptor_table[i].rotation_keys.delta_x),
-                                "y" / BitsInteger(construct.this.bone_channel_descriptor_table[i].rotation_keys.delta_y),
-                                "z" / BitsInteger(construct.this.bone_channel_descriptor_table[i].rotation_keys.delta_z),
-            )
-        if construct.this.bone_channel_descriptor_table[i].translation_keys_count > 0:
-            translation_bit_struct=BitStruct(
-                                "x" / BitsInteger(construct.this.bone_channel_descriptor_table[i].translation_keys.delta_x),
-                                "y" / BitsInteger(construct.this.bone_channel_descriptor_table[i].translation_keys.delta_y),
-                                "z" / BitsInteger(construct.this.bone_channel_descriptor_table[i].translation_keys.delta_z),
-            )
-        if construct.this.bone_channel_descriptor_table[i].scale_keys_count > 0:
-            scale_bit_struct=BitStruct(
-                                "x" / BitsInteger(construct.this.bone_channel_descriptor_table[i].scale_keys.delta_x),
-                                "y" / BitsInteger(construct.this.bone_channel_descriptor_table[i].scale_keys.delta_y),
-                                "z" / BitsInteger(construct.this.bone_channel_descriptor_table[i].scale_keys.delta_z),
-            )
+def get_anim(this):
+    context = this
+    while "bone_channel_descriptors" not in context:
+        context = context["_"]
+    return context
+
+
+def get_descriptor(this):
+    return get_anim(this).bone_channel_descriptors[this._index]
+
+
+def access_bit(data, num):
+    base = int(num // 8)
+    shift = int(num % 8)
+    return (data[base] & (1 << shift)) >> shift
+
 
 CompressedAnimation = Struct(
     scratch_size=Int32ub,
@@ -77,9 +82,36 @@ CompressedAnimation = Struct(
     bone_channel_count=Int32ub,
     unk_3=Int32ub,
     key_bitmap_count=Int32ub,
-    key_bitmap_array=Array(-(construct.this.key_bitmap_count // -32), Int32ub),
+    key_bitmap_array=ExprAdapter(Array(-(construct.this.key_bitmap_count // -32), Int32ub),
+                                 lambda values, ctx: struct.pack(f">{len(values)}L", *values),
+                                 lambda obj, ctx: struct.unpack(f">{ctx.key_bitmap_count}L", obj)),
     bone_channel_count_2=If(game_check.is_prime1, Int32ub),
-    key_bitstream=ReadCompressedAnimData(construct.this.key_bitmap_count),
+    bone_channel_descriptors=PrefixedArray(Int32ub, BoneChannelDescriptor),
+    animation_data=Bitwise(Array(
+        construct.this.key_bitmap_count,
+        Struct(
+            channels=Array(
+                construct.this._.bone_channel_count,
+                Struct(
+                    rotation=If(
+                        lambda this: get_descriptor(this).rotation_keys_count > 0,
+                        Struct(
+                            wsign=If(lambda this: access_bit(get_anim(this).key_bitmap_array, this._index + 1), Bit),
+                            data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
+                        )
+                    ),
+                    translation=If(
+                        lambda this: get_descriptor(this).translation_keys_count > 0,
+                        create_bits_field(lambda this: get_descriptor(this).translation_keys),
+                    ),
+                    scale=If(
+                        lambda this: get_descriptor(this).scale_keys_count > 0,
+                        create_bits_field(lambda this: get_descriptor(this).scale_keys),
+                    ),
+                )
+            )
+        )
+    ))
 )
 
 ANIM = Struct(
