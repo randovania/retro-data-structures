@@ -105,10 +105,13 @@ class AlignTo(Construct):
         modulus = construct.evaluate(self.modulus, context)
         position = stream_tell(stream, path)
         pad = modulus - (position % modulus)
-        return construct.stream_read(stream, pad, path)
+        if pad < modulus:
+            return construct.stream_read(stream, pad, path)
+        return b""
 
     def _build(self, obj, stream, context, path):
         modulus = construct.evaluate(self.modulus, context)
         position = stream_tell(stream, path)
         pad = modulus - (position % modulus)
-        construct.stream_write(stream, self.pattern * pad, pad, path)
+        if pad < modulus:
+            construct.stream_write(stream, self.pattern * pad, pad, path)

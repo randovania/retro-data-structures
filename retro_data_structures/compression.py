@@ -1,16 +1,9 @@
+import io
 import math
 
 import construct
 import lzokay
-from construct import Adapter
-
-
-class AbsInt(Adapter):
-    def _decode(self, obj, context, path):
-        return abs(obj)
-
-    def _encode(self, obj, context, path):
-        return obj
+from construct import GreedyRange, ExprAdapter
 
 
 class CompressedLZO(construct.Tunnel):
@@ -27,42 +20,40 @@ class CompressedLZO(construct.Tunnel):
         return self.lib.compress(data)
 
 
-def LZOSegment(decompressed_size):
-    return construct.FocusedSeq(
-        "data",
-        segment_size=construct.Peek(construct.Int16sb),
-        data=construct.IfThenElse(
-            construct.this.segment_size > 0,
-            construct.Prefixed(construct.Int16sb, CompressedLZO(construct.GreedyBytes, decompressed_size)),
-            construct.Prefixed(AbsInt(construct.Int16sb), construct.GreedyBytes),
-        )
-    )
-
-
-class LZOCompressedBlock(construct.Construct):
-    def __init__(self, uncompressed_size, start_offset=None):
-        super().__init__()
-        self.uncompressed_size = uncompressed_size
-        self.start_offset = start_offset
+class LZOSegment(construct.Subconstruct):
+    def __init__(self, decompressed_size):
+        super().__init__(CompressedLZO(construct.GreedyBytes, decompressed_size))
+        self.decompressed_size = decompressed_size
 
     def _parse(self, stream, context, path):
-        if self.start_offset is None:
-            if construct.stream_size(stream) % 32:
-                raise ValueError("stream size must be a multiple of 32 when start_offset is None")
+        length = construct.Int16sb._parsereport(stream, context, path)
+        data = construct.stream_read(stream, abs(length), path)
+        if length > 0:
+            return self.subcon._parsereport(io.BytesIO(data), context, path)
         else:
-            construct.stream_read(stream, construct.evaluate(self.start_offset, context), path)
+            return data
 
-        uncompressed_size = construct.evaluate(self.uncompressed_size, context)
-        num_segments = uncompressed_size / 0x4000
-        size_left = uncompressed_size
-        segments = []
-        for _ in range(math.ceil(num_segments)):
-            new_segment = LZOSegment(min(0x4000, size_left))._parsereport(stream, context, path)
-            size_left -= len(new_segment)
-            segments.append(new_segment)
+    def _build(self, uncompressed, stream, context, path):
+        stream2 = io.BytesIO()
+        buildret = self.subcon._build(uncompressed, stream2, context, path)
+        compressed_data = stream2.getvalue()
+        if len(compressed_data) < len(uncompressed):
+            construct.Int16sb._build(len(compressed_data), stream, context, path)
+            construct.stream_write(stream, compressed_data, len(compressed_data), path)
+            return buildret
+        else:
+            construct.Int16sb._build(-len(uncompressed), stream, context, path)
+            construct.stream_write(stream, uncompressed, len(uncompressed), path)
+            return buildret
 
-        assert size_left == 0
-        return b"".join(segments)
+
+def LZOCompressedBlock(decompressed_size, segment_size=0x4000):
+    return ExprAdapter(
+        GreedyRange(LZOSegment(segment_size)),
+        lambda segments, ctx: b"".join(segments),
+        lambda uncompressed, ctx: [uncompressed[segment_size * i:segment_size * (i + 1)]
+                                   for i in range(math.ceil(len(uncompressed) / segment_size))]
+    )
 
 
 ZlibCompressedBlock = construct.Compressed(construct.GreedyBytes, "zlib", level=9)
