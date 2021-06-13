@@ -1,16 +1,49 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
+import hashlib
+import io
 
 import construct
 from construct import (
     Int32ub, Struct, Const, Float32b, Array, Aligned, Computed, Switch, Peek, FocusedSeq, Sequence, IfThenElse,
-    Prefixed, GreedyBytes, Adapter, ListContainer
+    Prefixed, GreedyBytes, Adapter, ListContainer, Container, Tell, Rebuild, Pointer
 )
 
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSectionSizes
+
+
+class PrefixedWithPaddingBefore(construct.Subconstruct):
+    def __init__(self, length_field, subcon):
+        super().__init__(subcon)
+        self.padding = 32
+        self.length_field = length_field
+
+    def _parse(self, stream, context, path):
+        length = self.length_field._parsereport(stream, context, path)
+        bytes_to_pad = self.padding - (length % self.padding)
+        if bytes_to_pad < self.padding:
+            construct.stream_read(stream, bytes_to_pad, path)
+        data = construct.stream_read(stream, length, path)
+        if self.subcon is GreedyBytes:
+            return data
+        return self.subcon._parsereport(io.BytesIO(data), context, path)
+
+    def _build(self, obj, stream, context, path):
+        stream2 = io.BytesIO()
+        buildret = self.subcon._build(obj, stream2, context, path)
+        data = stream2.getvalue()
+        length = len(data)
+        self.length_field._build(length, stream, context, path)
+
+        bytes_to_pad = self.padding - (length % self.padding)
+        if bytes_to_pad < self.padding:
+            construct.stream_write(stream, b"\x00" * bytes_to_pad, bytes_to_pad, path)
+
+        construct.stream_write(stream, data, len(data), path)
+        return buildret
 
 
 def create(version: int, asset_id):
@@ -65,21 +98,25 @@ def create(version: int, asset_id):
         "static_geometry_map_section" / Int32ub,
 
         # Number of compressed data blocks in the file.
-        "compressed_block_count" / Aligned(16, Int32ub),
+        "_compressed_block_count" / Aligned(16, Rebuild(Int32ub, construct.len_(construct.this.section_groups))),
 
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "data_section_sizes" / Aligned(32, DataSectionSizes(construct.this.data_section_count)),
+        "_data_section_sizes" / Aligned(32, DataSectionSizes(construct.this.data_section_count)),
     ]
 
-    class DataSectionInBlocks(Adapter):
-        def _decode(self, compressed_blocks, context, path):
-            uncompressed_data = b"".join(block.data for block in compressed_blocks)
+    class DataSectionInGroup(Adapter):
+        def _decode(self, group, context, path):
+            if "section_count_offset" not in context:
+                context["section_count_offset"] = 0
 
             sections = []
             offset = 0
-            for section_size in context.data_section_sizes:
-                sections.append(uncompressed_data[offset:offset + section_size.value])
+            for i in range(group.section_count):
+                section_size = context._._data_section_sizes[context.section_count_offset + i]
+                sections.append(Container(data=group.data[offset:offset + section_size.value]))
                 offset += section_size.value
+
+            context.section_count_offset += group.section_count
 
             return ListContainer(sections)
 
@@ -92,31 +129,35 @@ def create(version: int, asset_id):
             return ListContainer(compressed_blocks)
 
     fields.extend([
-        "data_sections" / DataSectionInBlocks(Aligned(32, FocusedSeq(
-            "blocks",
-            headers=Array(
-                construct.this._.compressed_block_count,
-                Struct(
+        "section_groups" / Aligned(32, FocusedSeq(
+            "groups",
+            headers=Array(construct.this._._compressed_block_count, Struct(
+                address=Tell,
+                value=Struct(
                     "buffer_size" / Int32ub,
                     "uncompressed_size" / Int32ub,
                     "compressed_size" / Int32ub,
                     "section_count" / Int32ub,
-                )
-            ),
-            blocks=Array(
-                construct.this._.compressed_block_count,
-                Struct(
-                    header=Computed(lambda this: this._.headers[this._index]),
-                    data=IfThenElse(
-                        construct.this.header.compressed_size == 0,
-                        Prefixed(Computed(construct.this.header.uncompressed_size), GreedyBytes),
-                        Prefixed(Computed(lambda this: (this.header.compressed_size + 31) & ~31),
-                                 LZOCompressedBlock(construct.this.header.uncompressed_size,
-                                                    lambda this: 32 - (this.header.compressed_size % 32))),
-                    )
                 ),
-            ),
-        ))),
+            )),
+            groups=Array(
+                construct.this._._compressed_block_count,
+                DataSectionInGroup(Struct(
+                    _header=Computed(lambda this: this._.headers[this._index]),
+                    section_count=Pointer(lambda this: this._header.address + 12, Int32ub),
+                    data=IfThenElse(
+                        construct.this._header.value.compressed_size == 0,
+                        Prefixed(Pointer(lambda this: this._header.address + 4, Int32ub), GreedyBytes),
+                        PrefixedWithPaddingBefore(Computed(lambda this: this._header.value.compressed_size),
+                                                  LZOCompressedBlock(0x0),
+                                                  ),
+                    ),
+
+                    # Adding some hash to easy validation
+                    hash=Computed(lambda this: hashlib.sha256(this.data).hexdigest())
+                )),
+            )
+        )),
     ])
 
     return Struct(*fields)
