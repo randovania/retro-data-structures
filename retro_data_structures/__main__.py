@@ -1,11 +1,12 @@
 import argparse
+import json
 from pathlib import Path
 
-from retro_data_structures import mlvl
+from retro_data_structures import mlvl, construct_extensions
 from retro_data_structures.ancs import ANCS
 from retro_data_structures.cmdl import CMDL
 from retro_data_structures.mlvl import MLVL
-from retro_data_structures.mrea import MREA
+from retro_data_structures.mrea import MREA, Prime2MREA
 from retro_data_structures.pak import PAK
 
 types_per_game = {
@@ -45,6 +46,21 @@ def do_ksy_export(args):
         for format_name, cls in formats.items():
             print(f"Exporting {game} / {format_name}")
             cls.export_ksy(f"{game}_{format_name}", output_path.joinpath(f"{game}_{format_name}.ksy"))
+
+
+def dump_to(path: Path, decoded):
+    def default(o):
+        if callable(o):
+            o = o()
+        if isinstance(o, bytes):
+            return len(o)
+
+        raise TypeError(f'Object of type {o.__class__.__name__} '
+                        f'is not JSON serializable')
+
+    with path.open("w") as f:
+        x = construct_extensions.convert_to_raw_python(decoded)
+        f.write(json.JSONEncoder(indent=4, default=default).encode(x))
 
 
 def do_decode(args):
