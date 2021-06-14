@@ -115,3 +115,16 @@ class AlignTo(Construct):
         pad = modulus - (position % modulus)
         if pad < modulus:
             construct.stream_write(stream, self.pattern * pad, pad, path)
+
+
+def BitwiseWith32Blocks(subcon):
+    """
+    Bit level decoding in Retro's format are done from least significant bit, but in blocks of 32 bits.
+
+    """
+    return construct.Restreamed(
+        subcon,
+        lambda data: bytes(reversed(construct.bytes2bits(data))), 4,
+        lambda data: construct.bits2bytes(bytes(reversed(data))), 32,
+        lambda n: n // 32,
+    )
