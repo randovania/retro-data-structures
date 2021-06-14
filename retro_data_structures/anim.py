@@ -1,8 +1,9 @@
 import struct
+from typing import List
 
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Bitwise
+    IfThenElse, BitsInteger, ExprAdapter, ListContainer, Bitwise, Bit, FocusedSeq, GreedyBytes
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -67,6 +68,21 @@ def access_bit(data, num):
     return (data[base] & (1 << shift)) >> shift
 
 
+def to_bit_array(data: List[int], num_bits: int):
+    result = [
+        (data[i // 32] >> (i % 32)) & 1 != 0
+        for i in range(num_bits)
+    ]
+    return ListContainer(result)
+
+
+def from_bit_array(flags: List[bool], context):
+    result = [0] * (1 + (len(flags) - 1) // 32)
+    for i, flag in enumerate(flags):
+        result[i // 32] |= (flag << (i % 32))
+    return result
+
+
 CompressedAnimation = Struct(
     scratch_size=Int32ub,
     event_id=If(game_check.is_prime1, Int32ub),
@@ -82,35 +98,42 @@ CompressedAnimation = Struct(
     bone_channel_count=Int32ub,
     unk_3=Int32ub,
     key_bitmap_count=Int32ub,
-    key_bitmap_array=ExprAdapter(Array(-(construct.this.key_bitmap_count // -32), Int32ub),
-                                 lambda values, ctx: struct.pack(f">{len(values)}L", *values),
-                                 lambda obj, ctx: struct.unpack(f">{ctx.key_bitmap_count}L", obj)),
+    key_bitmap_array=ExprAdapter(
+        Array(-(construct.this.key_bitmap_count // -32), Int32ub),
+        lambda values, ctx: to_bit_array(values, ctx.key_bitmap_count),
+        from_bit_array,
+    ),
     bone_channel_count_2=If(game_check.is_prime1, Int32ub),
     bone_channel_descriptors=PrefixedArray(Int32ub, BoneChannelDescriptor),
-    animation_keys=Bitwise(Array(
-        construct.this.key_bitmap_count - 1,
-        Struct(
-            channels=If(lambda this: access_bit(get_anim(this).key_bitmap_array, this._index + 1), Array(
-                construct.this._.bone_channel_count,
-                Struct(
-                    rotation=If(
-                        lambda this: get_descriptor(this).rotation_keys_count > 0,
-                        Struct(
-                            wsign=Bit,
-                            data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
-                        )
-                    ),
-                    translation=If(
-                        lambda this: get_descriptor(this).translation_keys_count > 0,
-                        create_bits_field(lambda this: get_descriptor(this).translation_keys),
-                    ),
-                    scale=If(
-                        lambda this: get_descriptor(this).scale_keys_count > 0,
-                        create_bits_field(lambda this: get_descriptor(this).scale_keys),
-                    ),
-                )
-            ))
-        )
+    animation_keys=Bitwise(FocusedSeq(
+        "array",
+        "array" / Array(
+            construct.this._.key_bitmap_count - 1,
+            Struct(
+                channels=If(lambda this: get_anim(this).key_bitmap_array[this._index + 1], Array(
+                    lambda this: get_anim(this).bone_channel_count,
+                    Struct(
+
+                        rotation=If(
+                            lambda this: get_descriptor(this).rotation_keys_count > 0,
+                            Struct(
+                                wsign=Bit,
+                                data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
+                            )
+                        ),
+                        translation=If(
+                            lambda this: get_descriptor(this).translation_keys_count > 0,
+                            create_bits_field(lambda this: get_descriptor(this).translation_keys),
+                        ),
+                        scale=If(
+                            lambda this: get_descriptor(this).scale_keys_count > 0,
+                            create_bits_field(lambda this: get_descriptor(this).scale_keys),
+                        ),
+                    )
+                )),
+            ),
+        ),
+        GreedyBytes,
     ))
 )
 
