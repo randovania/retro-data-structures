@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated
+    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -72,20 +72,21 @@ CompressedAnimation = Struct(
     rotation_divisor=Int32ub,
     translation_multiplier=Float32b,
     scale_multiplier=If(game_check.is_prime2, Float32b),
-    bone_channel_count=Int32ub,
+    _bone_channel_count=Rebuild(Int32ub, construct.len_(construct.this.bone_channel_descriptors)),
     unk_3=Int32ub,
-    key_bitmap_count=Int32ub,
-    key_bitmap_array=BitwiseWith32Blocks(Aligned(32, Array(
-        construct.this.key_bitmap_count,
-        ExprAdapter(Bit, lambda raw, ctx: bool(raw), lambda i, ctx: int(i)),
+    _key_bitmap_count=Rebuild(Int32ub, construct.len_(construct.this.animation_keys) + 1),
+    _key_bitmap_array=BitwiseWith32Blocks(Aligned(32, Array(
+        construct.this._key_bitmap_count,
+        Rebuild(ExprAdapter(Bit, lambda raw, ctx: bool(raw), lambda i, ctx: int(i)),
+                lambda ctx: ctx.animation_keys[ctx._index - 1].channels is not None if ctx._index > 0 else True),
     ))),
-    bone_channel_count_2=If(game_check.is_prime1, Int32ub),
+    _bone_channel_count_2=If(game_check.is_prime1, Rebuild(Int32ub, construct.this._bone_channel_count)),
     bone_channel_descriptors=PrefixedArray(Int32ub, BoneChannelDescriptor),
     animation_keys=BitwiseWith32Blocks(Aligned(32, Array(
-        construct.this.key_bitmap_count - 1,
+        construct.this._key_bitmap_count - 1,
         Struct(
-            channels=If(lambda this: get_anim(this).key_bitmap_array[this._index + 1], Array(
-                lambda this: get_anim(this).bone_channel_count,
+            channels=If(lambda this: get_anim(this)._key_bitmap_array[this._index + 1], Array(
+                lambda this: get_anim(this)._bone_channel_count,
                 Struct(
 
                     rotation=If(
@@ -112,5 +113,5 @@ CompressedAnimation = Struct(
 ANIM = Struct(
     anim_version=Int32ub,
     anim=IfThenElse(construct.this.anim_version == 0x00000000, UncompressedAnimation, CompressedAnimation),
-    terminated=Terminated,
+    _terminated=Terminated,
 )
