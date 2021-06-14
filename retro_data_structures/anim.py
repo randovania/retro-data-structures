@@ -2,7 +2,7 @@ import struct
 
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, BitStruct, Bit, Bitwise
+    IfThenElse, BitsInteger, ExprAdapter, Bit, Bitwise
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -87,16 +87,16 @@ CompressedAnimation = Struct(
                                  lambda obj, ctx: struct.unpack(f">{ctx.key_bitmap_count}L", obj)),
     bone_channel_count_2=If(game_check.is_prime1, Int32ub),
     bone_channel_descriptors=PrefixedArray(Int32ub, BoneChannelDescriptor),
-    animation_data=Bitwise(Array(
-        construct.this.key_bitmap_count,
+    animation_keys=Bitwise(Array(
+        construct.this.key_bitmap_count - 1,
         Struct(
-            channels=Array(
+            channels=If(lambda this: access_bit(get_anim(this).key_bitmap_array, this._index + 1), Array(
                 construct.this._.bone_channel_count,
                 Struct(
                     rotation=If(
                         lambda this: get_descriptor(this).rotation_keys_count > 0,
                         Struct(
-                            wsign=If(lambda this: access_bit(get_anim(this).key_bitmap_array, this._index + 1), Bit),
+                            wsign=Bit,
                             data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
                         )
                     ),
@@ -109,7 +109,7 @@ CompressedAnimation = Struct(
                         create_bits_field(lambda this: get_descriptor(this).scale_keys),
                     ),
                 )
-            )
+            ))
         )
     ))
 )
