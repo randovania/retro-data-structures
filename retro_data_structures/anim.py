@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild
+    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild, GreedyRange
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -113,5 +113,6 @@ CompressedAnimation = Struct(
 ANIM = Struct(
     anim_version=Int32ub,
     anim=IfThenElse(construct.this.anim_version == 0x00000000, UncompressedAnimation, CompressedAnimation),
+    trailing_bytes=GreedyRange(Const(b"\xFF")),
     _terminated=Terminated,
 )
