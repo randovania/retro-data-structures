@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import json
-import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -120,16 +119,35 @@ async def compare_all_files_in_path(args):
 
     loop = asyncio.get_running_loop()
 
+    try:
+        import tqdm
+    except ImportError:
+        tqdm = None
+
+    errors = []
+
     with ProcessPoolExecutor() as executor:
         results = [
             loop.run_in_executor(executor, do_file, f, game, file_format)
             for f in input_path.glob(f"*.{file_format.upper()}")
         ]
+        as_completed = asyncio.as_completed(results)
+        if tqdm is not None:
+            as_completed = tqdm.tqdm(as_completed, total=len(results))
 
-        for c in asyncio.as_completed(results):
+        for c in as_completed:
             message = await c
             if message:
-                print(message)
+                if tqdm is not None:
+                    errors.append(message)
+                    as_completed.set_postfix_str(f"{len(errors)} errors")
+                else:
+                    print(message)
+
+    if errors:
+        print("Errors:")
+        for m in errors:
+            print(m)
 
 
 def main():
