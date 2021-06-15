@@ -3,7 +3,8 @@ Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b
+from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b, Terminated, Probe, Array, \
+    Tell
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
@@ -35,7 +36,8 @@ AnimationAABB = Struct(
 EffectComponent = Struct(
     name=String,
     particle=ObjectTag_32,
-    bone_name=String,
+    bone_name=If(game_check.is_prime1, String),
+    bone_id=If(game_check.is_prime2, Int32ub),
     scale=Float32b,
     parented_mode=Int32ub,
     flags=Int32ub,
@@ -123,4 +125,5 @@ ANCS = Struct(
     version=Const(1, Int16ub),
     character_set=CharacterSet,
     animation_set=AnimationSet,
+    _terminated=Terminated,
 )
