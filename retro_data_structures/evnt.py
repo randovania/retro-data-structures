@@ -39,7 +39,7 @@ ParticlePOINode = Struct(
     # TODO: prime 3 stuff
     base=BasePOINode,
     duration=Int32ub,
-    particle=game_check.AssetIdCorrect,
+    particle=game_check.ObjectTagCorrect,
     bone_name=If(game_check.is_prime1, String),
     bone_id=If(game_check.is_prime2, Int32ub),
     effect_scale=Float32b,
