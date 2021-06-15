@@ -1,8 +1,10 @@
 import argparse
 import asyncio
+import itertools
 import json
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from typing import Optional
 
 from retro_data_structures import mlvl, construct_extensions
 from retro_data_structures.ancs import ANCS
@@ -44,11 +46,13 @@ def create_parser():
     decode = subparser.add_parser("decode")
     decode.add_argument("--game", help="Hint the game of the file", type=int)
     decode.add_argument("--format", help="Hint the format of the file. Defaults to extension.")
+    decode.add_argument("--re-encode", help="Re-encode afterwards and compares to the original.", action="store_true")
     decode.add_argument("input_path", type=Path, help="Path to the file")
 
     compare = subparser.add_parser("compare-files")
     compare.add_argument("--game", help="Hint the game of the file", type=int)
     compare.add_argument("--format", help="Hint the format of the file")
+    compare.add_argument("--limit", help="Limit the number of files to test", type=int)
     compare.add_argument("input_path", type=Path, help="Path to the directory to glob")
 
     return parser
@@ -83,6 +87,7 @@ def do_decode(args):
     input_path: Path = args.input_path
     file_format = args.format
     game = args.game
+    re_encode = args.re_encode
 
     if file_format is None:
         file_format = input_path.suffix[1:]
@@ -93,8 +98,13 @@ def do_decode(args):
     decoded_from_raw = construct_class.parse(raw, game_hack=game)
     print(decoded_from_raw)
 
+    if re_encode:
+        encoded = construct_class.build(decoded_from_raw, game_hack=game)
+        if raw != encoded:
+            print(f"{input_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})")
 
-def do_file(file_path: Path, game: int, file_format: str):
+
+def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
     construct_class = ALL_FORMATS[file_format.lower()]
 
     try:
@@ -102,10 +112,8 @@ def do_file(file_path: Path, game: int, file_format: str):
         decoded_from_raw = construct_class.parse(raw, game_hack=game)
         encoded = construct_class.build(decoded_from_raw, game_hack=game)
 
-        raw_strip = raw.rstrip(b"\xFF")
-
         if raw != encoded:
-            return f"{file_path}: Results differ (len(raw): {len(raw)}; len(raw_strip): {len(raw_strip)}; len(encoded): {len(encoded)})"
+            return f"{file_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})"
         return None
 
     except Exception as e:
@@ -115,7 +123,14 @@ def do_file(file_path: Path, game: int, file_format: str):
 async def compare_all_files_in_path(args):
     input_path: Path = args.input_path
     file_format: str = args.format
-    game = args.game
+    game: int = args.game
+    limit: Optional[int] = args.limit
+
+    def apply_limit(it):
+        if limit is None:
+            return it
+        else:
+            return itertools.islice(it, limit)
 
     loop = asyncio.get_running_loop()
 
@@ -128,8 +143,8 @@ async def compare_all_files_in_path(args):
 
     with ProcessPoolExecutor() as executor:
         results = [
-            loop.run_in_executor(executor, do_file, f, game, file_format)
-            for f in input_path.glob(f"*.{file_format.upper()}")
+            loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
+            for f in apply_limit(input_path.glob(f"*.{file_format.upper()}"))
         ]
         as_completed = asyncio.as_completed(results)
         if tqdm is not None:
