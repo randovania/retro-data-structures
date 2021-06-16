@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild, GreedyRange
+    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild, GreedyRange, Tell, Pointer
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -61,6 +61,7 @@ def get_descriptor(this):
 
 
 CompressedAnimation = Struct(
+    _start=Tell,
     scratch_size=Int32ub,
     event_id=If(game_check.is_prime1, Int32ub),
     unk_1=If(game_check.is_prime1, Const(0x00000001, Int32ub)),
@@ -88,7 +89,6 @@ CompressedAnimation = Struct(
             channels=If(lambda this: get_anim(this)._key_bitmap_array[this._index + 1], Array(
                 lambda this: get_anim(this)._bone_channel_count,
                 Struct(
-
                     rotation=If(
                         lambda this: get_descriptor(this).rotation_keys_count > 0,
                         Struct(
@@ -108,6 +108,8 @@ CompressedAnimation = Struct(
             )),
         ),
     ))),
+    _end=Tell,
+    _update_scratch_size=Pointer(construct.this._start, Rebuild(Int32ub, construct.this._end - construct.this._start)),
 )
 
 ANIM = Struct(
