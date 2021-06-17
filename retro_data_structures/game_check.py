@@ -7,7 +7,7 @@ from construct import IfThenElse
 
 from retro_data_structures import common_types
 
-get_current_game = construct.this["_params"]["game_hack"]
+get_current_game = construct.this["_params"]["target_game"]
 is_prime1 = (get_current_game + 0 == 1)
 is_prime2 = (get_current_game + 0 == 2)
 is_prime3 = (get_current_game + 0 == 3)

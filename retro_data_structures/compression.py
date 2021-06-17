@@ -44,7 +44,6 @@ class LZOSegment(construct.Subconstruct):
         buildret = self.subcon._build(uncompressed, stream2, context, path)
         compressed_data = stream2.getvalue()
         if len(compressed_data) < len(uncompressed):
-            print("COMPRESSING!", len(compressed_data))
             construct.Int16sb._build(len(compressed_data), stream, context, path)
             construct.stream_write(stream, compressed_data, len(compressed_data), path)
             return buildret

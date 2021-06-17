@@ -6,8 +6,8 @@ def test_compare_p1(prime1_pwe_project):
     game = 1
     raw = input_path.read_bytes()
 
-    data = ANCS.parse(raw, game_hack=game)
-    encoded = ANCS.build(data, game_hack=game)
+    data = ANCS.parse(raw, target_game=game)
+    encoded = ANCS.build(data, target_game=game)
 
     assert encoded == raw
 
@@ -17,7 +17,7 @@ def test_compare_p2(prime2_pwe_project):
     game = 2
     raw = input_path.read_bytes()
 
-    data = ANCS.parse(raw, game_hack=game)
-    encoded = ANCS.build(data, game_hack=game)
+    data = ANCS.parse(raw, target_game=game)
+    encoded = ANCS.build(data, target_game=game)
 
     assert encoded == raw

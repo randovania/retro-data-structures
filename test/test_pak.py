@@ -169,7 +169,7 @@ def _compressed_resource():
 
 
 def test_echoes_resource_decode(compressed_resource):
-    decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], game_hack=2)
+    decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], target_game=2)
 
     assert len(decoded) == len(compressed_resource["contents"]["value"])
     assert decoded == compressed_resource["contents"]["value"]
@@ -177,8 +177,8 @@ def test_echoes_resource_decode(compressed_resource):
 
 def test_echoes_resource_encode_decode(compressed_resource):
     raw = compressed_resource["contents"]["value"]
-    decoded = CompressedPakResource.build(raw, game_hack=2)
-    encoded = CompressedPakResource.parse(decoded, game_hack=2)
+    decoded = CompressedPakResource.build(raw, target_game=2)
+    encoded = CompressedPakResource.parse(decoded, target_game=2)
     assert raw == encoded
 
 
@@ -187,8 +187,8 @@ def test_identical_when_keep_data(prime2_paks_path):
     game = 2
 
     raw = input_path.read_bytes()
-    decoded = PAK.parse(raw, game_hack=game)
-    encoded = PAK.build(decoded, game_hack=game)
+    decoded = PAK.parse(raw, target_game=game)
+    encoded = PAK.build(decoded, target_game=game)
 
     assert raw == encoded
 
@@ -198,19 +198,19 @@ def test_compare_header_keep_data(prime2_paks_path):
     game = 2
 
     raw = input_path.read_bytes()
-    raw_header = PAKNoData.parse(raw, game_hack=game)
+    raw_header = PAKNoData.parse(raw, target_game=game)
     raw_sizes = [
         (r.compressed, r.offset, r.size)
         for r in raw_header.resources
     ]
 
-    decoded = PAK.parse(raw, game_hack=game)
+    decoded = PAK.parse(raw, target_game=game)
     # for r in decoded.resources:
     #     r.contents.pop("data")
 
-    encoded = PAK.build(decoded, game_hack=game)
+    encoded = PAK.build(decoded, target_game=game)
 
-    custom_header = PAKNoData.parse(encoded, game_hack=game)
+    custom_header = PAKNoData.parse(encoded, target_game=game)
 
     custom_sizes = [
         (r.compressed, r.offset, r.size)
@@ -509,8 +509,8 @@ def test_compare_from_build():
         ]
     }
 
-    result = PAK.build(source, game_hack=game)
-    decoded = convert_to_raw_python(PAK.parse(result, game_hack=game))
+    result = PAK.build(source, target_game=game)
+    decoded = convert_to_raw_python(PAK.parse(result, target_game=game))
 
     sizes = []
     for resource in decoded["resources"]:

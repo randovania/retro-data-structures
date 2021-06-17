@@ -21,8 +21,8 @@ def test_compare(prime2_pwe_project):
     game = 2
     raw = input_path.read_bytes()
 
-    data = CMDL.parse(raw, game_hack=game)
-    encoded = CMDL.build(data, game_hack=game)
+    data = CMDL.parse(raw, target_game=game)
+    encoded = CMDL.build(data, target_game=game)
 
     raw_header = CMDLHeader.parse(raw)
     custom_header = CMDLHeader.parse(encoded)

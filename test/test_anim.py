@@ -7,8 +7,8 @@ from retro_data_structures.construct_extensions import convert_to_raw_python
 def do_file(path: Path):
     raw = path.read_bytes()
     try:
-        data = ANIM.parse(raw, game_hack=2)
-        encoded = ANIM.build(data, game_hack=2)
+        data = ANIM.parse(raw, target_game=2)
+        encoded = ANIM.build(data, target_game=2)
         return path, raw, encoded, None
     except Exception as e:
         return path, None, None, e
@@ -19,9 +19,9 @@ def test_compare(prime2_pwe_project):
     game = 2
     raw = input_path.read_bytes()
 
-    data = ANIM.parse(raw, game_hack=game)
-    encoded = ANIM.build(data, game_hack=game)
-    data2 = ANIM.parse(encoded, game_hack=game)
+    data = ANIM.parse(raw, target_game=game)
+    encoded = ANIM.build(data, target_game=game)
+    data2 = ANIM.parse(encoded, target_game=game)
 
     assert data2 == data
 
@@ -32,8 +32,8 @@ def test_missile_launcher(prime1_pwe_project, prime2_pwe_project):
     prime1_path = prime1_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
     prime2_path = prime2_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
 
-    p1_data = ANIM.parse_file(prime1_path, game_hack=1)
-    p2_data = ANIM.parse_file(prime2_path, game_hack=2)
+    p1_data = ANIM.parse_file(prime1_path, target_game=1)
+    p2_data = ANIM.parse_file(prime2_path, target_game=2)
 
     p1_aux = convert_to_raw_python(p1_data)
     p2_aux = convert_to_raw_python(p2_data)

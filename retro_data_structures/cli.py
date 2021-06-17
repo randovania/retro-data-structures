@@ -95,11 +95,11 @@ def do_decode(args):
     construct_class = ALL_FORMATS[file_format.lower()]
 
     raw = input_path.read_bytes()
-    decoded_from_raw = construct_class.parse(raw, game_hack=game)
+    decoded_from_raw = construct_class.parse(raw, target_game=game)
     print(decoded_from_raw)
 
     if re_encode:
-        encoded = construct_class.build(decoded_from_raw, game_hack=game)
+        encoded = construct_class.build(decoded_from_raw, target_game=game)
         if raw != encoded:
             print(f"{input_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})")
 
@@ -109,8 +109,8 @@ def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
 
     try:
         raw = file_path.read_bytes()
-        decoded_from_raw = construct_class.parse(raw, game_hack=game)
-        encoded = construct_class.build(decoded_from_raw, game_hack=game)
+        decoded_from_raw = construct_class.parse(raw, target_game=game)
+        encoded = construct_class.build(decoded_from_raw, target_game=game)
 
         if raw != encoded:
             return f"{file_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})"
