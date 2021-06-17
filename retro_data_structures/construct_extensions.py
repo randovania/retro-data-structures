@@ -1,9 +1,10 @@
+import io
 from typing import Any
 
 import construct
 from construct import (
     FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
-    EnumIntegerString, Container, Adapter, Enum, If, Pass, Subconstruct, Construct
+    EnumIntegerString, Container, Adapter, Enum, If, Subconstruct, Construct
 )
 
 
@@ -128,3 +129,43 @@ def BitwiseWith32Blocks(subcon):
         lambda data: construct.bits2bytes(bytes(reversed(data))), 32,
         lambda n: n // 32,
     )
+
+
+class AlignedPrefixed(Subconstruct):
+    def __init__(self, length_field, subcon, modulus, length_size):
+        super().__init__(subcon)
+        self.length_field = length_field
+        self.modulus = modulus
+        self.length_size = length_size
+
+    def _parse(self, stream, context, path):
+        modulus = construct.evaluate(self.modulus, context)
+        length_size = construct.evaluate(self.modulus, context)
+
+        length = self.length_field._parsereport(stream, context, path)
+        data = construct.stream_read(stream, length, path)
+        pad = modulus - ((len(data) - length_size) % modulus)
+        if pad < modulus:
+            data += b"\xFF" * pad
+
+        if self.subcon is construct.GreedyBytes:
+            return data
+        if type(self.subcon) is construct.GreedyString:
+            return data.decode(self.subcon.encoding)
+        return self.subcon._parsereport(io.BytesIO(data), context, path)
+
+    def _build(self, obj, stream, context, path):
+        modulus = construct.evaluate(self.modulus, context)
+        length_size = construct.evaluate(self.modulus, context)
+
+        stream2 = io.BytesIO()
+        buildret = self.subcon._build(obj, stream2, context, path)
+        data = stream2.getvalue()
+        pad = modulus - ((len(data) - length_size) % modulus)
+        if pad < modulus:
+            data += b"\xFF" * pad
+
+        length = len(data)
+        self.length_field._build(length, stream, context, path)
+        construct.stream_write(stream, data, len(data), path)
+        return buildret
