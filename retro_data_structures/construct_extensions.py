@@ -133,11 +133,12 @@ def BitwiseWith32Blocks(subcon):
 
 
 class AlignedPrefixed(Subconstruct):
-    def __init__(self, length_field, subcon, modulus, length_size):
+    def __init__(self, length_field, subcon, modulus, length_size, pad_byte=b"\xFF"):
         super().__init__(subcon)
         self.length_field = length_field
         self.modulus = modulus
         self.length_size = length_size
+        self.pad_byte = pad_byte
 
     def _parse(self, stream, context, path):
         modulus = construct.evaluate(self.modulus, context)
@@ -147,7 +148,7 @@ class AlignedPrefixed(Subconstruct):
         data = construct.stream_read(stream, length, path)
         pad = modulus - ((len(data) - length_size) % modulus)
         if pad < modulus:
-            data += b"\xFF" * pad
+            data += self.pad_byte * pad
 
         if self.subcon is construct.GreedyBytes:
             return data
@@ -164,7 +165,7 @@ class AlignedPrefixed(Subconstruct):
         data = stream2.getvalue()
         pad = modulus - ((len(data) - length_size) % modulus)
         if pad < modulus:
-            data += b"\xFF" * pad
+            data += self.pad_byte * pad
 
         length = len(data)
         self.length_field._build(length, stream, context, path)

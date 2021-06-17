@@ -1,6 +1,6 @@
 import construct
 from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b,
-                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild)
+                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Pointer, Tell, Probe)
 
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion
@@ -154,7 +154,7 @@ CMDL = Struct(
     _data_section_sizes=DataSectionSizes(construct.this._data_section_count),
     _=AlignTo(32),
     _current_section=construct.Computed(lambda this: 0),
-    material_sets=Array(construct.this._material_set_count, DataSection(Aligned(32, MaterialSet))),
+    material_sets=Array(construct.this._material_set_count, DataSection(MaterialSet)),
     attrib_arrays=Struct(
         positions=DataSection(GreedyRange(Vector3)),
         normals=DataSection(
@@ -172,12 +172,12 @@ CMDL = Struct(
             DataSection(GreedyRange(Array(2, Float16b))),
         ),
     ),
-    surface_header=DataSection(Aligned(32, Struct(
+    surface_header=DataSection(Struct(
         _num_surfaces=Rebuild(Int32ub, construct.len_(construct.this["_"].surfaces)),
         offsets=Array(construct.this._num_surfaces, Int32ub),
-    ))),
+    )),
     surfaces=Array(
         construct.this.surface_header._num_surfaces,
-        DataSection(Aligned(32, Surface)),
+        DataSection(Surface),
     ),
 )
