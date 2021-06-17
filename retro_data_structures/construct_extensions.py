@@ -101,6 +101,7 @@ class AlignTo(Construct):
         super().__init__()
         self.modulus = modulus
         self.pattern = b"\x00"
+        self.flagbuildnone = True
 
     def _parse(self, stream, context, path):
         modulus = construct.evaluate(self.modulus, context)
