@@ -83,15 +83,15 @@ def create():
                 _resource_index=Computed(lambda ctx: ctx["_index"]),
                 compressed=Pointer(header_field(0x0), Int32ub),
                 asset=Pointer(header_field(0x4), ObjectTag_32),
-                contents=RawCopy(Prefixed(
+                contents=RawCopy(AlignedPrefixed(
                     Pointer(header_field(0xC), Int32ub),
                     IfThenElse(
                         construct.this.compressed > 0,
                         CompressedPakResource,
                         GreedyBytes,
                     ),
-                    # 32,
-                    # Int32ub.length,
+                    32,
+                    Int32ub.length,
                 )),
                 _end=Tell,
                 size=Pointer(header_field(0xC), Rebuild(Int32ub, construct.this.contents.length)),
