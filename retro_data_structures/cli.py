@@ -144,7 +144,7 @@ async def compare_all_files_in_path(args):
     with ProcessPoolExecutor() as executor:
         results = [
             loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
-            for f in apply_limit(input_path.glob(f"*.{file_format.upper()}"))
+            for f in apply_limit(input_path.rglob(f"*.{file_format.upper()}"))
         ]
         as_completed = asyncio.as_completed(results)
         if tqdm is not None:
