@@ -9,6 +9,7 @@ from typing import Optional
 from retro_data_structures import mlvl, construct_extensions
 from retro_data_structures.ancs import ANCS
 from retro_data_structures.anim import ANIM
+from retro_data_structures.cinf import CINF
 from retro_data_structures.cmdl import CMDL
 from retro_data_structures.mlvl import MLVL
 from retro_data_structures.mrea import MREA
@@ -32,6 +33,7 @@ ALL_FORMATS = {
     "mrea": MREA,
     "pak": PAK,
     "anim": ANIM,
+    "cinf": CINF,
 }
 
 
@@ -142,13 +144,15 @@ async def compare_all_files_in_path(args):
     errors = []
 
     with ProcessPoolExecutor() as executor:
-        results = [
-            loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
-            for f in apply_limit(input_path.rglob(f"*.{file_format.upper()}"))
-        ]
+        files = apply_limit(input_path.rglob(f"*.{file_format.upper()}"))
+        if tqdm is not None:
+            files = tqdm.tqdm(files, unit=" file")
+
+        results = [loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
+                   for f in files]
         as_completed = asyncio.as_completed(results)
         if tqdm is not None:
-            as_completed = tqdm.tqdm(as_completed, total=len(results))
+            as_completed = tqdm.tqdm(as_completed, total=len(results), unit=" file")
 
         for c in as_completed:
             message = await c
