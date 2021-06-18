@@ -167,7 +167,10 @@ class AlignedPrefixed(Subconstruct):
         if pad < modulus:
             data += self.pad_byte * pad
 
-        length = len(data)
-        self.length_field._build(length, stream, context, path)
+        self.length_field._build(len(data), stream, context, path)
         construct.stream_write(stream, data, len(data), path)
         return buildret
+
+
+def Skip(count, subcon):
+    return construct.Seek(count * subcon.length, 1)
