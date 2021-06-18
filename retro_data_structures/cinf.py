@@ -1,4 +1,4 @@
-from construct import Struct, PrefixedArray, Int32ub, If
+from construct import Struct, PrefixedArray, Int32ub, If, Aligned
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import String, Vector3, Quaternion
@@ -17,8 +17,8 @@ BoneName = Struct(
     bone_id=Int32ub,
 )
 
-CINF = Struct(
+CINF = Aligned(32, Struct(
     bones=PrefixedArray(Int32ub, Bone),
     build_order_id=PrefixedArray(Int32ub, Int32ub),
     bone_names=PrefixedArray(Int32ub, BoneName),
-)
+), pattern=b"\xFF")
