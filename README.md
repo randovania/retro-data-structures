@@ -19,12 +19,14 @@ Construct type definitions for Retro Studios game
 ## Example Usage
 
 ```python
-from retro_data_structures.pak import PAK
+from retro_data_structures.formats.pak import PAK
+
 
 def read_file(path):
     with open(path, "rb") as f:
         return f.read()
-    
+
+
 PAK.build_file({
     'named_resources': [
         {"asset": {"type": 'TXTR', "id": 201335801}, "name": 'TXTR_ElevatorIcon_1'},

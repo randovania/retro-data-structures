@@ -6,15 +6,8 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-from retro_data_structures import mlvl, construct_extensions, dependencies
-from retro_data_structures.ancs import ANCS
-from retro_data_structures.anim import ANIM
-from retro_data_structures.cinf import CINF
-from retro_data_structures.cmdl import CMDL
-from retro_data_structures.cskr import CSKR
-from retro_data_structures.mlvl import MLVL
-from retro_data_structures.mrea import MREA
-from retro_data_structures.pak import PAK
+from retro_data_structures import construct_extensions, dependencies
+from retro_data_structures.formats import mlvl, ALL_FORMATS
 
 types_per_game = {
     "metroid_prime_1": {
@@ -26,16 +19,6 @@ types_per_game = {
     "metroid_prime_3": {
         "mlvl": mlvl.Prime3MLVL,
     },
-}
-ALL_FORMATS = {
-    "ancs": ANCS,
-    "cmdl": CMDL,
-    "mlvl": MLVL,
-    "mrea": MREA,
-    "pak": PAK,
-    "anim": ANIM,
-    "cinf": CINF,
-    "cskr": CSKR,
 }
 
 

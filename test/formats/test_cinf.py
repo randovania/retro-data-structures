@@ -1,4 +1,4 @@
-from retro_data_structures.cinf import CINF
+from retro_data_structures.formats.cinf import CINF
 from test_lib import parse_and_build_compare
 
 

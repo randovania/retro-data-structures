@@ -1,4 +1,4 @@
-from retro_data_structures.ancs import ANCS
+from retro_data_structures.formats.ancs import ANCS
 from retro_data_structures.construct_extensions import convert_to_raw_python
 
 

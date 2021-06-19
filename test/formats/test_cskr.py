@@ -1,4 +1,4 @@
-from retro_data_structures.cskr import CSKR
+from retro_data_structures.formats.cskr import CSKR
 from test_lib import parse_and_build_compare
 
 

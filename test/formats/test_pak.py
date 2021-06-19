@@ -3,7 +3,7 @@ from construct import (Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalStr
 
 from retro_data_structures.common_types import FourCC, AssetId32
 from retro_data_structures.construct_extensions import convert_to_raw_python
-from retro_data_structures.pak import PAK, CompressedPakResource
+from retro_data_structures.formats.pak import PAK, CompressedPakResource
 
 PAKNoData = Struct(
     header=Struct(

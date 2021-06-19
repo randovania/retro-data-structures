@@ -4,12 +4,12 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 import construct
 from construct import (
     Array, Struct, Int32ub, PrefixedArray, Int64ub, Float32b, Int16ub, CString, Const, Int8ub,
-    PaddedString, Switch, Peek, Sequence, FocusedSeq
+    Switch, Peek, Sequence, FocusedSeq
 )
 
 from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
 from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
-from retro_data_structures.guid import GUID
+from retro_data_structures.formats.guid import GUID
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,

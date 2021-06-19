@@ -1,8 +1,6 @@
-from pathlib import Path
-
 import construct
 
-from retro_data_structures.cmdl import CMDL
+from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.common_types import AABox
 from retro_data_structures.construct_extensions import convert_to_raw_python
 

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from retro_data_structures.anim import ANIM
+from retro_data_structures.formats.anim import ANIM
 from retro_data_structures.construct_extensions import convert_to_raw_python
 
 
