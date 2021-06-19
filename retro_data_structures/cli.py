@@ -11,6 +11,7 @@ from retro_data_structures.ancs import ANCS
 from retro_data_structures.anim import ANIM
 from retro_data_structures.cinf import CINF
 from retro_data_structures.cmdl import CMDL
+from retro_data_structures.cskr import CSKR
 from retro_data_structures.mlvl import MLVL
 from retro_data_structures.mrea import MREA
 from retro_data_structures.pak import PAK
@@ -34,6 +35,7 @@ ALL_FORMATS = {
     "pak": PAK,
     "anim": ANIM,
     "cinf": CINF,
+    "cskr": CSKR,
 }
 
 

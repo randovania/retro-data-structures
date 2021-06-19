@@ -9,6 +9,8 @@ Construct type definitions for Retro Studios game
 | CMDL     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | ANCS     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | ANIM     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
+| CSKR     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
+| CINF     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 
 * [1] File offsets must be changed manually
 * [2] Missing re-calculation of how sections are split between blocks.
