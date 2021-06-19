@@ -62,6 +62,9 @@ class EnumAdapter(Adapter):
 
 
 def convert_to_raw_python(value) -> Any:
+    if callable(value):
+        value = value()
+
     if isinstance(value, ListContainer):
         return [
             convert_to_raw_python(item)
@@ -171,6 +174,35 @@ class AlignedPrefixed(Subconstruct):
         construct.stream_write(stream, data, len(data), path)
         return buildret
 
+    def _sizeof(self, context, path):
+        return self.length_field._sizeof(context, path) + self.subcon._sizeof(context, path)
+
+    def _actualsize(self, stream, context, path):
+        position1 = stream_tell(stream, path)
+        length = self.length_field._parse(stream, context, path)
+        position2 = stream_tell(stream, path)
+        return (position2 - position1) + length
+
 
 def Skip(count, subcon):
     return construct.Seek(count * subcon.length, 1)
+
+
+class LazyPatchedForBug(construct.Lazy):
+    r"""
+    See https://github.com/construct/construct/issues/938
+    """
+
+    def _parse(self, stream, context, path):
+        offset = stream_tell(stream, path)
+
+        def execute():
+            fallback = stream_tell(stream, path)
+            construct.stream_seek(stream, offset, 0, path)
+            obj = self.subcon._parsereport(stream, context, path)
+            construct.stream_seek(stream, fallback, 0, path)
+            return obj
+
+        length = self.subcon._actualsize(stream, context, path)
+        construct.stream_seek(stream, length, 1, path)
+        return execute

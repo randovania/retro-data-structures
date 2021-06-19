@@ -1,12 +1,12 @@
 import construct
 from construct import (Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalString, IfThenElse,
                        FocusedSeq, Pointer, Aligned, Tell, Rebuild,
-                       GreedyBytes, Array, Seek, Computed, RawCopy, Prefixed)
+                       GreedyBytes, Array, Seek, Computed, RawCopy)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
-from retro_data_structures.construct_extensions import AlignTo, AlignedPrefixed
+from retro_data_structures.construct_extensions import AlignTo, AlignedPrefixed, LazyPatchedForBug
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),
@@ -83,7 +83,7 @@ def create():
                 _resource_index=Computed(lambda ctx: ctx["_index"]),
                 compressed=Pointer(header_field(0x0), Int32ub),
                 asset=Pointer(header_field(0x4), ObjectTag_32),
-                contents=RawCopy(AlignedPrefixed(
+                contents=RawCopy(LazyPatchedForBug(AlignedPrefixed(
                     Pointer(header_field(0xC), Int32ub),
                     IfThenElse(
                         construct.this.compressed > 0,
@@ -92,7 +92,7 @@ def create():
                     ),
                     32,
                     Int32ub.length,
-                )),
+                ))),
                 _end=Tell,
                 size=Pointer(header_field(0xC), Rebuild(Int32ub, construct.this.contents.length)),
                 _offset=Pointer(header_field(0x10), Rebuild(Int32ub, lambda ctx: ctx["_start"])),
