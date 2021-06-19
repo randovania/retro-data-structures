@@ -66,3 +66,8 @@ EVNT = Struct(
     particle_poi_nodes=PrefixedArray(Int32ub, ParticlePOINode),
     sound_poi_nodes=WithVersion(2, PrefixedArray(Int32ub, SoundPOINode)),
 )
+
+
+def dependencies_for(obj, target_game):
+    for particle_poi in obj.particle_poi_nodes:
+        yield particle_poi.particle.type, particle_poi.particle.id

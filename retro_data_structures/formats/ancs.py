@@ -7,9 +7,9 @@ import construct
 from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b, Terminated
 
 from retro_data_structures import game_check
-from retro_data_structures.formats import meta_animation
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions import WithVersion, BeforeVersion
+from retro_data_structures.formats import meta_animation, evnt
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
@@ -164,3 +164,7 @@ def dependencies_for(obj, target_game):
         for res in obj.animation_set.animation_resources:
             yield from _yield_dependency_if_valid(res.anim_id, "ANIM")
             yield from _yield_dependency_if_valid(res.event_id, "EVNT")
+
+    event_sets = obj.animation_set.event_sets or []
+    for event in event_sets:
+        yield from evnt.dependencies_for(event, target_game)

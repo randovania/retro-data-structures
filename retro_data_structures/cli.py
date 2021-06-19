@@ -2,11 +2,13 @@ import argparse
 import asyncio
 import itertools
 import json
+import logging
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from retro_data_structures import construct_extensions, dependencies
+from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.formats import mlvl, ALL_FORMATS
 
 types_per_game = {
@@ -44,8 +46,8 @@ def create_parser():
 
     deps = subparser.add_parser("list-dependencies")
     deps.add_argument("--game", help="Hint the game of the file", type=int)
-    deps.add_argument("--format", help="Hint the format of the file. Defaults to extension.")
-    deps.add_argument("input_path", type=Path, help="Path to the file")
+    deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
+    deps.add_argument("asset_ids", type=int, nargs='+', help="Asset id to list dependencies for")
 
     return parser
 
@@ -97,20 +99,13 @@ def do_decode(args):
 
 
 def list_dependencies(args):
-    input_path: Path = args.input_path
-    file_format = args.format
     game = args.game
+    paks_path: Path = args.paks_path
+    asset_ids: List[int] = args.asset_ids
 
-    if file_format is None:
-        file_format = input_path.suffix[1:]
-
-    construct_class = ALL_FORMATS[file_format.lower()]
-
-    raw = input_path.read_bytes()
-    decoded_from_raw = construct_class.parse(raw, target_game=game)
-
-    for asset_type, asset_id in dependencies.direct_dependencies_for(decoded_from_raw, file_format, game):
-        print("{}: {}".format(asset_type, asset_id))
+    with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
+        for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
+            print("{}: {}".format(asset_type, hex(asset_id)))
 
 
 def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
@@ -177,6 +172,7 @@ async def compare_all_files_in_path(args):
 
 
 def main():
+    logging.basicConfig(level=logging.INFO)
     args = create_parser().parse_args()
 
     if args.command == "ksy-export":
