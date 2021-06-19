@@ -1,7 +1,7 @@
 import enum
 
 import construct
-from construct import Struct, Int32ub, Switch, Float32b, Byte, PrefixedArray, Adapter, Probe, Int64ub
+from construct import Struct, Int32ub, Switch, Float32b, Byte, PrefixedArray, Int64ub
 
 from retro_data_structures.common_types import String
 from retro_data_structures.construct_extensions import EnumAdapter
@@ -60,3 +60,19 @@ by_asset_type = {
     Int32ub: MetaAnimation_AssetId32,
     Int64ub: MetaAnimation_AssetId64,
 }
+
+
+def dependencies_for(obj, target_game):
+    if obj.type == MetaAnimationType.Play:
+        yield "ANIM", obj.body.asset_id
+
+    elif obj.type in (MetaAnimationType.Blend, MetaAnimationType.PhaseBlend):
+        yield from dependencies_for(obj.body.anim_a, target_game)
+        yield from dependencies_for(obj.body.anim_b, target_game)
+
+    elif obj.type == MetaAnimationType.Random:
+        for anim in obj.body:
+            yield from dependencies_for(anim.animation, target_game)
+
+    elif obj.type == MetaAnimationType.Sequence:
+        yield from dependencies_for(obj.body, target_game)

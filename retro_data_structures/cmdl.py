@@ -208,3 +208,9 @@ CMDL = Struct(
         ),
     ),
 )
+
+
+def dependencies_for(obj, target_game):
+    for material_set in obj.material_sets:
+        for file_id in material_set.texture_file_ids:
+            yield "TXTR", file_id

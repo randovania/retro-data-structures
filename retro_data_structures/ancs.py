@@ -1,12 +1,12 @@
 """
 Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
+from typing import Optional, List
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b, Terminated, Probe, Array, \
-    Tell
+from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b, Terminated
 
-from retro_data_structures import game_check
+from retro_data_structures import game_check, meta_animation
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions import WithVersion, BeforeVersion
 from retro_data_structures.evnt import EVNT
@@ -23,11 +23,11 @@ AnimationName = Struct(
     name=String,
 )
 ParticleResourceData = Struct(
-    generic_particles=PrefixedArray(Int32ub, AssetId),
-    swoosh_particles=PrefixedArray(Int32ub, AssetId),
+    generic_particles=PrefixedArray(Int32ub, AssetId) * "PART",
+    swoosh_particles=PrefixedArray(Int32ub, AssetId) * "SWHC",
     unknown=WithVersion(6, Int32ub),
-    electric_particles=PrefixedArray(Int32ub, AssetId),
-    spawn_particles=WithVersion(10, PrefixedArray(Int32ub, AssetId)),
+    electric_particles=PrefixedArray(Int32ub, AssetId) * "ELSC",
+    spawn_particles=WithVersion(10, PrefixedArray(Int32ub, AssetId)) * "SPSC",
 )
 AnimationAABB = Struct(
     name=String,
@@ -55,9 +55,9 @@ Character = Struct(
     id=Int32ub,
     version=Int16ub,
     name=String,
-    model_id=AssetId,
-    skin_id=AssetId,
-    skeleton_id=AssetId,
+    model_id=AssetId * "CMDL",
+    skin_id=AssetId * "CSKR",
+    skeleton_id=AssetId * "CINF",
     animation_names=PrefixedArray(Int32ub, AnimationName),
     pas_database=PASDatabase,
     particle_resource_data=ParticleResourceData,
@@ -65,10 +65,10 @@ Character = Struct(
     unknown_2=WithVersion(10, Int32ub),
     animation_aab_array=WithVersion(2, PrefixedArray(Int32ub, AnimationAABB)),
     effect_array=WithVersion(2, PrefixedArray(Int32ub, Effect)),
-    frozen_model=WithVersion(4, AssetId),
-    frozen_skin=WithVersion(4, AssetId),
+    frozen_model=WithVersion(4, AssetId) * "CMDL",
+    frozen_skin=WithVersion(4, AssetId) * "CSKR",
     animation_id_map=WithVersion(5, PrefixedArray(Int32ub, Int32ub)),
-    spatial_primitives_id=WithVersion(10, AssetId),
+    spatial_primitives_id=WithVersion(10, AssetId) * "CSPP",
     unknown_3=WithVersion(10, Int8ub),
     indexed_animation_aabb_array=WithVersion(10, PrefixedArray(Int32ub, IndexedAnimationAABB)),
 )
@@ -102,8 +102,8 @@ HalfTransitions = Struct(
 )
 
 AnimationResourcePair = Struct(
-    anim_id=AssetId,
-    event_id=AssetId,
+    anim_id=AssetId * "ANIM",
+    event_id=AssetId * "EVNT",
 )
 
 AnimationSet = Struct(
@@ -127,3 +127,39 @@ ANCS = Struct(
     animation_set=AnimationSet,
     _terminated=Terminated,
 )
+
+
+def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str):
+    if asset_id is not None and asset_id != 0xFFFFFFFF:
+        yield asset_type, asset_id
+
+
+def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str):
+    if asset_ids is not None:
+        for asset_id in asset_ids:
+            yield from _yield_dependency_if_valid(asset_id, asset_type)
+
+
+def dependencies_for(obj, target_game):
+    for character in obj.character_set.characters:
+        yield from _yield_dependency_if_valid(character.model_id, "CMDL")
+        yield from _yield_dependency_if_valid(character.skin_id, "CSKR")
+        yield from _yield_dependency_if_valid(character.skeleton_id, "CINF")
+        yield from _yield_dependency_if_valid(character.frozen_model, "CMDL")
+        yield from _yield_dependency_if_valid(character.frozen_skin, "CSKR")
+        yield from _yield_dependency_if_valid(character.spatial_primitives_id, "CSPP")
+
+        # ParticleResourceData
+        psd = character.particle_resource_data
+        _yield_dependency_array(psd.generic_particles, "PART")
+        _yield_dependency_array(psd.swoosh_particles, "SWHC")
+        _yield_dependency_array(psd.electric_particles, "ELSC")
+        _yield_dependency_array(psd.spawn_particles, "SPSC")
+
+    for animation in obj.animation_set.animations:
+        yield from meta_animation.dependencies_for(animation.meta, target_game)
+
+    if obj.animation_set.animation_resources is not None:
+        for res in obj.animation_set.animation_resources:
+            yield from _yield_dependency_if_valid(res.anim_id, "ANIM")
+            yield from _yield_dependency_if_valid(res.event_id, "EVNT")

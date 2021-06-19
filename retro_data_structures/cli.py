@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional
 
-from retro_data_structures import mlvl, construct_extensions
+from retro_data_structures import mlvl, construct_extensions, dependencies
 from retro_data_structures.ancs import ANCS
 from retro_data_structures.anim import ANIM
 from retro_data_structures.cinf import CINF
@@ -59,6 +59,11 @@ def create_parser():
     compare.add_argument("--limit", help="Limit the number of files to test", type=int)
     compare.add_argument("input_path", type=Path, help="Path to the directory to glob")
 
+    deps = subparser.add_parser("list-dependencies")
+    deps.add_argument("--game", help="Hint the game of the file", type=int)
+    deps.add_argument("--format", help="Hint the format of the file. Defaults to extension.")
+    deps.add_argument("input_path", type=Path, help="Path to the file")
+
     return parser
 
 
@@ -106,6 +111,23 @@ def do_decode(args):
         encoded = construct_class.build(decoded_from_raw, target_game=game)
         if raw != encoded:
             print(f"{input_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})")
+
+
+def list_dependencies(args):
+    input_path: Path = args.input_path
+    file_format = args.format
+    game = args.game
+
+    if file_format is None:
+        file_format = input_path.suffix[1:]
+
+    construct_class = ALL_FORMATS[file_format.lower()]
+
+    raw = input_path.read_bytes()
+    decoded_from_raw = construct_class.parse(raw, target_game=game)
+
+    for asset_type, asset_id in dependencies.direct_dependencies_for(decoded_from_raw, file_format, game):
+        print("{}: {}".format(asset_type, asset_id))
 
 
 def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
@@ -178,6 +200,8 @@ def main():
         do_ksy_export(args)
     elif args.command == "decode":
         do_decode(args)
+    elif args.command == "list-dependencies":
+        list_dependencies(args)
     elif args.command == "compare-files":
         asyncio.run(compare_all_files_in_path(args))
     else:
