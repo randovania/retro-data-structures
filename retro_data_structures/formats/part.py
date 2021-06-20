@@ -1,65 +1,106 @@
 import construct
-from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Terminated, Sequence, Probe
+from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Terminated, Sequence, Probe, \
+    Pass, IfThenElse, Int32ub, PrefixedArray, FocusedSeq
 
-from retro_data_structures.common_types import FourCC
+from retro_data_structures import game_check
+from retro_data_structures.common_types import FourCC, Color4f
+from retro_data_structures.construct_extensions import ErrorWithMessage
 from retro_data_structures.game_check import AssetIdCorrect
 
-UnknownType = Sequence(Probe(), construct.Error)
+UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
 
-GetBool = Struct(
-    magic=Const('CNST', FourCC),
-    value=Flag,
+
+def FourCCSwitch(element_types):
+    return Struct(
+        type=FourCC,
+        body=Switch(construct.this.type, element_types, UnknownType)
+    )
+
+
+def StartingAtVersion(version, subcon):
+    return IfThenElse(
+        game_check.get_current_game >= version,
+        subcon,
+        ErrorWithMessage(f"Type only supported starting at version {version}"),
+    )
+
+
+# Subtypes
+CEKeyframeEmitter = Struct(
+    percent=Int32ub,
+    unk1=Int32ub,
+    loop=Flag,
+    unk2=Flag,
+    loopEnd=Int32ub,
+    loopStart=Int32ub,
+    keys=PrefixedArray(Int32ub, Color4f),
 )
+CEParticleColor = UnknownType
+REKeyframeEmitter = Struct(
+    percent=Int32ub,
+    unk1=Int32ub,
+    loop=Flag,
+    unk2=Flag,
+    loopEnd=Int32ub,
+    loopStart=Int32ub,
+    keys=PrefixedArray(Int32ub, Float32b),
+)
+
+SpawnSystemKeyframeInfo = Struct(
+    id=AssetIdCorrect,
+    type=IfThenElse(game_check.get_current_game >= 2, FourCC, Int32ub),
+    unk2=Int32ub,
+    unk3=Int32ub,
+)
+SpawnSystemKeyframeData = FocusedSeq(
+    "value",
+    magic=Const('CNST', FourCC),
+    value=Struct(
+        unk1=Int32ub,
+        unk2=Int32ub,
+        endFrame=Int32ub,
+        unk3=Int32ub,
+        spawns=PrefixedArray(Int32ub, Struct(
+            v1=Int32ub,
+            v2=PrefixedArray(Int32ub, SpawnSystemKeyframeInfo),
+        ))
+    )
+)
+
+GetBool = Struct(magic=Const('CNST', FourCC), value=Flag)
 GetInt = Int32sb
 GetReal = Float32b
 
-# Real Element
+# Element Types Declarations
 
-REAL_ELEMENT_TYPES = {
-    'CNST': GetReal,
-}
+REAL_ELEMENT_TYPES = {}
+INT_ELEMENT_TYPES = {}
+VECTOR_ELEMENT_TYPES = {}
+TEXTURE_ELEMENT_TYPES = {}
+EMITTER_ELEMENT_TYPES = {}
+COLOR_ELEMENT_TYPES = {}
+MOD_VECTOR_ELEMENT_TYPES = {}
 
-GetRealElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, REAL_ELEMENT_TYPES, UnknownType)
-)
-
-# Int Element
-
-INT_ELEMENT_TYPES = {
-    'CNST': GetInt,
-}
-
-GetIntElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, INT_ELEMENT_TYPES, UnknownType)
-)
-
-# Vector Element
-
-VECTOR_ELEMENT_TYPES = {
-    'CNST': Struct(
-        a=GetRealElement,
-        b=GetRealElement,
-        c=GetRealElement,
-    ),
-    'ANGC': Struct(
-        a=GetRealElement,
-        b=GetRealElement,
-        c=GetRealElement,
-        d=GetRealElement,
-        e=GetRealElement,
-    ),
-}
-
-GetVectorElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, VECTOR_ELEMENT_TYPES, UnknownType)
-)
+GetRealElement = FourCCSwitch(REAL_ELEMENT_TYPES)
+GetIntElement = FourCCSwitch(INT_ELEMENT_TYPES)
+GetVectorElement = FourCCSwitch(VECTOR_ELEMENT_TYPES)
+GetTextureElement = FourCCSwitch(TEXTURE_ELEMENT_TYPES)
+GetEmitterElement = FourCCSwitch(EMITTER_ELEMENT_TYPES)
+GetColorElement = FourCCSwitch(COLOR_ELEMENT_TYPES)
+GetModVectorElement = FourCCSwitch(MOD_VECTOR_ELEMENT_TYPES)
+GetChildGeneratorDesc = UnknownType
+GetModel = UnknownType
+GetSwooshGeneratorDesc = UnknownType
+GetElectricGeneratorDesc = UnknownType
 
 # Element Types Post
 
 REAL_ELEMENT_TYPES.update({
+    'LFTW': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    ),
+    'CNST': GetReal,
     'CHAN': Struct(
         a=GetRealElement,
         b=GetRealElement,
@@ -74,25 +115,102 @@ REAL_ELEMENT_TYPES.update({
         b=GetRealElement,
         c=GetRealElement,
     ),
-    'RAND': Struct(
-        a=GetRealElement,
-        b=GetRealElement,
-    ),
+    'KEYE': REKeyframeEmitter,
+    'KEYP': REKeyframeEmitter,
     'IRND': Struct(
         a=GetRealElement,
         b=GetRealElement,
     ),
-    'RLPT': Struct(
+    'RAND': Struct(
         a=GetRealElement,
-    )
+        b=GetRealElement,
+    ),
+    'DOTP': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    ),
+    'MULT': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    ),
+    'PULS': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetRealElement,
+        d=GetRealElement,
+    ),
+    'SCAL': GetRealElement,
+    'RLPT': GetRealElement,
+    'SINE': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+    ),
+    'ISWT': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    ),
+    'CLTN': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+    ),
+    'CEQL': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+    ),
+    **{k: GetRealElement for k in [f'PAP{i}' for i in range(1, 9)]},
+    'PSLL': GetRealElement,
+    'PRLW': GetRealElement,
+    'SUB_': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    ),
+    'VMAG': GetVectorElement,
+    'VXTR': GetVectorElement,
+    'VYTR': GetVectorElement,
+    'VZTR': GetVectorElement,
+    'CEXT': GetIntElement,
+    'ITRL': Struct(
+        a=GetIntElement,
+        b=GetRealElement,
+    ),
+    'CRNG': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetRealElement,
+    ),
+    'GTCR': GetColorElement,
+    'GTCG': GetColorElement,
+    'GTCB': GetColorElement,
+    'GTCA': GetColorElement,
+    # Complete
 })
 INT_ELEMENT_TYPES.update({
+    'CNST': GetInt,
     'RAND': Struct(
         a=GetIntElement,
         b=GetIntElement,
     ),
 })
 VECTOR_ELEMENT_TYPES.update({
+    'CNST': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+    ),
+    'ANGC': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetRealElement,
+    ),
     'CIRC': Struct(
         a=GetVectorElement,
         b=GetVectorElement,
@@ -101,69 +219,53 @@ VECTOR_ELEMENT_TYPES.update({
         e=GetRealElement,
     )
 })
-
-# Texture Element
-
-GetTextureElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, {
-        'CNST': Struct(
-            sub_id=FourCC,
-            id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect),
-        ),
-        'ATEX': Struct(
-            sub_id=FourCC,
-            id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect),
-            extra=If(lambda ctx: ctx.sub_id != 'NONE', Struct(
-                a=GetIntElement,
-                b=GetIntElement,
-                c=GetIntElement,
-                d=GetIntElement,
-                e=GetIntElement,
-                f=GetBool,
-            )),
-        ),
-    }, UnknownType)
-)
-
-# Emitter Element
-
-GetEmitterElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, {
-        'SETR': Struct(
-            prop1=FourCC,
-            a=If(construct.this.prop1 == 'ILOC', GetVectorElement),
-            prop2=If(construct.this.prop1 == 'ILOC', FourCC),
-            b=If(construct.this.prop2 == 'IVEC', GetVectorElement),
-        ),
-        'SEMR': Struct(
-            a=GetVectorElement,
-            b=GetVectorElement,
-        ),
-        'SPHE': Struct(
-            a=GetVectorElement,
-            b=GetRealElement,
-            c=GetRealElement,
-        ),
-        'ASPH': Struct(
-            a=GetVectorElement,
-            b=GetRealElement,
-            c=GetRealElement,
-            d=GetRealElement,
-            e=GetRealElement,
-            f=GetRealElement,
-            g=GetRealElement,
-        ),
-    }, UnknownType)
-)
-
-# Color Element
-
-CEKeyframeEmitter = construct.Error
-CEParticleColor = construct.Error
-
-COLOR_ELEMENT_TYPES = {
+TEXTURE_ELEMENT_TYPES.update({
+    'CNST': Struct(
+        sub_id=FourCC,
+        id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect) * "TXTR",
+    ),
+    'ATEX': Struct(
+        sub_id=FourCC,
+        id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect) * "TXTR",
+        extra=If(lambda ctx: ctx.sub_id != 'NONE', Struct(
+            a=GetIntElement,
+            b=GetIntElement,
+            c=GetIntElement,
+            d=GetIntElement,
+            e=GetIntElement,
+            f=GetBool,
+        )),
+    ),
+    # Complete
+})
+EMITTER_ELEMENT_TYPES.update({
+    'SETR': Struct(
+        prop1=FourCC,
+        a=If(construct.this.prop1 == 'ILOC', GetVectorElement),
+        prop2=If(construct.this.prop1 == 'ILOC', FourCC),
+        b=If(construct.this.prop2 == 'IVEC', GetVectorElement),
+    ),
+    'SEMR': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    ),
+    'SPHE': Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+    ),
+    'ASPH': Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetRealElement,
+        f=GetRealElement,
+        g=GetRealElement,
+    ),
+    # Complete
+})
+COLOR_ELEMENT_TYPES.update({
     'KEYE': CEKeyframeEmitter,
     'KEYP': CEKeyframeEmitter,
     'CNST': Struct(
@@ -173,14 +275,6 @@ COLOR_ELEMENT_TYPES = {
         d=GetRealElement,
     ),
     'PCOL': CEParticleColor,
-}
-
-GetColorElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, COLOR_ELEMENT_TYPES, UnknownType)
-)
-
-COLOR_ELEMENT_TYPES.update({
     'CHAN': Struct(
         a=GetColorElement,
         b=GetColorElement,
@@ -204,62 +298,132 @@ COLOR_ELEMENT_TYPES.update({
         d=GetColorElement,
     ),
 })
-
-# Mod Vector Element
-
-MOD_VECTOR_ELEMENT_TYPES = {}
-GetModVectorElement = Struct(
-    type=FourCC,
-    body=Switch(construct.this.type, MOD_VECTOR_ELEMENT_TYPES, UnknownType)
-)
-
 MOD_VECTOR_ELEMENT_TYPES.update({
-    'WIND': Struct(
+    'IMPL': Struct(
         a=GetVectorElement,
         b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetBool,
     ),
-    'GRAV': Struct(
+    'EMPL': Struct(
         a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetBool,
+    ),
+    'CHAN': Struct(
+        a=GetModVectorElement,
+        b=GetModVectorElement,
+        c=GetIntElement,
+    ),
+    'BNCE': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetBool,
     ),
     'CNST': Struct(
         a=GetRealElement,
         b=GetRealElement,
         c=GetRealElement,
-    )
+    ),
+    'GRAV': GetVectorElement,
+    'EXPL': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    ),
+    'SPOS': GetVectorElement,
+    'LMPL': Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetBool,
+    ),
+    'PULS': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetModVectorElement,
+        d=GetModVectorElement,
+    ),
+    'WIND': Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+    ),
+    'SWRL': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetRealElement,
+        d=GetRealElement,
+    ),
+    # Complete
 })
 
 # Particle
 
 PARTICLE_TYPES = {
-    'OPTS': GetBool,
-    'GRTE': GetRealElement,
-    'MAXP': GetIntElement,
-    'POFS': GetVectorElement,
-    'RDOP': GetBool,
-    'INDM': GetBool,
-    'RSOP': GetBool,
-    'ORNT': GetBool,
+    'PMCL': GetColorElement,
+    'LFOR': GetRealElement,
+    'IDTS': GetChildGeneratorDesc,
+    'EMTR': GetEmitterElement,
+    'COLR': GetColorElement,
     'CIND': GetBool,
+    'AAPH': GetBool,
+    'CSSD': GetIntElement,
+    'GRTE': GetRealElement,
     'FXLL': GetBool,
-    'TEXR': GetTextureElement,
-    'TIND': GetTextureElement,
+    'ICTS': GetChildGeneratorDesc,
+    'KSSM': SpawnSystemKeyframeData,
+    'ILOC': GetVectorElement,
+    'IITS': GetChildGeneratorDesc,
+    'IVEC': GetVectorElement,
+    'LDIR': GetVectorElement,
+    'LCLR': GetColorElement,
+    'LENG': GetRealElement,
+    'MAXP': GetIntElement,
+    'LOFF': GetVectorElement,
+    'LINT': GetRealElement,
+    'LINE': GetBool,
+    'LFOT': GetIntElement,
+    'LIT_': GetBool,
+    'LTME': GetIntElement,
+    'LSLA': GetRealElement,
+    'LTYP': GetIntElement,
+    'NDSY': GetIntElement,
     'MBSP': GetIntElement,
     'MBLR': GetBool,
-    'LIT_': GetBool,
-    'SORT': GetBool,
-    'ZBUF': GetBool,
-    'AAPH': GetBool,
-    'WIDT': GetRealElement,
-    'LENG': GetRealElement,
-    'LINE': GetBool,
-    'EMTR': GetEmitterElement,
-    'SIZE': GetRealElement,
-    'LTME': GetIntElement,
-    'COLR': GetColorElement,
-    'PMOO': GetBool,
-    'PMUS': GetBool,
+    'NCSY': GetIntElement,
+    'PISY': GetIntElement,
+    'OPTS': GetBool,
     'PMAB': GetBool,
-    'VMPC': GetBool,
+    'SESD': GetIntElement,
+    'SEPO': GetVectorElement,
+    'PSLT': GetIntElement,
+    'PMSC': GetVectorElement,
+    'PMOP': GetVectorElement,
+    'PMDL': GetModel,
+    'PMRT': GetVectorElement,
+    'POFS': GetVectorElement,
+    'PMUS': GetBool,
+    'PSIV': GetVectorElement,
+    'ROTA': GetRealElement,
+    'PSVM': GetModVectorElement,
+    'PSTS': GetRealElement,
+    'PSOV': GetVectorElement,
+    'PSWT': GetIntElement,
+    'SEED': GetIntElement,
+    'PMOO': GetBool,
+    'SSSD': GetIntElement,
+    'SORT': GetBool,
+    'SIZE': GetRealElement,
+    'SISY': GetIntElement,
+    'SSPO': GetVectorElement,
+    'TEXR': GetTextureElement,
+    'SSWH': GetSwooshGeneratorDesc,
+    'TIND': GetTextureElement,
     'VMD4': GetBool,
     'VMD3': GetBool,
     'VMD2': GetBool,
@@ -268,28 +432,33 @@ PARTICLE_TYPES = {
     'VEL3': GetModVectorElement,
     'VEL2': GetModVectorElement,
     'VEL1': GetModVectorElement,
-    'SISY': GetIntElement,
-    'PISY': GetIntElement,
-    'NDSY': GetIntElement,
-    'NCSY': GetIntElement,
-    'LSLA': GetRealElement,
-    'LFOR': GetRealElement,
-    'LFOT': GetIntElement,
-    'LDIR': GetVectorElement,
-    'LOFF': GetVectorElement,
-    'LINT': GetRealElement,
-    'LCLR': GetColorElement,
-    'LTYP': GetIntElement,
+    'ZBUF': GetBool,
+    'WIDT': GetRealElement,
+    'ORNT': GetBool,
+    'RSOP': GetBool,
+    'ADV1': GetRealElement,
+    'ADV2': GetRealElement,
+    'ADV3': GetRealElement,
+    'ADV4': GetRealElement,
+    'ADV5': GetRealElement,
+    'ADV6': GetRealElement,
+    'ADV7': GetRealElement,
+    'ADV8': GetRealElement,
+    'SELC': GetElectricGeneratorDesc,
+
+    # Prime 2
+    'RDOP': StartingAtVersion(2, GetBool),
+    'INDM': StartingAtVersion(2, GetBool),
+    'VMPC': StartingAtVersion(2, GetBool),
+
+    '_END': Pass,
 }
 
 PART = Struct(
     magic=Const('GPSM', FourCC),
     elements=RepeatUntil(
         lambda x, lst, ctx: x.type == '_END',
-        Struct(
-            type=FourCC,
-            body=Switch(construct.this.type, PARTICLE_TYPES)
-        )
+        FourCCSwitch(PARTICLE_TYPES),
     ),
     terminated=Terminated,
 )
@@ -301,3 +470,11 @@ def dependencies_for(obj, target_game):
             texture = element.body.body.id
             if texture is not None:
                 yield "TXTR", texture
+
+        if element.type == 'KSSM':
+            for spawn in element.body.spawns:
+                for t in spawn.v2:
+                    if target_game >= 2:
+                        yield t.type, t.id
+                    else:
+                        yield 'PART', t.id
