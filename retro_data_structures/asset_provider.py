@@ -8,6 +8,12 @@ from retro_data_structures.formats import PAK
 logger = logging.getLogger(__name__)
 
 
+class UnknownAssetId(Exception):
+    def __init__(self, asset_id):
+        super().__init__(f"Unknown asset id 0x{asset_id:08X}")
+        self.asset_id = asset_id
+
+
 class AssetProvider:
     def __init__(self, pak_paths: List[Path], target_game: int):
         self.pak_paths = pak_paths
@@ -41,7 +47,11 @@ class AssetProvider:
         if asset_id in self.loaded_assets:
             return self.loaded_assets[asset_id]
 
-        resource = self.resource_by_asset_id[asset_id]
+        try:
+            resource = self.resource_by_asset_id[asset_id]
+        except KeyError:
+            raise UnknownAssetId(asset_id)
+
         asset = formats.format_for(resource.asset.type).parse(resource.contents.value(), target_game=self.target_game)
         self.loaded_assets[asset_id] = asset
         return asset

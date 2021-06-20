@@ -1,9 +1,18 @@
 from typing import Iterator, Tuple, Dict, Set, List
 
-from retro_data_structures.asset_provider import AssetProvider
+from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId
 from retro_data_structures.formats import ancs, cmdl, evnt, part
 
 Dependency = Tuple[str, int]
+
+
+class InvalidDependency(Exception):
+    def __init__(self, this_asset_id: int, dependency_id: int, dependency_type: str):
+        super().__init__(f"Asset id 0x{this_asset_id:08X} has dependency 0x{dependency_id:08X} ({dependency_type}) "
+                         f"that doesn't exist.")
+        self.this_asset_id = this_asset_id
+        self.dependency_id = dependency_id
+        self.dependency_type = dependency_type
 
 
 def _no_dependencies(_obj, _target_game):
@@ -46,7 +55,10 @@ def _internal_dependencies_for(asset_provider: AssetProvider, asset_id: int, obj
     obj = asset_provider.get_asset(asset_id)
     for new_type, new_asset_id in direct_dependencies_for(obj, obj_type, asset_provider.target_game):
         deps_by_asset_id[asset_id].add((new_type, new_asset_id))
-        _internal_dependencies_for(asset_provider, new_asset_id, new_type, deps_by_asset_id)
+        try:
+            _internal_dependencies_for(asset_provider, new_asset_id, new_type, deps_by_asset_id)
+        except UnknownAssetId:
+            raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
 def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[int]) -> Set[Dependency]:
