@@ -263,6 +263,24 @@ EMITTER_ELEMENT_TYPES.update({
         f=GetRealElement,
         g=GetRealElement,
     ),
+    # Prime 2
+    'PLNE': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetVectorElement,
+        d=GetRealElement,
+        e=GetRealElement,
+        f=GetRealElement,
+    )),
+    'ELPS': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetVectorElement,
+        d=GetRealElement,
+        e=GetBool,
+    )),
+    'NONE': StartingAtVersion(2, Pass),
+
     # Complete
 })
 COLOR_ELEMENT_TYPES.update({
@@ -274,7 +292,6 @@ COLOR_ELEMENT_TYPES.update({
         c=GetRealElement,
         d=GetRealElement,
     ),
-    'PCOL': CEParticleColor,
     'CHAN': Struct(
         a=GetColorElement,
         b=GetColorElement,
@@ -297,6 +314,32 @@ COLOR_ELEMENT_TYPES.update({
         c=GetColorElement,
         d=GetColorElement,
     ),
+    'PCOL': CEParticleColor,
+
+    # Prime 2
+    'NONE': StartingAtVersion(2, Pass),
+    'ISWT': StartingAtVersion(2, Struct(
+        a=GetColorElement,
+        b=GetColorElement,
+    )),
+    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'MDAO': StartingAtVersion(2, Struct(
+        a=GetColorElement,
+        b=GetRealElement,
+    )),
+    'KPIN': StartingAtVersion(2, Struct(
+        a=GetColorElement,
+    )),
+    'MULT': StartingAtVersion(2, Struct(
+        a=GetColorElement,
+        b=GetColorElement,
+    )),
+    'VRTC': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+    )),
+    
+    # Complete
 })
 MOD_VECTOR_ELEMENT_TYPES.update({
     'IMPL': Struct(
@@ -450,7 +493,15 @@ PARTICLE_TYPES = {
     'RDOP': StartingAtVersion(2, GetBool),
     'INDM': StartingAtVersion(2, GetBool),
     'VMPC': StartingAtVersion(2, GetBool),
+    'FXBR': StartingAtVersion(2, GetRealElement),
+    'FXBO': StartingAtVersion(2, GetVectorElement),
+    'PMOV': StartingAtVersion(2, GetVectorElement),
+    'VAV1': StartingAtVersion(2, GetVectorElement),
+    'VAV2': StartingAtVersion(2, GetVectorElement),
+    'VAV3': StartingAtVersion(2, GetVectorElement),
+    'XTAD': StartingAtVersion(2, GetIntElement),
 
+    # End
     '_END': Pass,
 }
 
