@@ -7,9 +7,9 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional, List
 
-from retro_data_structures import construct_extensions, dependencies
+from retro_data_structures import construct_extensions, dependencies, formats
 from retro_data_structures.asset_provider import AssetProvider
-from retro_data_structures.formats import mlvl, ALL_FORMATS
+from retro_data_structures.formats import mlvl
 
 types_per_game = {
     "metroid_prime_1": {
@@ -86,7 +86,7 @@ def do_decode(args):
     if file_format is None:
         file_format = input_path.suffix[1:]
 
-    construct_class = ALL_FORMATS[file_format.lower()]
+    construct_class = formats.format_for(file_format)
 
     raw = input_path.read_bytes()
     decoded_from_raw = construct_class.parse(raw, target_game=game)
@@ -109,7 +109,7 @@ def list_dependencies(args):
 
 
 def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
-    construct_class = ALL_FORMATS[file_format.lower()]
+    construct_class = formats.format_for(file_format)
 
     try:
         raw = file_path.read_bytes()

@@ -7,6 +7,7 @@ from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.mlvl import MLVL
 from retro_data_structures.formats.mrea import MREA
 from retro_data_structures.formats.pak import PAK
+from retro_data_structures.formats.part import PART
 
 ALL_FORMATS = {
     "ancs": ANCS,
@@ -18,6 +19,7 @@ ALL_FORMATS = {
     "cinf": CINF,
     "cskr": CSKR,
     "evnt": EVNT,
+    "part": PART,
 }
 
 

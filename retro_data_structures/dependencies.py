@@ -1,7 +1,7 @@
 from typing import Iterator, Tuple, Dict, Set, List
 
 from retro_data_structures.asset_provider import AssetProvider
-from retro_data_structures.formats import ancs, cmdl, evnt
+from retro_data_structures.formats import ancs, cmdl, evnt, part
 
 Dependency = Tuple[str, int]
 
@@ -21,6 +21,7 @@ _dependency_functions = {
     "cmdl": cmdl.dependencies_for,
     "ancs": ancs.dependencies_for,
     "evnt": evnt.dependencies_for,
+    "part": part.dependencies_for,
 }
 
 
