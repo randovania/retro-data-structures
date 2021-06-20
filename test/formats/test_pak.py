@@ -1,29 +1,7 @@
 import pytest
-from construct import (Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalString)
 
-from retro_data_structures.common_types import FourCC, AssetId32
 from retro_data_structures.construct_extensions import convert_to_raw_python
-from retro_data_structures.formats.pak import PAK, CompressedPakResource
-
-PAKNoData = Struct(
-    header=Struct(
-        version_major=Const(3, Int16ub),
-        version_minor=Const(5, Int16ub),
-        unused=Const(0, Int32ub),
-    ),
-    named_resources=PrefixedArray(Int32ub, Struct(
-        asset_type=FourCC,
-        asset_id=AssetId32,
-        name=PascalString(Int32ub, "utf-8"),
-    )),
-    resources=PrefixedArray(Int32ub, Struct(
-        compressed=Int32ub,
-        asset_type=FourCC,
-        asset_id=AssetId32,
-        size=Int32ub,
-        offset=Int32ub,
-    )),
-)
+from retro_data_structures.formats.pak import PAK, CompressedPakResource, PAKNoData
 
 
 @pytest.fixture(name="compressed_resource")

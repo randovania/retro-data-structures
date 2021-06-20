@@ -21,6 +21,15 @@ ResourceHeader = Struct(
     offset=Int32ub,
 )
 
+PAKNoData = Struct(
+    _header=PAKHeader,
+    named_resources=PrefixedArray(Int32ub, Struct(
+        asset=ObjectTag_32,
+        name=PascalString(Int32ub, "utf-8"),
+    )),
+    resources=PrefixedArray(Int32ub, ResourceHeader)
+)
+
 
 def header_field(offset):
     def result(ctx):

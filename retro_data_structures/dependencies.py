@@ -65,7 +65,7 @@ def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[in
     deps_by_asset_id: Dict[int, Set[Dependency]] = {}
 
     for asset_id in asset_ids:
-        obj_type = asset_provider.resource_by_asset_id[asset_id].asset.type
+        obj_type = asset_provider.get_type_for_asset(asset_id)
         _internal_dependencies_for(asset_provider, asset_id, obj_type, deps_by_asset_id)
 
     result = set()

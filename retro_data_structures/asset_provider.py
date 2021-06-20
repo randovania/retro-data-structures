@@ -1,9 +1,9 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import List, BinaryIO, Optional
 
 from retro_data_structures import formats
-from retro_data_structures.formats import PAK
+from retro_data_structures.formats.pak import CompressedPakResource, PAKNoData
 
 logger = logging.getLogger(__name__)
 
@@ -15,43 +15,57 @@ class UnknownAssetId(Exception):
 
 
 class AssetProvider:
+    _pak_files: Optional[List[BinaryIO]] = None
+
     def __init__(self, pak_paths: List[Path], target_game: int):
         self.pak_paths = pak_paths
         self.target_game = target_game
         self.loaded_assets = {}
 
     def __enter__(self):
-        self.pak_files = [
+        self._pak_files = [
             path.open("rb")
             for path in self.pak_paths
         ]
-        self.paks = []
-        for i, pak_file in enumerate(self.pak_files):
+        self._paks = []
+        for i, pak_file in enumerate(self._pak_files):
             logger.info("Parsing PAK at %s", str(self.pak_paths[i]))
-            self.paks.append(PAK.parse_stream(pak_file, target_game=self.target_game))
+            self._paks.append(PAKNoData.parse_stream(pak_file, target_game=self.target_game))
 
-        self.resource_by_asset_id = {}
-        for pak in self.paks:
+        self._resource_by_asset_id = {}
+        for i, pak in enumerate(self._paks):
             for resource in pak.resources:
-                if resource.asset.id not in self.resource_by_asset_id:
-                    self.resource_by_asset_id[resource.asset.id] = resource
+                if resource.asset.id not in self._resource_by_asset_id:
+                    self._resource_by_asset_id[resource.asset.id] = (resource, i)
 
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        for pak in self.pak_files:
+        for pak in self._pak_files:
             pak.close()
-        self.pak_files = None
+        self._pak_files = None
 
     def get_asset(self, asset_id: int):
         if asset_id in self.loaded_assets:
             return self.loaded_assets[asset_id]
 
         try:
-            resource = self.resource_by_asset_id[asset_id]
+            resource, pak_id = self._resource_by_asset_id[asset_id]
         except KeyError:
             raise UnknownAssetId(asset_id)
 
-        asset = formats.format_for(resource.asset.type).parse(resource.contents.value(), target_game=self.target_game)
+        pak_file = self._pak_files[pak_id]
+        pak_file.seek(resource.offset)
+        data = pak_file.read(resource.size)
+        if resource.compressed:
+            data = CompressedPakResource.parse(data, target_game=self.target_game)
+
+        asset = formats.format_for(resource.asset.type).parse(data, target_game=self.target_game)
         self.loaded_assets[asset_id] = asset
         return asset
+
+    def get_type_for_asset(self, asset_id: int) -> str:
+        try:
+            return self._resource_by_asset_id[asset_id][0].asset.type
+        except KeyError:
+            raise UnknownAssetId(asset_id)
