@@ -14,6 +14,13 @@ class UnknownAssetId(Exception):
         self.asset_id = asset_id
 
 
+class InvalidAssetId(Exception):
+    def __init__(self, asset_id, reason: str):
+        super().__init__(f"Unable to decode asset id 0x{asset_id:08X}: {reason}")
+        self.asset_id = asset_id
+        self.reason = reason
+
+
 class AssetProvider:
     _pak_files: Optional[List[BinaryIO]] = None
 
@@ -60,7 +67,16 @@ class AssetProvider:
         if resource.compressed:
             data = CompressedPakResource.parse(data, target_game=self.target_game)
 
-        asset = formats.format_for(resource.asset.type).parse(data, target_game=self.target_game)
+        try:
+            format_for_type = formats.format_for(resource.asset.type)
+        except Exception:
+            raise InvalidAssetId(asset_id, f"Unsupported type {resource.asset.type}")
+
+        try:
+            asset = format_for_type.parse(data, target_game=self.target_game)
+        except Exception:
+            raise InvalidAssetId(asset_id, f"Unable to decode using type {resource.asset.type}")
+
         self.loaded_assets[asset_id] = asset
         return asset
 
