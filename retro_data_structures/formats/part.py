@@ -770,6 +770,24 @@ PARTICLE_TYPES = {
     'XTAD': StartingAtVersion(2, GetIntElement),
     'DFLG': StartingAtVersion(2, GetBitFlag),
 
+    # Prime 3
+    'STOP': StartingAtVersion(3, GetBool),
+    'PBDM': StartingAtVersion(3, GetIntElement),
+    'PMLT': StartingAtVersion(3, GetBool),
+    'MBDM': StartingAtVersion(3, GetIntElement),
+    'VGD1': StartingAtVersion(3, GetBool),
+    'VGD2': StartingAtVersion(3, GetBool),
+    'VGD3': StartingAtVersion(3, GetBool),
+    'VGD4': StartingAtVersion(3, GetBool),
+    'ALSC': StartingAtVersion(3, GetIntElement),
+    'DBPS': StartingAtVersion(3, GetBool),
+    'SVEO': StartingAtVersion(3, GetRealElement),
+    'ORTC': StartingAtVersion(3, GetBool),
+    'ISVF': StartingAtVersion(3, GetRealElement),
+    'ADV9': StartingAtVersion(3, GetRealElement),
+    'AMSC': StartingAtVersion(3, GetIntElement),
+    'XJAK': StartingAtVersion(3, GetIntElement),
+
     # End
     '_END': Pass,
 }
