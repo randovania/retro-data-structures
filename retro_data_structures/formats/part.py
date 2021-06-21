@@ -1,9 +1,9 @@
 import construct
 from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Terminated, Sequence, Probe, \
-    Pass, IfThenElse, Int32ub, PrefixedArray, FocusedSeq
+    Pass, IfThenElse, Int32ub, PrefixedArray, Byte, Array
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import FourCC, Color4f
+from retro_data_structures.common_types import FourCC, Color4f, Vector3
 from retro_data_structures.construct_extensions import ErrorWithMessage
 from retro_data_structures.game_check import AssetIdCorrect
 
@@ -25,27 +25,23 @@ def StartingAtVersion(version, subcon):
     )
 
 
+def create_keyframe_emitter(keys_type):
+    return Struct(
+        percent=Int32ub,
+        unk1=Int32ub,
+        loop=Flag,
+        unk2=Flag,
+        loopEnd=Int32ub,
+        loopStart=Int32ub,
+        keys=PrefixedArray(Int32ub, keys_type),
+    )
+
+
 # Subtypes
-CEKeyframeEmitter = Struct(
-    percent=Int32ub,
-    unk1=Int32ub,
-    loop=Flag,
-    unk2=Flag,
-    loopEnd=Int32ub,
-    loopStart=Int32ub,
-    keys=PrefixedArray(Int32ub, Color4f),
-)
-CEParticleColor = UnknownType
-REKeyframeEmitter = Struct(
-    percent=Int32ub,
-    unk1=Int32ub,
-    loop=Flag,
-    unk2=Flag,
-    loopEnd=Int32ub,
-    loopStart=Int32ub,
-    keys=PrefixedArray(Int32ub, Float32b),
-)
-VEKeyframeEmitter = UnknownType
+CEKeyframeEmitter = create_keyframe_emitter(Color4f)
+REKeyframeEmitter = create_keyframe_emitter(Float32b)
+VEKeyframeEmitter = create_keyframe_emitter(Vector3)
+IEKeyframeEmitter = create_keyframe_emitter(Int32sb)
 
 SpawnSystemKeyframeInfo = Struct(
     id=AssetIdCorrect,
@@ -53,18 +49,20 @@ SpawnSystemKeyframeInfo = Struct(
     unk2=Int32ub,
     unk3=Int32ub,
 )
-SpawnSystemKeyframeData = FocusedSeq(
-    "value",
-    magic=Const('CNST', FourCC),
-    value=Struct(
-        unk1=Int32ub,
-        unk2=Int32ub,
-        endFrame=Int32ub,
-        unk3=Int32ub,
-        spawns=PrefixedArray(Int32ub, Struct(
-            v1=Int32ub,
-            v2=PrefixedArray(Int32ub, SpawnSystemKeyframeInfo),
-        ))
+SpawnSystemKeyframeData = Struct(
+    magic=FourCC,
+    value=If(
+        construct.this.magic == 'CNST',
+        Struct(
+            unk1=Int32ub,
+            unk2=Int32ub,
+            endFrame=Int32ub,
+            unk3=Int32ub,
+            spawns=PrefixedArray(Int32ub, Struct(
+                v1=Int32ub,
+                v2=PrefixedArray(Int32ub, SpawnSystemKeyframeInfo),
+            ))
+        ),
     )
 )
 
@@ -89,10 +87,54 @@ GetTextureElement = FourCCSwitch(TEXTURE_ELEMENT_TYPES)
 GetEmitterElement = FourCCSwitch(EMITTER_ELEMENT_TYPES)
 GetColorElement = FourCCSwitch(COLOR_ELEMENT_TYPES)
 GetModVectorElement = FourCCSwitch(MOD_VECTOR_ELEMENT_TYPES)
-GetChildGeneratorDesc = UnknownType
-GetModel = UnknownType
-GetSwooshGeneratorDesc = UnknownType
+GetChildGeneratorDesc = Struct(
+    type=FourCC,
+    body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect)
+)
+GetModel = Struct(
+    type=FourCC,
+    body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect)
+)
+GetSwooshGeneratorDesc = Struct(
+    type=FourCC,
+    body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect)
+)
 GetElectricGeneratorDesc = UnknownType
+
+GetBitFlag = Struct(
+    magic1=FourCC,
+    magic2=FourCC,
+    a=Int32ub,
+    body=IfThenElse(
+        lambda this: this.magic2 == "BITF",
+        Int32ub,
+        Array(construct.this.a, Byte),
+    )
+)
+
+
+#
+
+
+def create_keyf_emitter(keys_type):
+    return Struct(
+        a=Int32ub,
+        b=Int32ub,
+        c=Flag,
+        d=Flag,
+        e=Int32ub,
+        f=Int32ub,
+        g=Float32b,
+        h=Float32b,
+        keys=PrefixedArray(Int32ub, keys_type),
+        i=GetRealElement,
+    )
+
+
+CFKeyframeEmitter = create_keyf_emitter(Int32ub)
+IFKeyframeEmitter = create_keyf_emitter(Int32ub)
+RFKeyframeEmitter = create_keyf_emitter(Float32b)
+VFKeyframeEmitter = create_keyf_emitter(Vector3)
 
 # Element Types Post
 
@@ -164,8 +206,8 @@ REAL_ELEMENT_TYPES.update({
         d=GetRealElement,
     ),
     **{k: Pass for k in [f'PAP{i}' for i in range(1, 9)]},
-    'PSLL': GetRealElement,
-    'PRLW': GetRealElement,
+    'PSLL': Pass,
+    'PRLW': Pass,
     'SUB_': Struct(
         a=GetRealElement,
         b=GetRealElement,
@@ -195,7 +237,7 @@ REAL_ELEMENT_TYPES.update({
     # Prime 2
     'OCSP': StartingAtVersion(2, GetIntElement),
     'GTCP': StartingAtVersion(2, Pass),
-    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'KEYF': StartingAtVersion(2, RFKeyframeEmitter),
     'KPIN': StartingAtVersion(2, GetRealElement),
     'NONE': StartingAtVersion(2, Pass),
     'PNO1': StartingAtVersion(2, Struct(
@@ -243,11 +285,83 @@ REAL_ELEMENT_TYPES.update({
     # Prime 2 Complete
 })
 INT_ELEMENT_TYPES.update({
+    'KEYE': IEKeyframeEmitter,
+    'KEYP': IEKeyframeEmitter,
+    'DETH': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'CLMP': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetIntElement,
+    ),
+    'CHAN': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetIntElement,
+    ),
+    'ADD_': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
     'CNST': GetInt,
+    'IMPL': GetIntElement,
+    'ILPT': GetIntElement,
+    'IRND': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'PULS': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetIntElement,
+        d=GetIntElement,
+    ),
+    'MULT': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'DIVD': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'SPAH': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetIntElement,
+    ),
     'RAND': Struct(
         a=GetIntElement,
         b=GetIntElement,
     ),
+    'RTOI': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'TSCL': GetRealElement,
+    'GAPC': Pass,
+    'GTCP': Pass,
+    'GEMT': Pass,
+    'MODU': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    'SUB_': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    ),
+    # Prime 1 Complete
+    'KEYF': StartingAtVersion(2, IFKeyframeEmitter),
+    'ISWT': StartingAtVersion(2, Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+    )),
+    'PDET': StartingAtVersion(2, Pass),
+    'KPIN': StartingAtVersion(2, GetIntElement),
+    'PCRT': StartingAtVersion(2, Pass),
+    'NONE': StartingAtVersion(2, Pass),
+    # Prime 2 Complete
 })
 VECTOR_ELEMENT_TYPES.update({
     'CONE': Struct(
@@ -321,7 +435,7 @@ VECTOR_ELEMENT_TYPES.update({
         a=GetVectorElement,
         b=GetVectorElement,
     )),
-    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'KEYF': StartingAtVersion(2, VFKeyframeEmitter),
     'KPIN': StartingAtVersion(2, GetVectorElement),
     'PAP1': StartingAtVersion(2, Pass),
     'PAP2': StartingAtVersion(2, Pass),
@@ -354,7 +468,10 @@ TEXTURE_ELEMENT_TYPES.update({
             f=GetBool,
         )),
     ),
-    # Complete
+    # Prime 1 Complete
+
+    'NONE': StartingAtVersion(2, Pass),
+    # Prime 2 Complete
 })
 EMITTER_ELEMENT_TYPES.update({
     'SETR': Struct(
@@ -432,7 +549,8 @@ COLOR_ELEMENT_TYPES.update({
         c=GetColorElement,
         d=GetColorElement,
     ),
-    'PCOL': CEParticleColor,
+    'PCOL': Pass,
+    # Prime 1 Complete
 
     # Prime 2
     'NONE': StartingAtVersion(2, Pass),
@@ -440,7 +558,7 @@ COLOR_ELEMENT_TYPES.update({
         a=GetColorElement,
         b=GetColorElement,
     )),
-    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'KEYF': StartingAtVersion(2, CFKeyframeEmitter),
     'MDAO': StartingAtVersion(2, Struct(
         a=GetColorElement,
         b=GetRealElement,
@@ -457,7 +575,7 @@ COLOR_ELEMENT_TYPES.update({
         b=GetRealElement,
     )),
 
-    # Complete
+    # Prime 2 Complete
 })
 MOD_VECTOR_ELEMENT_TYPES.update({
     'IMPL': Struct(
@@ -520,7 +638,19 @@ MOD_VECTOR_ELEMENT_TYPES.update({
         c=GetRealElement,
         d=GetRealElement,
     ),
-    # Complete
+    # Prime 1 Complete
+    'NONE': StartingAtVersion(2, Pass),
+    'BOXV': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetModVectorElement,
+    )),
+    'SPHV': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetModVectorElement,
+    )),
+    # Prime 2 Complete
 })
 
 # Particle
@@ -618,6 +748,7 @@ PARTICLE_TYPES = {
     'VAV2': StartingAtVersion(2, GetVectorElement),
     'VAV3': StartingAtVersion(2, GetVectorElement),
     'XTAD': StartingAtVersion(2, GetIntElement),
+    'DFLG': StartingAtVersion(2, GetBitFlag),
 
     # End
     '_END': Pass,
@@ -647,3 +778,15 @@ def dependencies_for(obj, target_game):
                         yield t.type, t.id
                     else:
                         yield 'PART', t.id
+
+        if element.type == 'SSWH':
+            if element.body is not None:
+                yield 'SWHC', element.body
+
+        if element.type == 'PMDL':
+            if element.body is not None:
+                yield 'CMDL', element.body
+
+        if element.type in ('IDTS', 'ICTS', 'IITS'):
+            if element.body is not None:
+                yield "PART", element.body
