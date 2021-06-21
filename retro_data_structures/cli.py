@@ -44,6 +44,11 @@ def create_parser():
     compare.add_argument("--limit", help="Limit the number of files to test", type=int)
     compare.add_argument("input_path", type=Path, help="Path to the directory to glob")
 
+    decode_from_paks = subparser.add_parser("decode-from-pak")
+    decode_from_paks.add_argument("--game", help="Hint the game of the file", type=int)
+    decode_from_paks.add_argument("paks_path", type=Path, help="Path to where to find pak files")
+    decode_from_paks.add_argument("asset_id", type=lambda x: int(x, 0), help="Asset id to print")
+
     deps = subparser.add_parser("list-dependencies")
     deps.add_argument("--game", help="Hint the game of the file", type=int)
     deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
@@ -96,6 +101,15 @@ def do_decode(args):
         encoded = construct_class.build(decoded_from_raw, target_game=game)
         if raw != encoded:
             print(f"{input_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})")
+
+
+def do_decode_from_pak(args):
+    game = args.game
+    paks_path: Path = args.paks_path
+    asset_id: int = args.asset_id
+
+    with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
+        print(asset_provider.get_asset(asset_id))
 
 
 def list_dependencies(args):
@@ -179,6 +193,8 @@ def main():
         do_ksy_export(args)
     elif args.command == "decode":
         do_decode(args)
+    elif args.command == "decode-from-pak":
+        do_decode_from_pak(args)
     elif args.command == "list-dependencies":
         list_dependencies(args)
     elif args.command == "compare-files":
