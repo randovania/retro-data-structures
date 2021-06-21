@@ -1,6 +1,7 @@
+import logging
 from typing import Iterator, Tuple, Dict, Set, List
 
-from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId
+from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
 from retro_data_structures.formats import ancs, cmdl, evnt, part
 
 Dependency = Tuple[str, int]
@@ -9,7 +10,7 @@ Dependency = Tuple[str, int]
 class InvalidDependency(Exception):
     def __init__(self, this_asset_id: int, dependency_id: int, dependency_type: str):
         super().__init__(f"Asset id 0x{this_asset_id:08X} has dependency 0x{dependency_id:08X} ({dependency_type}) "
-                         f"that doesn't exist.")
+                         f"that can't be parsed.")
         self.this_asset_id = this_asset_id
         self.dependency_id = dependency_id
         self.dependency_type = dependency_type
@@ -58,6 +59,9 @@ def _internal_dependencies_for(asset_provider: AssetProvider, asset_id: int, obj
         try:
             _internal_dependencies_for(asset_provider, new_asset_id, new_type, deps_by_asset_id)
         except UnknownAssetId:
+            logging.warning(f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) "
+                            f"that doesn't exist.")
+        except InvalidAssetId:
             raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
