@@ -288,6 +288,9 @@ REAL_ELEMENT_TYPES.update({
         d=GetIntElement,
     )),
     # Prime 2 Complete
+
+    # Prime 3
+    'PAP9': StartingAtVersion(3, Pass),
 })
 INT_ELEMENT_TYPES.update({
     'KEYE': IEKeyframeEmitter,
@@ -341,8 +344,8 @@ INT_ELEMENT_TYPES.update({
         b=GetIntElement,
     ),
     'RTOI': Struct(
-        a=GetIntElement,
-        b=GetIntElement,
+        a=GetRealElement,
+        b=GetRealElement,
     ),
     'TSCL': GetRealElement,
     'GAPC': Pass,
@@ -460,6 +463,7 @@ VECTOR_ELEMENT_TYPES.update({
     'PETR': StartingAtVersion(2, Pass),
     'PITR': StartingAtVersion(2, Pass),
     'RNDV': StartingAtVersion(2, GetRealElement),
+
 })
 TEXTURE_ELEMENT_TYPES.update({
     'CNST': Struct(
@@ -483,6 +487,15 @@ TEXTURE_ELEMENT_TYPES.update({
     # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
     'NONE': Pass,
     # Prime 2 Complete
+
+    # Prime 3
+    'TEXP': StartingAtVersion(3, Struct(
+        sub_id=FourCC,
+        id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect) * "TXTR",
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetRealElement,
+    )),
 })
 EMITTER_ELEMENT_TYPES.update({
     'SETR': Struct(
@@ -592,6 +605,12 @@ COLOR_ELEMENT_TYPES.update({
     )),
 
     # Prime 2 Complete
+
+    # Prime 3
+    'CFDL': StartingAtVersion(3, Struct(
+        a=GetColorElement,
+        b=GetColorElement,
+    )),
 })
 MOD_VECTOR_ELEMENT_TYPES.update({
     'IMPL': Struct(
@@ -671,6 +690,12 @@ MOD_VECTOR_ELEMENT_TYPES.update({
         c=GetModVectorElement,
     )),
     # Prime 2 Complete
+
+    # Prime 3
+    'SWLC': StartingAtVersion(3, Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    )),
 })
 
 # Particle
@@ -787,6 +812,9 @@ PARTICLE_TYPES = {
     'ADV9': StartingAtVersion(3, GetRealElement),
     'AMSC': StartingAtVersion(3, GetIntElement),
     'XJAK': StartingAtVersion(3, GetIntElement),
+    'EADV': StartingAtVersion(3, GetRealElement),
+    'PMTF': StartingAtVersion(3, GetBool),
+    'HJAK': StartingAtVersion(3, GetIntElement),
 
     # End
     '_END': Pass,
@@ -804,9 +832,10 @@ PART = Struct(
 def dependencies_for(obj, target_game):
     for element in obj.elements:
         if element.type in ('TEXR', 'TIND'):
-            texture = element.body.body.id
-            if texture is not None:
-                yield "TXTR", texture
+            if element.body is not None:
+                texture = element.body.body.id
+                if texture is not None:
+                    yield "TXTR", texture
 
         if element.type == 'KSSM':
             for spawn in element.body.spawns:
