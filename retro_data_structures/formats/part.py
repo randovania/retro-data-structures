@@ -45,6 +45,7 @@ REKeyframeEmitter = Struct(
     loopStart=Int32ub,
     keys=PrefixedArray(Int32ub, Float32b),
 )
+VEKeyframeEmitter = UnknownType
 
 SpawnSystemKeyframeInfo = Struct(
     id=AssetIdCorrect,
@@ -189,7 +190,57 @@ REAL_ELEMENT_TYPES.update({
     'GTCG': GetColorElement,
     'GTCB': GetColorElement,
     'GTCA': GetColorElement,
-    # Complete
+    # Prime 1 Complete
+
+    # Prime 2
+    'OCSP': StartingAtVersion(2, GetIntElement),
+    'GTCP': StartingAtVersion(2, Pass),
+    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'KPIN': StartingAtVersion(2, GetRealElement),
+    'NONE': StartingAtVersion(2, Pass),
+    'PNO1': StartingAtVersion(2, Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetIntElement,
+    )),
+    'PNO2': StartingAtVersion(2, Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetIntElement,
+    )),
+    'PNO3': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetIntElement,
+    )),
+    'PNO4': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+        c=GetRealElement,
+        d=GetRealElement,
+        e=GetIntElement,
+    )),
+    'PRN1': StartingAtVersion(2, GetRealElement),
+    'PRN2': StartingAtVersion(2, Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+    )),
+    'PRN3': StartingAtVersion(2, GetVectorElement),
+    'PRN4': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetRealElement,
+    )),
+    'TOCS': StartingAtVersion(2, Struct(
+        a=GetBool,
+        b=GetIntElement,
+        c=GetIntElement,
+        d=GetIntElement,
+    )),
+    # Prime 2 Complete
 })
 INT_ELEMENT_TYPES.update({
     'CNST': GetInt,
@@ -199,10 +250,14 @@ INT_ELEMENT_TYPES.update({
     ),
 })
 VECTOR_ELEMENT_TYPES.update({
-    'CNST': Struct(
-        a=GetRealElement,
+    'CONE': Struct(
+        a=GetVectorElement,
         b=GetRealElement,
-        c=GetRealElement,
+    ),
+    'CHAN': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetIntElement,
     ),
     'ANGC': Struct(
         a=GetRealElement,
@@ -211,13 +266,76 @@ VECTOR_ELEMENT_TYPES.update({
         d=GetRealElement,
         e=GetRealElement,
     ),
+    'ADD_': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    ),
+    'CCLU': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+        c=GetIntElement,
+        d=GetRealElement,
+    ),
+    'CNST': Struct(
+        a=GetRealElement,
+        b=GetRealElement,
+        c=GetRealElement,
+    ),
     'CIRC': Struct(
         a=GetVectorElement,
         b=GetVectorElement,
         c=GetRealElement,
         d=GetRealElement,
         e=GetRealElement,
-    )
+    ),
+    'KEYE': VEKeyframeEmitter,
+    'KEYP': VEKeyframeEmitter,
+    'MULT': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    ),
+    'RTOV': GetRealElement,
+    'PULS': Struct(
+        a=GetIntElement,
+        b=GetIntElement,
+        c=GetVectorElement,
+        d=GetVectorElement,
+    ),
+    'PVEL': Pass,
+    'PLCO': Pass,
+    'PLOC': Pass,
+    'PSOF': Pass,
+    'PSOU': Pass,
+    'PSOR': Pass,
+    'PSTR': Pass,
+    'SUB_': Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    ),
+    'CTVC': GetColorElement,
+    # Prime 1 Complete
+
+    # Prime 2
+    'PENV': StartingAtVersion(2, Pass),
+    'ISWT': StartingAtVersion(2, Struct(
+        a=GetVectorElement,
+        b=GetVectorElement,
+    )),
+    'KEYF': StartingAtVersion(2, ErrorWithMessage("Unsupported KEYF")),
+    'KPIN': StartingAtVersion(2, GetVectorElement),
+    'PAP1': StartingAtVersion(2, Pass),
+    'PAP2': StartingAtVersion(2, Pass),
+    'PAP3': StartingAtVersion(2, Pass),
+    'PAP4': StartingAtVersion(2, Pass),
+    'NORM': StartingAtVersion(2, GetVectorElement),
+    'NONE': StartingAtVersion(2, Pass),
+    'PILV': StartingAtVersion(2, Pass),
+    'PINV': StartingAtVersion(2, Pass),
+    'PEVL': StartingAtVersion(2, Pass),
+    'PNCV': StartingAtVersion(2, Pass),
+    'PETR': StartingAtVersion(2, Pass),
+    'PITR': StartingAtVersion(2, Pass),
+    'RNDV': StartingAtVersion(2, GetRealElement),
 })
 TEXTURE_ELEMENT_TYPES.update({
     'CNST': Struct(
@@ -338,7 +456,7 @@ COLOR_ELEMENT_TYPES.update({
         a=GetVectorElement,
         b=GetRealElement,
     )),
-    
+
     # Complete
 })
 MOD_VECTOR_ELEMENT_TYPES.update({
