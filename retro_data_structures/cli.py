@@ -180,7 +180,7 @@ async def compare_all_files_in_path(args):
                     print(message)
 
     if errors:
-        print("Errors:")
+        print(f"{len(errors)} errors:")
         for m in errors:
             print(m)
 
