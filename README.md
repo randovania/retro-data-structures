@@ -11,8 +11,8 @@ Construct type definitions for Retro Studios game
 | ANIM     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | CSKR     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | CINF     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
+| PART     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 
-* [1] File offsets must be changed manually
 * [2] Missing re-calculation of how sections are split between blocks.
 
 
