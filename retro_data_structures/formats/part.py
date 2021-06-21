@@ -4,7 +4,7 @@ from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Color4f, Vector3
-from retro_data_structures.construct_extensions import ErrorWithMessage
+from retro_data_structures.construct_extensions import ErrorWithMessage, TerminatedWithPadding, AlignTo
 from retro_data_structures.game_check import AssetIdCorrect
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
@@ -237,12 +237,14 @@ REAL_ELEMENT_TYPES.update({
     'GTCA': GetColorElement,
     # Prime 1 Complete
 
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
+
     # Prime 2
     'OCSP': StartingAtVersion(2, GetIntElement),
     'GTCP': StartingAtVersion(2, Pass),
     'KEYF': StartingAtVersion(2, RFKeyframeEmitter),
     'KPIN': StartingAtVersion(2, GetRealElement),
-    'NONE': StartingAtVersion(2, Pass),
     'PNO1': StartingAtVersion(2, Struct(
         a=GetRealElement,
         b=GetRealElement,
@@ -354,6 +356,10 @@ INT_ELEMENT_TYPES.update({
         a=GetIntElement,
         b=GetIntElement,
     ),
+
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
+
     # Prime 1 Complete
     'KEYF': StartingAtVersion(2, IFKeyframeEmitter),
     'ISWT': StartingAtVersion(2, Struct(
@@ -363,7 +369,6 @@ INT_ELEMENT_TYPES.update({
     'PDET': StartingAtVersion(2, Pass),
     'KPIN': StartingAtVersion(2, GetIntElement),
     'PCRT': StartingAtVersion(2, Pass),
-    'NONE': StartingAtVersion(2, Pass),
     # Prime 2 Complete
 })
 VECTOR_ELEMENT_TYPES.update({
@@ -432,6 +437,9 @@ VECTOR_ELEMENT_TYPES.update({
     'CTVC': GetColorElement,
     # Prime 1 Complete
 
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
+
     # Prime 2
     'PENV': StartingAtVersion(2, Pass),
     'ISWT': StartingAtVersion(2, Struct(
@@ -445,7 +453,6 @@ VECTOR_ELEMENT_TYPES.update({
     'PAP3': StartingAtVersion(2, Pass),
     'PAP4': StartingAtVersion(2, Pass),
     'NORM': StartingAtVersion(2, GetVectorElement),
-    'NONE': StartingAtVersion(2, Pass),
     'PILV': StartingAtVersion(2, Pass),
     'PINV': StartingAtVersion(2, Pass),
     'PEVL': StartingAtVersion(2, Pass),
@@ -473,7 +480,8 @@ TEXTURE_ELEMENT_TYPES.update({
     ),
     # Prime 1 Complete
 
-    'NONE': StartingAtVersion(2, Pass),
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
     # Prime 2 Complete
 })
 EMITTER_ELEMENT_TYPES.update({
@@ -501,6 +509,10 @@ EMITTER_ELEMENT_TYPES.update({
         f=GetRealElement,
         g=GetRealElement,
     ),
+    # Prime 1 Complete
+
+    'NONE': Pass,
+
     # Prime 2
     'PLNE': StartingAtVersion(2, Struct(
         a=GetVectorElement,
@@ -517,7 +529,6 @@ EMITTER_ELEMENT_TYPES.update({
         d=GetRealElement,
         e=GetBool,
     )),
-    'NONE': StartingAtVersion(2, Pass),
 
     # Complete
 })
@@ -555,8 +566,10 @@ COLOR_ELEMENT_TYPES.update({
     'PCOL': Pass,
     # Prime 1 Complete
 
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
+
     # Prime 2
-    'NONE': StartingAtVersion(2, Pass),
     'ISWT': StartingAtVersion(2, Struct(
         a=GetColorElement,
         b=GetColorElement,
@@ -642,7 +655,11 @@ MOD_VECTOR_ELEMENT_TYPES.update({
         d=GetRealElement,
     ),
     # Prime 1 Complete
-    'NONE': StartingAtVersion(2, Pass),
+
+    # Echoes explicitly tracks this value, but it's present in Prime 1 since the parser ignores unknown values
+    'NONE': Pass,
+
+    # Prime 2
     'BOXV': StartingAtVersion(2, Struct(
         a=GetVectorElement,
         b=GetVectorElement,
@@ -763,7 +780,6 @@ PART = Struct(
         lambda x, lst, ctx: x.type == '_END',
         FourCCSwitch(PARTICLE_TYPES),
     ),
-    terminated=Terminated,
 )
 
 
