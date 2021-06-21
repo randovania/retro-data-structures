@@ -163,7 +163,7 @@ REAL_ELEMENT_TYPES.update({
         c=GetRealElement,
         d=GetRealElement,
     ),
-    **{k: GetRealElement for k in [f'PAP{i}' for i in range(1, 9)]},
+    **{k: Pass for k in [f'PAP{i}' for i in range(1, 9)]},
     'PSLL': GetRealElement,
     'PRLW': GetRealElement,
     'SUB_': Struct(
