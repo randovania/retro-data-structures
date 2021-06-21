@@ -1,10 +1,10 @@
 import construct
-from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Terminated, Sequence, Probe, \
+from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Sequence, Probe, \
     Pass, IfThenElse, Int32ub, PrefixedArray, Byte, Array
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Color4f, Vector3
-from retro_data_structures.construct_extensions import ErrorWithMessage, TerminatedWithPadding, AlignTo
+from retro_data_structures.construct_extensions import ErrorWithMessage
 from retro_data_structures.game_check import AssetIdCorrect
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
