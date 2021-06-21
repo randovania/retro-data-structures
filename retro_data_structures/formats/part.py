@@ -99,7 +99,10 @@ GetSwooshGeneratorDesc = Struct(
     type=FourCC,
     body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect)
 )
-GetElectricGeneratorDesc = UnknownType
+GetElectricGeneratorDesc = Struct(
+    type=FourCC,
+    body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect)
+)
 
 GetBitFlag = Struct(
     magic1=FourCC,
@@ -131,7 +134,7 @@ def create_keyf_emitter(keys_type):
     )
 
 
-CFKeyframeEmitter = create_keyf_emitter(Int32ub)
+CFKeyframeEmitter = create_keyf_emitter(Color4f)
 IFKeyframeEmitter = create_keyf_emitter(Int32ub)
 RFKeyframeEmitter = create_keyf_emitter(Float32b)
 VFKeyframeEmitter = create_keyf_emitter(Vector3)
@@ -786,6 +789,10 @@ def dependencies_for(obj, target_game):
         if element.type == 'PMDL':
             if element.body is not None:
                 yield 'CMDL', element.body
+
+        if element.type == 'SELC':
+            if element.body is not None:
+                yield 'ELSC', element.body
 
         if element.type in ('IDTS', 'ICTS', 'IITS'):
             if element.body is not None:
