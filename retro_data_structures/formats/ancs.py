@@ -126,7 +126,6 @@ ANCS = Struct(
     version=Const(1, Int16ub),
     character_set=CharacterSet,
     animation_set=AnimationSet,
-    _terminated=Terminated,
 )
 
 
