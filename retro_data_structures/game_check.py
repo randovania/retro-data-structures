@@ -2,6 +2,7 @@
 For checking which game is being parsed
 """
 from enum import Enum
+from typing import Any, Callable
 
 from construct import IfThenElse
 
@@ -14,8 +15,19 @@ class Game(Enum):
     CORRUPTION = 3
 
     @property
+    def uses_asset_id_32(self):
+        return self.value <= Game.ECHOES.value
+
+    @property
     def uses_lzo(self):
         return self in {Game.ECHOES, Game.CORRUPTION}
+
+    @property
+    def invalid_asset_id(self) -> int:
+        if self.uses_asset_id_32:
+            return (1 << 32) - 1
+        else:
+            return (1 << 64) - 1
 
 
 def get_current_game(ctx):
@@ -38,24 +50,27 @@ def is_prime3(ctx):
     return get_current_game(ctx) == Game.CORRUPTION
 
 
-def current_game_at_most(target: Game):
+def current_game_at_most(target: Game) -> Callable[[Any], bool]:
     def result(ctx):
         return get_current_game(ctx).value <= target.value
 
     return result
 
 
-def current_game_at_least(target: Game):
+def current_game_at_least(target: Game) -> Callable[[Any], bool]:
     def result(ctx):
         return get_current_game(ctx).value >= target.value
 
     return result
 
 
+def uses_asset_id_32(ctx):
+    return get_current_game(ctx).uses_asset_id_32
+
+
 def uses_lzo(ctx):
     return get_current_game(ctx).uses_lzo
 
 
-uses_asset_id_32 = current_game_at_most(Game.ECHOES)
 AssetIdCorrect = IfThenElse(uses_asset_id_32, common_types.AssetId32, common_types.AssetId64)
 ObjectTagCorrect = IfThenElse(uses_asset_id_32, common_types.ObjectTag_32, common_types.ObjectTag_64)
