@@ -31,11 +31,17 @@ class AssetConverter:
         self.converters = converters
         self.converted_ids = {}
         self.converted_assets = {}
+        self._being_converted = set()
 
     def convert_by_id(self, asset_id: AssetId, source_game: Game) -> ConvertedAsset:
         new_id = self.converted_ids.get((source_game, asset_id))
         if new_id is not None:
             return self.converted_assets[new_id]
+
+        if asset_id in self._being_converted:
+            raise ValueError(f"Loop detected when converting {asset_id}")
+
+        self._being_converted.add(asset_id)
 
         asset_provider = self.asset_providers[source_game]
         source_asset = asset_provider.get_asset(asset_id)
@@ -43,6 +49,7 @@ class AssetConverter:
 
         new_asset = self.convert_asset(source_asset, asset_type, source_game)
         self.converted_ids[(source_game, asset_id)] = new_asset.id
+        self._being_converted.remove(asset_id)
 
         return new_asset
 
