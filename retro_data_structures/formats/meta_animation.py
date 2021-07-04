@@ -3,7 +3,7 @@ import enum
 import construct
 from construct import Struct, Int32ub, Switch, Float32b, Byte, PrefixedArray, Int64ub
 
-from retro_data_structures.common_types import String
+from retro_data_structures.common_types import String, AssetId64, AssetId32
 from retro_data_structures.construct_extensions import EnumAdapter
 
 
@@ -53,8 +53,8 @@ def create(asset_id):
     return meta
 
 
-MetaAnimation_AssetId32 = create(Int32ub)
-MetaAnimation_AssetId64 = create(Int64ub)
+MetaAnimation_AssetId32 = create(AssetId32)
+MetaAnimation_AssetId64 = create(AssetId64)
 
 by_asset_type = {
     Int32ub: MetaAnimation_AssetId32,
