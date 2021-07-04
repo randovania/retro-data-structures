@@ -87,3 +87,6 @@ class AssetProvider:
             return self._resource_by_asset_id[asset_id][0].asset.type
         except KeyError:
             raise UnknownAssetId(asset_id)
+
+    def asset_id_exists(self, asset_id: AssetId) -> bool:
+        return asset_id in self._resource_by_asset_id
