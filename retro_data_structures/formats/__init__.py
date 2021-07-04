@@ -1,3 +1,5 @@
+from construct import Construct
+
 from retro_data_structures.formats.ancs import ANCS
 from retro_data_structures.formats.anim import ANIM
 from retro_data_structures.formats.cinf import CINF
@@ -9,19 +11,23 @@ from retro_data_structures.formats.mrea import MREA
 from retro_data_structures.formats.pak import PAK
 from retro_data_structures.formats.part import PART
 
+AssetType = str
+AssetId = int
+
+
 ALL_FORMATS = {
-    "ancs": ANCS,
-    "cmdl": CMDL,
-    "mlvl": MLVL,
-    "mrea": MREA,
-    "pak": PAK,
-    "anim": ANIM,
-    "cinf": CINF,
-    "cskr": CSKR,
-    "evnt": EVNT,
-    "part": PART,
+    "ANCS": ANCS,
+    "CMDL": CMDL,
+    "MLVL": MLVL,
+    "MREA": MREA,
+    "PAK": PAK,
+    "ANIM": ANIM,
+    "CINF": CINF,
+    "CSKR": CSKR,
+    "EVNT": EVNT,
+    "PART": PART,
 }
 
 
-def format_for(type_name: str):
-    return ALL_FORMATS[type_name.lower()]
+def format_for(type_name: AssetType) -> Construct:
+    return ALL_FORMATS[type_name.upper()]

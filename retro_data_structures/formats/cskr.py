@@ -3,6 +3,7 @@ from construct import Struct, PrefixedArray, Int32ub, Float32b, Prefixed, Greedy
     IfThenElse, Array, Aligned
 
 from retro_data_structures import game_check
+from retro_data_structures.game_check import Game
 
 Weight = Struct(
     bone_id=Int32ub,
@@ -41,8 +42,8 @@ CSKR = Struct(
     footer=Switch(
         game_check.get_current_game,
         {
-            1: Prime1Footer,
-            2: Prime2Footer,
+            Game.PRIME: Prime1Footer,
+            Game.ECHOES: Prime2Footer,
         },
         construct.Error,
     ),

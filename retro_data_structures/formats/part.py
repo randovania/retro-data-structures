@@ -5,7 +5,7 @@ from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Color4f, Vector3
 from retro_data_structures.construct_extensions import ErrorWithMessage
-from retro_data_structures.game_check import AssetIdCorrect
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
 
@@ -17,9 +17,9 @@ def FourCCSwitch(element_types):
     )
 
 
-def StartingAtVersion(version, subcon):
+def StartingAtVersion(version: Game, subcon):
     return IfThenElse(
-        game_check.get_current_game >= version,
+        game_check.current_game_at_least(version),
         subcon,
         ErrorWithMessage(f"Type only supported starting at version {version}"),
     )
@@ -45,7 +45,7 @@ IEKeyframeEmitter = create_keyframe_emitter(Int32sb)
 
 SpawnSystemKeyframeInfo = Struct(
     id=AssetIdCorrect,
-    type=IfThenElse(game_check.get_current_game >= 2, FourCC, Int32ub),
+    type=IfThenElse(game_check.current_game_at_least(Game.ECHOES), FourCC, Int32ub),
     unk2=Int32ub,
     unk3=Int32ub,
 )
@@ -241,47 +241,47 @@ REAL_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 2
-    'OCSP': StartingAtVersion(2, GetIntElement),
-    'GTCP': StartingAtVersion(2, Pass),
-    'KEYF': StartingAtVersion(2, RFKeyframeEmitter),
-    'KPIN': StartingAtVersion(2, GetRealElement),
-    'PNO1': StartingAtVersion(2, Struct(
+    'OCSP': StartingAtVersion(Game.ECHOES, GetIntElement),
+    'GTCP': StartingAtVersion(Game.ECHOES, Pass),
+    'KEYF': StartingAtVersion(Game.ECHOES, RFKeyframeEmitter),
+    'KPIN': StartingAtVersion(Game.ECHOES, GetRealElement),
+    'PNO1': StartingAtVersion(Game.ECHOES, Struct(
         a=GetRealElement,
         b=GetRealElement,
         c=GetRealElement,
         d=GetIntElement,
     )),
-    'PNO2': StartingAtVersion(2, Struct(
+    'PNO2': StartingAtVersion(Game.ECHOES, Struct(
         a=GetRealElement,
         b=GetRealElement,
         c=GetRealElement,
         d=GetRealElement,
         e=GetIntElement,
     )),
-    'PNO3': StartingAtVersion(2, Struct(
+    'PNO3': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetRealElement,
         c=GetRealElement,
         d=GetIntElement,
     )),
-    'PNO4': StartingAtVersion(2, Struct(
+    'PNO4': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetRealElement,
         c=GetRealElement,
         d=GetRealElement,
         e=GetIntElement,
     )),
-    'PRN1': StartingAtVersion(2, GetRealElement),
-    'PRN2': StartingAtVersion(2, Struct(
+    'PRN1': StartingAtVersion(Game.ECHOES, GetRealElement),
+    'PRN2': StartingAtVersion(Game.ECHOES, Struct(
         a=GetRealElement,
         b=GetRealElement,
     )),
-    'PRN3': StartingAtVersion(2, GetVectorElement),
-    'PRN4': StartingAtVersion(2, Struct(
+    'PRN3': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'PRN4': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetRealElement,
     )),
-    'TOCS': StartingAtVersion(2, Struct(
+    'TOCS': StartingAtVersion(Game.ECHOES, Struct(
         a=GetBool,
         b=GetIntElement,
         c=GetIntElement,
@@ -290,7 +290,7 @@ REAL_ELEMENT_TYPES.update({
     # Prime 2 Complete
 
     # Prime 3
-    'PAP9': StartingAtVersion(3, Pass),
+    'PAP9': StartingAtVersion(Game.CORRUPTION, Pass),
 })
 INT_ELEMENT_TYPES.update({
     'KEYE': IEKeyframeEmitter,
@@ -364,14 +364,14 @@ INT_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 1 Complete
-    'KEYF': StartingAtVersion(2, IFKeyframeEmitter),
-    'ISWT': StartingAtVersion(2, Struct(
+    'KEYF': StartingAtVersion(Game.ECHOES, IFKeyframeEmitter),
+    'ISWT': StartingAtVersion(Game.ECHOES, Struct(
         a=GetIntElement,
         b=GetIntElement,
     )),
-    'PDET': StartingAtVersion(2, Pass),
-    'KPIN': StartingAtVersion(2, GetIntElement),
-    'PCRT': StartingAtVersion(2, Pass),
+    'PDET': StartingAtVersion(Game.ECHOES, Pass),
+    'KPIN': StartingAtVersion(Game.ECHOES, GetIntElement),
+    'PCRT': StartingAtVersion(Game.ECHOES, Pass),
     # Prime 2 Complete
 })
 VECTOR_ELEMENT_TYPES.update({
@@ -444,25 +444,25 @@ VECTOR_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 2
-    'PENV': StartingAtVersion(2, Pass),
-    'ISWT': StartingAtVersion(2, Struct(
+    'PENV': StartingAtVersion(Game.ECHOES, Pass),
+    'ISWT': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetVectorElement,
     )),
-    'KEYF': StartingAtVersion(2, VFKeyframeEmitter),
-    'KPIN': StartingAtVersion(2, GetVectorElement),
-    'PAP1': StartingAtVersion(2, Pass),
-    'PAP2': StartingAtVersion(2, Pass),
-    'PAP3': StartingAtVersion(2, Pass),
-    'PAP4': StartingAtVersion(2, Pass),
-    'NORM': StartingAtVersion(2, GetVectorElement),
-    'PILV': StartingAtVersion(2, Pass),
-    'PINV': StartingAtVersion(2, Pass),
-    'PEVL': StartingAtVersion(2, Pass),
-    'PNCV': StartingAtVersion(2, Pass),
-    'PETR': StartingAtVersion(2, Pass),
-    'PITR': StartingAtVersion(2, Pass),
-    'RNDV': StartingAtVersion(2, GetRealElement),
+    'KEYF': StartingAtVersion(Game.ECHOES, VFKeyframeEmitter),
+    'KPIN': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'PAP1': StartingAtVersion(Game.ECHOES, Pass),
+    'PAP2': StartingAtVersion(Game.ECHOES, Pass),
+    'PAP3': StartingAtVersion(Game.ECHOES, Pass),
+    'PAP4': StartingAtVersion(Game.ECHOES, Pass),
+    'NORM': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'PILV': StartingAtVersion(Game.ECHOES, Pass),
+    'PINV': StartingAtVersion(Game.ECHOES, Pass),
+    'PEVL': StartingAtVersion(Game.ECHOES, Pass),
+    'PNCV': StartingAtVersion(Game.ECHOES, Pass),
+    'PETR': StartingAtVersion(Game.ECHOES, Pass),
+    'PITR': StartingAtVersion(Game.ECHOES, Pass),
+    'RNDV': StartingAtVersion(Game.ECHOES, GetRealElement),
 
 })
 TEXTURE_ELEMENT_TYPES.update({
@@ -489,7 +489,7 @@ TEXTURE_ELEMENT_TYPES.update({
     # Prime 2 Complete
 
     # Prime 3
-    'TEXP': StartingAtVersion(3, Struct(
+    'TEXP': StartingAtVersion(Game.CORRUPTION, Struct(
         sub_id=FourCC,
         id=If(lambda ctx: ctx.sub_id != 'NONE', AssetIdCorrect) * "TXTR",
         a=GetIntElement,
@@ -527,7 +527,7 @@ EMITTER_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 2
-    'PLNE': StartingAtVersion(2, Struct(
+    'PLNE': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetVectorElement,
         c=GetVectorElement,
@@ -535,7 +535,7 @@ EMITTER_ELEMENT_TYPES.update({
         e=GetRealElement,
         f=GetRealElement,
     )),
-    'ELPS': StartingAtVersion(2, Struct(
+    'ELPS': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetVectorElement,
         c=GetVectorElement,
@@ -583,23 +583,23 @@ COLOR_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 2
-    'ISWT': StartingAtVersion(2, Struct(
+    'ISWT': StartingAtVersion(Game.ECHOES, Struct(
         a=GetColorElement,
         b=GetColorElement,
     )),
-    'KEYF': StartingAtVersion(2, CFKeyframeEmitter),
-    'MDAO': StartingAtVersion(2, Struct(
+    'KEYF': StartingAtVersion(Game.ECHOES, CFKeyframeEmitter),
+    'MDAO': StartingAtVersion(Game.ECHOES, Struct(
         a=GetColorElement,
         b=GetRealElement,
     )),
-    'KPIN': StartingAtVersion(2, Struct(
+    'KPIN': StartingAtVersion(Game.ECHOES, Struct(
         a=GetColorElement,
     )),
-    'MULT': StartingAtVersion(2, Struct(
+    'MULT': StartingAtVersion(Game.ECHOES, Struct(
         a=GetColorElement,
         b=GetColorElement,
     )),
-    'VRTC': StartingAtVersion(2, Struct(
+    'VRTC': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetRealElement,
     )),
@@ -607,7 +607,7 @@ COLOR_ELEMENT_TYPES.update({
     # Prime 2 Complete
 
     # Prime 3
-    'CFDL': StartingAtVersion(3, Struct(
+    'CFDL': StartingAtVersion(Game.CORRUPTION, Struct(
         a=GetColorElement,
         b=GetColorElement,
     )),
@@ -679,12 +679,12 @@ MOD_VECTOR_ELEMENT_TYPES.update({
     'NONE': Pass,
 
     # Prime 2
-    'BOXV': StartingAtVersion(2, Struct(
+    'BOXV': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetVectorElement,
         c=GetModVectorElement,
     )),
-    'SPHV': StartingAtVersion(2, Struct(
+    'SPHV': StartingAtVersion(Game.ECHOES, Struct(
         a=GetVectorElement,
         b=GetRealElement,
         c=GetModVectorElement,
@@ -692,7 +692,7 @@ MOD_VECTOR_ELEMENT_TYPES.update({
     # Prime 2 Complete
 
     # Prime 3
-    'SWLC': StartingAtVersion(3, Struct(
+    'SWLC': StartingAtVersion(Game.CORRUPTION, Struct(
         a=GetRealElement,
         b=GetRealElement,
     )),
@@ -783,38 +783,38 @@ PARTICLE_TYPES = {
     'SELC': GetElectricGeneratorDesc,
 
     # Prime 2
-    'RDOP': StartingAtVersion(2, GetBool),
-    'INDM': StartingAtVersion(2, GetBool),
-    'VMPC': StartingAtVersion(2, GetBool),
-    'FXBR': StartingAtVersion(2, GetRealElement),
-    'FXBO': StartingAtVersion(2, GetVectorElement),
-    'PMOV': StartingAtVersion(2, GetVectorElement),
-    'VAV1': StartingAtVersion(2, GetVectorElement),
-    'VAV2': StartingAtVersion(2, GetVectorElement),
-    'VAV3': StartingAtVersion(2, GetVectorElement),
-    'XTAD': StartingAtVersion(2, GetIntElement),
-    'DFLG': StartingAtVersion(2, GetBitFlag),
+    'RDOP': StartingAtVersion(Game.ECHOES, GetBool),
+    'INDM': StartingAtVersion(Game.ECHOES, GetBool),
+    'VMPC': StartingAtVersion(Game.ECHOES, GetBool),
+    'FXBR': StartingAtVersion(Game.ECHOES, GetRealElement),
+    'FXBO': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'PMOV': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'VAV1': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'VAV2': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'VAV3': StartingAtVersion(Game.ECHOES, GetVectorElement),
+    'XTAD': StartingAtVersion(Game.ECHOES, GetIntElement),
+    'DFLG': StartingAtVersion(Game.ECHOES, GetBitFlag),
 
     # Prime 3
-    'STOP': StartingAtVersion(3, GetBool),
-    'PBDM': StartingAtVersion(3, GetIntElement),
-    'PMLT': StartingAtVersion(3, GetBool),
-    'MBDM': StartingAtVersion(3, GetIntElement),
-    'VGD1': StartingAtVersion(3, GetBool),
-    'VGD2': StartingAtVersion(3, GetBool),
-    'VGD3': StartingAtVersion(3, GetBool),
-    'VGD4': StartingAtVersion(3, GetBool),
-    'ALSC': StartingAtVersion(3, GetIntElement),
-    'DBPS': StartingAtVersion(3, GetBool),
-    'SVEO': StartingAtVersion(3, GetRealElement),
-    'ORTC': StartingAtVersion(3, GetBool),
-    'ISVF': StartingAtVersion(3, GetRealElement),
-    'ADV9': StartingAtVersion(3, GetRealElement),
-    'AMSC': StartingAtVersion(3, GetIntElement),
-    'XJAK': StartingAtVersion(3, GetIntElement),
-    'EADV': StartingAtVersion(3, GetRealElement),
-    'PMTF': StartingAtVersion(3, GetBool),
-    'HJAK': StartingAtVersion(3, GetIntElement),
+    'STOP': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'PBDM': StartingAtVersion(Game.CORRUPTION, GetIntElement),
+    'PMLT': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'MBDM': StartingAtVersion(Game.CORRUPTION, GetIntElement),
+    'VGD1': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'VGD2': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'VGD3': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'VGD4': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'ALSC': StartingAtVersion(Game.CORRUPTION, GetIntElement),
+    'DBPS': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'SVEO': StartingAtVersion(Game.CORRUPTION, GetRealElement),
+    'ORTC': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'ISVF': StartingAtVersion(Game.CORRUPTION, GetRealElement),
+    'ADV9': StartingAtVersion(Game.CORRUPTION, GetRealElement),
+    'AMSC': StartingAtVersion(Game.CORRUPTION, GetIntElement),
+    'XJAK': StartingAtVersion(Game.CORRUPTION, GetIntElement),
+    'EADV': StartingAtVersion(Game.CORRUPTION, GetRealElement),
+    'PMTF': StartingAtVersion(Game.CORRUPTION, GetBool),
+    'HJAK': StartingAtVersion(Game.CORRUPTION, GetIntElement),
 
     # End
     '_END': Pass,

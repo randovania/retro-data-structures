@@ -2,6 +2,7 @@ from pathlib import Path
 
 from retro_data_structures.formats.anim import ANIM
 from retro_data_structures.construct_extensions import convert_to_raw_python
+from retro_data_structures.game_check import Game
 
 
 def do_file(path: Path):
@@ -16,7 +17,7 @@ def do_file(path: Path):
 
 def test_compare(prime2_pwe_project):
     input_path = prime2_pwe_project.joinpath('Resources/Uncategorized/01_gate_open.ANIM')
-    game = 2
+    game = Game.ECHOES
     raw = input_path.read_bytes()
 
     data = ANIM.parse(raw, target_game=game)
@@ -32,8 +33,8 @@ def test_missile_launcher(prime1_pwe_project, prime2_pwe_project):
     prime1_path = prime1_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
     prime2_path = prime2_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
 
-    p1_data = ANIM.parse_file(prime1_path, target_game=1)
-    p2_data = ANIM.parse_file(prime2_path, target_game=2)
+    p1_data = ANIM.parse_file(prime1_path, target_game=Game.PRIME)
+    p2_data = ANIM.parse_file(prime2_path, target_game=Game.ECHOES)
 
     p1_aux = convert_to_raw_python(p1_data)
     p2_aux = convert_to_raw_python(p2_data)

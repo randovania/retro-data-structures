@@ -3,6 +3,7 @@ import asyncio
 import itertools
 import json
 import logging
+import typing
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional, List
@@ -10,6 +11,7 @@ from typing import Optional, List
 from retro_data_structures import construct_extensions, dependencies, formats
 from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.formats import mlvl
+from retro_data_structures.game_check import Game
 
 types_per_game = {
     "metroid_prime_1": {
@@ -24,6 +26,28 @@ types_per_game = {
 }
 
 
+def game_argument_type(s: str) -> Game:
+    try:
+        return Game(int(s))
+    except ValueError:
+        # not a number, look by name
+        for g in Game:
+            g = typing.cast(Game, g)
+            if g.name.lower() == s.lower():
+                return g
+        raise ValueError(f"No enum named {s} found")
+
+
+def add_game_argument(parser: argparse.ArgumentParser):
+    choices = []
+    for g in Game:
+        g = typing.cast(Game, g)
+        choices.append(g.value)
+        choices.append(g.name)
+
+    parser.add_argument("--game", help="Hint the game of the file", type=game_argument_type, choices=list(Game))
+
+
 def create_parser():
     parser = argparse.ArgumentParser()
 
@@ -33,24 +57,24 @@ def create_parser():
     ksy_export.add_argument("output_path", type=Path)
 
     decode = subparser.add_parser("decode")
-    decode.add_argument("--game", help="Hint the game of the file", type=int)
+    add_game_argument(decode)
     decode.add_argument("--format", help="Hint the format of the file. Defaults to extension.")
     decode.add_argument("--re-encode", help="Re-encode afterwards and compares to the original.", action="store_true")
     decode.add_argument("input_path", type=Path, help="Path to the file")
 
     compare = subparser.add_parser("compare-files")
-    compare.add_argument("--game", help="Hint the game of the file", type=int)
+    add_game_argument(compare)
     compare.add_argument("--format", help="Hint the format of the file")
     compare.add_argument("--limit", help="Limit the number of files to test", type=int)
     compare.add_argument("input_path", type=Path, help="Path to the directory to glob")
 
     decode_from_paks = subparser.add_parser("decode-from-pak")
-    decode_from_paks.add_argument("--game", help="Hint the game of the file", type=int)
+    add_game_argument(decode_from_paks)
     decode_from_paks.add_argument("paks_path", type=Path, help="Path to where to find pak files")
     decode_from_paks.add_argument("asset_id", type=lambda x: int(x, 0), help="Asset id to print")
 
     deps = subparser.add_parser("list-dependencies")
-    deps.add_argument("--game", help="Hint the game of the file", type=int)
+    add_game_argument(deps)
     deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
     deps.add_argument("asset_ids", type=int, nargs='+', help="Asset id to list dependencies for")
 
@@ -61,8 +85,8 @@ def do_ksy_export(args):
     output_path: Path = args.output_path
     output_path.mkdir(parents=True, exist_ok=True)
 
-    for game, formats in types_per_game.items():
-        for format_name, cls in formats.items():
+    for game, game_formats in types_per_game.items():
+        for format_name, cls in game_formats.items():
             print(f"Exporting {game} / {format_name}")
             cls.export_ksy(f"{game}_{format_name}", output_path.joinpath(f"{game}_{format_name}.ksy"))
 
@@ -85,7 +109,7 @@ def dump_to(path: Path, decoded):
 def do_decode(args):
     input_path: Path = args.input_path
     file_format = args.format
-    game = args.game
+    game: Game = args.game
     re_encode = args.re_encode
 
     if file_format is None:
@@ -104,7 +128,7 @@ def do_decode(args):
 
 
 def do_decode_from_pak(args):
-    game = args.game
+    game: Game = args.game
     paks_path: Path = args.paks_path
     asset_id: int = args.asset_id
 
@@ -113,7 +137,7 @@ def do_decode_from_pak(args):
 
 
 def list_dependencies(args):
-    game = args.game
+    game: Game = args.game
     paks_path: Path = args.paks_path
     asset_ids: List[int] = args.asset_ids
 
@@ -122,7 +146,7 @@ def list_dependencies(args):
             print("{}: {}".format(asset_type, hex(asset_id)))
 
 
-def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
+def decode_encode_compare_file(file_path: Path, game: Game, file_format: str):
     construct_class = formats.format_for(file_format)
 
     try:
@@ -141,7 +165,7 @@ def decode_encode_compare_file(file_path: Path, game: int, file_format: str):
 async def compare_all_files_in_path(args):
     input_path: Path = args.input_path
     file_format: str = args.format
-    game: int = args.game
+    game: Game = args.game
     limit: Optional[int] = args.limit
 
     def apply_limit(it):

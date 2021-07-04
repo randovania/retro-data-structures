@@ -3,7 +3,9 @@ from pathlib import Path
 from typing import List, BinaryIO, Optional
 
 from retro_data_structures import formats
+from retro_data_structures.formats import AssetType, AssetId
 from retro_data_structures.formats.pak import CompressedPakResource, PAKNoData
+from retro_data_structures.game_check import Game
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,7 @@ class InvalidAssetId(Exception):
 class AssetProvider:
     _pak_files: Optional[List[BinaryIO]] = None
 
-    def __init__(self, pak_paths: List[Path], target_game: int):
+    def __init__(self, pak_paths: List[Path], target_game: Game):
         self.pak_paths = pak_paths
         self.target_game = target_game
         self.loaded_assets = {}
@@ -52,7 +54,7 @@ class AssetProvider:
             pak.close()
         self._pak_files = None
 
-    def get_asset(self, asset_id: int):
+    def get_asset(self, asset_id: AssetId):
         if asset_id in self.loaded_assets:
             return self.loaded_assets[asset_id]
 
@@ -80,7 +82,7 @@ class AssetProvider:
         self.loaded_assets[asset_id] = asset
         return asset
 
-    def get_type_for_asset(self, asset_id: int) -> str:
+    def get_type_for_asset(self, asset_id: AssetId) -> AssetType:
         try:
             return self._resource_by_asset_id[asset_id][0].asset.type
         except KeyError:
