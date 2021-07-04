@@ -10,7 +10,9 @@ from typing import Optional, List
 
 from retro_data_structures import construct_extensions, dependencies, formats
 from retro_data_structures.asset_provider import AssetProvider
-from retro_data_structures.formats import mlvl
+from retro_data_structures.conversion import conversions
+from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.formats import mlvl, AssetId
 from retro_data_structures.game_check import Game
 
 types_per_game = {
@@ -38,14 +40,14 @@ def game_argument_type(s: str) -> Game:
         raise ValueError(f"No enum named {s} found")
 
 
-def add_game_argument(parser: argparse.ArgumentParser):
+def add_game_argument(parser: argparse.ArgumentParser, name="--game"):
     choices = []
     for g in Game:
         g = typing.cast(Game, g)
         choices.append(g.value)
         choices.append(g.name)
 
-    parser.add_argument("--game", help="Hint the game of the file", type=game_argument_type, choices=list(Game))
+    parser.add_argument(name, help="The game of the file", type=game_argument_type, choices=list(Game), required=True)
 
 
 def create_parser():
@@ -76,7 +78,13 @@ def create_parser():
     deps = subparser.add_parser("list-dependencies")
     add_game_argument(deps)
     deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
-    deps.add_argument("asset_ids", type=int, nargs='+', help="Asset id to list dependencies for")
+    deps.add_argument("asset_ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
+
+    convert = subparser.add_parser("convert")
+    add_game_argument(convert, "--source-game")
+    add_game_argument(convert, "--target-game")
+    convert.add_argument("paks_path", type=Path, help="Path to where to find source pak files")
+    convert.add_argument("asset_ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
 
     return parser
 
@@ -144,6 +152,61 @@ def list_dependencies(args):
     with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
         for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
             print("{}: {}".format(asset_type, hex(asset_id)))
+
+
+def do_convert(args):
+    source_game: Game = args.source_game
+    target_game: Game = args.target_game
+    paks_path: Path = args.paks_path
+    asset_ids: List[int] = args.asset_ids
+
+    with AssetProvider(list(paks_path.glob("*.pak")), source_game) as asset_provider:
+        next_id = 0xFFFF0000
+
+        def id_generator(asset_type):
+            nonlocal next_id
+            result = next_id
+            while asset_provider.asset_id_exists(result):
+                result += 1
+
+            next_id = result + 1
+            return result
+
+        converter = AssetConverter(
+            target_game=target_game,
+            asset_providers={source_game: asset_provider},
+            id_generator=id_generator,
+            converters=conversions.converter_for,
+        )
+
+        for asset_id in asset_ids:
+            converted = converter.convert_by_id(asset_id, source_game)
+
+            print(
+                "\n========================="
+                "\n* Original Id: {:08x}"
+                "\n* Target Id: {:08x}"
+                "\n* Asset Type: {}"
+                "\n\n{}".format(
+                    asset_id,
+                    converted.id,
+                    converted.type,
+                    converted.resource,
+                ))
+
+        print("==================\n>> All converted assets")
+        reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
+            v: k
+            for k, v in converter.converted_ids.items()
+        }
+
+        for converted_asset in converter.converted_assets.values():
+            print(" {}: {:08x} from {:08x} ({})".format(
+                converted_asset.type,
+                converted_asset.id,
+                reverse_converted_ids[converted_asset.id][1],
+                reverse_converted_ids[converted_asset.id][0].name,
+            ))
 
 
 def decode_encode_compare_file(file_path: Path, game: Game, file_format: str):
@@ -221,6 +284,8 @@ def main():
         do_decode_from_pak(args)
     elif args.command == "list-dependencies":
         list_dependencies(args)
+    elif args.command == "convert":
+        do_convert(args)
     elif args.command == "compare-files":
         asyncio.run(compare_all_files_in_path(args))
     else:
