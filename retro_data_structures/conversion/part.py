@@ -8,7 +8,7 @@ def upgrade(data, converter: AssetConverter, source_game: Game):
     if source_game < Game.ECHOES <= converter.target_game:
         for element in data["elements"]:
             if element["type"] == u'KSSM' and element["body"]["magic"] != "NONE":
-                for spawn in element["body"]["spawns"]:
+                for spawn in element["body"]["value"]["spawns"]:
                     for t in spawn["v2"]:
                         t["type"] = "PART"
 
@@ -17,7 +17,7 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
     if converter.target_game <= Game.PRIME < source_game:
         for element in data["elements"]:
             if element["type"] == u'KSSM' and element["body"]["magic"] != "NONE":
-                for spawn in element["body"]["spawns"]:
+                for spawn in element["body"]["value"]["spawns"]:
                     for t in spawn["v2"]:
                         t["type"] = 0
             if element["type"] == u'RDOP':
@@ -53,7 +53,7 @@ def convert(data, converter: AssetConverter, source_game: Game):
                     body["id"] = converter.convert_by_id(body["id"], source_game)
 
         if element["type"] == 'KSSM' and element["body"]["magic"] != "NONE":
-            for spawn in element["body"]["spawns"]:
+            for spawn in element["body"]["value"]["spawns"]:
                 for t in spawn["v2"]:
                     t["id"] = converter.convert_by_id(t["id"], source_game)
 

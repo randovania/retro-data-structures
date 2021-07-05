@@ -844,7 +844,7 @@ def dependencies_for(obj, target_game: Game):
 
         if element.type == 'KSSM':
             if element.body.magic != 'NONE':
-                for spawn in element.body.spawns:
+                for spawn in element.body.value.spawns:
                     for t in spawn.v2:
                         yield from _yield_dependency_if_valid(
                             t.id,
