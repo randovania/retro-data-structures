@@ -3,6 +3,7 @@ from typing import Iterator, Tuple, Dict, Set, List
 
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
 from retro_data_structures.formats import ancs, cmdl, evnt, part
+from retro_data_structures.game_check import Game
 
 Dependency = Tuple[str, int]
 
@@ -39,7 +40,7 @@ def format_has_dependencies(obj_type: str):
     return obj_type.lower() not in _formats_without_dependencies
 
 
-def direct_dependencies_for(obj, obj_type: str, target_game: int) -> Iterator[Dependency]:
+def direct_dependencies_for(obj, obj_type: str, target_game: Game) -> Iterator[Dependency]:
     if format_has_dependencies(obj_type):
         yield from _dependency_functions[obj_type.lower()](obj, target_game)
 

@@ -6,6 +6,7 @@ from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion, Skip
 from retro_data_structures.data_section import DataSectionSizes, DataSection
+from retro_data_structures.game_check import Game
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -210,7 +211,7 @@ CMDL = Struct(
 )
 
 
-def dependencies_for(obj, target_game):
+def dependencies_for(obj, target_game: Game):
     for material_set in obj.material_sets:
         for file_id in material_set.texture_file_ids:
             yield "TXTR", file_id
