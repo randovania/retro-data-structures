@@ -1,13 +1,25 @@
+import functools
+
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.game_check import Game
 
 
-def part_convert(data, output_game):
-    if output_game == 1:
+def upgrade(data, converter: AssetConverter, source_game: Game):
+    if source_game < Game.ECHOES <= converter.target_game:
         for element in data["elements"]:
-            if element["type"] == u'KSSM':
-                element["body"]["value"]["spawns"][0]["v2"][0]["type"] = 0
+            if element["type"] == u'KSSM' and element["body"]["magic"] != "NONE":
+                for spawn in element["body"]["spawns"]:
+                    for t in spawn["v2"]:
+                        t["type"] = "PART"
+
+
+def downgrade(data, converter: AssetConverter, source_game: Game):
+    if converter.target_game <= Game.PRIME < source_game:
+        for element in data["elements"]:
+            if element["type"] == u'KSSM' and element["body"]["magic"] != "NONE":
+                for spawn in element["body"]["spawns"]:
+                    for t in spawn["v2"]:
+                        t["type"] = 0
             if element["type"] == u'RDOP':
                 element.pop()
             if element["type"] == u'XTAD':
@@ -23,38 +35,42 @@ def part_convert(data, output_game):
                     element["body"]["body"]["c"] = element["body"]["body"]["d"]
                     element["body"]["body"].pop("d")
                     element["body"]["body"].pop("e")
-        return data
-    elif output_game == 2:
-        for element in data["elements"]:
-            if element["type"] == u'KSSM':
-                element["body"]["value"]["spawns"][0]["v2"][0]["type"] = u'PART'
-        return data
-    elif output_game == 3:
-        return data
-
-
-def convert_from_prime(data, converter: AssetConverter):
-    if converter.target_game != Game.ECHOES:
-        raise UnsupportedTargetGame(Game.PRIME, converter.target_game)
-
-    # TODO
     return data
 
 
-def convert_from_echoes(data, converter: AssetConverter):
-    if converter.target_game != Game.PRIME:
-        raise UnsupportedTargetGame(Game.ECHOES, converter.target_game)
+def convert(data, converter: AssetConverter, source_game: Game):
+    if source_game.value < converter.target_game.value:
+        upgrade(data, converter, source_game)
+    elif source_game.value > converter.target_game.value:
+        downgrade(data, converter, source_game)
 
-    # TODO
+    # convert asset references
+    for element in data["elements"]:
+        if element["type"] in ('TEXR', 'TIND'):
+            body = element["body"]["body"]
+            if body is not None:
+                if body["id"] is not None:
+                    body["id"] = converter.convert_by_id(body["id"], source_game)
+
+        if element["type"] == 'KSSM' and element["body"]["magic"] != "NONE":
+            for spawn in element["body"]["spawns"]:
+                for t in spawn["v2"]:
+                    t["id"] = converter.convert_by_id(t["id"], source_game)
+
+        if element["type"] in ('SSWH', 'PMDL', 'SELC', 'IDTS', 'ICTS', 'IITS'):
+            body = element["body"]
+            if body["body"] is not None and source_game.is_valid_asset_id(body["body"]):
+                body["body"] = converter.convert_by_id(body["body"], source_game)
+
     return data
 
 
-def convert_from_corruption(data, converter: AssetConverter):
-    raise UnsupportedSourceGame(Game.CORRUPTION)
+class PARTConverter(dict):
+    def __missing__(self, key: Game):
+        if isinstance(key, Game):
+            return functools.partial(convert, source_game=key)
+        else:
+            raise KeyError(key)
 
 
-CONVERTERS = {
-    Game.PRIME: convert_from_prime,
-    Game.ECHOES: convert_from_echoes,
-    Game.CORRUPTION: convert_from_corruption,
-}
+CONVERTERS = PARTConverter()
