@@ -1,5 +1,7 @@
-from retro_data_structures.formats.ancs import ANCS
+from retro_data_structures import dependencies
+from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.construct_extensions import convert_to_raw_python
+from retro_data_structures.formats.ancs import ANCS
 from retro_data_structures.game_check import Game
 
 
@@ -24,3 +26,16 @@ def test_compare_p2(prime2_pwe_project):
     encoded = ANCS.build(data_as_dict, target_game=game)
 
     assert encoded == raw
+
+
+def test_dependencies_all_p1(prime1_pwe_project):
+    pak_path = prime1_pwe_project.joinpath("Disc", "files")
+    with AssetProvider(list(pak_path.glob("*.pak")), Game.PRIME) as asset_provider:
+        asset_ids = [
+            asset_id
+            for asset_id, (resource, _) in asset_provider._resource_by_asset_id.items()
+            if resource.asset.type == "ANCS"
+        ]
+
+        for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
+            print("{}: {}".format(asset_type, hex(asset_id)))
