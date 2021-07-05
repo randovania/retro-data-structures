@@ -78,7 +78,9 @@ def create_parser():
     deps = subparser.add_parser("list-dependencies")
     add_game_argument(deps)
     deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
-    deps.add_argument("asset_ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
+    g = deps.add_mutually_exclusive_group()
+    g.add_argument("--asset-ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
+    g.add_argument("--asset-type", type=str, help="List dependencies for all assets of the given type.")
 
     convert = subparser.add_parser("convert")
     add_game_argument(convert, "--source-game")
@@ -147,9 +149,18 @@ def do_decode_from_pak(args):
 def list_dependencies(args):
     game: Game = args.game
     paks_path: Path = args.paks_path
-    asset_ids: List[int] = args.asset_ids
+    asset_ids: List[int]
 
     with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
+        if args.asset_ids is not None:
+            asset_ids = args.asset_ids
+        else:
+            asset_ids = [
+                resource.asset.id
+                for resource in asset_provider.all_resource_headers
+                if resource.asset.type == args.asset_type.upper()
+            ]
+
         for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
             print("{}: {}".format(asset_type, hex(asset_id)))
 

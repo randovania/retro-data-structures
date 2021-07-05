@@ -90,3 +90,8 @@ class AssetProvider:
 
     def asset_id_exists(self, asset_id: AssetId) -> bool:
         return asset_id in self._resource_by_asset_id
+
+    @property
+    def all_resource_headers(self):
+        for resource, _ in self._resource_by_asset_id.values():
+            yield resource
