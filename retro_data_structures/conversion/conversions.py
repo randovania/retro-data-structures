@@ -1,4 +1,4 @@
-from retro_data_structures.conversion import anim, ancs, cinf, cmdl, cskr, evnt, part
+from retro_data_structures.conversion import anim, ancs, cinf, cmdl, cskr, evnt, part, txtr
 from retro_data_structures.conversion.asset_converter import ResourceConverter
 from retro_data_structures.formats import AssetType
 from retro_data_structures.game_check import Game
@@ -11,6 +11,7 @@ ALL_FORMATS = {
     "CSKR": cskr.CONVERTERS,
     "EVNT": evnt.CONVERTERS,
     "PART": part.CONVERTERS,
+    "TXTR": txtr.CONVERTERS,
 }
 
 
