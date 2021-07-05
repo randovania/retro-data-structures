@@ -1,6 +1,15 @@
+from construct.lib import ListContainer
+
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.game_check import Game
+
+
+def _convert_textures(material_set, converter: AssetConverter, source_game: Game):
+    material_set["texture_file_ids"] = ListContainer([
+        converter.convert_by_id(file_id, source_game)
+        for file_id in material_set["texture_file_ids"]
+    ])
 
 
 def convert_from_prime(data, converter: AssetConverter):
@@ -9,6 +18,8 @@ def convert_from_prime(data, converter: AssetConverter):
 
     data["version"] = 4
     for material_set in data["material_sets"]:
+        _convert_textures(material_set, converter, Game.PRIME)
+
         for material in material_set["materials"]:
             material["flags"] = material["flags"] + 0x3000
             material["vertex_attribute_flags"] = material["vertex_attribute_flags"] + 0x81000000
@@ -32,6 +43,8 @@ def convert_from_echoes(data, converter: AssetConverter):
 
     data["version"] = 2
     for material_set in data["material_sets"]:
+        _convert_textures(material_set, converter, Game.ECHOES)
+
         for material in material_set["materials"]:
             if not material["flags"] & 0x1:
                 material["flags"] = material["flags"] + 0x1
