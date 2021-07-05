@@ -75,4 +75,5 @@ def dependencies_for(obj, target_game):
             yield from dependencies_for(anim.animation, target_game)
 
     elif obj.type == MetaAnimationType.Sequence:
-        yield from dependencies_for(obj.body, target_game)
+        for item in obj.body:
+            yield from dependencies_for(item, target_game)
