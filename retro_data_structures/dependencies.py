@@ -26,6 +26,7 @@ _formats_without_dependencies = {
     "cskr",
     "cinf",
     "anim",
+    "cspp",
 }
 
 _dependency_functions = {
