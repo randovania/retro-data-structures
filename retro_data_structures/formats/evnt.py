@@ -1,4 +1,4 @@
-from construct import Struct, Int32ub, PrefixedArray, Int16ub, Byte, Float32b, If, Int32sb
+from construct import Struct, Int32ub, PrefixedArray, Int16ub, Byte, Float32b, If, Int32sb, Hex
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import String, CharAnimTime
@@ -48,7 +48,7 @@ ParticlePOINode = Struct(
 
 SoundPOINode = Struct(
     base=BasePOINode,
-    sound_id=Int32ub,
+    sound_id=Hex(Int32ub),
     fall_off=Float32b,
     max_distance=Float32b,
     echoes=If(game_check.is_prime2, Struct(
