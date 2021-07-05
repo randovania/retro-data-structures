@@ -1,3 +1,5 @@
+from typing import Optional
+
 import construct
 from construct import Struct, Const, RepeatUntil, Switch, Flag, Int32sb, Float32b, If, Sequence, Probe, \
     Pass, IfThenElse, Int32ub, PrefixedArray, Byte, Array
@@ -829,34 +831,39 @@ PART = Struct(
 )
 
 
-def dependencies_for(obj, target_game):
+def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
+    if asset_id is not None and game.is_valid_asset_id(asset_id):
+        yield asset_type, asset_id
+
+
+def dependencies_for(obj, target_game: Game):
     for element in obj.elements:
         if element.type in ('TEXR', 'TIND'):
-            if element.body is not None:
-                texture = element.body.body.id
-                if texture is not None:
-                    yield "TXTR", texture
+            if element.body.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body.id, "TXTR", target_game)
 
         if element.type == 'KSSM':
-            for spawn in element.body.spawns:
-                for t in spawn.v2:
-                    if target_game >= 2:
-                        yield t.type, t.id
-                    else:
-                        yield 'PART', t.id
+            if element.body.magic != 'NONE':
+                for spawn in element.body.spawns:
+                    for t in spawn.v2:
+                        yield from _yield_dependency_if_valid(
+                            t.id,
+                            t.type if target_game >= Game.ECHOES else "PART",
+                            target_game,
+                        )
 
         if element.type == 'SSWH':
             if element.body is not None:
-                yield 'SWHC', element.body
+                yield from _yield_dependency_if_valid(element.body.body, "SWHC", target_game)
 
         if element.type == 'PMDL':
             if element.body is not None:
-                yield 'CMDL', element.body
+                yield from _yield_dependency_if_valid(element.body.body, "CMDL", target_game)
 
         if element.type == 'SELC':
             if element.body is not None:
-                yield 'ELSC', element.body
+                yield from _yield_dependency_if_valid(element.body.body, "ELSC", target_game)
 
         if element.type in ('IDTS', 'ICTS', 'IITS'):
             if element.body is not None:
-                yield "PART", element.body
+                yield from _yield_dependency_if_valid(element.body.body, "PART", target_game)
