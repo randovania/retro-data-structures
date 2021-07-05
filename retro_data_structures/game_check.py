@@ -14,9 +14,29 @@ class Game(Enum):
     ECHOES = 2
     CORRUPTION = 3
 
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
     @property
     def uses_asset_id_32(self):
-        return self.value <= Game.ECHOES.value
+        return self <= Game.ECHOES
 
     @property
     def uses_lzo(self):
@@ -28,6 +48,11 @@ class Game(Enum):
             return (1 << 32) - 1
         else:
             return (1 << 64) - 1
+
+    def is_valid_asset_id(self, asset_id: int) -> bool:
+        if self == Game.PRIME and asset_id == 0:
+            return False
+        return asset_id != self.invalid_asset_id
 
 
 def get_current_game(ctx):
@@ -52,14 +77,14 @@ def is_prime3(ctx):
 
 def current_game_at_most(target: Game) -> Callable[[Any], bool]:
     def result(ctx):
-        return get_current_game(ctx).value <= target.value
+        return get_current_game(ctx) <= target
 
     return result
 
 
 def current_game_at_least(target: Game) -> Callable[[Any], bool]:
     def result(ctx):
-        return get_current_game(ctx).value >= target.value
+        return get_current_game(ctx) >= target
 
     return result
 
