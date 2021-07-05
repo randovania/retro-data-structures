@@ -5,6 +5,7 @@ from retro_data_structures.formats.anim import ANIM
 from retro_data_structures.formats.cinf import CINF
 from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.formats.cskr import CSKR
+from retro_data_structures.formats.cspp import CSPP
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.mlvl import MLVL
 from retro_data_structures.formats.mrea import MREA
@@ -28,6 +29,7 @@ ALL_FORMATS = {
     "EVNT": EVNT,
     "PART": PART,
     "TXTR": TXTR,
+    "CSPP": CSPP,
 }
 
 
