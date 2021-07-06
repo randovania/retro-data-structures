@@ -12,7 +12,10 @@ def convert_from_prime(data, converter: AssetConverter):
     if converter.target_game != Game.ECHOES:
         raise UnsupportedTargetGame(Game.PRIME, converter.target_game)
 
+    # ====================
+
     bones = {}
+
     for i, it in enumerate(data["anim"]["bone_channel_descriptors"]):
         bones[i] = it["bone_id"]
 
@@ -27,8 +30,9 @@ def convert_from_prime(data, converter: AssetConverter):
             "scale_keys": None,
         })
 
-    for i in range((max(bones.values()) + 1) > len(data["anim"]["bone_channel_descriptors"])):
-        data["anim"]["bone_channel_descriptors"]
+        for key in data["anim"]["animation_keys"]:
+            if key["channels"] is not None:
+                key["channels"] += [{"rotation": None, "translation": None, "scale": None}]
 
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * (len(old))
@@ -39,10 +43,6 @@ def convert_from_prime(data, converter: AssetConverter):
         it["scale_keys_count"] = 0
         data["anim"]["bone_channel_descriptors"][new_bone_id] = it
         index_conversion[new_bone_id] = i
-
-    for key in data["anim"]["animation_keys"]:
-        if key["channels"] is not None:
-            key["channels"] += [{"rotation": None, "translation": None, "scale": None}]
 
     for key in data["anim"]["animation_keys"]:
         if key["channels"] is not None:
