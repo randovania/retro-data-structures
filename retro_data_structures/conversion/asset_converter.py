@@ -1,7 +1,7 @@
 import copy
 from typing import Callable, Dict, Tuple, Any, NamedTuple
 
-from retro_data_structures.asset_provider import AssetProvider
+from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId
 from retro_data_structures.formats import AssetType, AssetId
 from retro_data_structures.game_check import Game
 
@@ -47,7 +47,10 @@ class AssetConverter:
         source_asset = asset_provider.get_asset(asset_id)
         asset_type = asset_provider.get_type_for_asset(asset_id)
 
-        new_asset = self.convert_asset(source_asset, asset_type, source_game)
+        try:
+            new_asset = self.convert_asset(source_asset, asset_type, source_game)
+        except Exception as e:
+            raise InvalidAssetId(asset_id, f"Unable to convert {asset_type}: {e}")
         self.converted_ids[(source_game, asset_id)] = new_asset.id
         self._being_converted.remove(asset_id)
 
