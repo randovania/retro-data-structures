@@ -205,6 +205,9 @@ def do_convert(args):
                     converted.resource,
                 ))
 
+            for dependency in dependencies.direct_dependencies_for(converted.resource, converted.type, target_game):
+                print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
+
         print("==================\n>> All converted assets")
         reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
             v: k
