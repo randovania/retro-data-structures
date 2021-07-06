@@ -103,6 +103,7 @@ def convert_from_prime(data, converter: AssetConverter):
         animation_resource["anim_id"]: animation_resource["event_id"]
         for animation_resource in data["animation_set"]["animation_resources"]
     }
+    data["animation_set"]["animation_resources"] = None
 
     event_sets = ListContainer()
     for animation in data["animation_set"]["animations"]:
