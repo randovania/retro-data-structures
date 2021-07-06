@@ -7,7 +7,7 @@ from retro_data_structures.game_check import Game
 
 def _convert_textures(material_set, converter: AssetConverter, source_game: Game):
     material_set["texture_file_ids"] = ListContainer([
-        converter.convert_by_id(file_id, source_game)
+        converter.convert_by_id(file_id, source_game).id
         for file_id in material_set["texture_file_ids"]
     ])
 
