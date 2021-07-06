@@ -3,6 +3,11 @@ from retro_data_structures.conversion.errors import UnsupportedTargetGame, Unsup
 from retro_data_structures.game_check import Game
 
 
+def _convert_particles(data, converter: AssetConverter, source_game: Game):
+    for poi_node in data["particle_poi_nodes"]:
+        poi_node["particle"]["id"] = converter.convert_by_id(poi_node["particle"]["id"], source_game).id
+
+
 def convert_from_prime(data, converter: AssetConverter):
     if converter.target_game != Game.ECHOES:
         raise UnsupportedTargetGame(Game.PRIME, converter.target_game)
@@ -18,6 +23,8 @@ def convert_from_prime(data, converter: AssetConverter):
         sound_poi_node["base"]["unk_1"] = 2
         sound_poi_node["sound_id"] = 0x80002748
         sound_poi_node["echoes"] = {"unk_a": 0, "unk_b": 7372, "unk_c": 7372, "unk_d": 0}
+
+    _convert_particles(data, converter, Game.PRIME)
 
     return data
 
@@ -38,6 +45,8 @@ def convert_from_echoes(data, converter: AssetConverter):
         sound_poi_node["base"]["unk_1"] = 1
         sound_poi_node["sound_id"] = 0x80000074
         sound_poi_node["echoes"] = None
+
+    _convert_particles(data, converter, Game.ECHOES)
 
     return data
 
