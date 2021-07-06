@@ -67,7 +67,12 @@ class AssetProvider:
         pak_file.seek(resource.offset)
         data = pak_file.read(resource.size)
         if resource.compressed:
-            data = CompressedPakResource.parse(data, target_game=self.target_game)
+            try:
+                data = CompressedPakResource.parse(data, target_game=self.target_game)
+            except Exception as e:
+                raise InvalidAssetId(asset_id,
+                                     f"Unable to decompress {resource.asset.type} from "
+                                     f"{self.pak_paths[pak_id]} at {resource.offset} with size {resource.size}: {e}.")
 
         try:
             format_for_type = formats.format_for(resource.asset.type)
