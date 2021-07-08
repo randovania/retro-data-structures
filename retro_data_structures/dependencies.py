@@ -1,15 +1,19 @@
 import logging
-from typing import Iterator, Tuple, Dict, Set, List
+from typing import Iterator, Dict, Set, List, NamedTuple, Callable, Any
 
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
-from retro_data_structures.formats import ancs, cmdl, evnt, part
+from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.formats import ancs, cmdl, evnt, part, AssetId, AssetType
 from retro_data_structures.game_check import Game
 
-Dependency = Tuple[str, int]
+
+class Dependency(NamedTuple):
+    type: AssetType
+    id: AssetId
 
 
 class InvalidDependency(Exception):
-    def __init__(self, this_asset_id: int, dependency_id: int, dependency_type: str):
+    def __init__(self, this_asset_id: AssetId, dependency_id: AssetId, dependency_type: AssetType):
         super().__init__(f"Asset id 0x{this_asset_id:08X} has dependency 0x{dependency_id:08X} ({dependency_type}) "
                          f"that can't be parsed.")
         self.this_asset_id = this_asset_id
@@ -37,17 +41,21 @@ _dependency_functions = {
 }
 
 
-def format_has_dependencies(obj_type: str):
+def format_has_dependencies(obj_type: AssetType):
     return obj_type.lower() not in _formats_without_dependencies
 
 
-def direct_dependencies_for(obj, obj_type: str, target_game: Game) -> Iterator[Dependency]:
+def direct_dependencies_for(obj, obj_type: AssetType, target_game: Game) -> Iterator[Dependency]:
     if format_has_dependencies(obj_type):
         yield from _dependency_functions[obj_type.lower()](obj, target_game)
 
 
-def _internal_dependencies_for(asset_provider: AssetProvider, asset_id: int, obj_type: str,
-                               deps_by_asset_id: Dict[int, Set[Dependency]]):
+def _internal_dependencies_for(
+        get_asset: Callable[[AssetId], Any],
+        target_game: Game,
+        asset_id: AssetId, obj_type: AssetType,
+        deps_by_asset_id: Dict[AssetId, Set[Dependency]]
+):
     if asset_id in deps_by_asset_id:
         return
 
@@ -55,11 +63,11 @@ def _internal_dependencies_for(asset_provider: AssetProvider, asset_id: int, obj
     if not format_has_dependencies(obj_type):
         return
 
-    obj = asset_provider.get_asset(asset_id)
-    for new_type, new_asset_id in direct_dependencies_for(obj, obj_type, asset_provider.target_game):
-        deps_by_asset_id[asset_id].add((new_type, new_asset_id))
+    obj = get_asset(asset_id)
+    for new_type, new_asset_id in direct_dependencies_for(obj, obj_type, target_game):
+        deps_by_asset_id[asset_id].add(Dependency(new_type, new_asset_id))
         try:
-            _internal_dependencies_for(asset_provider, new_asset_id, new_type, deps_by_asset_id)
+            _internal_dependencies_for(get_asset, target_game, new_asset_id, new_type, deps_by_asset_id)
         except UnknownAssetId:
             logging.warning(f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) "
                             f"that doesn't exist.")
@@ -67,15 +75,28 @@ def _internal_dependencies_for(asset_provider: AssetProvider, asset_id: int, obj
             raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
-def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[int]) -> Set[Dependency]:
-    deps_by_asset_id: Dict[int, Set[Dependency]] = {}
+def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[AssetId]) -> Set[Dependency]:
+    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
 
     for asset_id in asset_ids:
         obj_type = asset_provider.get_type_for_asset(asset_id)
-        _internal_dependencies_for(asset_provider, asset_id, obj_type, deps_by_asset_id)
+        _internal_dependencies_for(asset_provider.get_asset, asset_provider.target_game,
+                                   asset_id, obj_type, deps_by_asset_id)
 
     result = set()
     for deps in deps_by_asset_id.values():
         result.update(deps)
 
     return result
+
+
+def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId, Set[Dependency]]:
+    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
+
+    for converted in asset_converter.converted_assets.values():
+        if converted.id not in deps_by_asset_id:
+            _internal_dependencies_for(lambda asset_id: asset_converter.converted_assets[asset_id].resource,
+                                       asset_converter.target_game,
+                                       converted.id, converted.type, deps_by_asset_id)
+
+    return deps_by_asset_id
