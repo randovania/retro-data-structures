@@ -2,6 +2,13 @@ from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.game_check import Game
 
+_BONE_NAME_MAPPING = {
+    'Skeleton_Root': 1, 'root': 0, 'Electric': 6, 'WBbottom_SDK': 4, 'WBtop_SDK': 3, 'move_SDK': 2, 'snaplocators': 5,
+    'Missile_Launcher_SDK': 3, 'grapple_SDK': 2, 'skeleton_root': 1, 'can_SDK': 3, 'visor_SDK': 2, 'EnergyTank_SDK': 2,
+    'MorphBall_Pickup_SDK': 2, 'bomb_SDK': 2, 'power_SDK': 2, 'powerbombleft_SDK': 3, 'powerbombright_SDK': 2,
+    'Powerup_SDK': 2, 'bottom_piece': 4, 'cubes': 2, 'top_piece': 5, 'trails': 3, 'midring_SDK': 4, 'outring_SDK': 3,
+    'rotate_SDK': 2}
+
 
 def _convert_particles(data, converter: AssetConverter, source_game: Game):
     for poi_node in data["particle_poi_nodes"]:
@@ -16,8 +23,8 @@ def convert_from_prime(data, converter: AssetConverter):
         particle_poi_node["base"]["unk_1"] = 2
 
     for i, poi_node in enumerate(data["particle_poi_nodes"]):
+        poi_node["bone_id"] = _BONE_NAME_MAPPING.get(poi_node["bone_name"], i)
         poi_node["bone_name"] = None
-        poi_node["bone_id"] = i  # FIXME - Pull Bone ID from corresponding Bone Name - in CINF File
 
     for i, sound_poi_node in enumerate(data["sound_poi_nodes"]):
         sound_poi_node["base"]["unk_1"] = 2
