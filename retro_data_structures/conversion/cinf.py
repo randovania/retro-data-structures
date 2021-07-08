@@ -25,6 +25,7 @@ def convert_from_prime(data, converter: AssetConverter):
     for i, it in enumerate(data["build_order_id"]):
         it = it - 3
         data["build_order_id"][i] = it
+
     for bone_name in data["bone_names"]:
         bone_name["bone_id"] = bone_name["bone_id"] - 3
 

@@ -1,5 +1,5 @@
 import copy
-from typing import Callable, Dict, Tuple, Any, NamedTuple
+from typing import Callable, Dict, Tuple, Any, NamedTuple, Optional
 
 from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId
 from retro_data_structures.formats import AssetType, AssetId
@@ -33,7 +33,13 @@ class AssetConverter:
         self.converted_assets = {}
         self._being_converted = set()
 
-    def convert_by_id(self, asset_id: AssetId, source_game: Game) -> ConvertedAsset:
+    def convert_id(self, asset_id: Optional[AssetId], source_game: Game) -> AssetId:
+        if asset_id is not None and source_game.is_valid_asset_id(asset_id):
+            return self.convert_asset_by_id(asset_id, source_game).id
+        else:
+            return self.target_game.invalid_asset_id
+
+    def convert_asset_by_id(self, asset_id: AssetId, source_game: Game) -> ConvertedAsset:
         new_id = self.converted_ids.get((source_game, asset_id))
         if new_id is not None:
             return self.converted_assets[new_id]

@@ -49,18 +49,17 @@ def convert(data, converter: AssetConverter, source_game: Game):
         if element["type"] in ('TEXR', 'TIND'):
             body = element["body"]["body"]
             if body is not None:
-                if body["id"] is not None:
-                    body["id"] = converter.convert_by_id(body["id"], source_game).id
+                body["id"] = converter.convert_id(body["id"], source_game)
 
         if element["type"] == 'KSSM' and element["body"]["magic"] != "NONE":
             for spawn in element["body"]["value"]["spawns"]:
                 for t in spawn["v2"]:
-                    t["id"] = converter.convert_by_id(t["id"], source_game).id
+                    t["id"] = converter.convert_id(t["id"], source_game)
 
         if element["type"] in ('SSWH', 'PMDL', 'SELC', 'IDTS', 'ICTS', 'IITS'):
             body = element["body"]
-            if body["body"] is not None and source_game.is_valid_asset_id(body["body"]):
-                body["body"] = converter.convert_by_id(body["body"], source_game).id
+            if body["body"] is not None:
+                body["body"] = converter.convert_id(body["body"], source_game)
 
     return data
 

@@ -191,7 +191,7 @@ def do_convert(args):
         )
 
         for asset_id in asset_ids:
-            converted = converter.convert_by_id(asset_id, source_game)
+            converted = converter.convert_asset_by_id(asset_id, source_game)
 
             print(
                 "\n========================="

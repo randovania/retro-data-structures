@@ -12,11 +12,11 @@ from retro_data_structures.game_check import Game
 
 def _convert_meta_animation(animation, converter: AssetConverter, source_game: Game):
     if animation["type"] == MetaAnimationType.Play:
-        animation["body"]["asset_id"] = converter.convert_by_id(animation["body"]["asset_id"], source_game).id
+        animation["body"]["asset_id"] = converter.convert_id(animation["body"]["asset_id"], source_game)
 
     elif animation["type"] in (MetaAnimationType.Blend, MetaAnimationType.PhaseBlend):
-        animation["body"]["anim_a"] = converter.convert_by_id(animation["body"]["anim_a"], source_game).id
-        animation["body"]["anim_b"] = converter.convert_by_id(animation["body"]["anim_b"], source_game).id
+        animation["body"]["anim_a"] = converter.convert_id(animation["body"]["anim_a"], source_game)
+        animation["body"]["anim_b"] = converter.convert_id(animation["body"]["anim_b"], source_game)
 
     elif animation["type"] == MetaAnimationType.Random:
         for item in animation["body"]:
@@ -37,10 +37,7 @@ def _convert_meta_animations(data, converter: AssetConverter, source_game: Game)
 
 def _convert_character(data, converter: AssetConverter, source_game: Game):
     for field in ["model_id", "skin_id", "skeleton_id", "frozen_model", "frozen_skin"]:
-        if data[field] is None or data[field] == 0 or data[field] == source_game.invalid_asset_id:
-            data[field] = converter.invalid_asset_id
-        else:
-            data[field] = converter.convert_by_id(data[field], source_game).id
+        data[field] = converter.convert_id(data[field], source_game)
 
     if converter.target_game == Game.PRIME:
         data["spatial_primitives_id"] = None
@@ -51,7 +48,7 @@ def _convert_character(data, converter: AssetConverter, source_game: Game):
 
     for field in ["generic_particles", "swoosh_particles", "electric_particles"]:
         data["particle_resource_data"][field] = [
-            converter.convert_by_id(particle, source_game).id
+            converter.convert_id(particle, source_game)
             for particle in data["particle_resource_data"][field]
         ]
 
@@ -109,7 +106,7 @@ def convert_from_prime(data, converter: AssetConverter):
     for animation in data["animation_set"]["animations"]:
         anim_ids = list(get_animation_ids(animation["meta"]))
         event_sets.append(
-            converter.convert_by_id(anim_to_event[anim_ids[0]], Game.PRIME).resource
+            converter.convert_asset_by_id(anim_to_event[anim_ids[0]], Game.PRIME).resource
         )
     data["animation_set"]["event_sets"] = event_sets
 

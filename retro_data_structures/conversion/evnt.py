@@ -5,7 +5,7 @@ from retro_data_structures.game_check import Game
 
 def _convert_particles(data, converter: AssetConverter, source_game: Game):
     for poi_node in data["particle_poi_nodes"]:
-        poi_node["particle"]["id"] = converter.convert_by_id(poi_node["particle"]["id"], source_game).id
+        poi_node["particle"]["id"] = converter.convert_id(poi_node["particle"]["id"], source_game)
 
 
 def convert_from_prime(data, converter: AssetConverter):
