@@ -142,7 +142,7 @@ def do_decode_from_pak(args):
     paks_path: Path = args.paks_path
     asset_id: int = args.asset_id
 
-    with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
+    with AssetProvider(game, list(paks_path.glob("*.pak"))) as asset_provider:
         print(asset_provider.get_asset(asset_id))
 
 
@@ -151,7 +151,7 @@ def list_dependencies(args):
     paks_path: Path = args.paks_path
     asset_ids: List[int]
 
-    with AssetProvider(list(paks_path.glob("*.pak")), game) as asset_provider:
+    with AssetProvider(game, list(paks_path.glob("*.pak"))) as asset_provider:
         if args.asset_ids is not None:
             asset_ids = args.asset_ids
         else:
@@ -171,7 +171,7 @@ def do_convert(args):
     paks_path: Path = args.paks_path
     asset_ids: List[int] = args.asset_ids
 
-    with AssetProvider(list(paks_path.glob("*.pak")), source_game) as asset_provider:
+    with AssetProvider(source_game, list(paks_path.glob("*.pak"))) as asset_provider:
         next_id = 0xFFFF0000
 
         def id_generator(asset_type):

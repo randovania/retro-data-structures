@@ -1,4 +1,5 @@
 import logging
+import typing
 from pathlib import Path
 from typing import List, BinaryIO, Optional
 
@@ -26,16 +27,18 @@ class InvalidAssetId(Exception):
 class AssetProvider:
     _pak_files: Optional[List[BinaryIO]] = None
 
-    def __init__(self, pak_paths: List[Path], target_game: Game):
+    def __init__(self, target_game: Game, pak_paths: List[Path], pak_files: Optional[List[typing.BinaryIO]] = None):
         self.pak_paths = pak_paths
+        self._pak_files = pak_files
         self.target_game = target_game
         self.loaded_assets = {}
 
     def __enter__(self):
-        self._pak_files = [
-            path.open("rb")
-            for path in self.pak_paths
-        ]
+        if self._pak_files is None:
+            self._pak_files = [
+                path.open("rb")
+                for path in self.pak_paths
+            ]
         self._paks = []
         for i, pak_file in enumerate(self._pak_files):
             logger.info("Parsing PAK at %s", str(self.pak_paths[i]))

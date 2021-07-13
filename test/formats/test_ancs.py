@@ -30,7 +30,7 @@ def test_compare_p2(prime2_pwe_project):
 
 def test_dependencies_all_p1(prime1_pwe_project):
     pak_path = prime1_pwe_project.joinpath("Disc", "files")
-    with AssetProvider(list(pak_path.glob("*.pak")), Game.PRIME) as asset_provider:
+    with AssetProvider(Game.PRIME, list(pak_path.glob("*.pak"))) as asset_provider:
         asset_ids = [
             asset_id
             for asset_id, (resource, _) in asset_provider._resource_by_asset_id.items()
