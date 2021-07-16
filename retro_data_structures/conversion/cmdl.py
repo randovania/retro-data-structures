@@ -21,8 +21,8 @@ def convert_from_prime(data, converter: AssetConverter):
         _convert_textures(material_set, converter, Game.PRIME)
 
         for material in material_set["materials"]:
-            material["flags"] = material["flags"] + 0x3000
-            material["vertex_attribute_flags"] = material["vertex_attribute_flags"] + 0x81000000
+            material["flags"] |= 0x3000
+            material["vertex_attribute_flags"] |= 0x81000000
             material["unk_1"] = 0
             material["unk_2"] = 0
 
@@ -46,10 +46,9 @@ def convert_from_echoes(data, converter: AssetConverter):
         _convert_textures(material_set, converter, Game.ECHOES)
 
         for material in material_set["materials"]:
-            if not material["flags"] & 0x1:
-                material["flags"] = material["flags"] + 0x1
-            material["flags"] = material["flags"] - 0x3000
-            material["vertex_attribute_flags"] = material["vertex_attribute_flags"] - 0x81000000
+            material["flags"] |= 0x1
+            material["flags"] &= ~0x3000
+            material["vertex_attribute_flags"] &= ~0x81000000
             material["unk_1"] = None
             material["unk_2"] = None
 
