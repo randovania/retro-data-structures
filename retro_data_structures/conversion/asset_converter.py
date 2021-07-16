@@ -33,12 +33,16 @@ class AssetConverter:
         self.converted_assets = {}
         self._being_converted = set()
 
-    def convert_id(self, asset_id: Optional[AssetId], source_game: Game) -> AssetId:
+    def convert_id(self, asset_id: Optional[AssetId], source_game: Game, *,
+                   missing_assets_as_invalid: bool = True) -> AssetId:
         if asset_id is not None and source_game.is_valid_asset_id(asset_id):
             try:
                 return self.convert_asset_by_id(asset_id, source_game).id
             except UnknownAssetId:
-                return self.target_game.invalid_asset_id
+                if missing_assets_as_invalid:
+                    return self.target_game.invalid_asset_id
+                else:
+                    raise
         else:
             return self.target_game.invalid_asset_id
 
