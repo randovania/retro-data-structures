@@ -123,10 +123,9 @@ def convert_from_echoes(data, converter: AssetConverter):
     for character in data["character_set"]["characters"]:
         character["version"] = 6
         for animation_name in character["animation_names"]:
-            animation_name["unknown"] = u''
+            animation_name["unknown"] = ''
         character["unknown_1"] = 1
-        character["frozen_model"] = 0
-        character["frozen_skin"] = 0
+        _convert_character(character, converter, Game.ECHOES)
 
     _convert_meta_animations(data, converter, Game.ECHOES)
 
