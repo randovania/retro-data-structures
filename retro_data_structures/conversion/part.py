@@ -206,6 +206,7 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                     element["body"]["body"]["c"] = element["body"]["body"]["d"].copy()
                     del element["body"]["body"]["d"]
                     del element["body"]["body"]["e"]
+
             if element["type"] == "COLR":
                 if element["body"]["type"] == "MDAO":
                     if (
@@ -217,24 +218,16 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                         new_colr_cnst_a_keyp_b = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_c = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_d = copy.deepcopy(element["body"]["body"]["a"])
-                        new_colr_cnst_a_keyp_a["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_b["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_c["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_d["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
+                        new_colr_cnst_a_keyp_a["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_b["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_c["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_d["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
                         element["body"]["body"]["a"]["type"] = "CNST"
                         for i, key in enumerate(org_colr_mado_a_keye):
-                            new_colr_cnst_a_keyp_a["body"]["keys"][i] = key[0]
-                            new_colr_cnst_a_keyp_b["body"]["keys"][i] = key[1]
-                            new_colr_cnst_a_keyp_c["body"]["keys"][i] = key[2]
-                            new_colr_cnst_a_keyp_d["body"]["keys"][i] = key[3]
+                            for j, t in enumerate((new_colr_cnst_a_keyp_a, new_colr_cnst_a_keyp_b,
+                                                   new_colr_cnst_a_keyp_c, new_colr_cnst_a_keyp_d)):
+                                t["body"]["keys"][i] = key[j]
+
                         element["body"]["body"]["a"]["body"] = {
                             "a": new_colr_cnst_a_keyp_a,
                             "b": new_colr_cnst_a_keyp_b,
@@ -248,6 +241,7 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                             },
                         }
                     element["body"] = element["body"]["body"]["a"]
+
                 if element["body"]["type"] == "MULT":
                     if (
                         element["body"]["body"]["a"]["type"] == "PULS"
@@ -278,24 +272,17 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                             new_colr_a_c_mult_a_keyp_c_b = copy.deepcopy(element["body"]["body"]["a"]["body"]["c"])
                             new_colr_a_c_mult_a_keyp_c_c = copy.deepcopy(element["body"]["body"]["a"]["body"]["c"])
                             new_colr_a_c_mult_a_keyp_c_d = copy.deepcopy(element["body"]["body"]["a"]["body"]["c"])
-                            new_colr_a_c_mult_a_keyp_c_a["body"]["keys"] = [None] * len(
-                                element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
-                            )
-                            new_colr_a_c_mult_a_keyp_c_b["body"]["keys"] = [None] * len(
-                                element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
-                            )
-                            new_colr_a_c_mult_a_keyp_c_c["body"]["keys"] = [None] * len(
-                                element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
-                            )
-                            new_colr_a_c_mult_a_keyp_c_d["body"]["keys"] = [None] * len(
-                                element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
-                            )
+                            new_colr_a_c_mult_a_keyp_c_a["body"]["keys"] = [None] * len(org_colr_mult_a_c_keyp)
+                            new_colr_a_c_mult_a_keyp_c_b["body"]["keys"] = [None] * len(org_colr_mult_a_c_keyp)
+                            new_colr_a_c_mult_a_keyp_c_c["body"]["keys"] = [None] * len(org_colr_mult_a_c_keyp)
+                            new_colr_a_c_mult_a_keyp_c_d["body"]["keys"] = [None] * len(org_colr_mult_a_c_keyp)
                             element["body"]["body"]["a"]["body"]["c"]["type"] = "CNST"
                             for i, key in enumerate(org_colr_mult_a_c_keyp):
                                 new_colr_a_c_mult_a_keyp_c_a["body"]["keys"][i] = key[0]
                                 new_colr_a_c_mult_a_keyp_c_b["body"]["keys"][i] = key[1]
                                 new_colr_a_c_mult_a_keyp_c_c["body"]["keys"][i] = key[2]
                                 new_colr_a_c_mult_a_keyp_c_d["body"]["keys"][i] = key[3]
+
                             element["body"]["body"]["a"]["body"]["c"]["body"] = {
                                 "a": {
                                     "type": "MULT",
@@ -326,22 +313,24 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                                     },
                                 },
                             }
-                            num_keys = len(element["body"]["body"]["a"]["body"]["d"]["body"]["keys"])
+
+                            # ================================================
                             org_colr_mult_a_d_keyp = element["body"]["body"]["a"]["body"]["d"]["body"]["keys"]
                             new_colr_a_c_mult_a_keyp_d_a = copy.deepcopy(element["body"]["body"]["a"]["body"]["d"])
                             new_colr_a_c_mult_a_keyp_d_b = copy.deepcopy(element["body"]["body"]["a"]["body"]["d"])
                             new_colr_a_c_mult_a_keyp_d_c = copy.deepcopy(element["body"]["body"]["a"]["body"]["d"])
                             new_colr_a_c_mult_a_keyp_d_d = copy.deepcopy(element["body"]["body"]["a"]["body"]["d"])
-                            new_colr_a_c_mult_a_keyp_d_a["body"]["keys"] = [None] * num_keys
-                            new_colr_a_c_mult_a_keyp_d_b["body"]["keys"] = [None] * num_keys
-                            new_colr_a_c_mult_a_keyp_d_c["body"]["keys"] = [None] * num_keys
-                            new_colr_a_c_mult_a_keyp_d_d["body"]["keys"] = [None] * num_keys
+                            new_colr_a_c_mult_a_keyp_d_a["body"]["keys"] = [None] * len(org_colr_mult_a_d_keyp)
+                            new_colr_a_c_mult_a_keyp_d_b["body"]["keys"] = [None] * len(org_colr_mult_a_d_keyp)
+                            new_colr_a_c_mult_a_keyp_d_c["body"]["keys"] = [None] * len(org_colr_mult_a_d_keyp)
+                            new_colr_a_c_mult_a_keyp_d_d["body"]["keys"] = [None] * len(org_colr_mult_a_d_keyp)
                             element["body"]["body"]["a"]["body"]["d"]["type"] = "CNST"
                             for i, key in enumerate(org_colr_mult_a_d_keyp):
                                 new_colr_a_c_mult_a_keyp_d_a["body"]["keys"][i] = key[0]
                                 new_colr_a_c_mult_a_keyp_d_b["body"]["keys"][i] = key[1]
                                 new_colr_a_c_mult_a_keyp_d_c["body"]["keys"][i] = key[2]
                                 new_colr_a_c_mult_a_keyp_d_d["body"]["keys"][i] = key[3]
+
                             element["body"]["body"]["a"]["body"]["d"]["body"] = {
                                 "a": {
                                     "type": "MULT",
@@ -459,7 +448,9 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                                     },
                                 },
                             }
+
                     element["body"] = element["body"]["body"]["a"]
+
             if element["type"] == "ADV1":
                 if element["body"]["type"] == "KPIN":
                     element["body"] = element["body"]["body"]
