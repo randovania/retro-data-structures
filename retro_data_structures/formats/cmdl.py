@@ -1,7 +1,7 @@
 import construct
 from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b,
                        GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Pointer, Tell, Seek,
-                       FocusedSeq)
+                       FocusedSeq, ExprAdapter)
 
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
 from retro_data_structures.construct_extensions import AlignTo, WithVersion, Skip
@@ -178,7 +178,9 @@ CMDL = Struct(
         normals=DataSection(
             GreedyRange(IfThenElse(
                 construct.this._root.flags & 0x2,
-                construct.Error,  # TODO: read the half-vectors
+                Array(3, ExprAdapter(Int16ub,  # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
+                                     lambda obj, ctx: obj / 0x8000,
+                                     lambda obj, ctx: int(obj * 0x8000))),
                 Vector3,
             )),
         ),
