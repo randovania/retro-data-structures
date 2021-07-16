@@ -1,4 +1,4 @@
-from construct.lib import ListContainer
+from construct.lib import ListContainer, Container
 
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
@@ -137,10 +137,10 @@ def convert_from_echoes(data, converter: AssetConverter):
         for anim_id in get_animation_ids(animation["meta"]):
             if anim_id not in seen_ids and anim_id != Game.ECHOES.invalid_asset_id:
                 seen_ids.add(anim_id)
-                data["animation_set"]["animation_resources"].append({
+                data["animation_set"]["animation_resources"].append(Container({
                     "anim_id": anim_id,
                     "event_id": evnt_id,
-                })
+                }))
 
     data["animation_set"]["event_sets"] = None
 
