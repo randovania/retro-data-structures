@@ -1,7 +1,7 @@
 import copy
 from typing import Callable, Dict, Tuple, Any, NamedTuple, Optional
 
-from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId
+from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId, UnknownAssetId
 from retro_data_structures.formats import AssetType, AssetId
 from retro_data_structures.game_check import Game
 
@@ -35,7 +35,10 @@ class AssetConverter:
 
     def convert_id(self, asset_id: Optional[AssetId], source_game: Game) -> AssetId:
         if asset_id is not None and source_game.is_valid_asset_id(asset_id):
-            return self.convert_asset_by_id(asset_id, source_game).id
+            try:
+                return self.convert_asset_by_id(asset_id, source_game).id
+            except UnknownAssetId:
+                return self.target_game.invalid_asset_id
         else:
             return self.target_game.invalid_asset_id
 
