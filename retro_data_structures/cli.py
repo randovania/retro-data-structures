@@ -66,7 +66,7 @@ def create_parser():
 
     compare = subparser.add_parser("compare-files")
     add_game_argument(compare)
-    compare.add_argument("--format", help="Hint the format of the file")
+    compare.add_argument("--format", help="Hint the format of the file", required=True)
     compare.add_argument("--limit", help="Limit the number of files to test", type=int)
     compare.add_argument("input_path", type=Path, help="Path to the directory to glob")
 
