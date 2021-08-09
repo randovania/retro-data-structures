@@ -141,9 +141,9 @@ def create(version: int, asset_id):
         "_current_section" / construct.Computed(lambda this: 0),
 
         # Sections. Each group is compressed separately
-        "section_groups" / Aligned(32, FocusedSeq(
+        "section_groups" / FocusedSeq(
             "groups",
-            headers=Array(construct.this._._compressed_block_count, Struct(
+            headers=Aligned(32, Array(construct.this._._compressed_block_count, Struct(
                 address=Tell,
                 value=Struct(
                     "buffer_size" / Int32ub,
@@ -151,8 +151,8 @@ def create(version: int, asset_id):
                     "compressed_size" / Int32ub,
                     "section_count" / Int32ub,
                 ),
-            )),
-            groups=Array(
+            ))),
+            groups=Aligned(32, Array(
                 construct.this._._compressed_block_count,
                 DataSectionInGroup(Struct(
                     header=Computed(lambda this: this._.headers[this._index]),
@@ -167,8 +167,8 @@ def create(version: int, asset_id):
                         Prefixed(Pointer(lambda this: this.header.address + 4, Int32ub), GreedyBytes),
                     ),
                 )),
-            ),
-        )),
+            )),
+        ),
     ]
 
     return Struct(*fields)
