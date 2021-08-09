@@ -223,16 +223,167 @@ def do_convert(args):
             ))
 
 
+_ITEM_ID_TO_NAME = {
+    85: "AbsorbAttack",
+    94: "ActivateMorphballBoost",
+    32: "AgonKey1",
+    33: "AgonKey2",
+    34: "AgonKey3",
+    98: "AmberTranslator",
+    3: "AnnihilatorBeam",
+    21: "AnnihilatorBomb",
+    66: "ArchenemyCount",
+    89: "BeamWeaponsDisabled",
+    16: "BoostBall",
+    96: "CannonBall",
+    22: "ChargeBeam",
+    108: "ChargeCombo",
+    100: "CobaltTranslator",
+    79: "CoinAmplifier",
+    80: "CoinCounter",
+    8: "CombatVisor",
+    45: "DarkAmmo",
+    1: "DarkBeam",
+    19: "DarkBomb",
+    83: "DarkShield",
+    13: "DarkSuit",
+    10: "DarkVisor",
+    5: "Darkburst",
+    86: "DeathBall",
+    65: "DiedCount",
+    92: "DisableBall",
+    93: "DisableSpaceJump",
+    58: "DoubleDamage",
+    11: "EchoVisor",
+    99: "EmeraldTranslator",
+    42: "EnergyTank",
+    107: "EnergyTransferModule",
+    64: "FragCount",
+    23: "GrappleBeam",
+    25: "GravityBoost",
+    95: "HackedEffect",
+    41: "HealthRefill",
+    38: "HiveKey1",
+    39: "HiveKey2",
+    40: "HiveKey3",
+    59: "Invincibility",
+    57: "Invisibility",
+    47: "ItemPercentage",
+    46: "LightAmmo",
+    2: "LightBeam",
+    20: "LightBomb",
+    84: "LightShield",
+    14: "LightSuit",
+    50: "MiscCounter3",
+    44: "Missile",
+    90: "MissileWeaponsDisabled",
+    15: "MorphBall",
+    18: "MorphBallBombs",
+    56: "MultiChargeUpgrade",
+    51: "Multiplayer_Archenemy",
+    49: "Multiplayer_NumPlayersInOptionsMenu",
+    48: "Multiplayer_NumPlayersJoined",
+    67: "PersistentCounter1",
+    68: "PersistentCounter2",
+    69: "PersistentCounter3",
+    70: "PersistentCounter4",
+    71: "PersistentCounter5",
+    72: "PersistentCounter6",
+    73: "PersistentCounter7",
+    74: "PersistentCounter8",
+    0: "PowerBeam",
+    43: "Powerbomb",
+    87: "ScanVirus",
+    9: "ScanVisor",
+    27: "ScrewAttack",
+    26: "SeekerLauncher",
+    7: "SonicBoom",
+    24: "SpaceJumpBoots",
+    17: "SpiderBall",
+    6: "Sunburst",
+    4: "SuperMissile",
+    75: "SwitchVisorCombat",
+    77: "SwitchVisorDark",
+    78: "SwitchVisorEcho",
+    76: "SwitchVisorScan",
+    55: "SwitchWeaponAnnihilator",
+    53: "SwitchWeaponDark",
+    54: "SwitchWeaponLight",
+    52: "SwitchWeaponPower",
+    29: "TempleKey1",
+    30: "TempleKey2",
+    31: "TempleKey3",
+    101: "TempleKey4",
+    102: "TempleKey5",
+    103: "TempleKey6",
+    104: "TempleKey7",
+    105: "TempleKey8",
+    106: "TempleKey9",
+    35: "TorvusKey1",
+    36: "TorvusKey2",
+    37: "TorvusKey3",
+    28: "TranslatorUpgrade_TempETM",
+    60: "Unknown_60",
+    61: "Unknown_61",
+    62: "Unknown_62",
+    63: "Unknown_63",
+    91: "Unknown_91",
+    82: "UnlimitedBeamAmmo",
+    81: "UnlimitedMissiles",
+    12: "VariaSuit",
+    97: "VioletTranslator",
+    88: "VisorStatic",
+}
+
+
 def decode_encode_compare_file(file_path: Path, game: Game, file_format: str):
     construct_class = formats.format_for(file_format)
 
     try:
         raw = file_path.read_bytes()
         decoded_from_raw = construct_class.parse(raw, target_game=game)
-        encoded = construct_class.build(decoded_from_raw, target_game=game)
 
-        if raw != encoded and raw.rstrip(b"\xFF") != encoded:
-            return f"{file_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})"
+        sections = []
+        for group in decoded_from_raw.section_groups:
+            sections.extend(group.sections)
+
+        conditionals = [0xCEC16932, 0xE709DDC0, 0x49614C51, 0xB498B424]
+        condition_name = ["Equal To", "Not Equal To", "Greater Than", "Less Than", "Greater Than or Equal To",
+                          "Less Than or Equal To", "Greater Than All Other Players", "Less Than All Other Players"]
+
+        from retro_data_structures.formats.scly import SCLY
+        for i in range(decoded_from_raw.script_layers_section, decoded_from_raw.generated_script_objects_section):
+            scly = SCLY.parse(sections[i].data, target_game=game)
+            for instance in scly.script_instances:
+                name = None
+                arg = None
+                func = None
+
+                if instance.type in {"SPFN", "CRLY"}:
+                    for prop in instance.properties.data:
+                        if prop.id == 0x255A4580:
+                            name = prop.data[0].data
+                        if prop.id == 0xB581574B:
+                            arg = prop.data
+                        if prop.id == 0x95F8D644:
+                            func = prop.data
+
+                        if prop.id == 0x3FA164BC and prop.data != 0:
+                            print(f"{name}: func {func}, {_ITEM_ID_TO_NAME[prop.data]}, quantity {arg}")
+
+                        if prop.id in conditionals:
+                            if prop.data[0].data != 0:
+                                index = conditionals.index(prop.id)
+                                item = _ITEM_ID_TO_NAME[prop.data[1].data]
+                                field = "Capacity" if prop.data[2].data else "Amount"
+                                criteria = condition_name[prop.data[3].data]
+                                value = prop.data[4].data
+                                print(f"{name}: conditional {index}, {item} {field} {criteria} {value}")
+
+        # encoded = construct_class.build(decoded_from_raw, target_game=game)
+
+        # if raw != encoded and raw.rstrip(b"\xFF") != encoded:
+        #     return f"{file_path}: Results differ (len(raw): {len(raw)}; len(encoded): {len(encoded)})"
         return None
 
     except Exception as e:
@@ -260,10 +411,16 @@ async def compare_all_files_in_path(args):
 
     errors = []
 
-    with ProcessPoolExecutor() as executor:
+    with ProcessPoolExecutor(max_workers=1) as executor:
         files = apply_limit(input_path.rglob(f"*.{file_format.upper()}"))
-        if tqdm is not None:
-            files = tqdm.tqdm(files, unit=" file")
+        # if tqdm is not None:
+        #     files = tqdm.tqdm(files, unit=" file")
+
+        for f in files:
+            print(f)
+            decode_encode_compare_file(f, game, file_format)
+
+        raise SystemExit(0)
 
         results = [loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
                    for f in files]
@@ -279,6 +436,7 @@ async def compare_all_files_in_path(args):
                     as_completed.set_postfix_str(f"{len(errors)} errors")
                 else:
                     print(message)
+            raise SystemExit
 
     if errors:
         print(f"{len(errors)} errors:")
