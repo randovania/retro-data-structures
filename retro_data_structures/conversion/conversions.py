@@ -1,7 +1,5 @@
 from retro_data_structures.conversion import anim, ancs, cinf, cmdl, cskr, evnt, part, txtr
-from retro_data_structures.conversion.asset_converter import ResourceConverter
-from retro_data_structures.formats import AssetType
-from retro_data_structures.game_check import Game
+from retro_data_structures.conversion.asset_converter import ResourceConverter, AssetDetails
 
 ALL_FORMATS = {
     "ANCS": ancs.CONVERTERS,
@@ -15,10 +13,10 @@ ALL_FORMATS = {
 }
 
 
-def converter_for(source_game: Game, type_name: AssetType) -> ResourceConverter:
+def converter_for(details: AssetDetails) -> ResourceConverter:
     try:
-        format_converters = ALL_FORMATS[type_name.upper()]
+        format_converters = ALL_FORMATS[details.asset_type.upper()]
     except KeyError as e:
         raise KeyError(f"No conversion available for format {e}")
 
-    return format_converters[source_game]
+    return format_converters[details.original_game]

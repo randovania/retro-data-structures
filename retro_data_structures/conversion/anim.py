@@ -1,4 +1,4 @@
-from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.conversion.asset_converter import AssetConverter, Resource, AssetDetails
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.game_check import Game
 
@@ -8,7 +8,7 @@ def find_missing(lst):
             if x not in lst]
 
 
-def convert_from_prime(data, converter: AssetConverter):
+def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetConverter):
     if converter.target_game != Game.ECHOES:
         raise UnsupportedTargetGame(Game.PRIME, converter.target_game)
 
@@ -60,7 +60,7 @@ def convert_from_prime(data, converter: AssetConverter):
     return data
 
 
-def convert_from_echoes(data, converter: AssetConverter):
+def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetConverter):
     if converter.target_game != Game.PRIME:
         raise UnsupportedTargetGame(Game.ECHOES, converter.target_game)
 
@@ -103,7 +103,7 @@ def convert_from_echoes(data, converter: AssetConverter):
     return data
 
 
-def convert_from_corruption(data, converter: AssetConverter):
+def convert_from_corruption(data: Resource, details: AssetDetails, converter: AssetConverter):
     raise UnsupportedSourceGame(Game.CORRUPTION)
 
 

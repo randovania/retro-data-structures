@@ -1,7 +1,6 @@
 import copy
-import functools
 
-from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.conversion.asset_converter import AssetConverter, Resource, AssetDetails
 from retro_data_structures.game_check import Game
 
 
@@ -457,7 +456,9 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
     return data
 
 
-def convert(data, converter: AssetConverter, source_game: Game):
+def convert(data: Resource, details: AssetDetails, converter: AssetConverter):
+    source_game = details.original_game
+
     if source_game.value < converter.target_game.value:
         upgrade(data, converter, source_game)
     elif source_game.value > converter.target_game.value:
@@ -487,7 +488,7 @@ def convert(data, converter: AssetConverter, source_game: Game):
 class PARTConverter(dict):
     def __missing__(self, key: Game):
         if isinstance(key, Game):
-            return functools.partial(convert, source_game=key)
+            return convert
         else:
             raise KeyError(key)
 

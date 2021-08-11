@@ -1,6 +1,6 @@
 from construct.lib import ListContainer, Container
 
-from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.formats.meta_animation import MetaAnimationType
 from retro_data_structures.game_check import Game
@@ -80,7 +80,7 @@ def get_animation_ids(animation):
         raise ValueError(f"Unknown animation type: {animation['type']}")
 
 
-def convert_from_prime(data, converter: AssetConverter):
+def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetConverter):
     if converter.target_game != Game.ECHOES:
         raise UnsupportedTargetGame(Game.PRIME, converter.target_game)
 
@@ -116,7 +116,7 @@ def convert_from_prime(data, converter: AssetConverter):
     return data
 
 
-def convert_from_echoes(data, converter: AssetConverter):
+def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetConverter):
     if converter.target_game != Game.PRIME:
         raise UnsupportedTargetGame(Game.ECHOES, converter.target_game)
 
@@ -133,7 +133,8 @@ def convert_from_echoes(data, converter: AssetConverter):
     seen_ids = set()
 
     for animation, event_set in zip(data["animation_set"]["animations"], data["animation_set"]["event_sets"]):
-        evnt_id = converter.convert_asset(event_set, "EVNT", Game.ECHOES).id
+        details = AssetDetails(asset_id=None, asset_type="EVNT", original_game=Game.ECHOES)
+        evnt_id = converter.convert_asset(event_set, details).id
         for anim_id in get_animation_ids(animation["meta"]):
             if anim_id not in seen_ids and anim_id != Game.ECHOES.invalid_asset_id:
                 seen_ids.add(anim_id)
@@ -147,7 +148,7 @@ def convert_from_echoes(data, converter: AssetConverter):
     return data
 
 
-def convert_from_corruption(data, converter: AssetConverter):
+def convert_from_corruption(data: Resource, details: AssetDetails, converter: AssetConverter):
     raise UnsupportedSourceGame(Game.CORRUPTION)
 
 
