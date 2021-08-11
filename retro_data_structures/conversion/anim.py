@@ -66,11 +66,30 @@ def convert_from_echoes(data, converter: AssetConverter):
 
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * len(old)
+    index_conversion = {}
     for i, it in enumerate(old):
         new_bone_id = it["bone_id"] + 3
         it["bone_id"] = new_bone_id
         it["scale_keys_count"] = None
         data["anim"]["bone_channel_descriptors"][i] = it
+        index_conversion[new_bone_id] = i
+
+    enumme = data["anim"]["bone_channel_descriptors"].copy()
+    remove_count = 0
+    for i, bcd in enumerate(enumme):
+        if bcd["translation_keys_count"] == 0 and bcd["scale_keys_count"] is None and bcd["rotation_keys_count"] == 0:
+            del index_conversion[data["anim"]["bone_channel_descriptors"][i - remove_count]["bone_id"]]
+            del data["anim"]["bone_channel_descriptors"][i - remove_count]
+            remove_count += 1
+
+    for key in data["anim"]["animation_keys"]:
+        if key["channels"] is not None:
+            enumme = key["channels"].copy()
+            remove_count = 0
+            for i, channel in enumerate(enumme):
+                if channel["rotation"] is None and channel["translation"] is None and channel["scale"] is None:
+                    del key["channels"][i - remove_count]
+                    remove_count += 1
 
     data["anim"]["scale_multiplier"] = None
 
