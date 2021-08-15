@@ -93,9 +93,15 @@ def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[As
 def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId, Set[Dependency]]:
     deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
 
+    def get_asset(asset_id: AssetId):
+        try:
+            return asset_converter.converted_assets[asset_id].resource
+        except KeyError:
+            raise UnknownAssetId(asset_id) from None
+
     for converted in asset_converter.converted_assets.values():
         if converted.id not in deps_by_asset_id:
-            _internal_dependencies_for(lambda asset_id: asset_converter.converted_assets[asset_id].resource,
+            _internal_dependencies_for(get_asset,
                                        asset_converter.target_game,
                                        converted.id, converted.type, deps_by_asset_id)
 
