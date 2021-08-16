@@ -59,7 +59,7 @@ def _internal_dependencies_for(
     if asset_id in deps_by_asset_id:
         return
 
-    deps_by_asset_id[asset_id] = set()
+    deps_by_asset_id[asset_id] = {Dependency(obj_type, asset_id)}
     if not format_has_dependencies(obj_type):
         return
 
