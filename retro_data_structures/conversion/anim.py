@@ -1,7 +1,7 @@
 from retro_data_structures.conversion.asset_converter import AssetConverter, Resource, AssetDetails
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.game_check import Game
-
+import copy
 
 def find_missing(lst):
     return [x for x in range(lst[0], lst[-1] + 1)
@@ -14,12 +14,12 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
 
     # ====================
 
-    bones = {}
+    bones = []
 
     for i, it in enumerate(data["anim"]["bone_channel_descriptors"]):
-        bones[i] = it["bone_id"]
+        bones.append(it["bone_id"])
 
-    for i, it in enumerate(find_missing(sorted(bones.values()))):
+    for i, it in enumerate(find_missing(sorted(bones))):
         data["anim"]["bone_channel_descriptors"].append({
             "bone_id": it,
             "rotation_keys_count": 0,
@@ -31,23 +31,27 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
         })
 
         for key in data["anim"]["animation_keys"]:
-            if key["channels"] is not None:
-                key["channels"] += [{"rotation": None, "translation": None, "scale": None}]
+            key["channels"].append({
+                "rotation": None,
+                "translation": None,
+                "scale": None,
+            })
 
+    neworder = sorted(range(len(data["anim"]["bone_channel_descriptors"])), key = lambda x: data["anim"]["bone_channel_descriptors"][x]["bone_id"])
+
+    data["anim"]["bone_channel_descriptors"] = sorted(data["anim"]["bone_channel_descriptors"], key = lambda x: x["bone_id"])
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * (len(old))
-    index_conversion = {}
     for i, it in enumerate(old):
         new_bone_id = it["bone_id"] - 3
         it["bone_id"] = new_bone_id
         it["scale_keys_count"] = 0
-        data["anim"]["bone_channel_descriptors"][new_bone_id] = it
-        index_conversion[new_bone_id] = i
+        data["anim"]["bone_channel_descriptors"][i] = it
 
     for key in data["anim"]["animation_keys"]:
         if key["channels"] is not None:
             key["channels"] = [
-                key["channels"][index_conversion[i]]
+                key["channels"][neworder[i]]
                 for i, _ in enumerate(key["channels"])
             ]
 
@@ -66,19 +70,16 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
 
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * len(old)
-    index_conversion = {}
     for i, it in enumerate(old):
         new_bone_id = it["bone_id"] + 3
         it["bone_id"] = new_bone_id
         it["scale_keys_count"] = None
         data["anim"]["bone_channel_descriptors"][i] = it
-        index_conversion[new_bone_id] = i
 
     enumme = data["anim"]["bone_channel_descriptors"].copy()
     remove_count = 0
     for i, bcd in enumerate(enumme):
         if bcd["translation_keys_count"] == 0 and bcd["scale_keys_count"] is None and bcd["rotation_keys_count"] == 0:
-            del index_conversion[data["anim"]["bone_channel_descriptors"][i - remove_count]["bone_id"]]
             del data["anim"]["bone_channel_descriptors"][i - remove_count]
             remove_count += 1
 
@@ -90,6 +91,40 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
                 if channel["rotation"] is None and channel["translation"] is None and channel["scale"] is None:
                     del key["channels"][i - remove_count]
                     remove_count += 1
+
+    enumme = copy.deepcopy(data["anim"]["bone_channel_descriptors"])
+    remove_count = 0
+    for i,bcd in enumerate(enumme):
+        if bcd["translation_keys_count"] == 0 and bcd["scale_keys_count"] is None and bcd["rotation_keys_count"] == 0:
+            del data["anim"]["bone_channel_descriptors"][i - remove_count]
+            remove_count = remove_count + 1
+    for key in data["anim"]["animation_keys"]:
+        if key["channels"] is not None:
+            enumme = key["channels"].copy()
+            remove_count = 0
+            for i,channel in enumerate(enumme):
+                if channel["rotation"] is None and channel["translation"] is None and channel["scale"] is None:
+                    del key["channels"][i - remove_count]
+                    remove_count = remove_count + 1
+
+    enumme = copy.deepcopy(data["anim"]["bone_channel_descriptors"])
+    
+    for i, bcd in enumerate(enumme):
+        if bcd["bone_id"] == 3:
+            data["anim"]["bone_channel_descriptors"].append(bcd)
+            del data["anim"]["bone_channel_descriptors"][i]
+    
+    for key in data["anim"]["animation_keys"]:
+        if key["channels"] is not None:
+            key["channels"].append(key["channels"][0])
+            del key["channels"][0]
+
+    # HACK - Temple Keys hack (unsure why these are broken, this deletes the broken bone animation)
+    if details.asset_id == 0x46E4AF36:
+        del data["anim"]["bone_channel_descriptors"][1]
+        for key in data["anim"]["animation_keys"]:
+            if key["channels"] is not None:
+                del key["channels"][1]
 
     data["anim"]["scale_multiplier"] = None
 
