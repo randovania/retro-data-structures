@@ -7,13 +7,13 @@ class OffsetAdapter(Adapter):
         raise NotImplementedError()
     
     def _get_table_length(self, context):
-        raise NotImplementedError()
+        return len_(self._get_table(context))
     
     def _get_base_offset(self, context):
         return 0
     
     def _get_item_size(self, item):
-        raise NotImplementedError()
+        return item.size
     
 
     def _decode(self, obj, context, path):
