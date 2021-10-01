@@ -7,7 +7,7 @@ class OffsetAdapter(Adapter):
         raise NotImplementedError()
     
     def _get_table_length(self, context):
-        return len_(self._get_table(context))
+        return NotImplementedError()
     
     def _get_base_offset(self, context):
         return 0

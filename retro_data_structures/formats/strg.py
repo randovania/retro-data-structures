@@ -2,13 +2,14 @@
 https://wiki.axiodl.com/w/STRG_(File_Format)
 """
 
-from construct import (Byte, Index, Pointer, Seek, AdaptationError, Adapter, Array, Computed, Const,
-                       CString, Enum, GreedyRange, If, IfThenElse, Int32ub,
-                       Rebuild, Struct, Tell, len_, this)
+from construct import (Array, Byte, Computed, Const, CString, Enum,
+                       GreedyRange, If, Int32ub, Pointer, Rebuild, Seek,
+                       Struct, Tell, len_, this)
 from retro_data_structures import game_check
+from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.common_types import FourCC, String
 from retro_data_structures.game_check import Game
-from retro_data_structures.adapters.offset import OffsetAdapter
+
 
 class CorruptionLanguageOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
@@ -65,12 +66,10 @@ Language = Struct(
     "offset" / LanguageOffsetAdapter(Int32ub),
     "size" / If(
         game_check.is_prime2,
-        Int32ub
-        #Rebuild(
-        #    Int32ub,
-        #    this._.string_tables[this._index]._size
-        #)
-        # TODO: rebuild
+        Rebuild(
+            Int32ub,
+            lambda this: this._.string_tables[this.offset]._size
+        )
     )
 )
 
