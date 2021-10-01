@@ -14,3 +14,12 @@ def test_compare_p2(prime2_pwe_project):
     # without name table
     parse_and_build_compare(STRG, Game.ECHOES, prime2_pwe_project.joinpath(
         "Resources/Strings/Uncategorized/Light Suit.STRG"))
+
+def test_compare_p3(prime3_pwe_project):
+    # with name table
+    parse_and_build_compare(STRG, Game.CORRUPTION, prime3_pwe_project.joinpath(
+        "Resources/Strings/Uncategorized/Placeholder.STRG"))
+    
+    # without name table
+    parse_and_build_compare(STRG, Game.CORRUPTION, prime3_pwe_project.joinpath(
+        "Resources/Strings/Uncategorized/Placeholder2.STRG"))

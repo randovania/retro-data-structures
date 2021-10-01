@@ -15,6 +15,11 @@ def prime2_pwe_project():
 
 
 @pytest.fixture()
+def prime3_pwe_project():
+    return Path(os.environ["PRIME3_PWE_PROJECT"])
+
+
+@pytest.fixture()
 def prime1_paks_path():
     return Path(os.environ["PRIME1_PAKS"])
 
@@ -23,3 +28,7 @@ def prime1_paks_path():
 def prime2_paks_path():
     return Path(os.environ["PRIME2_PAKS"])
 
+
+@pytest.fixture()
+def prime3_paks_path():
+    return Path(os.environ["PRIME3_PAKS"])

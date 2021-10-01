@@ -1,12 +1,13 @@
 """
-https://wiki.axiodl.com/w/STRG_(Metroid_Prime)
+https://wiki.axiodl.com/w/STRG_(File_Format)
 """
 
-import construct
-from construct import (Tell, this, len_, Enum, Struct, Const, Int32ub, Array, CString, Rebuild, Computed, If, IfThenElse)
-
-from retro_data_structures.common_types import (FourCC, String)
+from construct import (AdaptationError, Adapter, Array, Computed, Const,
+                       CString, Enum, GreedyRange, If, IfThenElse, Int32ub,
+                       Rebuild, Struct, Tell, len_, this)
 from retro_data_structures import game_check
+from retro_data_structures.common_types import FourCC, String
+from retro_data_structures.game_check import Game
 
 Language = Struct(
     lang=FourCC,
@@ -25,6 +26,51 @@ Language = Struct(
             Computed(this._.string_tables[this._index]._size_end - this._.string_tables[this._index]._size_start)
         )
     )
+)
+
+class CorruptionLanguageOffsetAdapter(Adapter):
+    # stores offsets as indices
+    def _decode(self, obj, context, path):
+        string_table = context._.string_table
+        offset = obj
+        size = 0
+
+        for i in range(len_(string_table)):
+            if size == offset:
+                return i
+            if size > offset:
+                raise AdaptationError("No string begins at the requested offset!")
+
+            string = string_table[i]
+            size += string.size
+
+    def _encode(self, obj, context, path):
+        string_table = context._.string_table
+        index = obj
+        size = 0
+
+        for i in range(len_(string_table)):
+            if i == index:
+                return size
+            
+            string = string_table[i]
+            size += string.size
+
+def _compute_corruption_strings_size(ctx):
+    string_table = ctx._.string_table
+    offset_table = ctx.offsets
+    size = 0
+
+    for i in range(len_(offset_table)):
+        index = offset_table[i]
+        string = string_table[index]
+        size += string.size
+    
+    return size
+
+CorruptionLanguage = Struct(
+    strings_size=Rebuild(Int32ub, _compute_corruption_strings_size),
+    offsets=Array(this._.string_count, CorruptionLanguageOffsetAdapter(Int32ub)),
 )
 
 NameTable = Struct(
@@ -83,12 +129,26 @@ StringTable = Struct(
     _size_end=Tell
 )
 
+CorruptionString = Struct(
+    size=Rebuild(Int32ub, Computed(this._size_end - this._size_start)),
+    _size_start=Tell,
+    string=String,
+    _size_end=Tell
+)
+
 STRG = Struct(
     magic=Const(0x87654321, Int32ub),
     version=Enum(Int32ub, prime1=0, prime2=1, prime3=3),
     language_count=Rebuild(Int32ub, len_(this.language_table)),
     string_count=Rebuild(Int32ub, len_(this.string_tables[0])),
-    language_table=Array(this.language_count, Language),
-    name_table=If(game_check.is_prime2, NameTable),
-    string_tables=Array(this.language_count, StringTable)
+
+    language_table=If(game_check.current_game_at_most(Game.ECHOES), Array(this.language_count, Language)),
+
+    name_table=If(game_check.current_game_at_least(Game.ECHOES), NameTable),
+
+    language_ids=If(game_check.is_prime3, Array(this.language_count, FourCC)),
+    corruption_language_table=If(game_check.is_prime3, Array(this.language_count, CorruptionLanguage)),
+
+    string_tables=If(game_check.current_game_at_most(Game.ECHOES), Array(this.language_count, StringTable)),
+    string_table=If(game_check.is_prime3, GreedyRange(CorruptionString))
 )
