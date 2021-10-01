@@ -8,53 +8,26 @@ from construct import (AdaptationError, Adapter, Array, Computed, Const,
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, String
 from retro_data_structures.game_check import Game
+from retro_data_structures.adapters.offset import OffsetAdapter
 
-Language = Struct(
-    lang=FourCC,
-    offset=Rebuild(
-        Int32ub,
-        IfThenElse(
-            this._index == 0,
-            Const(0, Int32ub),
-            Computed(this._.language_table[this._index-1].offset + this._.language_table[this._index-1].size)
-        )
-    ),
-    size=If(
-        game_check.is_prime2,
-        Rebuild(
-            Int32ub,
-            Computed(this._.string_tables[this._index]._size_end - this._.string_tables[this._index]._size_start)
-        )
-    )
-)
+class CorruptionLanguageOffsetAdapter(OffsetAdapter):
+    def _get_table(self, context):
+        return context._.string_table
+    
+    def _get_table_length(self, context):
+        return len_(context._.string_table)
+    
+    def _get_item_size(self, item):
+        return item.size
 
-class CorruptionLanguageOffsetAdapter(Adapter):
-    # stores offsets as indices
-    def _decode(self, obj, context, path):
-        string_table = context._.string_table
-        offset = obj
-        size = 0
+class LanguageOffsetAdapter(OffsetAdapter):
+    pass
 
-        for i in range(len_(string_table)):
-            if size == offset:
-                return i
-            if size > offset:
-                raise AdaptationError("No string begins at the requested offset!")
+class NameTableOffsetAdapter(OffsetAdapter):
+    pass
 
-            string = string_table[i]
-            size += string.size
-
-    def _encode(self, obj, context, path):
-        string_table = context._.string_table
-        index = obj
-        size = 0
-
-        for i in range(len_(string_table)):
-            if i == index:
-                return size
-            
-            string = string_table[i]
-            size += string.size
+class StringTableOffsetAdapter(OffsetAdapter):
+    pass
 
 def _compute_corruption_strings_size(ctx):
     string_table = ctx._.string_table
@@ -67,6 +40,25 @@ def _compute_corruption_strings_size(ctx):
         size += string.size
     
     return size
+
+Language = Struct(
+    lang=FourCC,
+    offset=Rebuild(
+        Int32ub,
+        IfThenElse(
+            this._index == 0,
+            Computed(0),
+            Computed(this._.language_table[this._index-1].offset + this._.language_table[this._index-1].size)
+        )
+    ),
+    size=If(
+        game_check.is_prime2,
+        Rebuild(
+            Int32ub,
+            Computed(this._.string_tables[this._index]._size_end - this._.string_tables[this._index]._size_start)
+        )
+    )
+)
 
 CorruptionLanguage = Struct(
     strings_size=Rebuild(Int32ub, _compute_corruption_strings_size),
@@ -113,7 +105,7 @@ StringTable = Struct(
             Int32ub,
             IfThenElse(
                 this._index == 0,
-                Const(0, Int32ub),
+                Computed(0),
                 Computed(this.offsets[this._index-1] + (this.strings[this._index-1]._size_end - this.strings[this._index-1]._size_start))
             )
         )
