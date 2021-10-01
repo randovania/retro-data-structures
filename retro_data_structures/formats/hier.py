@@ -1,4 +1,4 @@
-from construct import (Struct, Const, Int32ub, PrefixedArray)
+from construct import (Struct, Const, Int32ub, PrefixedArray, GreedyRange, Byte)
 
 from retro_data_structures.common_types import AssetId32, String
 
@@ -10,4 +10,5 @@ HIER = Struct(
         scan_id=AssetId32,
         parent_id=Int32ub,
     )),
+    junk=GreedyRange(Byte)
 )
