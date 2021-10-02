@@ -3,7 +3,7 @@ from typing import Iterator, Dict, Set, List, NamedTuple, Callable, Any
 
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import ancs, cmdl, evnt, part, AssetId, AssetType
+from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part, AssetId, AssetType
 from retro_data_structures.game_check import Game
 
 
@@ -38,6 +38,8 @@ _dependency_functions = {
     "ancs": ancs.dependencies_for,
     "evnt": evnt.dependencies_for,
     "part": part.dependencies_for,
+    "scan": scan.dependencies_for,
+    "dgrp": dgrp.dependencies_for,
 }
 
 
