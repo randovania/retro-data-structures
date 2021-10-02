@@ -12,6 +12,7 @@ from retro_data_structures.formats.mrea import MREA
 from retro_data_structures.formats.pak import PAK
 from retro_data_structures.formats.part import PART
 from retro_data_structures.formats.txtr import TXTR
+from retro_data_structures.formats.strg import STRG
 
 AssetType = str
 AssetId = int
@@ -30,6 +31,7 @@ ALL_FORMATS = {
     "PART": PART,
     "TXTR": TXTR,
     "CSPP": CSPP,
+    "STRG": STRG,
 }
 
 

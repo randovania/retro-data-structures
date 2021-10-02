@@ -31,6 +31,7 @@ _formats_without_dependencies = {
     "cinf",
     "anim",
     "cspp",
+    "strg"
 }
 
 _dependency_functions = {
