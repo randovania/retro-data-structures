@@ -16,7 +16,10 @@ class CorruptionLanguageOffsetAdapter(OffsetAdapter):
         return context._.string_table
     
     def _get_table_length(self, context):
-        return len_(self._get_table(context))
+        return context._.string_table_length
+    
+    def _get_item_size(self, item):
+        return super()._get_item_size(item) + Int32ub.sizeof()
 
 class LanguageOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
@@ -54,7 +57,7 @@ def _compute_corruption_strings_size(ctx):
     offset_table = ctx.offsets
     size = 0
 
-    for i in range(len_(offset_table)):
+    for i in range(ctx._.string_count):
         index = offset_table[i]
         string = string_table[index]
         size += string.size
@@ -146,10 +149,18 @@ StringTable = Struct(
 )
 
 CorruptionString = Struct(
-    "size" /Rebuild(Int32ub, Computed(this._size_end - this._size_start)),
+    "_start" / Tell,
+    Seek(Int32ub.sizeof(), 1),
     "_size_start" / Tell,
     "string" / String,
-    "_size_end" / Tell
+    "_size_end" / Tell,
+    "size" / Pointer(
+        this._start,
+        Rebuild(
+            Int32ub,
+            this._size_end - this._size_start
+        )
+    )
 )
 
 STRG = Struct(
@@ -164,13 +175,18 @@ STRG = Struct(
 
     "name_table" / If(game_check.current_game_at_least(Game.ECHOES), NameTable),
 
-    "language_ids" / If(game_check.is_prime3, FourCC[this.language_count]),
-    "corruption_language_table" / If(game_check.is_prime3, CorruptionLanguage[this.language_count]),
+    "corr_lang_ids_start" / Tell,
+    If(game_check.is_prime3, Seek(FourCC.sizeof() * this.language_count, 1)),
+    "corr_lang_table_start" / Tell,
+    If(game_check.is_prime3, Seek(Int32ub.sizeof() * (this.string_count + 1) * this.language_count, 1)),
 
     "string_tables" / If(game_check.current_game_at_most(Game.ECHOES), StringTable[this.language_count]),
     "string_table" / If(game_check.is_prime3, GreedyRange(CorruptionString)),
+    "string_table_length" / If(game_check.is_prime3, Computed(len_(this.string_table))),
 
     "language_table" / If(game_check.current_game_at_most(Game.ECHOES), Pointer(this.lang_table_start, Language[this.language_count])),
+    "language_ids" / If(game_check.is_prime3, Pointer(this.corr_lang_ids_start, FourCC[this.language_count])),
+    "corruption_language_table" / If(game_check.is_prime3, Pointer(this.corr_lang_table_start, CorruptionLanguage[this.language_count])),
 
     "junk" / GreedyRange(Byte)
 )
