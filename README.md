@@ -12,6 +12,8 @@ Construct type definitions for Retro Studios game
 | CSKR     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | CINF     | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | PART     | &check;        | &check;         | &check;        | &check;         | &check; [1]    | &check; [1]     |
+| HIER     | -              | -               | &check;        | &check;         | -              | -               |
+| STRG     | &check;        | &check;         | &check;        | &check;         | &check;        | &check;         |
 
 * [1] All existing files parse, but not checked if exhaustive for what the game supports.
 * [2] Missing re-calculation of how sections are split between blocks.
