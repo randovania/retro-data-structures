@@ -34,7 +34,7 @@ ALL_FORMATS = {
     "CSPP": CSPP,
 
     "SCAN": SCAN,
-    "DGRP": DGRP
+    "DGRP": DGRP,
     "STRG": STRG,
 
 }
