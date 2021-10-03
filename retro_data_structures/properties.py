@@ -16,7 +16,7 @@ Property = Struct(
 
 SubProperties = PrefixedArray(Int16ub, Property)
 
-def AddPropertyInfo(_id, data_type, comment=""):
+def AddPropertyInfo(_id, data_type, comment="Unknown property"):
     PROPERTY_TYPES[_id] = data_type
     PROPERTY_INFO[_id] = comment
 
