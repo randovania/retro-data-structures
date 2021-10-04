@@ -14,7 +14,7 @@ class ByteEncoder(json.JSONEncoder):
             return self.default(obj.getvalue())
         return json.JSONEncoder.default(self, obj)
 
-def parse_and_build_compare(module, game: Game, file_path: Path, print_data=False):
+def parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=False):
     raw = file_path.read_bytes()
 
     data = module.parse(raw, target_game=game)
@@ -22,5 +22,8 @@ def parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fals
     if print_data:
         print(json.dumps(data_as_dict, indent=4, cls=ByteEncoder))
     encoded = module.build(data_as_dict, target_game=game)
+
+    if save_file:
+        file_path.parent.joinpath("TESTED.DUMB").write_bytes(encoded)
 
     assert encoded == raw

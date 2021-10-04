@@ -7,7 +7,7 @@ import io
 import construct
 from construct import (
     Peek, len_, RawCopy, Adapter, If, this, Byte, Int32ub, Struct, Const, Float32b, Array, Aligned, GreedyBytes, ListContainer, Container, Rebuild,
-    Tell, Computed, FocusedSeq, IfThenElse, Prefixed, Pointer, Subconstruct, Switch
+    Tell, Computed, FocusedSeq, IfThenElse, Prefixed, Pointer, Subconstruct, Switch, Lazy
 )
 from construct.core import FixedSized, RestreamData
 
@@ -27,7 +27,7 @@ DataSectionGroup = Struct(
             LZOCompressedBlock(this.header.uncompressed_size),
         ),
 
-        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes),
+        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes)
     )
 )
 
@@ -174,6 +174,7 @@ def create(version: int, asset_id):
         "area_transform" / Array(12, Float32b),
 
         # Number of world models in this area.
+        # TODO: rebuild
         "world_model_count" / Int32ub,
 
         # Number of script layers in this area.
@@ -238,11 +239,8 @@ def create(version: int, asset_id):
         # Sections. Each group is compressed separately
         "headers" / Aligned(32, Array(this.compressed_block_count, Struct(
             "address" / Tell,
-            "buffer_size" / Rebuild(Int32ub, IfThenElse(
-                this.compressed_size > 0,
-                Computed(this.compressed_size + 0x120),
-                Computed(this.uncompressed_size)
-            )),
+            # TODO: all of these should be rebuilt
+            "buffer_size" / Int32ub,
             "uncompressed_size" / Int32ub,
             "compressed_size" / Int32ub,
             "section_count" / Int32ub,
