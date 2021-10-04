@@ -16,6 +16,7 @@ from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSectionSizePointer, DataSectionSizes, GetDataSectionId, GetDataSectionSize, ResetCurrentSection
 from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
+from retro_data_structures.formats.script_layer import SCLY, SCGN
 
 DataSectionGroup = Struct(
     "header" / Computed(lambda this: this._.headers[this._index]),
@@ -57,6 +58,18 @@ class DataSectionGroupAdapter(Adapter):
 
 
 class CompressedBlocksAdapter(Adapter):
+    def _decode_category(self, category, subcon):
+        for i in range(len(category)):
+            section = category[i]
+            decoded = subcon.parse(section.data)
+            category[i].data = decoded
+    
+    def _encode_category(self, category, subcon):
+        for i in range(len(category)):
+            section = category[i]
+            encoded = subcon.build(section.data)
+            category[i].data = encoded
+
     def _decode(self, section_groups, context, path):
         _sections = []
 
@@ -88,6 +101,12 @@ class CompressedBlocksAdapter(Adapter):
             end = _categories[i+1]["value"]
             sections[c["label"]] = _sections[start:end]
         
+        self._decode_category(sections["script_layers_section"], SCLY)
+        self._decode_category(sections["generated_script_objects_section"], SCGN)
+        self._decode_category(sections["path_section"], AssetId32)
+        self._decode_category(sections["portal_area_section"], AssetId32)
+        self._decode_category(sections["static_geometry_map_section"], AssetId32)
+
         return sections
 
     def _encode(self, sections, context, path):
@@ -96,6 +115,12 @@ class CompressedBlocksAdapter(Adapter):
         current_group_size = 0
         current_group = []
         previous_label = ""
+
+        self._encode_category(sections["script_layers_section"], SCLY)
+        self._encode_category(sections["generated_script_objects_section"], SCGN)
+        self._encode_category(sections["path_section"], AssetId32)
+        self._encode_category(sections["portal_area_section"], AssetId32)
+        self._encode_category(sections["static_geometry_map_section"], AssetId32)
 
         def add_group(reason):
             nonlocal current_group, current_group_size
@@ -213,7 +238,11 @@ def create(version: int, asset_id):
         # Sections. Each group is compressed separately
         "headers" / Aligned(32, Array(this.compressed_block_count, Struct(
             "address" / Tell,
-            "buffer_size" / Int32ub,
+            "buffer_size" / Rebuild(Int32ub, IfThenElse(
+                this.compressed_size > 0,
+                Computed(this.compressed_size + 0x120),
+                Computed(this.uncompressed_size)
+            )),
             "uncompressed_size" / Int32ub,
             "compressed_size" / Int32ub,
             "section_count" / Int32ub,

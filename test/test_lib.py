@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 
 import json
@@ -9,6 +10,8 @@ class ByteEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, bytes):
             return obj.hex(' ').upper()
+        if isinstance(obj, BytesIO):
+            return self.default(obj.getvalue())
         return json.JSONEncoder.default(self, obj)
 
 def parse_and_build_compare(module, game: Game, file_path: Path, print_data=False):
