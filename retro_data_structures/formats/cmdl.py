@@ -169,7 +169,7 @@ CMDL = Struct(
                          + len(context.surfaces)),
     ),
     _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
-    _data_section_sizes=DataSectionSizes(construct.this._root._data_section_count),
+    data_section_sizes=DataSectionSizes(construct.this._root._data_section_count),
     _=AlignTo(32),
     _current_section=construct.Computed(lambda this: 0),
     material_sets=Array(construct.this._material_set_count, DataSection(MaterialSet)),
