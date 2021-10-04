@@ -3,10 +3,11 @@ from construct import Tell, Pointer, Int32ub, Struct, Array, Rebuild, If
 from retro_data_structures.construct_extensions import AlignedPrefixed, Skip
 
 
-def _get_current_section(context):
+def _get_current_section(context, increment=True):
     root = context["_root"]
     section = root["_current_section"]
-    root["_current_section"] += 1
+    if increment:
+        root["_current_section"] += 1
     return section
 
 def _get_section_length_address(context):
@@ -22,6 +23,9 @@ def DataSectionSizes(section_count, include_value=False):
 
 def GetDataSectionSize(context):
     return context._root._data_section_sizes.value[_get_current_section(context)]
+
+def GetDataSectionId(context):
+    return _get_current_section(context, False)
 
 def DataSectionSizePointer():
     return Pointer(_get_section_length_address, Int32ub)
