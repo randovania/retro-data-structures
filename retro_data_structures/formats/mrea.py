@@ -6,14 +6,15 @@ import io
 
 import construct
 from construct import (
-    Int32ub, Struct, Const, Float32b, Array, Aligned, GreedyBytes, ListContainer, Container, Rebuild,
+    RawCopy, Adapter, If, this, Byte, Int32ub, Struct, Const, Float32b, Array, Aligned, GreedyBytes, ListContainer, Container, Rebuild,
     Tell, Computed, FocusedSeq, IfThenElse, Prefixed, Pointer, Subconstruct, Switch
 )
+from construct.core import FixedSized, RestreamData
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
-from retro_data_structures.data_section import DataSectionSizes, DataSectionSizePointer
+from retro_data_structures.data_section import DataSectionSizePointer, DataSectionSizes
 from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
 
 class DataSectionInGroup(Subconstruct):
@@ -24,18 +25,19 @@ class DataSectionInGroup(Subconstruct):
 
         sections = []
         offset = 0
-        for i in range(group.section_count):
+        for i in range(group.header.section_count):
             section_size = size_pointer._parsereport(stream, context, path)
-            data = group.data[offset:offset + section_size]
+            data = group.data.data[offset:offset + section_size]
 
             sections.append(Container(
                 data=data,
                 hash=hashlib.sha256(data).hexdigest(),
+                size=section_size
             ))
             offset += section_size
 
         return Container(
-            compressed=group.header.value.compressed_size > 0,
+            compressed=group.header.compressed_size > 0,
             sections=ListContainer(sections),
         )
 
@@ -50,6 +52,55 @@ class DataSectionInGroup(Subconstruct):
 
         return obj2
 
+class DataSectionGroupsAdapter(Adapter):
+    def _decode(self, section_groups, context, path):
+        _sections = []
+
+        for group in section_groups:
+            _sections.extend(group.sections)
+        
+        def cat(label):
+            return {"label": label, "value": context[label]}
+        
+        _categories = sorted([
+            cat("geometry_section"),
+            cat("script_layers_section"),
+            cat("generated_script_objects_section"),
+            cat("collision_section"),
+            cat("unknown_section_1"),
+            cat("lights_section"),
+            cat("visibility_tree_section"),
+            cat("path_section"),
+            cat("unknown_section_2"),
+            cat("portal_area_section"),
+            cat("static_geometry_map_section"),
+            cat("data_section_count")
+        ], key=lambda cat:cat["value"])
+
+        sections = {}
+        for i in range(len(_categories)-1):
+            c = _categories[i]
+            start = c["value"]
+            end = _categories[i+1]["value"]
+            sections[c["label"]] = _sections[start:end]
+        
+        return sections
+
+    def _encode(self, sections, context, path):
+        return super()._encode(sections, context, path)
+
+DataSectionGroup = Struct(
+    "header" / Computed(lambda this: this._.headers[this._index]),
+    "data" / RawCopy(IfThenElse(
+        this.header.compressed_size > 0,
+        PrefixedWithPaddingBefore(
+            Pointer(this._.header.address + 8, Int32ub),
+            LZOCompressedBlock(this._.header.uncompressed_size),
+        ),
+
+        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes),
+    ))
+)
 
 def create(version: int, asset_id):
     fields = [
@@ -103,40 +154,26 @@ def create(version: int, asset_id):
         "static_geometry_map_section" / Int32ub,
 
         # Number of compressed data blocks in the file.
-        "_compressed_block_count" / Aligned(16, Rebuild(Int32ub, construct.len_(construct.this.section_groups))),
+        "_compressed_block_count" / Aligned(16, Rebuild(Int32ub, construct.len_(construct.this.sections))),
 
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "_data_section_sizes" / Aligned(32, DataSectionSizes(construct.this._root.data_section_count)),
+        "_data_section_sizes" / Aligned(32, DataSectionSizes(this.data_section_count)),
         "_current_section" / construct.Computed(lambda this: 0),
 
         # Sections. Each group is compressed separately
-        "section_groups" / FocusedSeq(
+        "sections" / DataSectionGroupsAdapter(FocusedSeq(
             "groups",
             headers=Aligned(32, Array(construct.this._._compressed_block_count, Struct(
-                address=Tell,
-                value=Struct(
-                    "buffer_size" / Int32ub,
-                    "uncompressed_size" / Int32ub,
-                    "compressed_size" / Int32ub,
-                    "section_count" / Int32ub,
-                ),
+                "address" / Tell,
+                "buffer_size" / Int32ub,
+                "uncompressed_size" / Int32ub,
+                "compressed_size" / Int32ub,
+                "section_count" / Int32ub,
             ))),
             groups=Aligned(32, Array(
                 construct.this._._compressed_block_count,
-                DataSectionInGroup(Struct(
-                    header=Computed(lambda this: this._.headers[this._index]),
-                    section_count=Pointer(lambda this: this.header.address + 12, Int32ub),
-                    data=IfThenElse(
-                        lambda this: this.header.value.compressed_size > 0,
-                        PrefixedWithPaddingBefore(
-                            Computed(lambda this: this.header.value.compressed_size),
-                            LZOCompressedBlock(lambda this: this.header.value.uncompressed_size),
-                        ),
-
-                        Prefixed(Pointer(lambda this: this.header.address + 4, Int32ub), GreedyBytes),
-                    ),
-                )),
-            )),
+                DataSectionInGroup(DataSectionGroup),
+            ))),
         ),
     ]
 
