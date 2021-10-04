@@ -15,36 +15,19 @@ from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSectionSizes, DataSectionSizePointer
 
+def PrefixedWithPaddingBefore(length_field, subcon):
+    return FocusedSeq(
+        "data",
+        "target_size" / Computed(32),
+        "length" / Rebuild(length_field, lambda this: len(this.data)),
+        "bytes_to_pad" / Computed(this.target_size - (this.length % this.target_size)),
+        "padding" / If(
+            this.bytes_to_pad < this.target_size,
+            Array(this.bytes_to_pad, Byte)
+        ),
+        "data" / subcon
+    )
 
-class PrefixedWithPaddingBefore(construct.Subconstruct):
-    def __init__(self, length_field, subcon):
-        super().__init__(subcon)
-        self.padding = 32
-        self.length_field = length_field
-
-    def _parse(self, stream, context, path):
-        length = self.length_field._parsereport(stream, context, path)
-        bytes_to_pad = self.padding - (length % self.padding)
-        if bytes_to_pad < self.padding:
-            construct.stream_read(stream, bytes_to_pad, path)
-        data = construct.stream_read(stream, length, path)
-        if self.subcon is GreedyBytes:
-            return data
-        return self.subcon._parsereport(io.BytesIO(data), context, path)
-
-    def _build(self, obj, stream, context, path):
-        stream2 = io.BytesIO()
-        buildret = self.subcon._build(obj, stream2, context, path)
-        data = stream2.getvalue()
-        length = len(data)
-        self.length_field._build(length, stream, context, path)
-
-        bytes_to_pad = self.padding - (length % self.padding)
-        if bytes_to_pad < self.padding:
-            construct.stream_write(stream, b"\x00" * bytes_to_pad, bytes_to_pad, path)
-
-        construct.stream_write(stream, data, len(data), path)
-        return buildret
 
 
 class DataSectionInGroup(Subconstruct):
