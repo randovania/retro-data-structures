@@ -14,45 +14,49 @@ from construct.core import FixedSized, RestreamData
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
-from retro_data_structures.data_section import DataSectionSizePointer, DataSectionSizes
+from retro_data_structures.data_section import DataSectionSizePointer, DataSectionSizes, GetDataSectionSize
 from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
 
-class DataSectionInGroup(Subconstruct):
-    def _parse(self, stream, context, path):
-        group = self.subcon._parsereport(stream, context, path)
+DataSectionGroup = Struct(
+    "header" / Computed(lambda this: this._.headers[this._index]),
+    "data" / IfThenElse(
+        this.header.compressed_size > 0,
+        PrefixedWithPaddingBefore(
+            Pointer(this._.header.address + 8, Int32ub),
+            LZOCompressedBlock(this._.header.uncompressed_size),
+        ),
 
-        size_pointer = DataSectionSizePointer()
+        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes),
+    )
+)
 
+class DataSectionGroupAdapter(Adapter):
+    def _decode(self, group, context, path):
         sections = []
         offset = 0
+
         for i in range(group.header.section_count):
-            section_size = size_pointer._parsereport(stream, context, path)
-            data = group.data.data[offset:offset + section_size]
+            section_size = GetDataSectionSize(context)
+            data = group.data[offset:offset+section_size]
 
             sections.append(Container(
                 data=data,
                 hash=hashlib.sha256(data).hexdigest(),
                 size=section_size
             ))
-            offset += section_size
 
+            offset += section_size
+        
         return Container(
             compressed=group.header.compressed_size > 0,
             sections=ListContainer(sections),
         )
+    
+    def _encode(self, group, context, path):
+        return b''.join([section.data for section in group.sections])
 
-    def _build(self, sections, stream, context, path):
-        if sections:
-            raise NotImplementedError
 
-        compressed_blocks = []
-        obj2 = ListContainer(compressed_blocks)
-
-        buildret = self.subcon._build(obj2, stream, context, path)
-
-        return obj2
-
-class DataSectionGroupsAdapter(Adapter):
+class CompressedBlocksAdapter(Adapter):
     def _decode(self, section_groups, context, path):
         _sections = []
 
@@ -88,19 +92,6 @@ class DataSectionGroupsAdapter(Adapter):
 
     def _encode(self, sections, context, path):
         return super()._encode(sections, context, path)
-
-DataSectionGroup = Struct(
-    "header" / Computed(lambda this: this._.headers[this._index]),
-    "data" / RawCopy(IfThenElse(
-        this.header.compressed_size > 0,
-        PrefixedWithPaddingBefore(
-            Pointer(this._.header.address + 8, Int32ub),
-            LZOCompressedBlock(this._.header.uncompressed_size),
-        ),
-
-        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes),
-    ))
-)
 
 def create(version: int, asset_id):
     fields = [
@@ -157,11 +148,11 @@ def create(version: int, asset_id):
         "_compressed_block_count" / Aligned(16, Rebuild(Int32ub, construct.len_(construct.this.sections))),
 
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "_data_section_sizes" / Aligned(32, DataSectionSizes(this.data_section_count)),
+        "_data_section_sizes" / Aligned(32, DataSectionSizes(this._.data_section_count, True)),
         "_current_section" / construct.Computed(lambda this: 0),
 
         # Sections. Each group is compressed separately
-        "sections" / DataSectionGroupsAdapter(FocusedSeq(
+        "sections" / CompressedBlocksAdapter(FocusedSeq(
             "groups",
             headers=Aligned(32, Array(construct.this._._compressed_block_count, Struct(
                 "address" / Tell,
@@ -172,7 +163,7 @@ def create(version: int, asset_id):
             ))),
             groups=Aligned(32, Array(
                 construct.this._._compressed_block_count,
-                DataSectionInGroup(DataSectionGroup),
+                DataSectionGroupAdapter(DataSectionGroup),
             ))),
         ),
     ]
