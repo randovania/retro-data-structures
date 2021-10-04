@@ -3,7 +3,7 @@ from typing import Any
 
 import construct
 from construct import (
-    FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
+    Computed, Array, Byte, FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
     EnumIntegerString, Container, Adapter, Enum, If, Subconstruct, Construct
 )
 
@@ -224,3 +224,16 @@ class ErrorWithMessage(Construct):
 
     def _sizeof(self, context, path):
         raise construct.SizeofError("Error does not have size, because it interrupts parsing and building", path=path)
+
+def PrefixedWithPaddingBefore(length_field, subcon):
+    return FocusedSeq(
+        "data",
+        "target_size" / Computed(32),
+        "length" / Rebuild(length_field, lambda this: len(this.data)),
+        "bytes_to_pad" / Computed(this.target_size - (this.length % this.target_size)),
+        "padding" / If(
+            this.bytes_to_pad < this.target_size,
+            Array(this.bytes_to_pad, Byte)
+        ),
+        "data" / subcon
+    )

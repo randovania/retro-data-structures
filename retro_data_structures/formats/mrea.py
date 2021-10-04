@@ -14,21 +14,7 @@ from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSectionSizes, DataSectionSizePointer
-
-def PrefixedWithPaddingBefore(length_field, subcon):
-    return FocusedSeq(
-        "data",
-        "target_size" / Computed(32),
-        "length" / Rebuild(length_field, lambda this: len(this.data)),
-        "bytes_to_pad" / Computed(this.target_size - (this.length % this.target_size)),
-        "padding" / If(
-            this.bytes_to_pad < this.target_size,
-            Array(this.bytes_to_pad, Byte)
-        ),
-        "data" / subcon
-    )
-
-
+from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
 
 class DataSectionInGroup(Subconstruct):
     def _parse(self, stream, context, path):
