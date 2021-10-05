@@ -27,7 +27,7 @@ def test_compare_p2(prime2_pwe_project):
 
     assert encoded == raw
 
-
+"""
 def test_dependencies_all_p1(prime1_pwe_project):
     pak_path = prime1_pwe_project.joinpath("Disc", "files")
     with AssetProvider(Game.PRIME, list(pak_path.glob("*.pak"))) as asset_provider:
@@ -39,3 +39,4 @@ def test_dependencies_all_p1(prime1_pwe_project):
 
         for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
             print("{}: {}".format(asset_type, hex(asset_id)))
+            """

@@ -253,7 +253,7 @@ def create(version: int, parse_block_func):
         "static_geometry_map_section" / Rebuild(Int32ub, lambda this: this.sections["static_geometry_map_section"][0].id),
 
         # Number of compressed data blocks in the file.
-        "compressed_block_count" / Aligned(16, Rebuild(Int32ub, len_(this.compressed_blocks))),
+        "compressed_block_count" / Aligned(16, Rebuild(Int32ub, len_(this.headers))),
 
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
         "data_section_sizes" / Aligned(32, DataSectionSizes(
@@ -276,8 +276,6 @@ def create(version: int, parse_block_func):
             "section_count" / Int32ub,
         ))),
         
-        "compressed_blocks" / Peek(CompressedBlocks(lambda this: False)),
-        Computed(ResetCurrentSection),
         "sections" / CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
     ]
 
