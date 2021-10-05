@@ -26,14 +26,14 @@ def DataSectionGroup(decompress):
         "data" / IfThenElse(
             this.header.compressed_size > 0,
             PrefixedWithPaddingBefore(
-                Pointer(this.header.address + 8, Int32ub),
+                Computed(this.header.compressed_size),
                 IfThenElse(
                     decompress,
                     LZOCompressedBlock(this.header.uncompressed_size),
                     GreedyBytes
                 )
             ),
-            Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes)
+            Prefixed(Computed(this.header.uncompressed_size), GreedyBytes)
         ),
     )
 
@@ -273,9 +273,10 @@ def create(version: int, parse_block_func):
             "buffer_size" / Int32ub,
             "uncompressed_size" / Int32ub,
             "compressed_size" / Int32ub,
-            "section_count" / Int32ub,
+            "section_count" / Int32ub, 
         ))),
         
+        #FIXME: recompression doesn't match with original when building
         "sections" / CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
     ]
 
