@@ -4,6 +4,7 @@ Vector2f = Array(2, Float32b)
 Vector3 = Array(3, Float32b)
 Quaternion = Array(4, Float32b)
 Color4f = Array(4, Float32b)
+BoundingBoxf = Array(6, Float32b)
 Transform4f = Array(12, Float32b)
 
 AABox = Struct(

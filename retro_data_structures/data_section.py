@@ -33,6 +33,5 @@ def ResetCurrentSection(context):
 def DataSectionSizePointer():
     return Pointer(_get_section_length_address, Int32ub)
 
-
-def DataSection(subcon, align=32):
-    return AlignedPrefixed(DataSectionSizePointer(), subcon, align, 0, b"\x00")
+def DataSection(subcon, align=32, size=DataSectionSizePointer):
+    return AlignedPrefixed(size(), subcon, align, 0, b"\x00")

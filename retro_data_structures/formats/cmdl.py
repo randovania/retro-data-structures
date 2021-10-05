@@ -25,6 +25,15 @@ TEVInput = Struct(
     tex_coord_tev_input=Byte,
 )
 
+Normal = IfThenElse(
+    lambda this: hasattr(this._root, "flags") and this._root.flags & 0x2,
+    Array(3, ExprAdapter(
+        Int16ub, # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
+        lambda obj, ctx: obj / 0x8000,
+        lambda obj, ctx: int(obj * 0x8000))),
+    Vector3,
+)
+
 param_count_per_uv_animtion_type = {
     0: 0,
     1: 0,
@@ -176,19 +185,13 @@ CMDL = Struct(
     attrib_arrays=Struct(
         positions=DataSection(GreedyRange(Vector3)),
         normals=DataSection(
-            GreedyRange(IfThenElse(
-                construct.this._root.flags & 0x2,
-                Array(3, ExprAdapter(Int16ub,  # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
-                                     lambda obj, ctx: obj / 0x8000,
-                                     lambda obj, ctx: int(obj * 0x8000))),
-                Vector3,
-            )),
+            GreedyRange(Normal),
         ),
         # TODO: none of Retro's games actually have data here, so this might be the wrong type!
         colors=DataSection(GreedyRange(Color4f)),
         uvs=DataSection(GreedyRange(Vector2f)),
         lightmap_uvs=If(
-            construct.this._root.flags & 0x4,
+            lambda this: hasattr(this._root, "flags") and this._root.flags & 0x4,
             DataSection(GreedyRange(Array(2, Float16b))),
         ),
     ),
