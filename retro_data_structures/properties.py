@@ -10,8 +10,8 @@ PROPERTY_TYPES = {}
 
 Property = Struct(
     "id" / Hex(Int32ub),
+    "comment" / Computed(lambda this: PROPERTY_INFO.get(this.id, "Unknown property")),
     "data" / Prefixed(Int16ub, GreedyRange(Switch(this.id, PROPERTY_TYPES, Byte))),
-    "comment" / Computed(lambda this: PROPERTY_INFO.get(this.id, "Unknown property"))
 )
 
 SubProperties = PrefixedArray(Int16ub, Property)

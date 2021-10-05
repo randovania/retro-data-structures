@@ -3,33 +3,39 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
 import hashlib
 import io
+from typing import Iterable
 
 import construct
 from construct import (
-    Peek, len_, RawCopy, Adapter, If, this, Byte, Int32ub, Struct, Const, Float32b, Array, Aligned, GreedyBytes, ListContainer, Container, Rebuild,
+    Seek, Peek, len_, RawCopy, Adapter, If, this, Byte, Int32ub, Struct, Const, Float32b, Array, Aligned, GreedyBytes, ListContainer, Container, Rebuild,
     Tell, Computed, FocusedSeq, IfThenElse, Prefixed, Pointer, Subconstruct, Switch, Lazy
 )
 from construct.core import FixedSized, RestreamData
 
-from retro_data_structures import game_check
+from retro_data_structures.game_check import AssetIdCorrect, get_current_game, Game
 from retro_data_structures.common_types import AssetId32
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSectionSizePointer, DataSectionSizes, GetDataSectionId, GetDataSectionSize, ResetCurrentSection
 from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
 from retro_data_structures.formats.script_layer import SCLY, SCGN
 
-DataSectionGroup = Struct(
-    "header" / Computed(lambda this: this._.headers[this._index]),
-    "data" / IfThenElse(
-        this.header.compressed_size > 0,
-        PrefixedWithPaddingBefore(
-            Pointer(this.header.address + 8, Int32ub),
-            LZOCompressedBlock(this.header.uncompressed_size),
+def DataSectionGroup(decompress):
+    return Struct(
+        "header" / Computed(lambda this: this._.headers[this._index]),
+        "decompressed" / Computed(decompress),
+        "data" / IfThenElse(
+            this.header.compressed_size > 0,
+            PrefixedWithPaddingBefore(
+                Pointer(this.header.address + 8, Int32ub),
+                IfThenElse(
+                    decompress,
+                    LZOCompressedBlock(this.header.uncompressed_size),
+                    GreedyBytes
+                )
+            ),
+            Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes)
         ),
-
-        Prefixed(Pointer(this.header.address + 4, Int32ub), GreedyBytes)
     )
-)
 
 class DataSectionGroupAdapter(Adapter):
     def _decode(self, group, context, path):
@@ -39,13 +45,19 @@ class DataSectionGroupAdapter(Adapter):
         for i in range(group.header.section_count):
             section_id = GetDataSectionId(context)
             section_size = GetDataSectionSize(context)
-            data = group.data[offset:offset+section_size]
+            
+            data = b''
+            if group.decompressed:
+                data = group.data[offset:offset+section_size]
+            elif i == 0:
+                data = group.data
 
             sections.append(Container(
                 data=data,
                 hash=hashlib.sha256(data).hexdigest(),
                 size=section_size,
-                id=section_id
+                id=section_id,
+                _decompressed=group.decompressed
             ))
 
             offset += section_size
@@ -58,17 +70,31 @@ class DataSectionGroupAdapter(Adapter):
 
 
 class CompressedBlocksAdapter(Adapter):
-    def _decode_category(self, category, subcon):
+    def _decode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-            decoded = subcon.parse(section.data)
-            category[i].data = decoded
+
+            if section._decompressed:
+                decoded = subcon._parse(io.BytesIO(section.data), context, path)
+                category[i].data = decoded
     
-    def _encode_category(self, category, subcon):
+    def _encode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-            encoded = subcon.build(section.data)
-            category[i].data = encoded
+
+            if section._decompressed:
+                encoded = io.BytesIO()
+                subcon._build(section.data, encoded, context, path)
+                category[i].data = encoded.getvalue()
+    
+    def _category_encodings(self):
+        return {
+            "script_layers_section": SCLY,
+            "generated_script_objects_section": SCGN,
+            "path_section": AssetIdCorrect,
+            "portal_area_section": AssetIdCorrect,
+            "static_geometry_map_section": AssetIdCorrect
+        }
 
     def _decode(self, section_groups, context, path):
         _sections = []
@@ -101,11 +127,8 @@ class CompressedBlocksAdapter(Adapter):
             end = _categories[i+1]["value"]
             sections[c["label"]] = _sections[start:end]
         
-        self._decode_category(sections["script_layers_section"], SCLY)
-        self._decode_category(sections["generated_script_objects_section"], SCGN)
-        self._decode_category(sections["path_section"], AssetId32)
-        self._decode_category(sections["portal_area_section"], AssetId32)
-        self._decode_category(sections["static_geometry_map_section"], AssetId32)
+        for category, subcon in self._category_encodings().items():
+            self._decode_category(sections[category], subcon, context, path)
 
         return sections
 
@@ -116,11 +139,8 @@ class CompressedBlocksAdapter(Adapter):
         current_group = []
         previous_label = ""
 
-        self._encode_category(sections["script_layers_section"], SCLY)
-        self._encode_category(sections["generated_script_objects_section"], SCGN)
-        self._encode_category(sections["path_section"], AssetId32)
-        self._encode_category(sections["portal_area_section"], AssetId32)
-        self._encode_category(sections["static_geometry_map_section"], AssetId32)
+        for category, subcon in self._category_encodings().items():
+            self._encode_category(sections[category], subcon, context, path)
 
         def add_group(reason):
             nonlocal current_group, current_group_size
@@ -159,12 +179,22 @@ class CompressedBlocksAdapter(Adapter):
         
         return groups
 
-CompressedBlocks = Aligned(32, Array(
-    this.compressed_block_count,
-    DataSectionGroupAdapter(DataSectionGroup),
-))
+def CompressedBlocks(parse_block_func):
+    return Aligned(32, Array(
+        this.compressed_block_count,
+        DataSectionGroupAdapter(DataSectionGroup(parse_block_func))
+    ))
 
-def create(version: int, asset_id):
+
+def IncludeScriptLayers(this):
+    """Parses only SCLY and SCGN sections."""
+    root = this._root
+    previous_sections = sum([header.section_count for header in root.headers[0:this._index]])
+    scly_sections = previous_sections >= root.script_layers_section-1 and previous_sections < (root.script_layers_section + root.script_layer_count)
+    scgn_section = previous_sections == root.generated_script_objects_section
+    return scly_sections or scgn_section
+
+def create(version: int, parse_block_func):
     fields = [
         "magic" / Const(0xDEADBEEF, Int32ub),
         "version" / Const(version, Int32ub),
@@ -246,20 +276,22 @@ def create(version: int, asset_id):
             "section_count" / Int32ub,
         ))),
         
-        "compressed_blocks" / Peek(CompressedBlocks),
+        "compressed_blocks" / Peek(CompressedBlocks(lambda this: False)),
         Computed(ResetCurrentSection),
-        "sections" / CompressedBlocksAdapter(CompressedBlocks),
+        "sections" / CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
     ]
 
     return Struct(*fields)
 
 
-Prime2MREA = create(0x19, AssetId32)
+def Prime2MREA(parse_block_func):
+    return create(0x19, parse_block_func)
 
-MREA = Switch(
-    game_check.get_current_game,
-    {
-        game_check.Game.ECHOES: Prime2MREA,
-    },
-    construct.Error,
-)
+def MREA(parse_block_func=IncludeScriptLayers):
+        return Switch(
+        get_current_game,
+        {
+            Game.ECHOES: Prime2MREA(parse_block_func),
+        },
+        construct.Error,
+    )
