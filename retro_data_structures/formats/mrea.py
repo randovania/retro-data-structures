@@ -185,14 +185,25 @@ def CompressedBlocks(parse_block_func):
         DataSectionGroupAdapter(DataSectionGroup(parse_block_func))
     ))
 
+def _previous_sections(this):
+    return sum([header.section_count for header in this._root.headers[0:this._index]])
 
 def IncludeScriptLayers(this):
     """Parses only SCLY and SCGN sections."""
     root = this._root
-    previous_sections = sum([header.section_count for header in root.headers[0:this._index]])
+    previous_sections = _previous_sections(this)
     scly_sections = previous_sections >= root.script_layers_section-1 and previous_sections < (root.script_layers_section + root.script_layer_count)
     scgn_section = previous_sections == root.generated_script_objects_section
     return scly_sections or scgn_section
+
+def IncludeAssetIdLayers(this):
+    """Parses only sections which hold single Asset IDs."""
+    root = this._root
+    previous_sections = _previous_sections(this)
+    path_section = previous_sections == root.path_section
+    portal_area_section = previous_sections == root.portal_area_section
+    static_geometry_map_section = previous_sections == root.static_geometry_map_section
+    return path_section or portal_area_section or static_geometry_map_section
 
 def create(version: int, parse_block_func):
     fields = [
