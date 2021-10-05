@@ -12,9 +12,11 @@ from construct import (
 )
 from construct.core import FixedSized, Float16b, GreedyRange, Int16sb, Int16ub, Padded, PrefixedArray, RestreamData
 from functools import partial
+from retro_data_structures.formats.area_collision import AreaCollision
+from retro_data_structures.formats.lights import Lights
 
 from retro_data_structures.game_check import AssetIdCorrect, get_current_game, Game
-from retro_data_structures.common_types import AssetId32, BoundingBoxf, Color4f, Transform4f, Vector2f, Vector3
+from retro_data_structures.common_types import AssetId32, AABox, Color4f, Transform4f, Vector2f, Vector3
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.data_section import DataSection, DataSectionSizePointer, DataSectionSizes, GetDataSectionId, GetDataSectionSize, ResetCurrentSection
 from retro_data_structures.construct_extensions import PrefixedWithPaddingBefore
@@ -24,11 +26,11 @@ from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
 WorldModelHeader = Struct(
     "visor_flags" / Int32ub, # TODO: FlagEnum
     "transform" / Transform4f,
-    "bounding_box" / BoundingBoxf
+    "bounding_box" / AABox
 )
 
 SurfaceGroupBounds = Struct(
-    "bounding_box" / BoundingBoxf,
+    "bounding_box" / AABox,
     "world_model_index" / Int16ub,
     "surface_group_index" / Int16ub,
     "unk1" / Int16sb,#IfThenElse(this._index == 0, Const(1, Int16sb), Const(-1, Int16sb)),
@@ -177,8 +179,8 @@ class CompressedBlocksAdapter(Adapter):
             "script_layers_section": SCLY,
             "generated_script_objects_section": SCGN,
             # TODO: implement these formats
-            #"collision_section": AreaCollision,
-            #"lights_section": Lights,
+            "collision_section": AreaCollision,
+            "lights_section": Lights,
             #"visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
             "portal_area_section": AssetIdCorrect,
