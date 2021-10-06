@@ -1,8 +1,6 @@
-from construct.core import Array, Const, Float16b, GreedyBytes, GreedyRange, Int16sb, Int16ub, Int32ub, PrefixedArray, Struct
+from construct.core import Adapter, Array, Const, Float16b, GreedyBytes, GreedyRange, Int16sb, Int16ub, Int32ub, PrefixedArray, Struct
 from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
 from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
-from retro_data_structures.formats.mrea import CompressedBlocksAdapter
-
 
 WorldModelHeader = Struct(
     "visor_flags" / Int32ub, # TODO: FlagEnum
@@ -37,52 +35,49 @@ def SurfaceLookupTable(surface_group_count, surface_count):
         )
     )
 
-class WorldGeometryCompressedBlockAdapter(CompressedBlocksAdapter):
-    def _geometry_codec(self, category, context, path, encode):
-        current_section = 0
+def GeometryCodec(category, context, path, encode, codec):
+    current_section = 0
 
-        def subcategory_codec(identifier, subcon=GreedyBytes, size=1):
-            nonlocal current_section
-            codec = self._decode_category
-            if encode:
-                codec = self._encode_category
+    def subcategory_codec(identifier, subcon=GreedyBytes, size=1):
+        nonlocal current_section
 
-            subcategory = category[current_section:current_section+size]
-            codec(subcategory, subcon, context, path)
+        subcategory = category[current_section:current_section+size]
+        codec(subcategory, subcon, context, path)
 
-            for section in subcategory:
-                section["label"] = identifier
-            current_section += size
+        for section in subcategory:
+            section["label"] = identifier
+        current_section += size
 
-        subcategory_codec("material_set", MaterialSet)
+    subcategory_codec("material_set", MaterialSet)
 
-        for i in range(context._root.world_model_count):
-            subcategory_codec("header", WorldModelHeader)
+    for i in range(context._root.world_model_count):
+        subcategory_codec("header", WorldModelHeader)
 
-            #TODO: strip padding
-            subcategory_codec("positions", GreedyRange(Vector3))
-            subcategory_codec("normals", GreedyRange(Normal))
-            subcategory_codec("colors", GreedyRange(Color4f))
-            subcategory_codec("uvs", GreedyRange(Vector2f))
-            subcategory_codec("lightmap_uvs", GreedyRange(Array(2, Float16b)))
+        #TODO: strip padding
+        subcategory_codec("positions", GreedyRange(Vector3))
+        subcategory_codec("normals", GreedyRange(Normal))
+        subcategory_codec("colors", GreedyRange(Color4f))
+        subcategory_codec("uvs", GreedyRange(Vector2f))
+        subcategory_codec("lightmap_uvs", GreedyRange(Array(2, Float16b)))
 
-            if encode:
-                surface_count = len(category[current_section].data)
-            subcategory_codec("surface_offsets", PrefixedArray(Int32ub, Int32ub))
-            if not encode:
-                surface_count = len(category[current_section-1].data)
+        if encode:
+            surface_count = len(category[current_section].data)
+        subcategory_codec("surface_offsets", PrefixedArray(Int32ub, Int32ub))
+        if not encode:
+            surface_count = len(category[current_section-1].data)
 
-            subcategory_codec("surface", Surface, surface_count)
+        subcategory_codec("surface", Surface, surface_count)
 
-            if encode:
-                surface_group_count = len(category[current_section].data)
-            subcategory_codec("surface_group_ids", SurfaceGroupIds(surface_count))
-            if not encode:
-                surface_group_count = len(category[current_section-1].data)
-            
-            subcategory_codec("surface_lookup_table", SurfaceLookupTable(surface_group_count, surface_count))
+        if encode:
+            surface_group_count = len(category[current_section].data)
+        subcategory_codec("surface_group_ids", SurfaceGroupIds(surface_count))
+        if not encode:
+            surface_group_count = len(category[current_section-1].data)
+        
+        subcategory_codec("surface_lookup_table", SurfaceLookupTable(surface_group_count, surface_count))
 
-        subcategory_codec("area_octree") # TODO: parse octree
+    subcategory_codec("area_octree") # TODO: parse octree
 
-        subcategory_codec("surface_group_bounds", PrefixedArray(Int32ub, SurfaceGroupBounds))
-    
+    subcategory_codec("surface_group_bounds", PrefixedArray(Int32ub, SurfaceGroupBounds))
+
+    return category

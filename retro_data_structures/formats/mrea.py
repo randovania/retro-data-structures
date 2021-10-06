@@ -18,8 +18,8 @@ from retro_data_structures.data_section import (DataSectionSizes,
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY
-from retro_data_structures.formats.world_geometry import \
-    WorldGeometryCompressedBlockAdapter
+from retro_data_structures.formats.visi import VISI
+from retro_data_structures.formats.world_geometry import GeometryCodec
 from retro_data_structures.game_check import (AssetIdCorrect, Game,
                                               get_current_game)
 
@@ -80,7 +80,7 @@ class CompressedBlocksAdapter(Adapter):
         for i in range(len(category)):
             section = category[i]
 
-            if section._decompressed:
+            if section.size > 0 and section._decompressed:
                 decoded = subcon._parse(io.BytesIO(section.data), context, path)
                 category[i].data = decoded
         return category
@@ -89,14 +89,11 @@ class CompressedBlocksAdapter(Adapter):
         for i in range(len(category)):
             section = category[i]
 
-            if section._decompressed:
+            if section.size > 0 and section._decompressed:
                 encoded = io.BytesIO()
                 subcon._build(section.data, encoded, context, path)
                 category[i].data = encoded.getvalue()
         return category
-    
-    def _geometry_codec(self, category, context, path, encode):
-        return
 
     def _category_encodings(self):
         return {
@@ -104,8 +101,7 @@ class CompressedBlocksAdapter(Adapter):
             "generated_script_objects_section": SCGN,
             "collision_section": AreaCollision,
             "lights_section": Lights,
-            # TODO: implement these formats
-            #"visibility_tree_section": VISI,
+            "visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
             "portal_area_section": AssetIdCorrect,
             "static_geometry_map_section": AssetIdCorrect
@@ -142,7 +138,7 @@ class CompressedBlocksAdapter(Adapter):
             end = _categories[i+1]["value"]
             sections[c["label"]] = _sections[start:end]
         
-        self._geometry_codec(sections["geometry_section"], context, path, encode=False)
+        GeometryCodec(sections["geometry_section"], context, path, encode=False, codec=self._decode_category)
         for category, subcon in self._category_encodings().items():
             self._decode_category(sections[category], subcon, context, path)
 
@@ -155,7 +151,7 @@ class CompressedBlocksAdapter(Adapter):
         current_group = []
         previous_label = ""
 
-        self._geometry_codec(sections["geometry_section"], context, path, encode=True)
+        GeometryCodec(sections["geometry_section"], context, path, encode=True, codec=self._encode_category)
         for category, subcon in self._category_encodings().items():
             self._encode_category(sections[category], subcon, context, path)
 
@@ -305,7 +301,7 @@ def create(version: int, parse_block_func):
         ))),
         
         # FIXME: recompression doesn't match with original when building
-        "sections" / WorldGeometryCompressedBlockAdapter(CompressedBlocks(parse_block_func)),
+        "sections" / CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
 
     ]
 
