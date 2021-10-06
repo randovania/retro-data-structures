@@ -6,9 +6,11 @@ import io
 
 import construct
 from construct import (Adapter, Aligned, Array, Computed, Const, Container,
-                       GreedyBytes, IfThenElse, Int32ub, ListContainer,
-                       Prefixed, Rebuild, Struct, Switch, Tell, len_, this)
-from retro_data_structures.common_types import Transform4f
+                       GreedyBytes, If, IfThenElse, Int8ub, Int32ub,
+                       ListContainer, Prefixed, PrefixedArray, Rebuild,
+                       Sequence, Struct, Switch, Tell, len_, this)
+from retro_data_structures import game_check
+from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions import \
     PrefixedWithPaddingBefore
@@ -104,7 +106,15 @@ class CompressedBlocksAdapter(Adapter):
             "visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
             "portal_area_section": AssetIdCorrect,
-            "static_geometry_map_section": AssetIdCorrect
+            "static_geometry_map_section": AssetIdCorrect,
+            "unknown_section_1": Struct(
+                "magic" / If(game_check.is_prime3, Const("LLTE", FourCC)),
+                "data" / Const(1, Int32ub)
+            ),
+            "unknown_section_2": Sequence(
+                Const(0, Int32ub),
+                PrefixedArray(Int32ub, Const(0xFF, Int8ub)) # TODO: rebuild according to surface group count
+            )
         }
 
     def _decode(self, section_groups, context, path):
