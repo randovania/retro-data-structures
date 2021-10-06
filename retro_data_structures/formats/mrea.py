@@ -60,6 +60,7 @@ def SurfaceLookupTable(surface_group_count, surface_count):
 def DataSectionGroup(decompress):
     return Struct(
         "header" / Computed(lambda this: this._.headers[this._index]),
+        "address" / Tell,
         "decompressed" / Computed(decompress),
         "data" / IfThenElse(
             this.header.compressed_size > 0,
@@ -71,7 +72,7 @@ def DataSectionGroup(decompress):
                     GreedyBytes
                 )
             ),
-            Prefixed(Computed(this.header.uncompressed_size), GreedyBytes)
+            Aligned(32, Prefixed(Computed(this.header.uncompressed_size), GreedyBytes))
         ),
     )
 
@@ -95,7 +96,8 @@ class DataSectionGroupAdapter(Adapter):
                 hash=hashlib.sha256(data).hexdigest(),
                 size=section_size,
                 id=section_id,
-                _decompressed=group.decompressed
+                _decompressed=group.decompressed,
+                group_address=group.address
             ))
 
             offset += section_size
@@ -178,9 +180,9 @@ class CompressedBlocksAdapter(Adapter):
         return {
             "script_layers_section": SCLY,
             "generated_script_objects_section": SCGN,
-            # TODO: implement these formats
             "collision_section": AreaCollision,
             "lights_section": Lights,
+            # TODO: implement these formats
             #"visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
             "portal_area_section": AssetIdCorrect,
@@ -382,6 +384,7 @@ def create(version: int, parse_block_func):
         
         # FIXME: recompression doesn't match with original when building
         "sections" / CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
+
     ]
 
     return Struct(*fields)

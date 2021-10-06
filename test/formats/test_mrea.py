@@ -11,7 +11,7 @@ def test_compare_raw(prime2_pwe_project):
     parse_and_build_compare(MREA(lambda this: False), Game.ECHOES, path)
 
     # with compression
-    parse_and_build_compare(MREA(lambda this: True), Game.ECHOES, path)
+    parse_and_build_compare(MREA(), Game.ECHOES, path)
 
 def test_compare_parsed(prime2_pwe_project):
     path = prime2_pwe_project.joinpath(_mrea_path)
@@ -20,4 +20,4 @@ def test_compare_parsed(prime2_pwe_project):
     parse_and_build_compare_parsed(MREA(lambda this: False), Game.ECHOES, path)
 
     # with compression
-    parse_and_build_compare_parsed(MREA(lambda this: True), Game.ECHOES, path, True)
+    parse_and_build_compare_parsed(MREA(), Game.ECHOES, path, True)
