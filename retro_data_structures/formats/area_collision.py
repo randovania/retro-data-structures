@@ -1,5 +1,5 @@
-from construct import Rebuild, Byte, this, Aligned, BitsInteger, Bitwise, Struct, Int32ub, Const, Int16ub, Enum, Tell, Prefixed
-from construct.core import Adapter, Array, ExprAdapter, FlagsEnum, If, Int, Int64ub, Pass, PrefixedArray, Switch
+from construct import Sequence, Rebuild, Byte, this, Aligned, BitsInteger, Bitwise, Struct, Int32ub, Const, Int16ub, Enum, Tell, Prefixed
+from construct.core import Adapter, Array, ExprAdapter, FlagsEnum, GreedyBytes, If, Int, Int64ub, LazyBound, Pass, PrefixedArray, Switch
 
 from retro_data_structures.common_types import AABox, Vector3
 from retro_data_structures import game_check
@@ -7,28 +7,31 @@ from retro_data_structures import game_check
 def NodeTypeEnum(subcon):
     return Enum(subcon, none=0, branch=1, leaf=2)
 
-_node_cases = {}
-
 CollisionLeaf = Struct(
     "bounding_box" / AABox,
     "triangle_index_list" / PrefixedArray(Int16ub, Int16ub)
 )
 
-def CollisionBranch():
-    return Struct(
-        "child_node_types" / Aligned(32, Bitwise(Array(8, NodeTypeEnum(BitsInteger(2))))),
-        "child_node_offsets" / Array(8, Int32ub), # TODO: offset adapter
-        "child_nodes" / Array(8, Switch(
-            lambda this: this.child_node_types[7-this._index],
-            _node_cases
-        ))
-    )
-
-_node_cases = {
+_node_types = {
     "none": Pass,
-    "branch": CollisionBranch(),
+    "branch": LazyBound(lambda: CollisionBranch),
     "leaf": CollisionLeaf
 }
+
+CollisionBranch = Struct(
+    "child_node_types" / Aligned(32, Bitwise(Array(8, NodeTypeEnum(BitsInteger(2))))),
+    "child_node_offsets" / Array(8, Int32ub), # TODO: offset adapter
+    "child_nodes" / Sequence(
+        Switch(lambda this: this._.child_node_types[3], _node_types),
+        Switch(lambda this: this._.child_node_types[2], _node_types),
+        Switch(lambda this: this._.child_node_types[1], _node_types),
+        Switch(lambda this: this._.child_node_types[0], _node_types),
+        Switch(lambda this: this._.child_node_types[7], _node_types),
+        Switch(lambda this: this._.child_node_types[6], _node_types),
+        Switch(lambda this: this._.child_node_types[5], _node_types),
+        Switch(lambda this: this._.child_node_types[4], _node_types)
+    )
+)
 
 Prime1Materials = FlagsEnum(Int32ub,
     unknown=0x00000001,
@@ -143,7 +146,11 @@ AreaCollision = Struct(
     "root_node_type" / NodeTypeEnum(Int32ub),
     "octree" / Prefixed(Int32ub, Switch(
         this.root_node_type,
-        _node_cases
+        {
+            "none": Pass,
+            "branch": CollisionBranch,
+            "leaf": CollisionLeaf
+        }
     )),
     "collision_indices" / CollisionIndex,
     "_size_end" / Tell
