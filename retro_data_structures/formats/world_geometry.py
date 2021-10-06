@@ -1,6 +1,7 @@
 from construct.core import Adapter, Array, Const, Float16b, GreedyBytes, GreedyRange, Int16sb, Int16ub, Int32ub, PrefixedArray, Struct
 from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
 from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
+from retro_data_structures.formats.arot import AROT
 
 WorldModelHeader = Struct(
     "visor_flags" / Int32ub, # TODO: FlagEnum
@@ -76,7 +77,7 @@ def GeometryCodec(category, context, path, encode, codec):
         
         subcategory_codec("surface_lookup_table", SurfaceLookupTable(surface_group_count, surface_count))
 
-    subcategory_codec("area_octree") # TODO: parse octree
+    subcategory_codec("area_octree", AROT)
 
     subcategory_codec("surface_group_bounds", PrefixedArray(Int32ub, SurfaceGroupBounds))
 
