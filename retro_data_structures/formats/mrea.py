@@ -101,7 +101,7 @@ class CompressedBlocksAdapter(Adapter):
         return {
             "script_layers_section": SCLY,
             "generated_script_objects_section": SCGN,
-            #"collision_section": AreaCollision,
+            "collision_section": AreaCollision,
             "lights_section": Lights,
             "visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
