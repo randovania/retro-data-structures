@@ -7,6 +7,7 @@ from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4
 from retro_data_structures.construct_extensions import AlignTo, WithVersion, Skip
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.game_check import Game
+from retro_data_structures import game_check
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -55,8 +56,8 @@ Material = Struct(
     flags=Int32ub,
     texture_indices=PrefixedArray(Int32ub, Int32ub),
     vertex_attribute_flags=Int32ub,
-    unk_1=WithVersion(4, Int32ub),
-    unk_2=WithVersion(4, Int32ub),
+    unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
+    unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
     group_index=Int32ub,
     konst_colors=If(construct.this.flags & 0x8, PrefixedArray(Int32ub, Int32ub)),
     blend_destination_factor=Int16ub,
@@ -127,8 +128,8 @@ Surface = Struct(
         next_surface_pointer_storage=Int32ub,
         _extra_data_size=Rebuild(Int32ub, construct.len_(construct.this.extra_data)),
         surface_normal=Vector3,
-        unk_1=WithVersion(4, Int16ub),
-        unk_2=WithVersion(4, Int16ub),
+        unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
+        unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
         extra_data=Bytes(construct.this["_extra_data_size"]),
     )),
     _primitives_address=Tell,

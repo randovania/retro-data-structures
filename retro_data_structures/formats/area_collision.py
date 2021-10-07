@@ -38,7 +38,7 @@ _shared_materials = {
 
 _prime1_materials = dict(_shared_materials, **{
     "Lava": 0x00000200,
-    "_unknown_1": 0x00000400,
+    "unknown_1": 0x00000400,
 
     "Slow Mud": 0x00001000,
 
@@ -47,9 +47,9 @@ _prime1_materials = dict(_shared_materials, **{
 
     "Shoot Thru": 0x00040000,
     "Solid": 0x00080000,
-    "_unknown_2": 0x00100000,
+    "unknown_2": 0x00100000,
     
-    "_unknown_3": 0x01000000,
+    "unknown_3": 0x01000000,
     "Redundant Edge/Flipped Tri": 0x02000000,
 })
 
@@ -59,8 +59,8 @@ _prime23_materials = dict(_shared_materials, **{
 
     "Fabric": 0x00001000,
     
-    "_unused_1": 0x00004000,
-    "_unused_2": 0x00008000,
+    "unused_1": 0x00004000,
+    "unused_2": 0x00008000,
     
     "Moth Organics/Seed Organics": 0x00040000,
     "Web": 0x00080000,

@@ -12,8 +12,13 @@ class ByteEncoder(json.JSONEncoder):
             return obj.hex(' ').upper()
         if isinstance(obj, BytesIO):
             return None
+        if isinstance(obj, filter):
+            return list(obj)
 
-        return json.JSONEncoder.default(self, obj)
+        try:
+            return json.JSONEncoder.default(self, obj)
+        except TypeError as msg:
+            return str(msg)
 
 def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=False):
     raw = file_path.read_bytes()

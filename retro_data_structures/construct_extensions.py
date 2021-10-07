@@ -1,11 +1,14 @@
 import io
 from typing import Any
+import enum
+from functools import partial
 
 import construct
 from construct import (
     GreedyBytes, Peek, RawCopy, Computed, Array, Byte, FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
     EnumIntegerString, Container, Adapter, Enum, If, Subconstruct, Construct
 )
+from construct.core import IfThenElse
 
 
 def PrefixedArrayWithExtra(countfield, extrafield, subcon):
@@ -84,19 +87,34 @@ def convert_to_raw_python(value) -> Any:
     return value
 
 
-def get_version(this):
+def get_version(this, enum_type):
     if 'version' not in this:
-        return get_version(this['_'])
+        return get_version(this['_'], enum_type)
     else:
+        if isinstance(this.version, EnumIntegerString):
+            return int(this.version)
+        if enum_type and isinstance(this.version, str):
+            return enum_type[this.version]
         return this.version
 
+def compare_version(version):
+    if isinstance(version, enum.Enum):
+        return partial(get_version, enum_type=type(version))
+    return partial(get_version, enum_type=None)
+
+def WithVersionElse(version, with_subcon, before_subcon):
+    return IfThenElse(
+        lambda this: compare_version(version)(this) >= version,
+        with_subcon,
+        before_subcon
+    )
 
 def WithVersion(version, subcon):
-    return If(lambda this: get_version(this) >= version, subcon)
+    return If(lambda this: compare_version(version)(this) >= version, subcon)
 
 
 def BeforeVersion(version, subcon):
-    return If(lambda this: get_version(this) < version, subcon)
+    return If(lambda this: compare_version(version)(this) < version, subcon)
 
 
 class AlignTo(Construct):

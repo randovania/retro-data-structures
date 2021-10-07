@@ -3,7 +3,7 @@ from construct import Tell, Pointer, Int32ub, Struct, Array, Rebuild, If
 from retro_data_structures.construct_extensions import AlignedPrefixed, Skip
 
 def _get_current_section(context, increment=True):
-    root = context["_root"]
+    root = context._root
     section = root["_current_section"]
     if increment:
         root["_current_section"] += 1
@@ -21,7 +21,7 @@ def DataSectionSizes(section_count, include_value=False, rebuildfunc=lambda this
     )
 
 def GetDataSectionSize(context):
-    return context._root.data_section_sizes.value[_get_current_section(context)]
+    return context._root.header.data_section_sizes.value[_get_current_section(context)]
 
 def GetDataSectionId(context):
     return _get_current_section(context, False)

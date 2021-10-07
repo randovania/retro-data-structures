@@ -2,6 +2,8 @@ from construct.core import Adapter, Array, Const, Float16b, GreedyBytes, GreedyR
 from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
 from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
 from retro_data_structures.formats.arot import AROT
+from retro_data_structures.formats.mrea import MREAVersion
+from retro_data_structures.construct_extensions import get_version
 
 WorldModelHeader = Struct(
     "visor_flags" / Int32ub, # TODO: FlagEnum
@@ -37,6 +39,9 @@ def SurfaceLookupTable(surface_group_count, surface_count):
     )
 
 def GeometryCodec(category, context, path, encode, codec):
+    if category[0].size <= 0 or category[0]._decompressed == False:
+        return category
+
     current_section = 0
 
     def subcategory_codec(identifier, subcon=GreedyBytes, size=1):
@@ -51,7 +56,7 @@ def GeometryCodec(category, context, path, encode, codec):
 
     subcategory_codec("material_set", MaterialSet)
 
-    for i in range(context._root.world_model_count):
+    for i in range(context._root.header.world_model_count):
         subcategory_codec("header", WorldModelHeader)
 
         #TODO: strip padding
@@ -69,6 +74,9 @@ def GeometryCodec(category, context, path, encode, codec):
 
         subcategory_codec("surface", Surface, surface_count)
 
+        if get_version(context, MREAVersion) <= MREAVersion.Prime:
+            continue
+
         if encode:
             surface_group_count = len(category[current_section].data)
         subcategory_codec("surface_group_ids", SurfaceGroupIds(surface_count))
@@ -77,8 +85,8 @@ def GeometryCodec(category, context, path, encode, codec):
         
         subcategory_codec("surface_lookup_table", SurfaceLookupTable(surface_group_count, surface_count))
 
-    subcategory_codec("area_octree", AROT)
-
-    subcategory_codec("surface_group_bounds", PrefixedArray(Int32ub, SurfaceGroupBounds))
+    if get_version(context, MREAVersion) >= MREAVersion.Echoes:
+        subcategory_codec("area_octree", AROT)
+        subcategory_codec("surface_group_bounds", PrefixedArray(Int32ub, SurfaceGroupBounds))
 
     return category

@@ -1,4 +1,5 @@
 from construct import Aligned, Array, Const, Int32ub, Struct, this, FlagsEnum, Int16ub
+from construct.core import Computed, If
 from retro_data_structures.common_types import AABox, FourCC
 import math
 
@@ -18,9 +19,10 @@ AROT = Struct(
     "nodes" / Array(this.header.node_count, Struct(
         "bitmap_index" / Int16ub,
         "subdivision_flags" / FlagsEnum(Int16ub, x=1, y=2, z=4),
-        "children" / Array(
-            2**(this.subdivision_flags.z + this.subdivision_flags.y + this.subdivision_flags.x),
+        "subdivisions" / Computed(this.subdivision_flags.z + this.subdivision_flags.y + this.subdivision_flags.x),
+        "children" / If(this.subdivisions, Array(
+            2**this.subdivisions,
             Int16ub
-        )
+        ))
     ))
 )
