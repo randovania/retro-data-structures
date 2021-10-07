@@ -194,7 +194,7 @@ class SectionCategoryAdapter(Adapter):
             end = None
             if i < len(_categories)-1:
                 end = _categories[i+1]["value"]
-            sections[c["label"]] = _sections[start:end]
+            sections[c["label"]] = ListContainer(_sections[start:end])
 
         GeometryCodec(sections["geometry_section"], context, path, encode=False, codec=self._decode_category)
         for category, subcon in self._category_encodings().items():
@@ -404,7 +404,7 @@ def MREAHeader():
         "categories" / Computed(_used_categories)
     ) 
 
-def MREA(parse_block_func=IncludeScriptLayers):
+def _MREA(parse_block_func=IncludeScriptLayers):
     fields = [
         "header" / Aligned(32, MREAHeader()),
         "_current_section" / Computed(0),
@@ -433,3 +433,5 @@ def MREA(parse_block_func=IncludeScriptLayers):
     ]
 
     return Struct(*fields)
+
+MREA = _MREA()

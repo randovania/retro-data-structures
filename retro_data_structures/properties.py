@@ -1,6 +1,6 @@
-from construct import (Byte, Computed, Flag, Float32b, GreedyRange, Hex,
+from construct.core import (Byte, Computed, Flag, Float32b, GreedyRange, Hex,
                        Int16ub, Int32sb, Int32ub, Prefixed, PrefixedArray,
-                       Struct, Switch, this)
+                       Struct, Switch, this, GreedyBytes)
 
 from retro_data_structures.common_types import String
 from retro_data_structures.game_check import AssetIdCorrect
@@ -11,13 +11,13 @@ PROPERTY_TYPES = {}
 Property = Struct(
     "id" / Hex(Int32ub),
     "comment" / Computed(lambda this: PROPERTY_INFO.get(this.id, "Unknown property")),
-    "data" / Prefixed(Int16ub, GreedyRange(Switch(this.id, PROPERTY_TYPES, Byte))),
+    "data" / Prefixed(Int16ub, Switch(this.id, PROPERTY_TYPES, GreedyBytes)),
 )
 
 SubProperties = PrefixedArray(Int16ub, Property)
 
 def AddPropertyInfo(_id, data_type, comment="Unknown property"):
-    PROPERTY_TYPES[_id] = data_type
+    PROPERTY_TYPES[_id] = GreedyRange(data_type)
     PROPERTY_INFO[_id] = comment
 
 # TODO: add missing comments
