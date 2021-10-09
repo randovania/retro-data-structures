@@ -7,6 +7,7 @@ from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4
 from retro_data_structures.construct_extensions import AlignTo, WithVersion, Skip
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.game_check import Game
+from retro_data_structures import game_check
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -23,6 +24,15 @@ TEVInput = Struct(
     padding=Int16ub,
     texture_tev_input=Byte,
     tex_coord_tev_input=Byte,
+)
+
+Normal = IfThenElse(
+    lambda this: hasattr(this._root, "flags") and this._root.flags & 0x2,
+    Array(3, ExprAdapter(
+        Int16ub, # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
+        lambda obj, ctx: obj / 0x8000,
+        lambda obj, ctx: int(obj * 0x8000))),
+    Vector3,
 )
 
 param_count_per_uv_animtion_type = {
@@ -46,8 +56,8 @@ Material = Struct(
     flags=Int32ub,
     texture_indices=PrefixedArray(Int32ub, Int32ub),
     vertex_attribute_flags=Int32ub,
-    unk_1=WithVersion(4, Int32ub),
-    unk_2=WithVersion(4, Int32ub),
+    unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
+    unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
     group_index=Int32ub,
     konst_colors=If(construct.this.flags & 0x8, PrefixedArray(Int32ub, Int32ub)),
     blend_destination_factor=Int16ub,
@@ -118,8 +128,8 @@ Surface = Struct(
         next_surface_pointer_storage=Int32ub,
         _extra_data_size=Rebuild(Int32ub, construct.len_(construct.this.extra_data)),
         surface_normal=Vector3,
-        unk_1=WithVersion(4, Int16ub),
-        unk_2=WithVersion(4, Int16ub),
+        unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
+        unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
         extra_data=Bytes(construct.this["_extra_data_size"]),
     )),
     _primitives_address=Tell,
@@ -169,26 +179,20 @@ CMDL = Struct(
                          + len(context.surfaces)),
     ),
     _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
-    _data_section_sizes=DataSectionSizes(construct.this._root._data_section_count),
+    data_section_sizes=DataSectionSizes(construct.this._root._data_section_count),
     _=AlignTo(32),
     _current_section=construct.Computed(lambda this: 0),
     material_sets=Array(construct.this._material_set_count, DataSection(MaterialSet)),
     attrib_arrays=Struct(
         positions=DataSection(GreedyRange(Vector3)),
         normals=DataSection(
-            GreedyRange(IfThenElse(
-                construct.this._root.flags & 0x2,
-                Array(3, ExprAdapter(Int16ub,  # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
-                                     lambda obj, ctx: obj / 0x8000,
-                                     lambda obj, ctx: int(obj * 0x8000))),
-                Vector3,
-            )),
+            GreedyRange(Normal),
         ),
         # TODO: none of Retro's games actually have data here, so this might be the wrong type!
         colors=DataSection(GreedyRange(Color4f)),
         uvs=DataSection(GreedyRange(Vector2f)),
         lightmap_uvs=If(
-            construct.this._root.flags & 0x4,
+            lambda this: hasattr(this._root, "flags") and this._root.flags & 0x4,
             DataSection(GreedyRange(Array(2, Float16b))),
         ),
     ),
