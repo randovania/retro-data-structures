@@ -168,6 +168,8 @@ def read_property_names(map_path: Path):
         for item in typing.cast(typing.Iterable[Element], m)
     }
 
+    return property_names
+
 
 def get_paths(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
     return {
@@ -231,8 +233,6 @@ def parse_game_list(templates_path: Path) -> dict:
     }
 
 def parse(game_ids: typing.Iterable[str] = []) -> dict:
-    global property_names
-
     templates_path = Path("PrimeWorldEditor/templates")
     read_property_names(templates_path / "PropertyMap.xml")
 

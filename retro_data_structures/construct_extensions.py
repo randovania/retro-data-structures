@@ -278,6 +278,8 @@ class PrefixedWithPaddingBefore(Subconstruct):
 
 class DictAdapter(Adapter):
     def __init__(self, subcon, objisdict=True):
+        if not objisdict:
+            subcon = Struct("*Key" / VarInt, "Value" / subcon)
         super().__init__(PrefixedArray(VarInt, subcon))
         self.objisdict = objisdict
     
@@ -285,24 +287,26 @@ class DictAdapter(Adapter):
         D = {}
         for v in obj:
             if self.objisdict:
-                D[v["*ID"]] = v
-                del v["*ID"]
+                D[v["*Key"]] = v
+                del v["*Key"]
             else:
-                D[v["*ID"]] = v["Value"]
+                D[v["*Key"]] = v["Value"]
         return D
     
     def _encode(self, obj, context, path):
+        L = []
         for k, v in obj.items():
             if self.objisdict:
-                v["*ID"] = k
+                v["*Key"] = k
             else:
-                v = {"*ID": k, "Value": v}
-        return obj.values()
+                v = {"*Key": k, "Value": v}
+            L.append(v)
+        return L
 
 def DictStruct(*fields):
     return Struct(
         *fields,
-        "*ID" / String
+        "*Key" / String
     )
 
 def LabeledOptional(label, subcon):

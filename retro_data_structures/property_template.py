@@ -121,3 +121,7 @@ ListGameTemplate = DictStruct(
 
 GameList = DictAdapter(ListGameTemplate)
 
+PropertyNames = Prefixed(VarInt, Compressed(
+    DictAdapter(String, objisdict=False),
+    "zlib"
+))
