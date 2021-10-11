@@ -1,14 +1,17 @@
-import io
-from typing import Any
 import enum
+import io
+from functools import partial
+from typing import Any
 from functools import partial
 
 import construct
 from construct import (
-    GreedyBytes, Peek, RawCopy, Computed, Array, Byte, FocusedSeq, Rebuild, this, len_, GreedyRange, Int32ul, stream_tell, Int32ub, ListContainer,
+    GreedyBytes, FocusedSeq, Rebuild, this, len_, stream_tell, Int32ub, ListContainer,
     EnumIntegerString, Container, Adapter, Enum, If, Subconstruct, Construct
 )
-from construct.core import IfThenElse
+from construct.core import Const, IfThenElse, Optional, PrefixedArray, Struct, VarInt
+
+from retro_data_structures.common_types import String
 
 
 def PrefixedArrayWithExtra(countfield, extrafield, subcon):
@@ -272,3 +275,39 @@ class PrefixedWithPaddingBefore(Subconstruct):
 
         construct.stream_write(stream, data, len(data), path)
         return buildret
+
+class DictAdapter(Adapter):
+    def __init__(self, subcon, objisdict=True):
+        super().__init__(PrefixedArray(VarInt, subcon))
+        self.objisdict = objisdict
+    
+    def _decode(self, obj, context, path):
+        D = {}
+        for v in obj:
+            if self.objisdict:
+                D[v["*ID"]] = v
+                del v["*ID"]
+            else:
+                D[v["*ID"]] = v["Value"]
+        return D
+    
+    def _encode(self, obj, context, path):
+        for k, v in obj.items():
+            if self.objisdict:
+                v["*ID"] = k
+            else:
+                v = {"*ID": k, "Value": v}
+        return obj.values()
+
+def DictStruct(*fields):
+    return Struct(
+        *fields,
+        "*ID" / String
+    )
+
+def LabeledOptional(label, subcon):
+    return Optional(FocusedSeq(
+        "subcon",
+        Const(label),
+        "subcon" / subcon,
+    ))
