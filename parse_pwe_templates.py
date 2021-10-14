@@ -1,10 +1,19 @@
 import dataclasses
+import json
 import pprint
 import re
 import typing
 from pathlib import Path
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
+
+
+_game_id_to_file = {
+    "Prime": "prime",
+    "Echoes": "echoes",
+    "Corruption": "corruption",
+    "DKCReturns": "dkc_returns",
+}
 
 
 @dataclasses.dataclass(frozen=True)
@@ -28,8 +37,9 @@ def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str = "w")
         for name, value in e.values.items():
             code += f"    {_scrub(name)} = {value}\n"
 
-    with Path(__file__).parent.joinpath(f"retro_data_structures/enums/{game}.py").open(mode) as f:
-        f.write(code)
+    if game in _game_id_to_file:
+        with Path(__file__).parent.joinpath(f"retro_data_structures/enums/{_game_id_to_file[game]}.py").open(mode) as f:
+            f.write(code)
 
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
@@ -137,13 +147,13 @@ def _parse_choice(properties: Element, game_id: str, path: Path) -> dict:
         else:
             return {
                 "type": _type,
-                "choices": choices
+                "choices": choices,
             }
 
         create_enums(game_id, [EnumDefinition(name, choices)], "a")
 
     return {
-        "type": _type
+        "type": _type,
     }
 
 
@@ -250,7 +260,7 @@ def parse_game_list(templates_path: Path) -> dict:
     }
 
 
-def parse(game_ids: typing.Iterable[str] = []) -> dict:
+def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
     templates_path = Path("PrimeWorldEditor/templates")
     read_property_names(templates_path / "PropertyMap.xml")
 
@@ -260,9 +270,18 @@ def parse(game_ids: typing.Iterable[str] = []) -> dict:
     return {
         _id: parse_game(templates_path, game_path, _id)
         for _id, game_path in game_list.items()
-        if not game_ids or _id in game_ids
+        if game_ids is None or _id in game_ids
     }
 
 
+def persist_data(parse_result):
+    base_dir = Path(__file__).parent
+    for game_id, data in parse_result.items():
+        if game_id in _game_id_to_file:
+            path = base_dir.joinpath(f"retro_data_structures/property_templates/{_game_id_to_file[game_id]}.json")
+            with path.open("w") as f:
+                json.dump(data, f, indent=4)
+
+
 if __name__ == '__main__':
-    pprint.pprint(parse(), sort_dicts=False)
+    persist_data(parse())
