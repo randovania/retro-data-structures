@@ -4,7 +4,7 @@ from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions import Skip
 from retro_data_structures import game_check
 
-from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstancePrime
+from retro_data_structures.formats.script_object import ScriptInstance
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -19,7 +19,7 @@ ScriptLayerPrime = Struct(
             lambda this: this._.layer_sizes[this._index],
             Struct(
                 "unk" / Hex(Int8ub),
-                "objects" / PrefixedArray(Int32ub, ScriptInstancePrime),
+                "objects" / PrefixedArray(Int32ub, ScriptInstance),
             )
         )
     ),

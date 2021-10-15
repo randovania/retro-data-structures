@@ -1,5 +1,6 @@
 from parse_pwe_templates import parse, read_property_names
-from retro_data_structures.property_template import GameTemplate, PropertyNames
+from retro_data_structures.game_check import Game
+from retro_data_structures.property_template import GameTemplate, PropertyNames, CreatePropertyConstructs
 from pathlib import Path
 
 def test_compare_pwe_templates():
@@ -17,3 +18,5 @@ def test_compare_pwe_templates():
         assert encoded == GameTemplate.build(GameTemplate.parse(encoded))
 
         base_path.joinpath(f"retro_data_structures/properties/{game}.prop").write_bytes(encoded)
+
+    CreatePropertyConstructs([Game.ECHOES])

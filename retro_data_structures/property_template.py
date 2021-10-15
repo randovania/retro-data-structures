@@ -1,8 +1,12 @@
 import enum
 from pathlib import Path
-from construct.core import Check, Compressed, Default, Flag, Float32b, GreedyBytes, Hex, IfThenElse, Int16ub, Int32ub, LazyBound, Prefixed, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
+import construct
+from construct.core import Check, Compressed, Computed, Default, FixedSized, Flag, Float32b, GreedyBytes, Hex, IfThenElse, Int16ub, Int32ub, LazyBound, Prefixed, Subconstruct, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
+from construct.lib.containers import Container
+from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, String
 from retro_data_structures.construct_extensions import DictStruct, DictAdapter, ErrorWithMessage, LabeledOptional
+from retro_data_structures.game_check import AssetIdCorrect, Game, get_current_game
 
 Proportion = FocusedSeq(
     "value",
@@ -46,26 +50,29 @@ def TypeSwitch(cases, default=None):
     )
 
 def PropertyDef(*extra_fields, include_id=True):
+    id_field = ["id" / LabeledOptional(b'ID', Hex(Int32ub))] if include_id else []
     return Struct(
         "type" / PropertyTypeEnum,
-        "id" / IfThenElse(include_id, Hex(Int32ub), Const(b'')),
+        *id_field,
         *extra_fields
     )
 
+PropertySubcons = {
+    "Int": Int32ub,
+    "Float": Float32b,
+    "Bool": Flag,
+    "Short": Int16ub,
+    "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
+    "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
+    "Flags": Int32ub,
+    "Choice": Int32ub,
+    "Enum": Int32ub,
+    "Asset": AssetIdCorrect,
+}
+
 def Property(include_id=True):
-    default_value_types = {
-        "Int": Int32ub,
-        "Float": Float32b,
-        "Bool": Flag,
-        "Short": Int16ub,
-        "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
-        "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
-        "Flags": Int32ub,
-        "Choice": VarInt,
-        "Enum": Int32ub
-    }
     default_value_field = [
-        "default_value" / LabeledOptional(b'DV', Switch(this.type, default_value_types, Prefixed(VarInt, GreedyBytes)))
+        "default_value" / LabeledOptional(b'DV', Switch(this.type, PropertySubcons, Prefixed(VarInt, GreedyBytes)))
     ]
     enum_property = PropertyDef(
         "archetype" / LabeledOptional(b'AR', String),
@@ -76,7 +83,7 @@ def Property(include_id=True):
         {
             "Struct": PropertyDef(
                 "archetype" / LabeledOptional(b'AR', String),
-                "properties" / PrefixedArray(VarInt, LazyBound(lambda: Property())),
+                "properties" / PrefixedArray(VarInt, LazyBound(lambda: Property(include_id))),
                 include_id=include_id
             ),
             "Asset": PropertyDef(
@@ -84,7 +91,7 @@ def Property(include_id=True):
                 include_id=include_id
             ),
             "Array": PropertyDef(
-                "item_archetype" / LabeledOptional(b'IA', LazyBound(lambda: Property(False))),
+                "item_archetype" / LazyBound(lambda: Property(False)),
                 include_id=include_id
             ),
             "Choice": enum_property,
@@ -97,7 +104,8 @@ def Property(include_id=True):
 
 ScriptObjectTemplate = DictStruct(
     "type" / Const("Struct", PropertyTypeEnum),
-    "properties" / PrefixedArray(VarInt, Property())
+    "atomic" / Default(Flag, False),
+    "properties" / PrefixedArray(VarInt, Property()),
 )
 
 PropertyArchetype = TypeSwitch(
@@ -125,3 +133,95 @@ PropertyNames = Prefixed(VarInt, Compressed(
     DictAdapter(String, objisdict=False),
     "zlib"
 ))
+
+_game_template_cache = {}
+def GetGameTemplate(game: Game):
+    prop_path = Path(__file__).parent.joinpath("properties")
+
+    print(game)
+    game_id = {Game.PRIME: "Prime", Game.ECHOES: "Echoes", Game.CORRUPTION: "Corruption"}[game]
+
+    if not game_id in _game_template_cache.keys():
+        _game_template_cache[game_id] = GameTemplate.parse_file(prop_path / (game_id + ".prop"))
+
+    return _game_template_cache[game_id]
+
+PropertyConstructs = Container()
+def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
+    for game_id in games:
+        game_template = GetGameTemplate(game_id)
+
+        archetypes = Container()
+        
+        def get_subcon(prop, atomic=False):
+            if prop.type == "Struct":
+                archetype = game_template.property_archetypes[prop.archetype]
+                add_archetype(prop.archetype, archetype)
+                return archetypes[prop.archetype]
+            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+            if prop.type == "Array":
+                data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
+                if atomic:
+                    return data
+                return Struct(
+                    "id" / Int32ub,
+                    "data" / Prefixed(prefix, data),
+                    Computed(lambda this: print(f'{f"0x{this.id:X}"}: {this.data}'))
+                )
+            data = PropertySubcons.get(prop.type, GreedyBytes)
+            if atomic:
+                return data
+            return Struct(
+                "id" / Int32ub,
+                "data" / Prefixed(prefix, data),
+                Computed(lambda this: print(f'{f"0x{this.id:X}"}: {this.data}'))
+            )
+        
+        def add_archetype(name, archetype):
+            if name in archetypes.keys():
+                return
+            if archetype.type == "Choice" or archetype.type == "Enum":
+                return
+            properties = {f'0x{prop.id:X}': get_subcon(prop) for prop in archetype.properties}
+            atomic_properties = {f'0x{prop.id:X}': get_subcon(prop, True) for prop in archetype.properties}
+            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+            if archetype.atomic:
+                archetypes[name] = Struct(
+                    "_data" / Peek(GreedyBytes),
+                    Computed(lambda this: print(this._data.hex())),
+                    "id" / Int32ub,
+                    "data" / Prefixed(prefix, Struct(**atomic_properties)),
+                    Computed(lambda this: print(f'{f"0x{this.id:X}"}: {this.data}'))
+                )
+            else:
+                archetypes[name] = Struct(
+                    "id" / Int32ub,
+                    "data" / Prefixed(prefix, Struct(
+                        "count" / Const(len(properties), prefix),
+                        **properties
+                    )),
+                    Computed(lambda this: print(f'{f"0x{this.id:X}"}: {this.data}'))
+                )
+
+        for name, archetype in game_template.property_archetypes.items():
+            add_archetype(name, archetype)
+
+        script_objects = Container()
+
+        for name, obj in game_template.script_objects.items():
+            properties = Container({f'0x{prop.id:X}': get_subcon(prop) for prop in obj.properties})
+            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+            script_objects[name] = Struct(
+                "id" / Const(0xFFFFFFFF, Int32ub),
+                "data" / Prefixed(prefix, Struct(
+                    "count" / Const(len(properties), prefix),
+                    **properties
+                ))
+            )
+        
+        PropertyConstructs[game_id] = script_objects
+
+def GetPropertyConstruct(game, obj_id) -> Subconstruct:
+    if not game in PropertyConstructs:
+        CreatePropertyConstructs([game])
+    return PropertyConstructs[game].get(obj_id, GreedyBytes)

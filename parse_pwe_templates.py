@@ -61,9 +61,11 @@ def _prop_asset(element: Element, game_id: str, path: Path) -> dict:
     return {"type_filter": type_filter}
 
 def _prop_array(element: Element, game_id: str, path: Path) -> dict:
+    # print(ElementTree.tostring(element, encoding='utf8', method='xml'))
     item_archetype = None
     if (item_archetype_element := element.find("ItemArchetype")) is not None:
         item_archetype = _parse_single_property(item_archetype_element, game_id, path, include_id=False)
+    # print(item_archetype)
     return {"item_archetype": item_archetype}
 
 def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
@@ -73,15 +75,13 @@ def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
     return extras
 
 def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool=True) -> dict:
+    parsed = {}
     if include_id:
-        parsed = {
-            "id": int(element.attrib["ID"], 16),
-            "type": element.attrib["Type"]
-        }
-    else:
-        parsed = {
-            "type": element.attrib["Type"]
-        }
+        parsed.update({"id": int(element.attrib["ID"], 16)})
+    parsed.update({
+        "type": element.attrib["Type"],
+        "name": element.find("Name").text if element.find("Name") is not None else ""
+    })
     
     property_type_extras = {
         "Struct": _prop_struct,
@@ -105,6 +105,7 @@ def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
 
     return {
         "type": "Struct",
+        "atomic": properties.find("Atomic") is not None,
         "properties": elements,
     }
 
