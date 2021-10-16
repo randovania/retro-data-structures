@@ -1,0 +1,3 @@
+[submodule "PrimeWorldEditor"]
+	path = PrimeWorldEditor
+	url = https://github.com/AxioDL/PrimeWorldEditor

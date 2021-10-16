@@ -4,7 +4,7 @@ For checking which game is being parsed
 from enum import Enum
 from typing import Any, Callable
 
-from construct import IfThenElse
+from construct.core import IfThenElse
 
 from retro_data_structures import common_types
 
@@ -87,6 +87,13 @@ def current_game_at_least(target: Game) -> Callable[[Any], bool]:
         return get_current_game(ctx) >= target
 
     return result
+
+def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:
+    return IfThenElse(
+        current_game_at_least(target),
+        subcon1,
+        subcon2
+    )
 
 
 def uses_asset_id_32(ctx):
