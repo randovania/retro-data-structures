@@ -18,13 +18,16 @@ class ParmType(enum.IntEnum):
 
 
 def construct_type_for_parm_type(t):
-    return Switch(t, {
-        ParmType.Int32: Int32ub,
-        ParmType.Uint32: Int32ub,
-        ParmType.Real: Int32ub,
-        ParmType.Bool: Int8ub,
-        ParmType.Enum: Int32ub,
-    })
+    return Switch(
+        t,
+        {
+            ParmType.Int32: Int32ub,
+            ParmType.Uint32: Int32ub,
+            ParmType.Real: Int32ub,
+            ParmType.Bool: Int8ub,
+            ParmType.Enum: Int32ub,
+        },
+    )
 
 
 class WeightFunction(enum.IntEnum):
@@ -44,10 +47,11 @@ ParmInfo = Struct(
 
 AnimInfo = Struct(
     "anim_id" / Int32ub,
-    "parm_values" / Array(
+    "parm_values"
+    / Array(
         construct.this._.parm_info_count,
-        construct_type_for_parm_type(lambda this: this._.parm_info_array[this._index].parm_type)
-    )
+        construct_type_for_parm_type(lambda this: this._.parm_info_array[this._index].parm_type),
+    ),
 )
 
 AnimState = Struct(
@@ -62,5 +66,5 @@ PASDatabase = Struct(
     "magic" / Const(b"PAS4"),
     "anim_state_count" / Int32ub,
     "default_anim_state" / Int32ub,
-    "anim_states" / Array(construct.this.anim_state_count, AnimState)
+    "anim_states" / Array(construct.this.anim_state_count, AnimState),
 )

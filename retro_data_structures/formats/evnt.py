@@ -15,13 +15,16 @@ BasePOINode = Struct(
     weight=Float32b,
     character_index=Int32sb,
     flags=Int32ub,
-    unk_extra=If(game_check.is_prime3, Struct(
-        Int32ub,
-        Int32ub,
-        Int32ub,
-        Float32b,
-        Float32b,
-    ))
+    unk_extra=If(
+        game_check.is_prime3,
+        Struct(
+            Int32ub,
+            Int32ub,
+            Int32ub,
+            Float32b,
+            Float32b,
+        ),
+    ),
 )
 
 BoolPOINode = Struct(
@@ -51,12 +54,15 @@ SoundPOINode = Struct(
     sound_id=Hex(Int32ub),
     fall_off=Float32b,
     max_distance=Float32b,
-    echoes=If(game_check.is_prime2, Struct(
-        unk_a=Int32ub,
-        unk_b=Int16ub,
-        unk_c=Int16ub,
-        unk_d=Float32b,
-    ))
+    echoes=If(
+        game_check.is_prime2,
+        Struct(
+            unk_a=Int32ub,
+            unk_b=Int16ub,
+            unk_c=Int16ub,
+            unk_d=Float32b,
+        ),
+    ),
 )
 
 EVNT = Struct(

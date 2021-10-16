@@ -6,8 +6,7 @@ from retro_data_structures.game_check import Game
 
 
 def find_missing(lst):
-    return [x for x in range(lst[0], lst[-1] + 1)
-            if x not in lst]
+    return [x for x in range(lst[0], lst[-1] + 1) if x not in lst]
 
 
 def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetConverter):
@@ -22,28 +21,35 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
         bones.append(it["bone_id"])
 
     for i, it in enumerate(find_missing(sorted(bones))):
-        data["anim"]["bone_channel_descriptors"].append({
-            "bone_id": it,
-            "rotation_keys_count": 0,
-            "rotation_keys": None,
-            "translation_keys_count": 0,
-            "translation_keys": None,
-            "scale_keys_count": None,
-            "scale_keys": None,
-        })
+        data["anim"]["bone_channel_descriptors"].append(
+            {
+                "bone_id": it,
+                "rotation_keys_count": 0,
+                "rotation_keys": None,
+                "translation_keys_count": 0,
+                "translation_keys": None,
+                "scale_keys_count": None,
+                "scale_keys": None,
+            }
+        )
 
         for key in data["anim"]["animation_keys"]:
-            key["channels"].append({
-                "rotation": None,
-                "translation": None,
-                "scale": None,
-            })
+            key["channels"].append(
+                {
+                    "rotation": None,
+                    "translation": None,
+                    "scale": None,
+                }
+            )
 
-    neworder = sorted(range(len(data["anim"]["bone_channel_descriptors"])),
-                      key=lambda x: data["anim"]["bone_channel_descriptors"][x]["bone_id"])
+    neworder = sorted(
+        range(len(data["anim"]["bone_channel_descriptors"])),
+        key=lambda x: data["anim"]["bone_channel_descriptors"][x]["bone_id"],
+    )
 
-    data["anim"]["bone_channel_descriptors"] = sorted(data["anim"]["bone_channel_descriptors"],
-                                                      key=lambda x: x["bone_id"])
+    data["anim"]["bone_channel_descriptors"] = sorted(
+        data["anim"]["bone_channel_descriptors"], key=lambda x: x["bone_id"]
+    )
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * (len(old))
     for i, it in enumerate(old):
@@ -54,10 +60,7 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
 
     for key in data["anim"]["animation_keys"]:
         if key["channels"] is not None:
-            key["channels"] = [
-                key["channels"][neworder[i]]
-                for i, _ in enumerate(key["channels"])
-            ]
+            key["channels"] = [key["channels"][neworder[i]] for i, _ in enumerate(key["channels"])]
 
     data["anim"]["scale_multiplier"] = 0.0
     data["anim"]["event_id"] = None

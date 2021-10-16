@@ -1,7 +1,28 @@
 import construct
-from construct import (Struct, Int32ub, Const, Array, Aligned, PrefixedArray, If, Int16ub, Byte, Float32b,
-                       GreedyRange, IfThenElse, Float16b, Bytes, Switch, Int8ub, Rebuild, Pointer, Tell, Seek,
-                       FocusedSeq, ExprAdapter)
+from construct import (
+    Struct,
+    Int32ub,
+    Const,
+    Array,
+    Aligned,
+    PrefixedArray,
+    If,
+    Int16ub,
+    Byte,
+    Float32b,
+    GreedyRange,
+    IfThenElse,
+    Float16b,
+    Bytes,
+    Switch,
+    Int8ub,
+    Rebuild,
+    Pointer,
+    Tell,
+    Seek,
+    FocusedSeq,
+    ExprAdapter,
+)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
@@ -28,10 +49,14 @@ TEVInput = Struct(
 
 Normal = IfThenElse(
     lambda this: hasattr(this._root, "flags") and this._root.flags & 0x2,
-    Array(3, ExprAdapter(
-        Int16ub,  # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
-        lambda obj, ctx: obj / 0x8000,
-        lambda obj, ctx: int(obj * 0x8000))),
+    Array(
+        3,
+        ExprAdapter(
+            Int16ub,  # TODO: use the surface mantissa, but it's always 0x8000 for Retro anyway
+            lambda obj, ctx: obj / 0x8000,
+            lambda obj, ctx: int(obj * 0x8000),
+        ),
+    ),
     Vector3,
 )
 
@@ -64,12 +89,9 @@ Material = Struct(
     blend_source_factor=Int16ub,
     reflection_indirect_texture_slot_index=If(construct.this.flags & 0x400, Int32ub),
     color_channel_flags=PrefixedArray(Int32ub, Int32ub),
-
     tev_stages=PrefixedArray(Int32ub, TEVStage),
     tev_inputs=Array(construct.len_(construct.this.tev_stages), TEVInput),
-
     texgen_flags=PrefixedArray(Int32ub, Int32ub),
-
     material_animations_section_size=Int32ub,
     uv_animations=PrefixedArray(Int32ub, UVAnimation),
 )
@@ -80,22 +102,25 @@ MaterialSet = Struct(
     _material_end_offsets_address=Tell,
     _material_end_offsets=Seek(construct.this["_material_count"] * Int32ub.length, 1),
     _materials_start=Tell,
-    materials=Array(construct.this["_material_count"], FocusedSeq(
-        "material",
-        material=Material,
-        _end=Tell,
-        update_end_offset=Pointer(
-            lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
-            Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"])
+    materials=Array(
+        construct.this["_material_count"],
+        FocusedSeq(
+            "material",
+            material=Material,
+            _end=Tell,
+            update_end_offset=Pointer(
+                lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
+                Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
+            ),
         ),
-    )),
+    ),
 )
 
 
 def get_material(context):
     surface = context
-    while 'header' not in surface:
-        surface = surface['_']
+    while "header" not in surface:
+        surface = surface["_"]
     return context._root.material_sets[0].materials[surface.header.material_index]
 
 
@@ -113,48 +138,69 @@ def VertexAttrib(flag):
             3: Int16ub,
             2: Int8ub,
             1: Int8ub,
-        }
+        },
     )
 
 
 Surface = Struct(
-    header=Aligned(32, Struct(
-        center_point=Vector3,
-        material_index=Int32ub,
-        mantissa=Int16ub,
-        _display_list_size_address=Tell,
-        _display_list_size=Rebuild(Int16ub, lambda ctx: 0),
-        parent_model_pointer_storage=Int32ub,
-        next_surface_pointer_storage=Int32ub,
-        _extra_data_size=Rebuild(Int32ub, construct.len_(construct.this.extra_data)),
-        surface_normal=Vector3,
-        unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
-        unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
-        extra_data=Bytes(construct.this["_extra_data_size"]),
-    )),
+    header=Aligned(
+        32,
+        Struct(
+            center_point=Vector3,
+            material_index=Int32ub,
+            mantissa=Int16ub,
+            _display_list_size_address=Tell,
+            _display_list_size=Rebuild(Int16ub, lambda ctx: 0),
+            parent_model_pointer_storage=Int32ub,
+            next_surface_pointer_storage=Int32ub,
+            _extra_data_size=Rebuild(Int32ub, construct.len_(construct.this.extra_data)),
+            surface_normal=Vector3,
+            unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
+            unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int16ub),
+            extra_data=Bytes(construct.this["_extra_data_size"]),
+        ),
+    ),
     _primitives_address=Tell,
-    primitives=GreedyRange(Struct(
-        type=Byte,
-        vertices=PrefixedArray(Int16ub, Struct(
-            matrix=Struct(
-                position=VertexAttrib(0x01 << 24),
-                tex=Struct(*[
-                    str(i) / VertexAttrib(flag << 24)
-                    for i, flag in enumerate([0x02, 0x04, 0x08, 0x10,
-                                              0x20, 0x40, 0x80])
-                ]),
+    primitives=GreedyRange(
+        Struct(
+            type=Byte,
+            vertices=PrefixedArray(
+                Int16ub,
+                Struct(
+                    matrix=Struct(
+                        position=VertexAttrib(0x01 << 24),
+                        tex=Struct(
+                            *[
+                                str(i) / VertexAttrib(flag << 24)
+                                for i, flag in enumerate([0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80])
+                            ]
+                        ),
+                    ),
+                    position=VertexAttrib(0x03),
+                    normal=VertexAttrib(0x0C),
+                    color_0=VertexAttrib(0x30),
+                    color_1=VertexAttrib(0xC0),
+                    tex=Struct(
+                        *[
+                            str(i) / VertexAttrib(flag)
+                            for i, flag in enumerate(
+                                [
+                                    0x00000300,
+                                    0x00000C00,
+                                    0x00003000,
+                                    0x0000C000,
+                                    0x00030000,
+                                    0x000C0000,
+                                    0x00300000,
+                                    0x00C00000,
+                                ]
+                            )
+                        ]
+                    ),
+                ),
             ),
-            position=VertexAttrib(0x03),
-            normal=VertexAttrib(0x0c),
-            color_0=VertexAttrib(0x30),
-            color_1=VertexAttrib(0xc0),
-            tex=Struct(*[
-                str(i) / VertexAttrib(flag)
-                for i, flag in enumerate([0x00000300, 0x00000C00, 0x00003000, 0x0000C000,
-                                          0x00030000, 0x000C0000, 0x00300000, 0x00C00000])
-            ]),
-        ))
-    )),
+        )
+    ),
     _size=Tell,
     _update_display_size=Pointer(
         construct.this.header["_display_list_size_address"],
@@ -172,11 +218,12 @@ CMDL = Struct(
     aabox=AABox,
     _data_section_count=Rebuild(
         Int32ub,
-        lambda context: (len(context.material_sets)
-                         + sum(1 for k, v in context.attrib_arrays.items()
-                               if not k.startswith("_") and v is not None)
-                         + 1
-                         + len(context.surfaces)),
+        lambda context: (
+            len(context.material_sets)
+            + sum(1 for k, v in context.attrib_arrays.items() if not k.startswith("_") and v is not None)
+            + 1
+            + len(context.surfaces)
+        ),
     ),
     _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
     data_section_sizes=DataSectionSizes(construct.this._root._data_section_count),
@@ -197,10 +244,12 @@ CMDL = Struct(
         ),
     ),
     _surface_header_address=Tell,
-    _surface_header=DataSection(Struct(
-        num_surfaces=Rebuild(Int32ub, construct.len_(construct.this["_"].surfaces)),
-        end_offsets=Skip(construct.this.num_surfaces, Int32ub),
-    )),
+    _surface_header=DataSection(
+        Struct(
+            num_surfaces=Rebuild(Int32ub, construct.len_(construct.this["_"].surfaces)),
+            end_offsets=Skip(construct.this.num_surfaces, Int32ub),
+        )
+    ),
     _surfaces_start=Tell,
     surfaces=Array(
         construct.this["_surface_header"].num_surfaces,
@@ -211,7 +260,8 @@ CMDL = Struct(
             update_end_offset=Pointer(
                 # One extra Int32ub for the num_surfaces
                 lambda ctx: ctx["_"]["_surface_header_address"] + Int32ub.length + Int32ub.length * ctx["_index"],
-                Rebuild(Int32ub, lambda ctx: ctx.end - ctx["_"]["_surfaces_start"])),
+                Rebuild(Int32ub, lambda ctx: ctx.end - ctx["_"]["_surfaces_start"]),
+            ),
         ),
     ),
 )

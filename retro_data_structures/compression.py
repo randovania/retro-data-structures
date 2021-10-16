@@ -33,8 +33,9 @@ class LZOSegment(construct.Subconstruct):
         if length > 0:
             result = self.subcon._parsereport(io.BytesIO(data), context, path)
             if len(result) != decompressed_size:
-                raise construct.StreamError(f"Expected to decompress {decompressed_size} bytes, got {len(result)}",
-                                            path)
+                raise construct.StreamError(
+                    f"Expected to decompress {decompressed_size} bytes, got {len(result)}", path
+                )
             return result
         else:
             return data
@@ -82,7 +83,7 @@ class LZOCompressedBlock(Adapter):
     def _encode(self, uncompressed, context, path):
         segment_size = self.segment_size
         return [
-            uncompressed[segment_size * i:segment_size * (i + 1)]
+            uncompressed[segment_size * i : segment_size * (i + 1)]
             for i in range(math.ceil(len(uncompressed) / segment_size))
         ]
 

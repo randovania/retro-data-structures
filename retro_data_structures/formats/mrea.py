@@ -5,19 +5,40 @@ import hashlib
 import io
 from enum import IntEnum
 
-from construct.core import (Adapter, Aligned, Array, Computed, Const,
-                            Container, Enum, FixedSized, GreedyBytes, If, IfThenElse,
-                            Int8ub, Int32ub, ListContainer, PrefixedArray,
-                            Rebuild, Sequence, Struct, Tell, len_, this)
+from construct.core import (
+    Adapter,
+    Aligned,
+    Array,
+    Computed,
+    Const,
+    Container,
+    Enum,
+    FixedSized,
+    GreedyBytes,
+    If,
+    IfThenElse,
+    Int8ub,
+    Int32ub,
+    ListContainer,
+    PrefixedArray,
+    Rebuild,
+    Sequence,
+    Struct,
+    Tell,
+    len_,
+    this,
+)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions import (
-    BeforeVersion, PrefixedWithPaddingBefore, WithVersion, WithVersionElse)
-from retro_data_structures.data_section import (DataSection, DataSectionSizes,
-                                                GetDataSectionId,
-                                                GetDataSectionSize)
+    BeforeVersion,
+    PrefixedWithPaddingBefore,
+    WithVersion,
+    WithVersionElse,
+)
+from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
@@ -44,17 +65,14 @@ def DataSectionGroup(decompress):
         "header" / Computed(lambda this: this._.headers[this._index]),
         "address" / Tell,
         "decompressed" / Computed(decompress),
-        "data" / IfThenElse(
+        "data"
+        / IfThenElse(
             this.header.compressed_size > 0,
             PrefixedWithPaddingBefore(
                 Computed(this.header.compressed_size),
-                IfThenElse(
-                    decompress,
-                    LZOCompressedBlock(this.header.uncompressed_size),
-                    GreedyBytes
-                )
+                IfThenElse(decompress, LZOCompressedBlock(this.header.uncompressed_size), GreedyBytes),
             ),
-            DataSection(GreedyBytes, size=lambda: Computed(this.header.uncompressed_size))
+            DataSection(GreedyBytes, size=lambda: Computed(this.header.uncompressed_size)),
         ),
     )
 
@@ -68,51 +86,60 @@ class DataSectionGroupAdapter(Adapter):
             section_id = GetDataSectionId(context)
             section_size = GetDataSectionSize(context)
 
-            data = b''
+            data = b""
             if group.decompressed:
-                data = group.data[offset:offset + section_size]
+                data = group.data[offset : offset + section_size]
             elif i == 0:
                 data = group.data
 
-            sections.append(Container(
-                data=data,
-                hash=hashlib.sha256(data).hexdigest(),
-                size=section_size,
-                id=section_id,
-                _decompressed=group.decompressed,
-            ))
+            sections.append(
+                Container(
+                    data=data,
+                    hash=hashlib.sha256(data).hexdigest(),
+                    size=section_size,
+                    id=section_id,
+                    _decompressed=group.decompressed,
+                )
+            )
 
             offset += section_size
 
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return {"data": b''.join([section.data for section in group])}
+        return {"data": b"".join([section.data for section in group])}
 
 
 class UncompressedDataSections(Adapter):
     def __init__(self, parse_block_func):
-        super().__init__(Array(
-            this.header.data_section_count,
-            Struct(
-                "data" / Aligned(32, FixedSized(lambda this: this._root.header.data_section_sizes.value[this._index],
-                                                GreedyBytes)),
-                "_decompressed" / Computed(parse_block_func)
+        super().__init__(
+            Array(
+                this.header.data_section_count,
+                Struct(
+                    "data"
+                    / Aligned(
+                        32,
+                        FixedSized(lambda this: this._root.header.data_section_sizes.value[this._index], GreedyBytes),
+                    ),
+                    "_decompressed" / Computed(parse_block_func),
+                ),
             )
-        ))
+        )
         self.parse_block_func = parse_block_func
 
     def _decode(self, sections, context, path):
         decoded = []
         for i in range(len(sections)):
             section = sections[i]
-            decoded.append(Container(
-                data=section.data,
-                hash=hashlib.sha256(section.data).hexdigest(),
-                size=len(section.data),
-                id=i,
-                _decompressed=section._decompressed
-            ))
+            decoded.append(
+                Container(
+                    data=section.data,
+                    hash=hashlib.sha256(section.data).hexdigest(),
+                    size=len(section.data),
+                    id=i,
+                    _decompressed=section._decompressed,
+                )
+            )
         return [ListContainer(decoded)]
 
     def _encode(self, sections, context, path):
@@ -131,7 +158,7 @@ _all_categories = [
     "area_octree_section",
     "unknown_section_2",
     "portal_area_section",
-    "static_geometry_map_section"
+    "static_geometry_map_section",
 ]
 
 
@@ -167,13 +194,12 @@ class SectionCategoryAdapter(Adapter):
             "portal_area_section": AssetIdCorrect,
             "static_geometry_map_section": AssetIdCorrect,
             "unknown_section_1": Struct(
-                "magic" / If(game_check.is_prime3, Const("LLTE", FourCC)),
-                "data" / Const(1, Int32ub)
+                "magic" / If(game_check.is_prime3, Const("LLTE", FourCC)), "data" / Const(1, Int32ub)
             ),
             "unknown_section_2": Sequence(
                 Const(0, Int32ub),
-                PrefixedArray(Int32ub, Const(0xFF, Int8ub))  # TODO: rebuild according to surface group count
-            )
+                PrefixedArray(Int32ub, Const(0xFF, Int8ub)),  # TODO: rebuild according to surface group count
+            ),
         }
 
     def _decode(self, section_groups, context, path):
@@ -186,11 +212,8 @@ class SectionCategoryAdapter(Adapter):
             return {"label": label, "value": context.header[label] if isinstance(context.header[label], int) else -1}
 
         _categories = sorted(
-            list(filter(
-                lambda item: item["value"] != -1,
-                list(map(lambda label: cat(label), _all_categories)))
-            ),
-            key=lambda cat: cat["value"]
+            list(filter(lambda item: item["value"] != -1, list(map(lambda label: cat(label), _all_categories)))),
+            key=lambda cat: cat["value"],
         )
 
         sections = {}
@@ -237,6 +260,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
 
         for cat_label, cat_sections in sorted(sections.items(), key=lambda item: item[1][0].id):
             for section in cat_sections:
+
                 def start_new_group():
                     if current_group_size == 0:
                         return (False, "")
@@ -267,14 +291,13 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
 
 
 def CompressedBlocks(parse_block_func):
-    return Aligned(32, Array(
-        this.header.compressed_block_count,
-        DataSectionGroupAdapter(DataSectionGroup(parse_block_func))
-    ))
+    return Aligned(
+        32, Array(this.header.compressed_block_count, DataSectionGroupAdapter(DataSectionGroup(parse_block_func)))
+    )
 
 
 def _previous_sections_group(this):
-    return sum([header.section_count for header in this._root.headers[0:this._index]])
+    return sum([header.section_count for header in this._root.headers[0 : this._index]])
 
 
 def _previous_sections_uncompressed(this):
@@ -306,7 +329,8 @@ def IncludeCategories(*categories):
 
         for category in categories:
             if root.header[category] != None and root.header[category] <= previous_sections < find_next_category(
-                    category, this):
+                category, this
+            ):
                 return True
         return False
 
@@ -334,92 +358,60 @@ def MREAHeader():
     return Struct(
         "magic" / Const(0xDEADBEEF, Int32ub),
         "version" / Enum(Int32ub, MREAVersion),
-
         # Matrix that represents the area's transform from the origin.
         # Most area data is pre-transformed, so this matrix is only used occasionally.
         "area_transform" / Transform4f,
-
         # Number of world models in this area.
         # TODO: rebuild
         "world_model_count" / Int32ub,
-
         # Number of script layers in this area.
-        "script_layer_count" / WithVersion(MREAVersion.Echoes,
-                                           Rebuild(Int32ub, len_(this._.sections.script_layers_section))
-                                           ),
-
+        "script_layer_count"
+        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, len_(this._.sections.script_layers_section))),
         # Number of data sections in the file.
-        "data_section_count" / Rebuild(
-            Int32ub,
-            lambda this: sum(map(
-                lambda cat: len(cat),
-                this._.sections.values()
-            ))
-        ),
-
+        "data_section_count" / Rebuild(Int32ub, lambda this: sum(map(lambda cat: len(cat), this._.sections.values()))),
         # Section index for world geometry data. Always 0; starts on materials.
         "geometry_section" / Rebuild(Int32ub, get_section_id("geometry_section")),
-
         # Section index for script layer data.
         "script_layers_section" / Rebuild(Int32ub, get_section_id("script_layers_section")),
-
         # Section index for generated script object data.
-        "generated_script_objects_section" / WithVersion(MREAVersion.Echoes,
-                                                         Rebuild(Int32ub,
-                                                                 get_section_id("generated_script_objects_section"))
-                                                         ),
-
+        "generated_script_objects_section"
+        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("generated_script_objects_section"))),
         # Section index for collision data.
         "collision_section" / Rebuild(Int32ub, get_section_id("collision_section")),
-
         # Section index for first unknown section.
         "unknown_section_1" / Rebuild(Int32ub, get_section_id("unknown_section_1")),
-
         # Section index for light data.
         "lights_section" / Rebuild(Int32ub, get_section_id("lights_section")),
-
         # Section index for visibility tree data.
         "visibility_tree_section" / Rebuild(Int32ub, get_section_id("visibility_tree_section")),
-
         # Section index for path data.
         "path_section" / Rebuild(Int32ub, get_section_id("path_section")),
-
         # Section index for area octree data.
-        "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo,
-                                              Rebuild(Int32ub, get_section_id("area_octree_section"))
-                                              ),
-
+        "area_octree_section"
+        / BeforeVersion(MREAVersion.EchoesDemo, Rebuild(Int32ub, get_section_id("area_octree_section"))),
         # Section index for second unknown section.
-        "unknown_section_2" / WithVersion(MREAVersion.Echoes,
-                                          Rebuild(Int32ub, get_section_id("unknown_section_2"))
-                                          ),
-
+        "unknown_section_2" / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("unknown_section_2"))),
         # Section index for portal area data.
-        "portal_area_section" / WithVersion(MREAVersion.Echoes,
-                                            Rebuild(Int32ub, get_section_id("portal_area_section"))
-                                            ),
-
+        "portal_area_section"
+        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("portal_area_section"))),
         # Section index for static geometry map data.
-        "static_geometry_map_section" / WithVersion(MREAVersion.Echoes,
-                                                    Rebuild(Int32ub, get_section_id("static_geometry_map_section"))
-                                                    ),
-
+        "static_geometry_map_section"
+        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("static_geometry_map_section"))),
         # Number of compressed data blocks in the file.
-        "compressed_block_count" / WithVersion(MREAVersion.Echoes,
-                                               Aligned(16, Rebuild(Int32ub, len_(this._.headers)))
-                                               ),
-
+        "compressed_block_count" / WithVersion(MREAVersion.Echoes, Aligned(16, Rebuild(Int32ub, len_(this._.headers)))),
         # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "data_section_sizes" / Aligned(32, DataSectionSizes(
-            this._.data_section_count,
-            True,
-            lambda this: sorted(
-                [x for l in this._root.sections.values() for x in l],
-                key=lambda section: section.id
-            )[this._index].size
-        )),
-
-        "categories" / Computed(_used_categories)
+        "data_section_sizes"
+        / Aligned(
+            32,
+            DataSectionSizes(
+                this._.data_section_count,
+                True,
+                lambda this: sorted(
+                    [x for l in this._root.sections.values() for x in l], key=lambda section: section.id
+                )[this._index].size,
+            ),
+        ),
+        "categories" / Computed(_used_categories),
     )
 
 
@@ -428,27 +420,32 @@ def _MREA(parse_block_func=IncludeScriptLayers):
         "header" / Aligned(32, MREAHeader()),
         "_current_section" / Computed(0),
         "version" / Computed(this.header.version),
-
         # Sections. Each group is compressed separately
-        "headers" / WithVersion(
+        "headers"
+        / WithVersion(
             MREAVersion.Echoes,
-            Aligned(32, Array(this.header.compressed_block_count, Struct(
-                "address" / Tell,
-                # TODO: all of these should be rebuilt
-                "buffer_size" / Int32ub,
-                "uncompressed_size" / Int32ub,
-                "compressed_size" / Int32ub,
-                "section_count" / Int32ub,
-            )))
+            Aligned(
+                32,
+                Array(
+                    this.header.compressed_block_count,
+                    Struct(
+                        "address" / Tell,
+                        # TODO: all of these should be rebuilt
+                        "buffer_size" / Int32ub,
+                        "uncompressed_size" / Int32ub,
+                        "compressed_size" / Int32ub,
+                        "section_count" / Int32ub,
+                    ),
+                ),
+            ),
         ),
-
         # FIXME: recompression doesn't match with original when building
-        "sections" / WithVersionElse(
+        "sections"
+        / WithVersionElse(
             MREAVersion.Echoes,
             CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
-            SectionCategoryAdapter(UncompressedDataSections(parse_block_func))
+            SectionCategoryAdapter(UncompressedDataSections(parse_block_func)),
         ),
-
     ]
 
     return Struct(*fields)

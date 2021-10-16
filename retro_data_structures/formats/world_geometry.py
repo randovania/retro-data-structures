@@ -1,5 +1,15 @@
-from construct.core import Array, Const, Float16b, GreedyBytes, GreedyRange, Int16sb, Int16ub, Int32ub, \
-    PrefixedArray, Struct
+from construct.core import (
+    Array,
+    Const,
+    Float16b,
+    GreedyBytes,
+    GreedyRange,
+    Int16sb,
+    Int16ub,
+    Int32ub,
+    PrefixedArray,
+    Struct,
+)
 
 from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
 from retro_data_structures.construct_extensions import get_version
@@ -7,11 +17,7 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
 from retro_data_structures.formats.mrea import MREAVersion
 
-WorldModelHeader = Struct(
-    "visor_flags" / Int32ub,  # TODO: FlagEnum
-    "transform" / Transform4f,
-    "bounding_box" / AABox
-)
+WorldModelHeader = Struct("visor_flags" / Int32ub, "transform" / Transform4f, "bounding_box" / AABox)  # TODO: FlagEnum
 
 SurfaceGroupBounds = Struct(
     "bounding_box" / AABox,
@@ -24,22 +30,15 @@ SurfaceGroupBounds = Struct(
 
 def SurfaceGroupIds(surface_count):
     return PrefixedArray(
-        Const(surface_count, Int16ub),
-        Struct("model_relative_id" / Int16ub, "area_relative_id" / Int16ub)
+        Const(surface_count, Int16ub), Struct("model_relative_id" / Int16ub, "area_relative_id" / Int16ub)
     )
 
 
 def SurfaceLookupTable(surface_group_count, surface_count):
     return Struct(
         "surface_group_count" / Const(surface_group_count, Int16ub),
-        "lookup_table_index_array" / Array(
-            surface_group_count,
-            Int16ub  # TODO: rebuild
-        ),
-        "surface_lookup_table" / Array(
-            surface_count,
-            Int16ub
-        )
+        "lookup_table_index_array" / Array(surface_group_count, Int16ub),  # TODO: rebuild
+        "surface_lookup_table" / Array(surface_count, Int16ub),
     )
 
 
@@ -52,7 +51,7 @@ def GeometryCodec(category, context, path, encode, codec):
     def subcategory_codec(identifier, subcon=GreedyBytes, size=1):
         nonlocal current_section
 
-        subcategory = category[current_section:current_section + size]
+        subcategory = category[current_section : current_section + size]
         codec(subcategory, subcon, context, path)
 
         for section in subcategory:

@@ -17,8 +17,12 @@ BoneName = Struct(
     bone_id=Int32ub,
 )
 
-CINF = Aligned(32, Struct(
-    bones=PrefixedArray(Int32ub, Bone),
-    build_order_id=PrefixedArray(Int32ub, Int32ub),
-    bone_names=PrefixedArray(Int32ub, BoneName),
-), pattern=b"\xFF")
+CINF = Aligned(
+    32,
+    Struct(
+        bones=PrefixedArray(Int32ub, Bone),
+        build_order_id=PrefixedArray(Int32ub, Int32ub),
+        bone_names=PrefixedArray(Int32ub, BoneName),
+    ),
+    pattern=b"\xFF",
+)

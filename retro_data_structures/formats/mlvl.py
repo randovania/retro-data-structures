@@ -3,8 +3,20 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 import construct
 from construct import (
-    Array, Struct, Int32ub, PrefixedArray, Int64ub, Float32b, Int16ub, CString, Const, Int8ub,
-    Switch, Peek, Sequence, FocusedSeq
+    Array,
+    Struct,
+    Int32ub,
+    PrefixedArray,
+    Int64ub,
+    Float32b,
+    Int16ub,
+    CString,
+    Const,
+    Int8ub,
+    Switch,
+    Peek,
+    Sequence,
+    FocusedSeq,
 )
 
 from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
@@ -67,10 +79,13 @@ def create_area(version: int, asset_id):
 
     # Echoes
     if version == 0x17:
-        area_fields.append("module_dependencies" / Struct(
-            rel_module=PrefixedArray(Int32ub, CString("utf-8")),
-            rel_offset=PrefixedArray(Int32ub, Int32ub),
-        ))
+        area_fields.append(
+            "module_dependencies"
+            / Struct(
+                rel_module=PrefixedArray(Int32ub, CString("utf-8")),
+                rel_offset=PrefixedArray(Int32ub, Int32ub),
+            )
+        )
 
     # DKCR
     if version >= 0x1B:
@@ -103,10 +118,12 @@ def create(version: int, asset_id):
 
     # TODO: time attack for DKCR
 
-    fields.extend([
-        "world_save_info_id" / asset_id,
-        "default_skybox_id" / asset_id,
-    ])
+    fields.extend(
+        [
+            "world_save_info_id" / asset_id,
+            "default_skybox_id" / asset_id,
+        ]
+    )
 
     # Prime 1
     if version <= 0x11:
@@ -117,13 +134,9 @@ def create(version: int, asset_id):
     # Prime 1
     if version <= 0x11:
         # Extra field is unknown, always 1
-        fields.append(
-            "areas" / PrefixedArrayWithExtra(Int32ub, Const(1, Int32ub), area)
-        )
+        fields.append("areas" / PrefixedArrayWithExtra(Int32ub, Const(1, Int32ub), area))
     else:
-        fields.append(
-            "areas" / PrefixedArray(Int32ub, area)
-        )
+        fields.append("areas" / PrefixedArray(Int32ub, area))
 
     # DKCR
     if version <= 0x1B:
@@ -139,19 +152,25 @@ def create(version: int, asset_id):
     # Prime 1
     if version <= 0x11:
         fields.append(
-            "audio_group" / PrefixedArray(Int32ub, Struct(
-                group_id=Int32ub,
-                agsc_id=asset_id,
-            ))
+            "audio_group"
+            / PrefixedArray(
+                Int32ub,
+                Struct(
+                    group_id=Int32ub,
+                    agsc_id=asset_id,
+                ),
+            )
         )
 
         # Unknown purpose, always empty
         fields.append(CString("utf-8"))
 
-    fields.extend([
-        "area_layer_flags" / PrefixedArray(Int32ub, MLVLAreaLayerFlags),
-        "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
-    ])
+    fields.extend(
+        [
+            "area_layer_flags" / PrefixedArray(Int32ub, MLVLAreaLayerFlags),
+            "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
+        ]
+    )
 
     # Corruption
     if version >= 0x19:
@@ -177,5 +196,5 @@ MLVL = FocusedSeq(
             0x19: Prime3MLVL,
         },
         construct.Error,
-    )
+    ),
 )

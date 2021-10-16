@@ -43,10 +43,13 @@ def create(asset_id):
         unknown_2=Byte,
     )
 
-    meta_bodies[MetaAnimationType.Random] = PrefixedArray(Int32ub, Struct(
-        animation=meta,
-        probability=Int32ub,
-    ))
+    meta_bodies[MetaAnimationType.Random] = PrefixedArray(
+        Int32ub,
+        Struct(
+            animation=meta,
+            probability=Int32ub,
+        ),
+    )
 
     meta_bodies[MetaAnimationType.Sequence] = PrefixedArray(Int32ub, meta)
 

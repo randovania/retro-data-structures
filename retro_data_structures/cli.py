@@ -79,14 +79,14 @@ def create_parser():
     add_game_argument(deps)
     deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
     g = deps.add_mutually_exclusive_group()
-    g.add_argument("--asset-ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
+    g.add_argument("--asset-ids", type=lambda x: int(x, 0), nargs="+", help="Asset id to list dependencies for")
     g.add_argument("--asset-type", type=str, help="List dependencies for all assets of the given type.")
 
     convert = subparser.add_parser("convert")
     add_game_argument(convert, "--source-game")
     add_game_argument(convert, "--target-game")
     convert.add_argument("paks_path", type=Path, help="Path to where to find source pak files")
-    convert.add_argument("asset_ids", type=lambda x: int(x, 0), nargs='+', help="Asset id to list dependencies for")
+    convert.add_argument("asset_ids", type=lambda x: int(x, 0), nargs="+", help="Asset id to list dependencies for")
 
     return parser
 
@@ -108,8 +108,7 @@ def dump_to(path: Path, decoded):
         if isinstance(o, bytes):
             return len(o)
 
-        raise TypeError(f'Object of type {o.__class__.__name__} '
-                        f'is not JSON serializable')
+        raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
     with path.open("w") as f:
         x = construct_extensions.convert_to_raw_python(decoded)
@@ -203,24 +202,26 @@ def do_convert(args):
                     converted.id,
                     converted.type,
                     converted.resource,
-                ))
+                )
+            )
 
             for dependency in dependencies.direct_dependencies_for(converted.resource, converted.type, target_game):
                 print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
 
         print("==================\n>> All converted assets")
         reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
-            v: k
-            for k, v in converter.converted_ids.items()
+            v: k for k, v in converter.converted_ids.items()
         }
 
         for converted_asset in converter.converted_assets.values():
-            print(" {}: {:08x} from {:08x} ({})".format(
-                converted_asset.type,
-                converted_asset.id,
-                reverse_converted_ids[converted_asset.id][1],
-                reverse_converted_ids[converted_asset.id][0].name,
-            ))
+            print(
+                " {}: {:08x} from {:08x} ({})".format(
+                    converted_asset.type,
+                    converted_asset.id,
+                    reverse_converted_ids[converted_asset.id][1],
+                    reverse_converted_ids[converted_asset.id][0].name,
+                )
+            )
 
 
 _ITEM_ID_TO_NAME = {
@@ -348,10 +349,19 @@ def decode_encode_compare_file(file_path: Path, game: Game, file_format: str):
             sections.extend(group.sections)
 
         conditionals = [0xCEC16932, 0xE709DDC0, 0x49614C51, 0xB498B424]
-        condition_name = ["Equal To", "Not Equal To", "Greater Than", "Less Than", "Greater Than or Equal To",
-                          "Less Than or Equal To", "Greater Than All Other Players", "Less Than All Other Players"]
+        condition_name = [
+            "Equal To",
+            "Not Equal To",
+            "Greater Than",
+            "Less Than",
+            "Greater Than or Equal To",
+            "Less Than or Equal To",
+            "Greater Than All Other Players",
+            "Less Than All Other Players",
+        ]
 
         from retro_data_structures.formats.scly import SCLY
+
         for i in range(decoded_from_raw.script_layers_section, decoded_from_raw.generated_script_objects_section):
             scly = SCLY.parse(sections[i].data, target_game=game)
             for instance in scly.script_instances:
@@ -422,8 +432,7 @@ async def compare_all_files_in_path(args):
 
         raise SystemExit(0)
 
-        results = [loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format)
-                   for f in files]
+        results = [loop.run_in_executor(executor, decode_encode_compare_file, f, game, file_format) for f in files]
         as_completed = asyncio.as_completed(results)
         if tqdm is not None:
             as_completed = tqdm.tqdm(as_completed, total=len(results), unit=" file")

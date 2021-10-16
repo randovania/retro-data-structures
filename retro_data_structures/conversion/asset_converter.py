@@ -33,8 +33,13 @@ class AssetConverter:
     converted_ids: Dict[Tuple[Game, AssetId], AssetId]
     converted_assets: Dict[AssetId, ConvertedAsset]
 
-    def __init__(self, target_game: Game, asset_providers: Dict[Game, AssetProvider], id_generator: IdGenerator,
-                 converters: Callable[[AssetDetails], ResourceConverter]):
+    def __init__(
+        self,
+        target_game: Game,
+        asset_providers: Dict[Game, AssetProvider],
+        id_generator: IdGenerator,
+        converters: Callable[[AssetDetails], ResourceConverter],
+    ):
         self.target_game = target_game
         self.asset_providers = asset_providers
         self.id_generator = id_generator
@@ -43,8 +48,9 @@ class AssetConverter:
         self.converted_assets = {}
         self._being_converted = set()
 
-    def convert_id(self, asset_id: Optional[AssetId], source_game: Game, *,
-                   missing_assets_as_invalid: bool = True) -> AssetId:
+    def convert_id(
+        self, asset_id: Optional[AssetId], source_game: Game, *, missing_assets_as_invalid: bool = True
+    ) -> AssetId:
         if asset_id is not None and source_game.is_valid_asset_id(asset_id):
             try:
                 return self.convert_asset_by_id(asset_id, source_game).id

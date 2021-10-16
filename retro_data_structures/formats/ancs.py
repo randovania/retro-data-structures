@@ -14,6 +14,7 @@ from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
+
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
 from retro_data_structures.game_check import Game
 
@@ -113,11 +114,14 @@ AnimationSet = Struct(
     animations=PrefixedArray(Int32ub, Animation),
     transitions=PrefixedArray(Int32ub, Transition),
     default_transition=MetaTransition_v1,
-    additive=If(construct.this.table_count >= 2, Struct(
-        additive_animations=PrefixedArray(Int32ub, AdditiveAnimation),
-        default_fade_in_time=Float32b,
-        default_fade_out_time=Float32b,
-    )),
+    additive=If(
+        construct.this.table_count >= 2,
+        Struct(
+            additive_animations=PrefixedArray(Int32ub, AdditiveAnimation),
+            default_fade_in_time=Float32b,
+            default_fade_out_time=Float32b,
+        ),
+    ),
     half_transitions=If(construct.this.table_count >= 3, PrefixedArray(Int32ub, HalfTransitions)),
     animation_resources=If(game_check.is_prime1, PrefixedArray(Int32ub, AnimationResourcePair)),
     event_sets=If(game_check.is_prime2, PrefixedArray(Int32ub, EVNT)),

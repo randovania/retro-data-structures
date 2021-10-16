@@ -1,4 +1,4 @@
-from construct import (Adapter, AdaptationError)
+from construct import Adapter, AdaptationError
 
 
 class OffsetAdapter(Adapter):

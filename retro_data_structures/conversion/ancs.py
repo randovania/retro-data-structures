@@ -10,6 +10,7 @@ from retro_data_structures.game_check import Game
 # For MP2->MP1 AnimID needs parsed and passed in here, EvntId needs to be created new/unique and passed in as well.
 # For MP1->MP2 - Pass in EVNT file path to build proper event_sets
 
+
 def _convert_meta_animation(animation, converter: AssetConverter, source_game: Game):
     if animation["type"] == MetaAnimationType.Play:
         animation["body"]["asset_id"] = converter.convert_id(animation["body"]["asset_id"], source_game)
@@ -48,8 +49,7 @@ def _convert_character(data, converter: AssetConverter, source_game: Game):
 
     for field in ["generic_particles", "swoosh_particles", "electric_particles"]:
         data["particle_resource_data"][field] = [
-            converter.convert_id(particle, source_game)
-            for particle in data["particle_resource_data"][field]
+            converter.convert_id(particle, source_game) for particle in data["particle_resource_data"][field]
         ]
 
     if converter.target_game == Game.PRIME:
@@ -105,9 +105,7 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
     event_sets = ListContainer()
     for animation in data["animation_set"]["animations"]:
         anim_ids = list(get_animation_ids(animation["meta"]))
-        event_sets.append(
-            converter.convert_asset_by_id(anim_to_event[anim_ids[0]], Game.PRIME).resource
-        )
+        event_sets.append(converter.convert_asset_by_id(anim_to_event[anim_ids[0]], Game.PRIME).resource)
     data["animation_set"]["event_sets"] = event_sets
 
     # Convert the animations after the event sets, so the asset id conversion doesn't break us
@@ -123,7 +121,7 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
     for character in data["character_set"]["characters"]:
         character["version"] = 6
         for animation_name in character["animation_names"]:
-            animation_name["unknown"] = ''
+            animation_name["unknown"] = ""
         character["unknown_1"] = 1
         _convert_character(character, converter, Game.ECHOES)
 
@@ -138,10 +136,14 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
         for anim_id in get_animation_ids(animation["meta"]):
             if anim_id not in seen_ids and anim_id != Game.ECHOES.invalid_asset_id:
                 seen_ids.add(anim_id)
-                data["animation_set"]["animation_resources"].append(Container({
-                    "anim_id": anim_id,
-                    "event_id": evnt_id,
-                }))
+                data["animation_set"]["animation_resources"].append(
+                    Container(
+                        {
+                            "anim_id": anim_id,
+                            "event_id": evnt_id,
+                        }
+                    )
+                )
 
     data["animation_set"]["event_sets"] = None
 

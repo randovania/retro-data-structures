@@ -35,10 +35,7 @@ class AssetProvider:
 
     def __enter__(self):
         if self._pak_files is None:
-            self._pak_files = [
-                path.open("rb")
-                for path in self.pak_paths
-            ]
+            self._pak_files = [path.open("rb") for path in self.pak_paths]
         self._paks = []
         for i, pak_file in enumerate(self._pak_files):
             logger.info("Parsing PAK at %s", str(self.pak_paths[i]))
@@ -73,9 +70,11 @@ class AssetProvider:
             try:
                 data = CompressedPakResource.parse(data, target_game=self.target_game)
             except Exception as e:
-                raise InvalidAssetId(asset_id,
-                                     f"Unable to decompress {resource.asset.type} from "
-                                     f"{self.pak_paths[pak_id]} at {resource.offset} with size {resource.size}: {e}.")
+                raise InvalidAssetId(
+                    asset_id,
+                    f"Unable to decompress {resource.asset.type} from "
+                    f"{self.pak_paths[pak_id]} at {resource.offset} with size {resource.size}: {e}.",
+                )
 
         try:
             format_for_type = formats.format_for(resource.asset.type)

@@ -90,11 +90,7 @@ def current_game_at_least(target: Game) -> Callable[[Any], bool]:
 
 
 def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:
-    return IfThenElse(
-        current_game_at_least(target),
-        subcon1,
-        subcon2
-    )
+    return IfThenElse(current_game_at_least(target), subcon1, subcon2)
 
 
 def uses_asset_id_32(ctx):

@@ -1,6 +1,25 @@
 import construct
-from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, Terminated, Rebuild, GreedyRange, Tell, Pointer
+from construct import (
+    Struct,
+    Array,
+    PrefixedArray,
+    Const,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    Float32b,
+    If,
+    IfThenElse,
+    BitsInteger,
+    ExprAdapter,
+    Bit,
+    Aligned,
+    Terminated,
+    Rebuild,
+    GreedyRange,
+    Tell,
+    Pointer,
+)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
@@ -76,38 +95,54 @@ CompressedAnimation = Struct(
     _bone_channel_count=Rebuild(Int32ub, construct.len_(construct.this.bone_channel_descriptors)),
     unk_3=Int32ub,
     _key_bitmap_count=Rebuild(Int32ub, construct.len_(construct.this.animation_keys) + 1),
-    _key_bitmap_array=BitwiseWith32Blocks(Aligned(32, Array(
-        construct.this._key_bitmap_count,
-        Rebuild(ExprAdapter(Bit, lambda raw, ctx: bool(raw), lambda i, ctx: int(i)),
-                lambda ctx: ctx.animation_keys[ctx._index - 1].channels is not None if ctx._index > 0 else True),
-    ))),
+    _key_bitmap_array=BitwiseWith32Blocks(
+        Aligned(
+            32,
+            Array(
+                construct.this._key_bitmap_count,
+                Rebuild(
+                    ExprAdapter(Bit, lambda raw, ctx: bool(raw), lambda i, ctx: int(i)),
+                    lambda ctx: ctx.animation_keys[ctx._index - 1].channels is not None if ctx._index > 0 else True,
+                ),
+            ),
+        )
+    ),
     _bone_channel_count_2=If(game_check.is_prime1, Rebuild(Int32ub, construct.this._bone_channel_count)),
     bone_channel_descriptors=PrefixedArray(Int32ub, BoneChannelDescriptor),
-    animation_keys=BitwiseWith32Blocks(Aligned(32, Array(
-        construct.this._key_bitmap_count - 1,
-        Struct(
-            channels=If(lambda this: get_anim(this)._key_bitmap_array[this._index + 1], Array(
-                lambda this: get_anim(this)._bone_channel_count,
+    animation_keys=BitwiseWith32Blocks(
+        Aligned(
+            32,
+            Array(
+                construct.this._key_bitmap_count - 1,
                 Struct(
-                    rotation=If(
-                        lambda this: get_descriptor(this).rotation_keys_count > 0,
-                        Struct(
-                            wsign=Bit,
-                            data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
-                        )
+                    channels=If(
+                        lambda this: get_anim(this)._key_bitmap_array[this._index + 1],
+                        Array(
+                            lambda this: get_anim(this)._bone_channel_count,
+                            Struct(
+                                rotation=If(
+                                    lambda this: get_descriptor(this).rotation_keys_count > 0,
+                                    Struct(
+                                        wsign=Bit,
+                                        data=create_bits_field(lambda this: get_descriptor(this).rotation_keys),
+                                    ),
+                                ),
+                                translation=If(
+                                    lambda this: get_descriptor(this).translation_keys_count > 0,
+                                    create_bits_field(lambda this: get_descriptor(this).translation_keys),
+                                ),
+                                scale=If(
+                                    lambda this: game_check.is_prime2(this)
+                                    and get_descriptor(this).scale_keys_count > 0,
+                                    create_bits_field(lambda this: get_descriptor(this).scale_keys),
+                                ),
+                            ),
+                        ),
                     ),
-                    translation=If(
-                        lambda this: get_descriptor(this).translation_keys_count > 0,
-                        create_bits_field(lambda this: get_descriptor(this).translation_keys),
-                    ),
-                    scale=If(
-                        lambda this: game_check.is_prime2(this) and get_descriptor(this).scale_keys_count > 0,
-                        create_bits_field(lambda this: get_descriptor(this).scale_keys),
-                    ),
-                )
-            )),
-        ),
-    ))),
+                ),
+            ),
+        )
+    ),
     _end=Tell,
     _update_scratch_size=Pointer(construct.this._start, Rebuild(Int32ub, construct.this._end - construct.this._start)),
 )

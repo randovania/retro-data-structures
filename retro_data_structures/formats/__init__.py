@@ -32,11 +32,9 @@ ALL_FORMATS = {
     "PART": PART,
     "TXTR": TXTR,
     "CSPP": CSPP,
-
     "SCAN": SCAN,
     "DGRP": DGRP,
     "STRG": STRG,
-
 }
 
 

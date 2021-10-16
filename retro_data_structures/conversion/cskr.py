@@ -23,7 +23,7 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
     for i in range(len(list(set(bones.values())))):
         data["footer"]["pool_to_skin_idx"][i] = i
     for i, size in enumerate(vertex_sizes.values()):
-        data["footer"]["trailing_bytes"] += i.to_bytes(1, 'big') * size
+        data["footer"]["trailing_bytes"] += i.to_bytes(1, "big") * size
 
     return data
 
@@ -41,7 +41,7 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
     data["footer"] = {
         "unk_a": {"first": 0xFFFFFFFF, "other": total_vertices},
         "unk_b": {"first": 0xFFFFFFFF, "other": total_vertices},
-        "trailing_bytes": b''
+        "trailing_bytes": b"",
     }
 
     return data

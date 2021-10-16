@@ -1,5 +1,4 @@
-from construct import (Array, Const, Enum, Flag, Float32b, If, Int32ub, StopIf,
-                       Struct)
+from construct import Array, Const, Enum, Flag, Float32b, If, Int32ub, StopIf, Struct
 from construct.core import IfThenElse, PrefixedArray
 
 from retro_data_structures import game_check
@@ -7,7 +6,8 @@ from retro_data_structures.common_types import Color4f, Vector3
 
 Lights = Struct(
     "magic" / Const(0xBABEDEAD, Int32ub),
-    "layers" / Array(
+    "layers"
+    / Array(
         lambda this: 4 if game_check.is_prime3(this) else 2,
         PrefixedArray(
             Int32ub,
@@ -29,8 +29,8 @@ Lights = Struct(
                 "unk6" / Float32b,
                 "unk6" / Float32b,
                 "unk7" / Float32b,
-                "unk8" / Int32ub
-            )
-        )
-    )
+                "unk8" / Int32ub,
+            ),
+        ),
+    ),
 )

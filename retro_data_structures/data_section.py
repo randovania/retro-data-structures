@@ -20,7 +20,7 @@ def DataSectionSizes(section_count, include_value=False, rebuildfunc=lambda this
     return Struct(
         address=Tell,
         value=If(include_value, Array(section_count, Rebuild(Int32ub, rebuildfunc))),
-        offset=If(lambda this: not include_value, Skip(section_count, Int32ub))
+        offset=If(lambda this: not include_value, Skip(section_count, Int32ub)),
     )
 
 

@@ -5,8 +5,21 @@ from typing import Any
 
 import construct
 from construct import (
-    GreedyBytes, FocusedSeq, Rebuild, this, len_, stream_tell, Int32ub, ListContainer,
-    EnumIntegerString, Container, Adapter, Enum, If, Subconstruct, Construct
+    GreedyBytes,
+    FocusedSeq,
+    Rebuild,
+    this,
+    len_,
+    stream_tell,
+    Int32ub,
+    ListContainer,
+    EnumIntegerString,
+    Container,
+    Adapter,
+    Enum,
+    If,
+    Subconstruct,
+    Construct,
 )
 from construct.core import Const, IfThenElse, Optional, PrefixedArray, Struct, VarInt
 
@@ -28,11 +41,12 @@ def PrefixedArrayWithExtra(countfield, extrafield, subcon):
         >>> d.parse(b"\x02abcdefgh")
         [1684234849, 1751606885]
     """
-    macro = FocusedSeq("items",
-                       "count" / Rebuild(countfield, len_(this.items)),
-                       "extra" / extrafield,
-                       "items" / subcon[this.count],
-                       )
+    macro = FocusedSeq(
+        "items",
+        "count" / Rebuild(countfield, len_(this.items)),
+        "extra" / extrafield,
+        "items" / subcon[this.count],
+    )
 
     def _actualsize(self, stream, context, path):
         position1 = stream_tell(stream, path)
@@ -71,17 +85,10 @@ def convert_to_raw_python(value) -> Any:
         value = value()
 
     if isinstance(value, ListContainer):
-        return [
-            convert_to_raw_python(item)
-            for item in value
-        ]
+        return [convert_to_raw_python(item) for item in value]
 
     if isinstance(value, Container):
-        return {
-            key: convert_to_raw_python(item)
-            for key, item in value.items()
-            if not key.startswith("_")
-        }
+        return {key: convert_to_raw_python(item) for key, item in value.items() if not key.startswith("_")}
 
     if isinstance(value, EnumIntegerString):
         return str(value)
@@ -90,8 +97,8 @@ def convert_to_raw_python(value) -> Any:
 
 
 def get_version(this, enum_type):
-    if 'version' not in this:
-        return get_version(this['_'], enum_type)
+    if "version" not in this:
+        return get_version(this["_"], enum_type)
     else:
         if isinstance(this.version, EnumIntegerString):
             return int(this.version)
@@ -107,11 +114,7 @@ def compare_version(version):
 
 
 def WithVersionElse(version, with_subcon, before_subcon):
-    return IfThenElse(
-        lambda this: compare_version(version)(this) >= version,
-        with_subcon,
-        before_subcon
-    )
+    return IfThenElse(lambda this: compare_version(version)(this) >= version, with_subcon, before_subcon)
 
 
 def WithVersion(version, subcon):
@@ -152,8 +155,10 @@ def BitwiseWith32Blocks(subcon):
     """
     return construct.Restreamed(
         subcon,
-        lambda data: bytes(reversed(construct.bytes2bits(data))), 4,
-        lambda data: construct.bits2bytes(bytes(reversed(data))), 32,
+        lambda data: bytes(reversed(construct.bytes2bits(data))),
+        4,
+        lambda data: construct.bits2bytes(bytes(reversed(data))),
+        32,
         lambda n: n // 32,
     )
 
@@ -309,15 +314,14 @@ class DictAdapter(Adapter):
 
 
 def DictStruct(*fields):
-    return Struct(
-        *fields,
-        "*Key" / String
-    )
+    return Struct(*fields, "*Key" / String)
 
 
 def LabeledOptional(label, subcon):
-    return Optional(FocusedSeq(
-        "subcon",
-        Const(label),
-        "subcon" / subcon,
-    ))
+    return Optional(
+        FocusedSeq(
+            "subcon",
+            Const(label),
+            "subcon" / subcon,
+        )
+    )

@@ -209,8 +209,8 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
             if element["type"] == "COLR":
                 if element["body"]["type"] == "MDAO":
                     if (
-                            element["body"]["body"]["a"]["type"] == "KEYE"
-                            and element["body"]["body"]["b"]["type"] == "KEYP"
+                        element["body"]["body"]["a"]["type"] == "KEYE"
+                        and element["body"]["body"]["b"]["type"] == "KEYP"
                     ):
                         org_colr_mado_a_keye = element["body"]["body"]["a"]["body"]["keys"]
                         new_colr_cnst_a_keyp_a = copy.deepcopy(element["body"]["body"]["a"])
@@ -218,17 +218,27 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                         new_colr_cnst_a_keyp_c = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_d = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_a["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"])
+                            element["body"]["body"]["a"]["body"]["keys"]
+                        )
                         new_colr_cnst_a_keyp_b["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"])
+                            element["body"]["body"]["a"]["body"]["keys"]
+                        )
                         new_colr_cnst_a_keyp_c["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"])
+                            element["body"]["body"]["a"]["body"]["keys"]
+                        )
                         new_colr_cnst_a_keyp_d["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"])
+                            element["body"]["body"]["a"]["body"]["keys"]
+                        )
                         element["body"]["body"]["a"]["type"] = "CNST"
                         for i, key in enumerate(org_colr_mado_a_keye):
-                            for j, t in enumerate((new_colr_cnst_a_keyp_a, new_colr_cnst_a_keyp_b,
-                                                   new_colr_cnst_a_keyp_c, new_colr_cnst_a_keyp_d)):
+                            for j, t in enumerate(
+                                (
+                                    new_colr_cnst_a_keyp_a,
+                                    new_colr_cnst_a_keyp_b,
+                                    new_colr_cnst_a_keyp_c,
+                                    new_colr_cnst_a_keyp_d,
+                                )
+                            ):
                                 t["body"]["keys"][i] = key[j]
 
                         element["body"]["body"]["a"]["body"] = {
@@ -247,8 +257,8 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
 
                 if element["body"]["type"] == "MULT":
                     if (
-                            element["body"]["body"]["a"]["type"] == "PULS"
-                            and element["body"]["body"]["b"]["type"] == "KEYP"
+                        element["body"]["body"]["a"]["type"] == "PULS"
+                        and element["body"]["body"]["b"]["type"] == "KEYP"
                     ):
                         org_colr_mult_b_keyp = element["body"]["body"]["b"]["body"]["keys"]
                         new_colr_a_c_mult_b_keyp_a = copy.deepcopy(element["body"]["body"]["b"])
@@ -267,8 +277,8 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                             new_colr_a_c_mult_b_keyp_d["body"]["keys"][i] = key[3]
 
                         if (
-                                element["body"]["body"]["a"]["body"]["c"]["type"] == "KEYP"
-                                and element["body"]["body"]["a"]["body"]["d"]["type"] == "KEYP"
+                            element["body"]["body"]["a"]["body"]["c"]["type"] == "KEYP"
+                            and element["body"]["body"]["a"]["body"]["d"]["type"] == "KEYP"
                         ):
                             org_colr_mult_a_c_keyp = element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
                             new_colr_a_c_mult_a_keyp_c_a = copy.deepcopy(element["body"]["body"]["a"]["body"]["c"])

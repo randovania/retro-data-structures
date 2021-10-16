@@ -2,8 +2,7 @@
 https://wiki.axiodl.com/w/SCAN_(File_Format)
 """
 
-from construct.core import (Array, Byte, Check, Const, Enum, Float32b, GreedyRange,
-                            Hex, IfThenElse, Int32ub, Struct)
+from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRange, Hex, IfThenElse, Int32ub, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32, FourCC
@@ -20,7 +19,7 @@ ScanImage = Struct(
     "width" / Int32ub,
     "height" / Int32ub,
     "interval" / Float32b,
-    "duration" / Float32b
+    "duration" / Float32b,
 )
 
 Prime1SCAN = Struct(
@@ -29,18 +28,10 @@ Prime1SCAN = Struct(
     "frame_id" / AssetId32,  # FRME
     "text_id" / AssetId32,  # STRG
     "scan_speed" / Enum(Int32ub, fast=0, slow=1),
-    "logbook_category" / Enum(
-        Int32ub,
-        none=0,
-        pirate=1,
-        chozo=2,
-        creatures=3,
-        research=4,
-        artifacts=5
-    ),
+    "logbook_category" / Enum(Int32ub, none=0, pirate=1, chozo=2, creatures=3, research=4, artifacts=5),
     "scan_icon" / Enum(Byte, orange=0, red=1),
     "scan_images" / Array(4, ScanImage),
-    "junk" / GreedyRange(Byte)
+    "junk" / GreedyRange(Byte),
 )
 
 Prime23SCAN = Struct(
@@ -50,7 +41,7 @@ Prime23SCAN = Struct(
     "instance_count" / Const(1, Int32ub),
     "scannable_object_info" / ScriptInstance,
     "dependencies" / DGRP,
-    "junk" / GreedyRange(Byte)
+    "junk" / GreedyRange(Byte),
 )
 
 SCAN = IfThenElse(game_check.is_prime1, Prime1SCAN, Prime23SCAN)

@@ -3,11 +3,33 @@ from retro_data_structures.conversion.errors import UnsupportedTargetGame, Unsup
 from retro_data_structures.game_check import Game
 
 _BONE_NAME_MAPPING = {
-    'Skeleton_Root': 1, 'root': 0, 'Electric': 6, 'WBbottom_SDK': 4, 'WBtop_SDK': 3, 'move_SDK': 2, 'snaplocators': 5,
-    'Missile_Launcher_SDK': 3, 'grapple_SDK': 2, 'skeleton_root': 1, 'can_SDK': 3, 'visor_SDK': 2, 'EnergyTank_SDK': 2,
-    'MorphBall_Pickup_SDK': 2, 'bomb_SDK': 2, 'power_SDK': 2, 'powerbombleft_SDK': 3, 'powerbombright_SDK': 2,
-    'Powerup_SDK': 2, 'bottom_piece': 4, 'cubes': 2, 'top_piece': 5, 'trails': 3, 'midring_SDK': 4, 'outring_SDK': 3,
-    'rotate_SDK': 2}
+    "Skeleton_Root": 1,
+    "root": 0,
+    "Electric": 6,
+    "WBbottom_SDK": 4,
+    "WBtop_SDK": 3,
+    "move_SDK": 2,
+    "snaplocators": 5,
+    "Missile_Launcher_SDK": 3,
+    "grapple_SDK": 2,
+    "skeleton_root": 1,
+    "can_SDK": 3,
+    "visor_SDK": 2,
+    "EnergyTank_SDK": 2,
+    "MorphBall_Pickup_SDK": 2,
+    "bomb_SDK": 2,
+    "power_SDK": 2,
+    "powerbombleft_SDK": 3,
+    "powerbombright_SDK": 2,
+    "Powerup_SDK": 2,
+    "bottom_piece": 4,
+    "cubes": 2,
+    "top_piece": 5,
+    "trails": 3,
+    "midring_SDK": 4,
+    "outring_SDK": 3,
+    "rotate_SDK": 2,
+}
 
 
 def _convert_particles(data, converter: AssetConverter, source_game: Game):
@@ -45,7 +67,7 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
 
     for i, poi_node in enumerate(data["particle_poi_nodes"]):
         bone_name = str(poi_node["base"]["name"]).split("-", 1)
-        poi_node["bone_name"] = f'{bone_name[0]}'  # HACK - Not sure this will always work...?
+        poi_node["bone_name"] = f"{bone_name[0]}"  # HACK - Not sure this will always work...?
         poi_node["bone_id"] = None
 
     for i, sound_poi_node in enumerate(data["sound_poi_nodes"]):

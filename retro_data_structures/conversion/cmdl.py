@@ -6,10 +6,9 @@ from retro_data_structures.game_check import Game
 
 
 def _convert_textures(material_set, converter: AssetConverter, source_game: Game):
-    material_set["texture_file_ids"] = ListContainer([
-        converter.convert_id(file_id, source_game)
-        for file_id in material_set["texture_file_ids"]
-    ])
+    material_set["texture_file_ids"] = ListContainer(
+        [converter.convert_id(file_id, source_game) for file_id in material_set["texture_file_ids"]]
+    )
 
 
 def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetConverter):

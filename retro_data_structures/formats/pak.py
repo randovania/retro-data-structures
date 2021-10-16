@@ -1,7 +1,23 @@
 import construct
-from construct import (Struct, Const, Int16ub, PrefixedArray, Int32ub, PascalString, IfThenElse,
-                       FocusedSeq, Pointer, Aligned, Tell, Rebuild,
-                       GreedyBytes, Array, Seek, Computed, RawCopy)
+from construct import (
+    Struct,
+    Const,
+    Int16ub,
+    PrefixedArray,
+    Int32ub,
+    PascalString,
+    IfThenElse,
+    FocusedSeq,
+    Pointer,
+    Aligned,
+    Tell,
+    Rebuild,
+    GreedyBytes,
+    Array,
+    Seek,
+    Computed,
+    RawCopy,
+)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import ObjectTag_32
@@ -23,11 +39,14 @@ ResourceHeader = Struct(
 
 PAKNoData = Struct(
     _header=PAKHeader,
-    named_resources=PrefixedArray(Int32ub, Struct(
-        asset=ObjectTag_32,
-        name=PascalString(Int32ub, "utf-8"),
-    )),
-    resources=PrefixedArray(Int32ub, ResourceHeader)
+    named_resources=PrefixedArray(
+        Int32ub,
+        Struct(
+            asset=ObjectTag_32,
+            name=PascalString(Int32ub, "utf-8"),
+        ),
+    ),
+    resources=PrefixedArray(Int32ub, ResourceHeader),
 )
 
 
@@ -77,35 +96,45 @@ CompressedPakResource = FocusedSeq(
 def create():
     return "PAK" / Struct(
         _header=PAKHeader,
-        named_resources=PrefixedArray(Int32ub, Struct(
-            asset=ObjectTag_32,
-            name=PascalString(Int32ub, "utf-8"),
-        )),
+        named_resources=PrefixedArray(
+            Int32ub,
+            Struct(
+                asset=ObjectTag_32,
+                name=PascalString(Int32ub, "utf-8"),
+            ),
+        ),
         _num_resources=Rebuild(Int32ub, construct.len_(construct.this.resources)),
         _start_headers=Tell,
         _skip_headers=Seek(skip_headers, 1),
         _align=AlignTo(32),
         resources=Array(
             construct.this["_num_resources"],
-            Aligned(32, Struct(
-                _start=Tell,
-                _resource_index=Computed(lambda ctx: ctx["_index"]),
-                compressed=Pointer(header_field(0x0), Int32ub),
-                asset=Pointer(header_field(0x4), ObjectTag_32),
-                contents=RawCopy(LazyPatchedForBug(AlignedPrefixed(
-                    Pointer(header_field(0xC), Int32ub),
-                    IfThenElse(
-                        construct.this.compressed > 0,
-                        CompressedPakResource,
-                        GreedyBytes,
+            Aligned(
+                32,
+                Struct(
+                    _start=Tell,
+                    _resource_index=Computed(lambda ctx: ctx["_index"]),
+                    compressed=Pointer(header_field(0x0), Int32ub),
+                    asset=Pointer(header_field(0x4), ObjectTag_32),
+                    contents=RawCopy(
+                        LazyPatchedForBug(
+                            AlignedPrefixed(
+                                Pointer(header_field(0xC), Int32ub),
+                                IfThenElse(
+                                    construct.this.compressed > 0,
+                                    CompressedPakResource,
+                                    GreedyBytes,
+                                ),
+                                32,
+                                Int32ub.length,
+                            )
+                        )
                     ),
-                    32,
-                    Int32ub.length,
-                ))),
-                _end=Tell,
-                size=Pointer(header_field(0xC), Rebuild(Int32ub, construct.this.contents.length)),
-                _offset=Pointer(header_field(0x10), Rebuild(Int32ub, lambda ctx: ctx["_start"])),
-            )),
+                    _end=Tell,
+                    size=Pointer(header_field(0xC), Rebuild(Int32ub, construct.this.contents.length)),
+                    _offset=Pointer(header_field(0x10), Rebuild(Int32ub, lambda ctx: ctx["_start"])),
+                ),
+            ),
         ),
     )
 
