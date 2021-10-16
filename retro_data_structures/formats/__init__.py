@@ -9,7 +9,7 @@ from retro_data_structures.formats.cspp import CSPP
 from retro_data_structures.formats.dgrp import DGRP
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.mlvl import MLVL
-from retro_data_structures.formats.mrea import MREA
+from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.pak import PAK
 from retro_data_structures.formats.part import PART
 from retro_data_structures.formats.scan import SCAN
@@ -23,7 +23,7 @@ ALL_FORMATS = {
     "ANCS": ANCS,
     "CMDL": CMDL,
     "MLVL": MLVL,
-    "MREA": MREA,
+    "MREA": Mrea,
     "PAK": PAK,
     "ANIM": ANIM,
     "CINF": CINF,
