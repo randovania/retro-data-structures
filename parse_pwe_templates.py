@@ -1,10 +1,10 @@
 import dataclasses
 import pprint
+import re
 import typing
 from pathlib import Path
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
-import re
 
 
 @dataclasses.dataclass(frozen=True)
@@ -12,14 +12,15 @@ class EnumDefinition:
     name: str
     values: typing.Dict[str, typing.Any]
 
-def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str="w"):
+
+def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str = "w"):
     code = '"""\nGenerated file.\n"""\nfrom enum import Enum\n' if mode == "w" else ""
 
     def _scrub(string: str):
-        s = re.sub(r'\W', '', string) # remove non-word characters
-        s = re.sub(r'^(?=\d)', '_', s) # add leading underscore to strings starting with a number
-        s = re.sub(r'^None$', '_None', s) # add leading underscore to None
-        s = s or "_EMPTY" # add name for empty string keys
+        s = re.sub(r'\W', '', string)  # remove non-word characters
+        s = re.sub(r'^(?=\d)', '_', s)  # add leading underscore to strings starting with a number
+        s = re.sub(r'^None$', '_None', s)  # add leading underscore to None
+        s = s or "_EMPTY"  # add name for empty string keys
         return s
 
     for e in enums:
@@ -29,6 +30,7 @@ def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str="w"):
 
     with Path(__file__).parent.joinpath(f"retro_data_structures/enums/{game}.py").open(mode) as f:
         f.write(code)
+
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
     default_value_types = {
@@ -42,11 +44,12 @@ def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
         "Choice": lambda el: int(el.text, 10),
         "Enum": lambda el: int(el.text, 16)
     }
-    
+
     default_value = None
     if (default_value_element := element.find("DefaultValue")) is not None:
         default_value = default_value_types.get(element.attrib["Type"], lambda el: el.text)(default_value_element)
     return {"default_value": default_value}
+
 
 def _prop_struct(element: Element, game_id: str, path: Path) -> dict:
     return {
@@ -54,11 +57,13 @@ def _prop_struct(element: Element, game_id: str, path: Path) -> dict:
         "properties": _parse_properties(element, game_id, path)["properties"]
     }
 
+
 def _prop_asset(element: Element, game_id: str, path: Path) -> dict:
     type_filter = []
     if element.find("TypeFilter"):
         type_filter = [t.text for t in element.find("TypeFilter")]
     return {"type_filter": type_filter}
+
 
 def _prop_array(element: Element, game_id: str, path: Path) -> dict:
     # print(ElementTree.tostring(element, encoding='utf8', method='xml'))
@@ -68,11 +73,13 @@ def _prop_array(element: Element, game_id: str, path: Path) -> dict:
     # print(item_archetype)
     return {"item_archetype": item_archetype}
 
+
 def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
     _parse_choice(element, game_id, path)
     extras = {"archetype": element.attrib.get("Archetype")}
     extras.update(_prop_default_value(element, game_id, path))
     return extras
+
 
 def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool=True) -> dict:
     parsed = {}
@@ -95,6 +102,7 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
     parsed.update(property_type_extras.get(element.attrib["Type"], _prop_default_value)(element, game_id, path))
 
     return parsed
+
 
 def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
     elements = []
@@ -131,12 +139,14 @@ def _parse_choice(properties: Element, game_id: str, path: Path) -> dict:
                 "type": _type,
                 "choices": choices
             }
-            
+
         create_enums(game_id, [EnumDefinition(name, choices)], "a")
-    
+
     return {
         "type": _type
     }
+
+
 _parse_choice.unknowns = {}
 
 
@@ -158,7 +168,10 @@ def parse_property_archetypes(path: Path, game_id: str) -> dict:
     else:
         raise ValueError(f"Unknown Archetype format: {_type}")
 
+
 property_names: typing.Dict[int, str] = {}
+
+
 def read_property_names(map_path: Path):
     global property_names
 
@@ -227,6 +240,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         "property_archetypes": property_archetypes
     }
 
+
 def parse_game_list(templates_path: Path) -> dict:
     t = ElementTree.parse(templates_path / "GameList.xml")
     root = t.getroot()
@@ -234,6 +248,7 @@ def parse_game_list(templates_path: Path) -> dict:
         game.attrib["ID"]: Path(game.find("GameTemplate").text)
         for game in root
     }
+
 
 def parse(game_ids: typing.Iterable[str] = []) -> dict:
     templates_path = Path("PrimeWorldEditor/templates")
