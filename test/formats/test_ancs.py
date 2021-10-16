@@ -27,6 +27,7 @@ def test_compare_p2(prime2_pwe_project):
 
     assert encoded == raw
 
+
 """
 def test_dependencies_all_p1(prime1_pwe_project):
     pak_path = prime1_pwe_project.joinpath("Disc", "files")

@@ -16,7 +16,7 @@ def do_file(path: Path):
 
 
 def test_compare(prime2_pwe_project):
-    input_path = prime2_pwe_project.joinpath('Resources/Uncategorized/01_gate_open.ANIM')
+    input_path = prime2_pwe_project.joinpath("Resources/Uncategorized/01_gate_open.ANIM")
     game = Game.ECHOES
     raw = input_path.read_bytes()
 
@@ -63,10 +63,7 @@ def test_missile_launcher(prime1_pwe_project, prime2_pwe_project):
 
     for key in p1_aux["anim"]["animation_keys"]:
         if key["channels"] is not None:
-            key["channels"] = [
-                key["channels"][index_conversion[i]]
-                for i, _ in enumerate(key["channels"])
-            ]
+            key["channels"] = [key["channels"][index_conversion[i]] for i, _ in enumerate(key["channels"])]
 
     # These changes need more thinking
     p1_aux["anim"]["unk_2"] = 257
