@@ -35,7 +35,9 @@ class ScriptInstanceAdapter(Adapter):
     
     def _encode(self, obj, context, path):
         subcon = self._get_property_construct(context)
-        return subcon.build(obj, **context)
+        encoded = io.BytesIO()
+        subcon._build(obj, encoded, context, path)
+        return encoded.getvalue()
 
 _prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
 

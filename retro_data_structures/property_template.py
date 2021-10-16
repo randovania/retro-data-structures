@@ -32,11 +32,7 @@ class PropertyTypes(enum.IntEnum):
 
     AnimationSet=enum.auto()
     Spline=enum.auto()
-    AnimParams=enum.auto()
-    Collision=enum.auto()
-    Billboard=enum.auto()
     Sound=enum.auto()
-    Model=enum.auto()
 
     Enum=enum.auto()
 
@@ -60,18 +56,25 @@ def PropertyDef(*extra_fields, include_id=True):
 
 PropertySubcons = {
     "Int": Int32ub,
-    "Float": Float32b,
     "Bool": Flag,
+    "Float": Float32b,
+    "String": String,
     "Short": Int16ub,
+
+    "Asset": AssetIdCorrect,
+    "Choice": Int32ub,
+    # Struct
+    "Flags": Int32ub,
+    # Array
+
     "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
     "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
-    "Flags": Int32ub,
-    "Choice": Int32ub,
-    "Enum": Int32ub,
-    "String": String,
+    
+    "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub),
+    # TODO: Spline
     "Sound": Hex(Int32ub),
-    "Asset": AssetIdCorrect,
-    "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub)
+
+    "Enum": Int32ub,
 }
 
 def Property(include_id=True):

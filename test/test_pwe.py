@@ -18,5 +18,3 @@ def test_compare_pwe_templates():
         assert encoded == GameTemplate.build(GameTemplate.parse(encoded))
 
         base_path.joinpath(f"retro_data_structures/properties/{game}.prop").write_bytes(encoded)
-
-    CreatePropertyConstructs([Game.ECHOES])
