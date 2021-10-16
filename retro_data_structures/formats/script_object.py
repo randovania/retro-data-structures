@@ -2,6 +2,7 @@
 https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
+import io
 import construct
 from construct.core import (Adapter, GreedyBytes, Hex, Int8ub, Int16ub,
                             Int32ub, Prefixed, PrefixedArray, Struct)
@@ -30,19 +31,21 @@ class ScriptInstanceAdapter(Adapter):
 
     def _decode(self, obj, context, path):
         subcon = self._get_property_construct(context)
-        return subcon.parse(obj, **context)
+        return subcon._parsereport(io.BytesIO(obj), context, path)
     
     def _encode(self, obj, context, path):
         subcon = self._get_property_construct(context)
         return subcon.build(obj, **context)
 
+_prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
+
 ScriptInstance = Struct(
     "type" / game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
     "instance" / Prefixed(
-        current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub),
+        _prefix,
         Struct(
             "id" / Hex(Int32ub), # TODO: Union
-            "connections" / PrefixedArray(Int16ub, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
+            "connections" / PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
             "base_property" / ScriptInstanceAdapter(lambda this: f'0x{this._.type:X}' if isinstance(this._.type, int) else this._.type)
         )
     )

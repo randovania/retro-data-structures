@@ -1,12 +1,12 @@
 import enum
 from pathlib import Path
 import construct
-from construct.core import Check, Compressed, Computed, Default, FixedSized, Flag, Float32b, GreedyBytes, Hex, If, IfThenElse, Int16ub, Int32ub, LazyBound, Prefixed, Subconstruct, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
+from construct.core import Check, Compressed, Computed, Default, FixedSized, Flag, Float32b, GreedyBytes, Hex, If, IfThenElse, Int16ub, Int32ub, Int64ub, LazyBound, Prefixed, Subconstruct, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
 from construct.lib.containers import Container
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, String
 from retro_data_structures.construct_extensions import DictStruct, DictAdapter, ErrorWithMessage, LabeledOptional
-from retro_data_structures.game_check import AssetIdCorrect, Game, get_current_game
+from retro_data_structures.game_check import AssetIdCorrect, Game, get_current_game, is_prime1
 
 Proportion = FocusedSeq(
     "value",
@@ -69,6 +69,9 @@ PropertySubcons = {
     "Choice": Int32ub,
     "Enum": Int32ub,
     "String": String,
+    "Sound": Hex(Int32ub),
+    "Asset": AssetIdCorrect,
+    "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub)
 }
 
 def Property(include_id=True):
@@ -148,7 +151,9 @@ def GetGameTemplate(game: Game):
     return _game_template_cache[game_id]
 
 _property_names_cache = {}
-def GetPropertyName(prop_id):
+def GetPropertyName(game_id, prop_id):
+    if game_id < Game.ECHOES:
+        return ""
     global _property_names_cache
     prop_path = prop_path = Path(__file__).parent.joinpath("properties")
     if not _property_names_cache:
@@ -170,12 +175,12 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
             
             if prop.type == "Array":
                 data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
-            elif prop.type == "Asset":
-                data = AssetId32 if game_id.uses_asset_id_32 else AssetId64
+            # elif prop.type == "Asset":
+            #     data = AssetId32 if game_id.uses_asset_id_32 else AssetId64
             else:
                 data = PropertySubcons.get(prop.type, GreedyBytes)
             
-            if atomic:
+            if atomic or game_id < Game.ECHOES:
                 return data
             return Struct(
                 "id" / Hex(Int32ub),
@@ -183,38 +188,38 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
             )
         
         def get_property_name(prop, names):
-            name = names[prop.id] or prop.name
+            name = names.get(prop.id) or prop.name
             occurences = len([n for n in names.values() if n == name])
             if not name or occurences > 1:
                 name += f'0x{prop.id:X}'
             return name
+
+        def property_struct(properties, atomic):
+            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+            
+            id_field = []
+            count_field = ["prop_count" / Const(len(properties), prefix)] if not atomic else []
+            data = Struct(*count_field, **properties)
+
+            if game_id >= Game.ECHOES:
+                id_field = ["id" / If(lambda this: not (atomic and hasattr(this._, "count")), Hex(Int32ub))]
+                data = IfThenElse(
+                    lambda this: not (atomic and hasattr(this._, "count")),
+                    Prefixed(prefix, data),
+                    data
+                )
+            
+            return [*id_field, "data" / data]#, Computed(lambda this: print(this.data) if game_check.is_prime1(this) else None)]
 
         def add_archetype(name, archetype):
             if name in archetypes.keys():
                 return
             if archetype.type == "Choice" or archetype.type == "Enum":
                 return
-            names = {prop.id: GetPropertyName(prop.id) for prop in archetype.properties}
-            properties = Container({get_property_name(prop, names): get_subcon(prop) for prop in archetype.properties})
-            atomic_properties = Container({get_property_name(prop, names): get_subcon(prop, True) for prop in archetype.properties})
-            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
-            if archetype.atomic:
-                archetypes[name] = Struct(
-                    "id" / If(lambda this: not hasattr(this._, "count"), Hex(Int32ub)),
-                    "data" / IfThenElse(
-                        lambda this: not hasattr(this._, "count"),
-                        Prefixed(prefix, Struct(**atomic_properties)),
-                        Struct(**atomic_properties)
-                    ),
-                )
-            else:
-                archetypes[name] = Struct(
-                    "id" / Hex(Int32ub),
-                    "data" / Prefixed(prefix, Struct(
-                        "prop_count" / Const(len(properties), prefix),
-                        **properties
-                    )),
-                )
+            names = {prop.id: GetPropertyName(game_id, prop.id) for prop in archetype.properties}
+            properties = Container({get_property_name(prop, names): get_subcon(prop, archetype.atomic) for prop in archetype.properties})
+
+            archetypes[name] = Struct(*property_struct(properties, archetype.atomic))
 
         for name, archetype in game_template.property_archetypes.items():
             add_archetype(name, archetype)
@@ -222,16 +227,12 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
         script_objects = Container()
 
         for name, obj in game_template.script_objects.items():
-            names = {prop.id: GetPropertyName(prop.id) for prop in obj.properties}
+            names = {prop.id: GetPropertyName(game_id, prop.id) for prop in obj.properties}
             properties = Container({get_property_name(prop, names): get_subcon(prop) for prop in obj.properties})
-            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+
             script_objects[name] = Struct(
                 "name" / Computed(obj.name),
-                "id" / Const(0xFFFFFFFF, Hex(Int32ub)),
-                "data" / Prefixed(prefix, Struct(
-                    "prop_count" / Const(len(properties), prefix),
-                    **properties
-                ))
+                *property_struct(properties, False)
             )
 
         PropertyConstructs[game_id] = script_objects
