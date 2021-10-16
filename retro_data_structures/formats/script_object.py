@@ -5,7 +5,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 import io
 
 import construct
-from construct.core import Adapter, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct
+from construct.core import Adapter, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct, Lazy
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
@@ -42,19 +42,21 @@ class ScriptInstanceAdapter(Adapter):
         return encoded.getvalue()
 
 
+def ThisTypeAsString(this):
+    return f"0x{this._.type:X}" if isinstance(this._.type, int) else this._.type
+
+
 _prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
 
 ScriptInstance = Struct(
-    "type" / game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
-    "instance"
-    / Prefixed(
+    type=game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
+    instance=Prefixed(
         _prefix,
         Struct(
-            "id" / Hex(Int32ub),  # TODO: Union
-            "connections"
-            / PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
-            "base_property"
-            / ScriptInstanceAdapter(lambda this: f"0x{this._.type:X}" if isinstance(this._.type, int) else this._.type),
+            id=Hex(Int32ub),  # TODO: Union
+            connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
+            base_property=ScriptInstanceAdapter(ThisTypeAsString),
+            # base_property=GreedyBytes,
         ),
     ),
 )

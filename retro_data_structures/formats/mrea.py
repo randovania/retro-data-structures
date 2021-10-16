@@ -216,7 +216,7 @@ class SectionCategoryAdapter(Adapter):
             key=lambda cat: cat["value"],
         )
 
-        sections = {}
+        sections = Container()
         for i in range(len(_categories)):
             c = _categories[i]
             start = c["value"]
@@ -251,9 +251,9 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
         current_group = []
         previous_label = ""
 
-        def add_group(reason):
+        def add_group(r):
             nonlocal current_group, current_group_size
-            # print(f"Group complete! {reason} Group size: {current_group_size}")
+            # print(f"Group complete! {r} Group size: {current_group_size}")
             groups.append(current_group)
             current_group = []
             current_group_size = 0
