@@ -3,9 +3,11 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
 import io
+from typing import Iterator
 
 import construct
-from construct.core import Adapter, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct, Lazy
+from construct import Container
+from construct.core import Adapter, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
@@ -55,8 +57,56 @@ ScriptInstance = Struct(
         Struct(
             id=Hex(Int32ub),  # TODO: Union
             connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
-            base_property=ScriptInstanceAdapter(ThisTypeAsString),
-            # base_property=GreedyBytes,
+            # base_property=ScriptInstanceAdapter(ThisTypeAsString),
+            base_property=GreedyBytes,
         ),
     ),
 )
+
+
+class ScriptInstanceHelper:
+    _raw: Container
+    target_game: Game
+
+    def __init__(self, raw: Container, target_game: Game):
+        self._raw = raw
+        self.target_game = target_game
+
+    def __str__(self):
+        return "<ScriptInstance {} 0x{:08x}>".format(self.type, self.id)
+
+    def __eq__(self, other):
+        return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
+
+    @property
+    def type(self) -> str:
+        return self._raw.type
+
+    @property
+    def id(self) -> int:
+        return self._raw.instance.id
+
+    @property
+    def name(self) -> str:
+        return self.get_property(("EditorProperties", "Name"))
+
+    @property
+    def _property_construct(self):
+        return GetPropertyConstruct(self.target_game, self.type)
+
+    def get_properties(self):
+        return self._property_construct.parse(
+            self._raw.instance.base_property,
+            target_game=self.target_game,
+        )
+
+    def set_properties(self, data: Container):
+        self._raw.instance.base_property = self._property_construct.build(
+            data, target_game=self.target_game,
+        )
+
+    def get_property(self, chain: Iterator[str]):
+        prop = self.get_properties()["data"]
+        for name in chain:
+            prop = prop[name]["data"]
+        return prop

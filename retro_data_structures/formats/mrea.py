@@ -4,6 +4,7 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 import hashlib
 import io
 from enum import IntEnum
+from typing import Iterator
 
 from construct.core import (
     Adapter,
@@ -42,9 +43,9 @@ from retro_data_structures.data_section import DataSection, DataSectionSizes, Ge
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.script_layer import SCGN, SCLY
+from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
 from retro_data_structures.formats.visi import VISI
-from retro_data_structures.game_check import AssetIdCorrect
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 
 class MREAVersion(IntEnum):
@@ -452,3 +453,24 @@ def _MREA(parse_block_func=IncludeScriptLayers):
 
 
 MREA = _MREA()
+
+
+class Mrea:
+    _raw: Container
+    target_game: Game
+
+    def __init__(self, raw: Container, target_game: Game):
+        self._raw = raw
+        self.target_game = target_game
+
+    @classmethod
+    def parse(cls, data: bytes, target_game: Game) -> "Mrea":
+        return cls(MREA.parse(data, target_game=target_game), target_game)
+
+    def build(self) -> bytes:
+        return MREA.build(self._raw, target_game=self.target_game)
+
+    @property
+    def script_layers(self) -> Iterator[ScriptLayerHelper]:
+        for section in self._raw.sections.script_layers_section:
+            yield ScriptLayerHelper(section.data, self.target_game)

@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import Iterable
+from typing import Dict
 
 from construct.core import (
     Check,
@@ -185,7 +185,7 @@ def GetPropertyName(game_id: Game, prop_id):
     return _property_names_cache.get(prop_id, "")
 
 
-PropertyConstructs = Container()
+PropertyConstructs: Dict[Game, Dict[str, Subconstruct]] = {}
 
 _ENUMS_BY_GAME = {
     Game.PRIME: retro_data_structures.enums.prime,
@@ -261,7 +261,7 @@ def CreatePropertyConstructs(game_id: Game):
     for arch_name, archetype in game_template.property_archetypes.items():
         add_archetype(arch_name, archetype)
 
-    script_objects = Container()
+    script_objects = {}
 
     for script_name, obj in game_template.script_objects.items():
         property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in obj.properties}
@@ -272,8 +272,8 @@ def CreatePropertyConstructs(game_id: Game):
     PropertyConstructs[game_id] = script_objects
 
 
-def GetPropertyConstruct(game: Game, obj_id) -> Subconstruct:
+def GetPropertyConstruct(game: Game, obj_type: str) -> Subconstruct:
     if game not in PropertyConstructs:
         CreatePropertyConstructs(game)
 
-    return PropertyConstructs[game].get(obj_id, GreedyBytes)
+    return PropertyConstructs[game].get(obj_type, GreedyBytes)

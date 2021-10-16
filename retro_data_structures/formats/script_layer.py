@@ -14,11 +14,13 @@ from construct.core import (
     Tell,
     this,
 )
+from construct.lib import Container
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions import Skip
-from retro_data_structures.formats.script_object import ScriptInstance
+from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
+from retro_data_structures.game_check import Game
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -53,3 +55,17 @@ def ScriptLayer(identifier):
 
 SCLY = IfThenElse(game_check.current_game_at_least(game_check.Game.ECHOES), ScriptLayer("SCLY"), ScriptLayerPrime)
 SCGN = ScriptLayer("SCGN")
+
+
+class ScriptLayerHelper:
+    _raw: Container
+    target_game: Game
+
+    def __init__(self, raw: Container, target_game: Game):
+        self._raw = raw
+        self.target_game = target_game
+
+    @property
+    def instances(self):
+        for instance in self._raw.script_instances:
+            yield ScriptInstanceHelper(instance, self.target_game)
