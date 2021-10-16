@@ -1,5 +1,6 @@
 import dataclasses
 import json
+import logging
 import pprint
 import re
 import typing
@@ -212,6 +213,8 @@ def get_key_map(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
 
 
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
+    logging.info("Parsing templates for game %s: %s", game_id, game_xml)
+
     base_path = templates_path / game_xml.parent
 
     t = ElementTree.parse(templates_path / game_xml)
@@ -275,6 +278,7 @@ def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
 
 
 def persist_data(parse_result):
+    logging.info("Persisting the parsed properties")
     base_dir = Path(__file__).parent
     for game_id, data in parse_result.items():
         if game_id in _game_id_to_file:
@@ -284,4 +288,5 @@ def persist_data(parse_result):
 
 
 if __name__ == '__main__':
-    persist_data(parse())
+    logging.basicConfig(level=logging.INFO)
+    persist_data(parse(_game_id_to_file.keys()))
