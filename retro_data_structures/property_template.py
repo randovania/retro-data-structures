@@ -1,5 +1,4 @@
 import enum
-from importlib import import_module
 from pathlib import Path
 from typing import Iterable
 
@@ -38,7 +37,7 @@ from retro_data_structures.common_types import FourCC, String
 from retro_data_structures.construct_extensions import DictAdapter, DictStruct, ErrorWithMessage, LabeledOptional
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
-Proportion = FocusedSeq("value", "value" / Float32b, Check(lambda this: this.value >= 0.0 and this.value <= 1.0))
+Proportion = FocusedSeq("value", "value" / Float32b, Check(lambda t: 0.0 <= t.value <= 1.0))
 
 
 class PropertyTypes(enum.IntEnum):

@@ -6,8 +6,6 @@ from pathlib import Path
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
-from retro_data_structures.property_template import PropertyNames, GameTemplate
-
 _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
@@ -279,6 +277,8 @@ def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
 def persist_data(parse_result):
     logging.info("Persisting the parsed properties")
     base_dir = Path(__file__).parent
+
+    from retro_data_structures.property_template import PropertyNames, GameTemplate
 
     encoded = PropertyNames.build(property_names)
     base_dir.joinpath(f"retro_data_structures/properties/property_names.pname").write_bytes(encoded)
