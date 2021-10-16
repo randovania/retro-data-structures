@@ -78,9 +78,10 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
     parsed = {}
     if include_id:
         parsed.update({"id": int(element.attrib["ID"], 16)})
+    name = element.find("Name")
     parsed.update({
         "type": element.attrib["Type"],
-        "name": element.find("Name").text if element.find("Name") is not None else ""
+        "name": name.text if name is not None and name.text is not None else ""
     })
     
     property_type_extras = {
@@ -105,6 +106,7 @@ def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
 
     return {
         "type": "Struct",
+        "name": properties.find("Name").text if properties.find("Name") is not None else "",
         "atomic": properties.find("Atomic") is not None,
         "properties": elements,
     }
