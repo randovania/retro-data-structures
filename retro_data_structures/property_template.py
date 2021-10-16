@@ -1,5 +1,6 @@
 import enum
 from pathlib import Path
+from importlib import import_module
 import construct
 from construct.core import Check, Compressed, Computed, Default, FixedSized, Flag, Float32b, GreedyBytes, Hex, If, IfThenElse, Int16ub, Int32ub, Int64ub, LazyBound, Prefixed, Subconstruct, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
 from construct.lib.containers import Container
@@ -166,6 +167,7 @@ def GetPropertyName(game_id, prop_id):
 PropertyConstructs = Container()
 def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
     for game_id in games:
+        enums = import_module('retro_data_structures.enums.'+{Game.PRIME: "Prime", Game.ECHOES: "Echoes", Game.CORRUPTION: "Corruption"}[game_id])
         game_template = GetGameTemplate(game_id)
 
         archetypes = Container()
@@ -178,8 +180,8 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
             
             if prop.type == "Array":
                 data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
-            # elif prop.type == "Asset":
-            #     data = AssetId32 if game_id.uses_asset_id_32 else AssetId64
+            elif hasattr(prop, "archetype") and prop.archetype is not None and (prop.type == "Choice" or prop.type == "Enum"):
+                data = Enum(Int32ub, getattr(enums, prop.archetype))
             else:
                 data = PropertySubcons.get(prop.type, GreedyBytes)
             

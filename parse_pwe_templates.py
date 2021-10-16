@@ -19,7 +19,7 @@ def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str="w"):
         s = re.sub(r'\W', '', string) # remove non-word characters
         s = re.sub(r'^(?=\d)', '_', s) # add leading underscore to strings starting with a number
         s = re.sub(r'^None$', '_None', s) # add leading underscore to None
-        s = s or "_Empty_" # add name for empty string keys
+        s = s or "_EMPTY" # add name for empty string keys
         return s
 
     for e in enums:
