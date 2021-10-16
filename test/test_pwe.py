@@ -1,6 +1,8 @@
+from pathlib import Path
+
 from parse_pwe_templates import parse, read_property_names
 from retro_data_structures.property_template import GameTemplate, PropertyNames
-from pathlib import Path
+
 
 def test_compare_pwe_templates():
     base_path = Path(__file__).parent.parent

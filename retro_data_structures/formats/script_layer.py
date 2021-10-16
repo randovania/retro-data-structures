@@ -1,10 +1,10 @@
-from construct import (If, Struct, Const, Int8ub, Int32ub, PrefixedArray)
-from construct.core import Computed, FixedSized, Hex, IfThenElse, PascalString, Peek, Pointer, Prefixed, Rebuild, Array, Seek, Tell, this
+from construct.core import (Array, Const, FixedSized, Hex, If, IfThenElse,
+                            Int8ub, Int32ub, Peek, Pointer, PrefixedArray,
+                            Struct, Tell, this)
+from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions import Skip
-from retro_data_structures import game_check
-
-from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstancePrime
+from retro_data_structures.formats.script_object import ScriptInstance
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -19,7 +19,7 @@ ScriptLayerPrime = Struct(
             lambda this: this._.layer_sizes[this._index],
             Struct(
                 "unk" / Hex(Int8ub),
-                "objects" / PrefixedArray(Int32ub, ScriptInstancePrime),
+                "objects" / PrefixedArray(Int32ub, ScriptInstance),
             )
         )
     ),

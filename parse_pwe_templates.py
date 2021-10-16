@@ -20,7 +20,7 @@ def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str = "w")
         s = re.sub(r'\W', '', string)  # remove non-word characters
         s = re.sub(r'^(?=\d)', '_', s)  # add leading underscore to strings starting with a number
         s = re.sub(r'^None$', '_None', s)  # add leading underscore to None
-        s = s or "_Empty_"  # add name for empty string keys
+        s = s or "_EMPTY"  # add name for empty string keys
         return s
 
     for e in enums:
@@ -66,9 +66,11 @@ def _prop_asset(element: Element, game_id: str, path: Path) -> dict:
 
 
 def _prop_array(element: Element, game_id: str, path: Path) -> dict:
+    # print(ElementTree.tostring(element, encoding='utf8', method='xml'))
     item_archetype = None
     if (item_archetype_element := element.find("ItemArchetype")) is not None:
         item_archetype = _parse_single_property(item_archetype_element, game_id, path, include_id=False)
+    # print(item_archetype)
     return {"item_archetype": item_archetype}
 
 
@@ -79,17 +81,16 @@ def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
     return extras
 
 
-def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool = True) -> dict:
+def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool=True) -> dict:
+    parsed = {}
     if include_id:
-        parsed = {
-            "id": int(element.attrib["ID"], 16),
-            "type": element.attrib["Type"]
-        }
-    else:
-        parsed = {
-            "type": element.attrib["Type"]
-        }
-
+        parsed.update({"id": int(element.attrib["ID"], 16)})
+    name = element.find("Name")
+    parsed.update({
+        "type": element.attrib["Type"],
+        "name": name.text if name is not None and name.text is not None else ""
+    })
+    
     property_type_extras = {
         "Struct": _prop_struct,
         "Asset": _prop_asset,
@@ -113,6 +114,8 @@ def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
 
     return {
         "type": "Struct",
+        "name": properties.find("Name").text if properties.find("Name") is not None else "",
+        "atomic": properties.find("Atomic") is not None,
         "properties": elements,
     }
 
