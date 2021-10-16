@@ -3,6 +3,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
 import io
+
 import construct
 from construct.core import (Adapter, GreedyBytes, Hex, Int8ub, Int16ub,
                             Int32ub, Prefixed, PrefixedArray, Struct)

@@ -1,13 +1,20 @@
 import enum
-from pathlib import Path
 from importlib import import_module
-import construct
-from construct.core import Check, Compressed, Computed, Default, FixedSized, Flag, Float32b, GreedyBytes, Hex, If, IfThenElse, Int16ub, Int32ub, Int64ub, LazyBound, Prefixed, Subconstruct, this, Adapter, Const, Enum, Error, FocusedSeq, Peek, PrefixedArray, Struct, Switch, VarInt
+from pathlib import Path
+
+from construct.core import (Check, Compressed, Computed, Const, Default, Enum,
+                            Flag, Float32b, FocusedSeq, GreedyBytes, Hex, If,
+                            IfThenElse, Int16ub, Int32ub, LazyBound, Peek,
+                            Prefixed, PrefixedArray, Struct, Subconstruct,
+                            Switch, VarInt, this)
 from construct.lib.containers import Container
-from retro_data_structures import game_check
-from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, String
-from retro_data_structures.construct_extensions import DictStruct, DictAdapter, ErrorWithMessage, LabeledOptional
-from retro_data_structures.game_check import AssetIdCorrect, Game, get_current_game, is_prime1
+
+from retro_data_structures.common_types import FourCC, String
+from retro_data_structures.construct_extensions import (DictAdapter,
+                                                        DictStruct,
+                                                        ErrorWithMessage,
+                                                        LabeledOptional)
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 Proportion = FocusedSeq(
     "value",

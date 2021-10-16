@@ -2,14 +2,14 @@
 https://wiki.axiodl.com/w/SCAN_(File_Format)
 """
 
-from construct import (Array, Byte, Check, Const, Enum, Flag, Float32b,
-                       GreedyRange, Hex, IfThenElse, Int32sb, Int32ub, Struct)
+from construct.core import (Array, Byte, Check, Const, Enum, Float32b, GreedyRange,
+                       Hex, IfThenElse, Int32ub, Struct)
 from retro_data_structures import game_check
-from retro_data_structures.common_types import AssetId32, FourCC, String
+from retro_data_structures.common_types import AssetId32, FourCC
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
 from retro_data_structures.formats.script_object import ScriptInstance
-from retro_data_structures.game_check import AssetIdCorrect, Game
+from retro_data_structures.game_check import Game
 
 ScanImage = Struct(
     "texture" / AssetId32, #TXTR
