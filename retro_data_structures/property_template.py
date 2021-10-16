@@ -22,29 +22,32 @@ Proportion = FocusedSeq(
     Check(lambda this: this.value >= 0.0 and this.value <= 1.0)
 )
 
+
 class PropertyTypes(enum.IntEnum):
-    Int=enum.auto()
-    Bool=enum.auto()
-    Float=enum.auto()
-    String=enum.auto()
-    Short=enum.auto()
+    Int = enum.auto()
+    Bool = enum.auto()
+    Float = enum.auto()
+    String = enum.auto()
+    Short = enum.auto()
 
-    Asset=enum.auto()
-    Choice=enum.auto()
-    Struct=enum.auto()
-    Flags=enum.auto()
-    Array=enum.auto()
-    
-    Color=enum.auto()
-    Vector=enum.auto()
+    Asset = enum.auto()
+    Choice = enum.auto()
+    Struct = enum.auto()
+    Flags = enum.auto()
+    Array = enum.auto()
 
-    AnimationSet=enum.auto()
-    Spline=enum.auto()
-    Sound=enum.auto()
+    Color = enum.auto()
+    Vector = enum.auto()
 
-    Enum=enum.auto()
+    AnimationSet = enum.auto()
+    Spline = enum.auto()
+    Sound = enum.auto()
+
+    Enum = enum.auto()
+
 
 PropertyTypeEnum = Enum(VarInt, PropertyTypes)
+
 
 def TypeSwitch(cases, default=None):
     return FocusedSeq(
@@ -52,6 +55,7 @@ def TypeSwitch(cases, default=None):
         "type" / Peek(PropertyTypeEnum),
         "result" / Switch(lambda this: this.type or this.result["type"], cases, default)
     )
+
 
 def PropertyDef(*extra_fields, include_id=True):
     id_field = ["id" / LabeledOptional(b'ID', Hex(Int32ub))] if include_id else []
@@ -61,6 +65,7 @@ def PropertyDef(*extra_fields, include_id=True):
         *id_field,
         *extra_fields
     )
+
 
 PropertySubcons = {
     "Int": Int32ub,
@@ -77,13 +82,14 @@ PropertySubcons = {
 
     "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
     "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
-    
+
     "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub),
     # TODO: Spline
     "Sound": Hex(Int32ub),
 
     "Enum": Int32ub,
 }
+
 
 def Property(include_id=True):
     default_value_field = [
@@ -117,6 +123,7 @@ def Property(include_id=True):
         )
     )
 
+
 ScriptObjectTemplate = DictStruct(
     "type" / Const("Struct", PropertyTypeEnum),
     "atomic" / Default(Flag, False),
@@ -134,12 +141,12 @@ PropertyArchetype = TypeSwitch(
 )
 
 GameTemplate = Prefixed(VarInt, Compressed(Struct(
-    "script_objects" /  DictAdapter(ScriptObjectTemplate),
+    "script_objects" / DictAdapter(ScriptObjectTemplate),
     "property_archetypes" / DictAdapter(PropertyArchetype)
 ), "zlib"))
 
 ListGameTemplate = DictStruct(
-    "script_objects" /  DictAdapter(ScriptObjectTemplate),
+    "script_objects" / DictAdapter(ScriptObjectTemplate),
     "property_archetypes" / DictAdapter(PropertyArchetype)
 )
 
@@ -151,6 +158,8 @@ PropertyNames = Prefixed(VarInt, Compressed(
 ))
 
 _game_template_cache = {}
+
+
 def GetGameTemplate(game: Game):
     prop_path = Path(__file__).parent.joinpath("properties")
 
@@ -161,7 +170,10 @@ def GetGameTemplate(game: Game):
 
     return _game_template_cache[game_id]
 
+
 _property_names_cache = {}
+
+
 def GetPropertyName(game_id, prop_id):
     if game_id < Game.ECHOES:
         return ""
@@ -171,34 +183,39 @@ def GetPropertyName(game_id, prop_id):
         _property_names_cache = PropertyNames.parse_file(prop_path / "property_names.pname")
     return _property_names_cache.get(prop_id, "")
 
+
 PropertyConstructs = Container()
+
+
 def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
     for game_id in games:
-        enums = import_module('retro_data_structures.enums.'+{Game.PRIME: "Prime", Game.ECHOES: "Echoes", Game.CORRUPTION: "Corruption"}[game_id])
+        enums = import_module('retro_data_structures.enums.' +
+                              {Game.PRIME: "Prime", Game.ECHOES: "Echoes", Game.CORRUPTION: "Corruption"}[game_id])
         game_template = GetGameTemplate(game_id)
 
         archetypes = Container()
-        
+
         def get_subcon(prop, atomic=False):
             if prop.type == "Struct":
                 archetype = game_template.property_archetypes[prop.archetype]
                 add_archetype(prop.archetype, archetype)
                 return archetypes[prop.archetype]
-            
+
             if prop.type == "Array":
                 data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
-            elif hasattr(prop, "archetype") and prop.archetype is not None and (prop.type == "Choice" or prop.type == "Enum"):
+            elif hasattr(prop, "archetype") and prop.archetype is not None and (
+                    prop.type == "Choice" or prop.type == "Enum"):
                 data = Enum(Int32ub, getattr(enums, prop.archetype))
             else:
                 data = PropertySubcons.get(prop.type, GreedyBytes)
-            
+
             if atomic or game_id < Game.ECHOES:
                 return data
             return Struct(
                 "id" / Hex(Int32ub),
                 "data" / Prefixed(Int16ub if game_id >= Game.ECHOES else Int32ub, data),
             )
-        
+
         def get_property_name(prop, names):
             name = names.get(prop.id) or prop.name
             occurences = len([n for n in names.values() if n == name])
@@ -208,7 +225,7 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
 
         def property_struct(properties, atomic):
             prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
-            
+
             id_field = []
             count_field = ["prop_count" / Const(len(properties), prefix)] if not atomic else []
             data = Struct(*count_field, **properties)
@@ -220,8 +237,9 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
                     Prefixed(prefix, data),
                     data
                 )
-            
-            return [*id_field, "data" / data]#, Computed(lambda this: print(this.data) if game_check.is_prime1(this) else None)]
+
+            return [*id_field,
+                    "data" / data]  # , Computed(lambda this: print(this.data) if game_check.is_prime1(this) else None)]
 
         def add_archetype(name, archetype):
             if name in archetypes.keys():
@@ -229,7 +247,8 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
             if archetype.type == "Choice" or archetype.type == "Enum":
                 return
             names = {prop.id: GetPropertyName(game_id, prop.id) for prop in archetype.properties}
-            properties = Container({get_property_name(prop, names): get_subcon(prop, archetype.atomic) for prop in archetype.properties})
+            properties = Container(
+                {get_property_name(prop, names): get_subcon(prop, archetype.atomic) for prop in archetype.properties})
 
             archetypes[name] = Struct(*property_struct(properties, archetype.atomic))
 
@@ -248,6 +267,7 @@ def CreatePropertyConstructs(games=[Game.PRIME, Game.ECHOES, Game.CORRUPTION]):
             )
 
         PropertyConstructs[game_id] = script_objects
+
 
 def GetPropertyConstruct(game, obj_id) -> Subconstruct:
     if not game in PropertyConstructs:

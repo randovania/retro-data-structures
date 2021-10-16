@@ -1,7 +1,9 @@
+import copy
+
 from retro_data_structures.conversion.asset_converter import AssetConverter, Resource, AssetDetails
 from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
 from retro_data_structures.game_check import Game
-import copy
+
 
 def find_missing(lst):
     return [x for x in range(lst[0], lst[-1] + 1)
@@ -37,9 +39,11 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
                 "scale": None,
             })
 
-    neworder = sorted(range(len(data["anim"]["bone_channel_descriptors"])), key = lambda x: data["anim"]["bone_channel_descriptors"][x]["bone_id"])
+    neworder = sorted(range(len(data["anim"]["bone_channel_descriptors"])),
+                      key=lambda x: data["anim"]["bone_channel_descriptors"][x]["bone_id"])
 
-    data["anim"]["bone_channel_descriptors"] = sorted(data["anim"]["bone_channel_descriptors"], key = lambda x: x["bone_id"])
+    data["anim"]["bone_channel_descriptors"] = sorted(data["anim"]["bone_channel_descriptors"],
+                                                      key=lambda x: x["bone_id"])
     old = data["anim"]["bone_channel_descriptors"]
     data["anim"]["bone_channel_descriptors"] = [None] * (len(old))
     for i, it in enumerate(old):
@@ -94,7 +98,7 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
 
     enumme = copy.deepcopy(data["anim"]["bone_channel_descriptors"])
     remove_count = 0
-    for i,bcd in enumerate(enumme):
+    for i, bcd in enumerate(enumme):
         if bcd["translation_keys_count"] == 0 and bcd["scale_keys_count"] is None and bcd["rotation_keys_count"] == 0:
             del data["anim"]["bone_channel_descriptors"][i - remove_count]
             remove_count = remove_count + 1
@@ -102,18 +106,18 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
         if key["channels"] is not None:
             enumme = key["channels"].copy()
             remove_count = 0
-            for i,channel in enumerate(enumme):
+            for i, channel in enumerate(enumme):
                 if channel["rotation"] is None and channel["translation"] is None and channel["scale"] is None:
                     del key["channels"][i - remove_count]
                     remove_count = remove_count + 1
 
     enumme = copy.deepcopy(data["anim"]["bone_channel_descriptors"])
-    
+
     for i, bcd in enumerate(enumme):
         if bcd["bone_id"] == 3:
             data["anim"]["bone_channel_descriptors"].append(bcd)
             del data["anim"]["bone_channel_descriptors"][i]
-    
+
     for key in data["anim"]["animation_keys"]:
         if key["channels"] is not None:
             key["channels"].append(key["channels"][0])

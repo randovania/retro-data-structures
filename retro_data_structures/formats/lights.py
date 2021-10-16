@@ -1,6 +1,7 @@
 from construct import (Array, Const, Enum, Flag, Float32b, If, Int32ub, StopIf,
                        Struct)
 from construct.core import IfThenElse, PrefixedArray
+
 from retro_data_structures import game_check
 from retro_data_structures.common_types import Color4f, Vector3
 

@@ -2,7 +2,6 @@ import enum
 import io
 from functools import partial
 from typing import Any
-from functools import partial
 
 import construct
 from construct import (
@@ -100,10 +99,12 @@ def get_version(this, enum_type):
             return enum_type[this.version]
         return this.version
 
+
 def compare_version(version):
     if isinstance(version, enum.Enum):
         return partial(get_version, enum_type=type(version))
     return partial(get_version, enum_type=None)
+
 
 def WithVersionElse(version, with_subcon, before_subcon):
     return IfThenElse(
@@ -111,6 +112,7 @@ def WithVersionElse(version, with_subcon, before_subcon):
         with_subcon,
         before_subcon
     )
+
 
 def WithVersion(version, subcon):
     return If(lambda this: compare_version(version)(this) >= version, subcon)
@@ -246,6 +248,7 @@ class ErrorWithMessage(Construct):
     def _sizeof(self, context, path):
         raise construct.SizeofError("Error does not have size, because it interrupts parsing and building", path=path)
 
+
 class PrefixedWithPaddingBefore(Subconstruct):
     def __init__(self, length_field, subcon):
         super().__init__(subcon)
@@ -276,13 +279,14 @@ class PrefixedWithPaddingBefore(Subconstruct):
         construct.stream_write(stream, data, len(data), path)
         return buildret
 
+
 class DictAdapter(Adapter):
     def __init__(self, subcon, objisdict=True):
         if not objisdict:
             subcon = Struct("*Key" / VarInt, "Value" / subcon)
         super().__init__(PrefixedArray(VarInt, subcon))
         self.objisdict = objisdict
-    
+
     def _decode(self, obj, context, path):
         D = {}
         for v in obj:
@@ -292,7 +296,7 @@ class DictAdapter(Adapter):
             else:
                 D[v["*Key"]] = v["Value"]
         return D
-    
+
     def _encode(self, obj, context, path):
         L = []
         for k, v in obj.items():
@@ -303,11 +307,13 @@ class DictAdapter(Adapter):
             L.append(v)
         return L
 
+
 def DictStruct(*fields):
     return Struct(
         *fields,
         "*Key" / String
     )
+
 
 def LabeledOptional(label, subcon):
     return Optional(FocusedSeq(

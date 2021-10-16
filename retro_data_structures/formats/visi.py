@@ -1,4 +1,6 @@
-from construct.core import BitStruct, BitsInteger, BitsSwapped, If, Int16ub, Int24ub, Int8ub, Switch, this, Array, Const, Enum, FixedSized, Flag, GreedyBytes, GreedyRange, Int32ub, Prefixed, Struct
+from construct.core import BitStruct, BitsInteger, BitsSwapped, If, Int16ub, Int24ub, Int8ub, Switch, this, Array, \
+    Const, Enum, FixedSized, Flag, GreedyBytes, GreedyRange, Int32ub, Prefixed, Struct
+
 from retro_data_structures.common_types import FourCC, AABox
 
 OctreeNode = Struct(
@@ -23,7 +25,7 @@ OctreeNode = Struct(
         (2 ** (this.header.subdivide_x + this.header.subdivide_y + this.header.subdivide_z)) - 1,
         Switch(
             this.header.pointer_size,
-            { 
+            {
                 "_16_bit": Int16ub,
                 "_8_bit": Int8ub,
                 "_24_bit": Int24ub
@@ -32,7 +34,7 @@ OctreeNode = Struct(
     ),
     "leaf_data" / If(
         lambda this: not (this.header.subdivide_x or this.header.subdivide_y or this.header.subdivide_z),
-        FixedSized(this._.leaf_size, GreedyBytes) # TODO: handle leaf data
+        FixedSized(this._.leaf_size, GreedyBytes)  # TODO: handle leaf data
     )
 )
 

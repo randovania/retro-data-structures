@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, PrefixedArray, Int32ub, Float32b, Prefixed, GreedyBytes, Int16ub, Switch, Terminated, \
-    IfThenElse, Array, Aligned
+    IfThenElse, Array
 
 from retro_data_structures import game_check
 from retro_data_structures.game_check import Game

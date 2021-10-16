@@ -1,4 +1,5 @@
 from construct.core import Byte, Const, Int32ub, PrefixedArray, Struct
+
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.formats.script_object import ScriptInstance
 

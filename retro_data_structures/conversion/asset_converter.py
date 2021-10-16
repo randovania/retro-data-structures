@@ -1,6 +1,6 @@
 import copy
 import dataclasses
-from typing import Callable, Dict, Tuple, Any, NamedTuple, Optional
+from typing import Callable, Dict, Tuple, Any, Optional
 
 from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId, UnknownAssetId
 from retro_data_structures.formats import AssetType, AssetId

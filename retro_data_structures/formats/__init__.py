@@ -1,4 +1,5 @@
 from construct import Construct
+
 from retro_data_structures.formats.ancs import ANCS
 from retro_data_structures.formats.anim import ANIM
 from retro_data_structures.formats.cinf import CINF
@@ -12,12 +13,11 @@ from retro_data_structures.formats.mrea import MREA
 from retro_data_structures.formats.pak import PAK
 from retro_data_structures.formats.part import PART
 from retro_data_structures.formats.scan import SCAN
-from retro_data_structures.formats.txtr import TXTR
 from retro_data_structures.formats.strg import STRG
+from retro_data_structures.formats.txtr import TXTR
 
 AssetType = str
 AssetId = int
-
 
 ALL_FORMATS = {
     "ANCS": ANCS,

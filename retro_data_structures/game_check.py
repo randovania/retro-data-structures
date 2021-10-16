@@ -88,6 +88,7 @@ def current_game_at_least(target: Game) -> Callable[[Any], bool]:
 
     return result
 
+
 def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:
     return IfThenElse(
         current_game_at_least(target),

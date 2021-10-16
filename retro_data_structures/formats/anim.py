@@ -1,6 +1,6 @@
 import construct
 from construct import Struct, Array, PrefixedArray, Const, Int8ub, Int16ub, Int32ub, Float32b, If, \
-    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, RawCopy, Terminated, Rebuild, GreedyRange, Tell, Pointer
+    IfThenElse, BitsInteger, ExprAdapter, Bit, Aligned, Terminated, Rebuild, GreedyRange, Tell, Pointer
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime

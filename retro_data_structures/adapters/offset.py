@@ -1,20 +1,20 @@
-from construct import (Adapter, len_, AdaptationError, this)
+from construct import (Adapter, AdaptationError)
+
 
 class OffsetAdapter(Adapter):
     # stores offsets as indices
 
     def _get_table(self, context):
         raise NotImplementedError()
-    
+
     def _get_table_length(self, context):
         return NotImplementedError()
-    
+
     def _get_base_offset(self, context):
         return 0
-    
+
     def _get_item_size(self, item):
         return item.size
-    
 
     def _decode(self, obj, context, path):
         table = self._get_table(context)
@@ -38,7 +38,6 @@ class OffsetAdapter(Adapter):
         for i in range(self._get_table_length(context)):
             if i == index:
                 return size
-            
+
             item = table[i]
             size += self._get_item_size(item)
-
