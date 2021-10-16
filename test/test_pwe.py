@@ -11,11 +11,7 @@ def test_compare_pwe_templates():
     encoded = PropertyNames.build(property_names)
     assert encoded == PropertyNames.build(PropertyNames.parse(encoded))
 
-    base_path.joinpath(f"retro_data_structures/properties/property_names.pname").write_bytes(encoded)
-
     game_list = parse(["Prime", "Echoes", "Corruption"])
     for game, template in game_list.items():
         encoded = GameTemplate.build(template)
         assert encoded == GameTemplate.build(GameTemplate.parse(encoded))
-
-        base_path.joinpath(f"retro_data_structures/properties/{game}.prop").write_bytes(encoded)

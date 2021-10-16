@@ -1,13 +1,12 @@
 import dataclasses
-import json
 import logging
-import pprint
 import re
 import typing
 from pathlib import Path
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
+from retro_data_structures.property_template import PropertyNames, GameTemplate
 
 _game_id_to_file = {
     "Prime": "prime",
@@ -92,7 +91,7 @@ def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
     return extras
 
 
-def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool=True) -> dict:
+def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool = True) -> dict:
     parsed = {}
     if include_id:
         parsed.update({"id": int(element.attrib["ID"], 16)})
@@ -101,7 +100,7 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         "type": element.attrib["Type"],
         "name": name.text if name is not None and name.text is not None else ""
     })
-    
+
     property_type_extras = {
         "Struct": _prop_struct,
         "Asset": _prop_asset,
@@ -280,11 +279,14 @@ def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
 def persist_data(parse_result):
     logging.info("Persisting the parsed properties")
     base_dir = Path(__file__).parent
-    for game_id, data in parse_result.items():
+
+    encoded = PropertyNames.build(property_names)
+    base_dir.joinpath(f"retro_data_structures/properties/property_names.pname").write_bytes(encoded)
+
+    for game_id, template in parse_result.items():
         if game_id in _game_id_to_file:
-            path = base_dir.joinpath(f"retro_data_structures/property_templates/{_game_id_to_file[game_id]}.json")
-            with path.open("w") as f:
-                json.dump(data, f, indent=4)
+            encoded = GameTemplate.build(template)
+            base_dir.joinpath(f"retro_data_structures/properties/{game_id}.prop").write_bytes(encoded)
 
 
 if __name__ == '__main__':
