@@ -8,11 +8,11 @@ from construct.core import (
     Int16ub,
     Int32ub,
     PrefixedArray,
-    Struct,
+    Struct, Construct,
 )
 
 from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
-from retro_data_structures.construct_extensions import get_version
+from retro_data_structures.construct_extensions.version import get_version
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
 from retro_data_structures.formats.mrea import MREAVersion
@@ -48,7 +48,7 @@ def GeometryCodec(category, context, path, encode, codec):
 
     current_section = 0
 
-    def subcategory_codec(identifier, subcon=GreedyBytes, size=1):
+    def subcategory_codec(identifier, subcon: Construct = GreedyBytes, size=1):
         nonlocal current_section
 
         subcategory = category[current_section : current_section + size]

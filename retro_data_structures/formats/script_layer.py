@@ -18,7 +18,7 @@ from construct.lib import Container
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
-from retro_data_structures.construct_extensions import Skip
+from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 

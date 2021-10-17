@@ -1,6 +1,4 @@
-from retro_data_structures import dependencies
-from retro_data_structures.asset_provider import AssetProvider
-from retro_data_structures.construct_extensions import convert_to_raw_python
+from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.ancs import ANCS
 from retro_data_structures.game_check import Game
 

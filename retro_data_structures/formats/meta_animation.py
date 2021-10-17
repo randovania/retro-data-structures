@@ -3,8 +3,8 @@ import enum
 import construct
 from construct import Struct, Int32ub, Switch, Float32b, Byte, PrefixedArray, Int64ub
 
+from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.common_types import String, AssetId64, AssetId32
-from retro_data_structures.construct_extensions import EnumAdapter
 
 
 class MetaAnimationType(enum.IntEnum):

@@ -26,7 +26,8 @@ from construct.core import (
 )
 
 from retro_data_structures.common_types import AABox, Vector3
-from retro_data_structures.construct_extensions import ErrorWithMessage, Skip
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
+
 
 class AreaCollisionVersion(enum.IntEnum):
     prime1 = 3

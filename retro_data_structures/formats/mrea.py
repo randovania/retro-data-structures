@@ -33,12 +33,8 @@ from construct.core import (
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
-from retro_data_structures.construct_extensions import (
-    BeforeVersion,
-    PrefixedWithPaddingBefore,
-    WithVersion,
-    WithVersionElse,
-)
+from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
+from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion, WithVersionElse
 from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT

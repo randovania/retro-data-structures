@@ -8,8 +8,9 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional, List
 
-from retro_data_structures import construct_extensions, dependencies, formats
+from retro_data_structures import dependencies, formats
 from retro_data_structures.asset_provider import AssetProvider
+from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.formats import mlvl, AssetId
@@ -111,7 +112,7 @@ def dump_to(path: Path, decoded):
         raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
     with path.open("w") as f:
-        x = construct_extensions.convert_to_raw_python(decoded)
+        x = convert_to_raw_python(decoded)
         f.write(json.JSONEncoder(indent=4, default=default).encode(x))
 
 

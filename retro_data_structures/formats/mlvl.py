@@ -20,7 +20,7 @@ from construct import (
 )
 
 from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
-from retro_data_structures.construct_extensions import PrefixedArrayWithExtra
+from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.formats.guid import GUID
 
 MLVLConnectingDock = Struct(

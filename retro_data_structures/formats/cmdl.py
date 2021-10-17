@@ -26,7 +26,8 @@ from construct import (
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
-from retro_data_structures.construct_extensions import AlignTo, Skip
+from retro_data_structures.construct_extensions.alignment import AlignTo
+from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.game_check import Game
 

@@ -1,6 +1,6 @@
 import pytest
 
-from retro_data_structures.construct_extensions import convert_to_raw_python
+from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.pak import PAK, CompressedPakResource, PAKNoData
 from retro_data_structures.game_check import Game
 

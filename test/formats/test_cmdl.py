@@ -2,7 +2,7 @@ import construct
 
 from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.common_types import AABox
-from retro_data_structures.construct_extensions import convert_to_raw_python
+from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.game_check import Game
 
 CMDLHeader = construct.Struct(
