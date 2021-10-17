@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict
 
 from construct.core import (
+    Adapter,
     Check,
     Compressed,
     Computed,
@@ -17,6 +18,7 @@ from construct.core import (
     If,
     IfThenElse,
     Int16ub,
+    Int32sb,
     Int32ub,
     LazyBound,
     Optional,
@@ -94,28 +96,29 @@ def PropertyDef(*extra_fields, include_id=True):
 
 
 PropertySubcons = {
-    "Int": Int32ub,
+    "Int": Int32sb,
     "Bool": Flag,
     "Float": Float32b,
     "String": String,
     "Short": Int16ub,
     "Asset": AssetIdCorrect,
-    "Choice": Int32ub,
+    "Choice": Int32sb,
     # Struct
-    "Flags": Int32ub,
+    "Flags": Int32sb,
     # Array
     "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
     "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
     "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub),
     # TODO: Spline
-    "Sound": Hex(Int32ub),
-    "Enum": Int32ub,
+    "Sound": Hex(Int32sb),
+    "Enum": Int32sb,
 }
 
 
 def Property(include_id=True):
     default_value_field = [
-        "default_value" / LabeledOptional(b"DV", Switch(this.type, PropertySubcons, Prefixed(VarInt, GreedyBytes)))
+        "has_default" / Flag,
+        "default_value" / If(this.has_default, Switch(this.type, PropertySubcons, Prefixed(VarInt, GreedyBytes)))
     ]
     enum_property = PropertyDef(
         "archetype" / LabeledOptional(b"AR", String), *default_value_field, include_id=include_id
@@ -208,6 +211,18 @@ _ENUMS_BY_GAME = {
 }
 
 
+class OnlyIfModified(Adapter):
+    def __init__(self, subcon, default):
+        super().__init__(Optional(subcon))
+        self.default = default
+    
+    def _decode(self, obj, context, path):
+        return obj if obj else self.default
+    
+    def _encode(self, obj, context, path):
+        return None if obj == self.default else obj
+
+
 def CreatePropertyConstructs(game_id: Game):
     enums = _ENUMS_BY_GAME[game_id]
     game_template = GetGameTemplate(game_id)
@@ -248,9 +263,7 @@ def CreatePropertyConstructs(game_id: Game):
         if prop.cook_preference == "Always":
             pass # default behavior
         elif prop.cook_preference == "OnlyIfModified":
-            # TODO: return default if parsing returns None
-            # TODO: build only if value != default
-            data = Optional(data)
+            data = OnlyIfModified(data, prop.default_value)
         elif prop.cook_preference == "Never":
             data = Pass
         elif prop.cook_preference == "Default":
