@@ -73,7 +73,7 @@ class ScriptInstanceHelper:
         self.target_game = target_game
 
     def __str__(self):
-        return "<ScriptInstance {} 0x{:08x}>".format(self.type, self.id)
+        return "<ScriptInstance {} 0x{:08x}>".format(self.type_name, self.id)
 
     def __eq__(self, other):
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
@@ -81,6 +81,13 @@ class ScriptInstanceHelper:
     @property
     def type(self) -> str:
         return self._raw.type
+    
+    @property
+    def type_name(self) -> str:
+        try:
+            return self.get_properties()["_name"]
+        except:
+            return self.type
 
     @property
     def id(self) -> int:
@@ -106,7 +113,7 @@ class ScriptInstanceHelper:
         )
 
     def get_property(self, chain: Iterator[str]):
-        prop = self.get_properties()["data"]
+        prop = self.get_properties()
         for name in chain:
-            prop = prop[name]["data"]
+            prop = prop[name]
         return prop
