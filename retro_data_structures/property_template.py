@@ -30,7 +30,7 @@ from construct.core import (
     VarInt,
     this,
 )
-from construct.lib.containers import Container
+from construct.lib.containers import Container, ListContainer
 
 import retro_data_structures.enums.corruption
 import retro_data_structures.enums.echoes
@@ -215,12 +215,18 @@ def CreatePropertyConstructs(game_id: Game):
 
     def get_subcon(prop, atomic=False):
         if prop.type == "Struct":
-            # TODO: account for cook preferences
+            archetype = game_template.property_archetypes.get(prop.archetype, Container({"properties": ListContainer()}))
             prop_id = prop.id if not atomic else None
-            add_archetype(prop.archetype, game_template.property_archetypes[prop.archetype])
-            return archetypes[prop.archetype](prop_id)
+            if not prop.properties:
+                # no changes to defaults or cook preferences
+                add_archetype(prop.archetype, archetype)
+                return archetypes[prop.archetype](prop_id)
+            else:
+                properties = {p.id: p for p in archetype.properties.copy()}
+                properties.update({p.id: p for p in prop.properties})
+                return property_struct(properties.values(), atomic)(prop_id)
 
-        elif prop.type == "Array":
+        if prop.type == "Array":
             data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
         elif (
                 hasattr(prop, "archetype")
@@ -258,12 +264,16 @@ def CreatePropertyConstructs(game_id: Game):
             name += f"0x{prop.id:X}"
         return name
 
-    def property_struct(properties, atomic, *extra_fields):
+    def property_struct(_properties, atomic, *extra_fields):
         prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+        id_field = []
+        count_field = ["prop_count" / prefix] if not atomic else [] # TODO: rebuild
+
+        property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in _properties}
+        properties = Container({get_property_name(prop, property_names): get_subcon(prop, atomic) for prop in _properties})
 
         def result(property_id=None):
-            id_field = []
-            count_field = ["prop_count" / prefix] if not atomic else [] # TODO: rebuild
+            nonlocal id_field, count_field
             data = Struct(*extra_fields, *count_field, **properties)
 
             if game_id >= Game.ECHOES:
@@ -282,12 +292,7 @@ def CreatePropertyConstructs(game_id: Game):
             return
         if archetype.type == "Choice" or archetype.type == "Enum":
             return
-        names = {prop.id: GetPropertyName(game_id, prop.id) for prop in archetype.properties}
-        properties = Container(
-            {get_property_name(prop, names): get_subcon(prop, archetype.atomic) for prop in archetype.properties}
-        )
-
-        archetypes[name] = property_struct(properties, archetype.atomic)
+        archetypes[name] = property_struct(archetype.properties, archetype.atomic)
 
     for arch_name, archetype in game_template.property_archetypes.items():
         add_archetype(arch_name, archetype)
@@ -295,10 +300,7 @@ def CreatePropertyConstructs(game_id: Game):
     script_objects = {}
 
     for script_name, obj in game_template.script_objects.items():
-        property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in obj.properties}
-        properties = Container({get_property_name(prop, property_names): get_subcon(prop) for prop in obj.properties})
-
-        script_objects[script_name] = property_struct(properties, False, "_name" / Computed(obj.name))(0xFFFFFFFF)
+        script_objects[script_name] = property_struct(obj.properties, False, "_name" / Computed(obj.name))(0xFFFFFFFF)
 
     PropertyConstructs[game_id] = script_objects
 
