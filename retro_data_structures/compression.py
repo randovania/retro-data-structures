@@ -81,6 +81,15 @@ class LZOCompressedBlock(Adapter):
         return b"".join(segments)
 
     def _encode(self, uncompressed, context, path):
+
+        decompressed_size = construct.evaluate(self.decompressed_size, context)
+        if decompressed_size != len(uncompressed):
+            raise ValueError("Decompressed size {} doesn't match size of data to compress ({}) at {}".format(
+                decompressed_size,
+                len(uncompressed),
+                path,
+            ))
+
         segment_size = self.segment_size
         return [
             uncompressed[segment_size * i : segment_size * (i + 1)]
