@@ -19,6 +19,8 @@ from construct.core import (
     Int16ub,
     Int32ub,
     LazyBound,
+    Optional,
+    Pass,
     Peek,
     Prefixed,
     PrefixedArray,
@@ -62,6 +64,11 @@ class PropertyTypes(enum.IntEnum):
 
     Enum = enum.auto()
 
+class CookPreference(enum.IntEnum):
+    Always = enum.auto()
+    OnlyIfModified = enum.auto()
+    Default = enum.auto()
+    Never = enum.auto()
 
 PropertyTypeEnum = Enum(VarInt, PropertyTypes)
 
@@ -76,7 +83,13 @@ def TypeSwitch(cases, default=None):
 
 def PropertyDef(*extra_fields, include_id=True):
     id_field = ["id" / LabeledOptional(b"ID", Hex(Int32ub))] if include_id else []
-    return Struct("type" / PropertyTypeEnum, "name" / String, *id_field, *extra_fields)
+    return Struct(
+        "type" / PropertyTypeEnum,
+        "name" / String,
+        "cook_preference" / Enum(VarInt, CookPreference),
+        *id_field,
+        *extra_fields
+    )
 
 
 PropertySubcons = {
@@ -202,11 +215,12 @@ def CreatePropertyConstructs(game_id: Game):
 
     def get_subcon(prop, atomic=False):
         if prop.type == "Struct":
+            # TODO: account for cook preferences
             prop_id = prop.id if not atomic else None
             add_archetype(prop.archetype, game_template.property_archetypes[prop.archetype])
             return archetypes[prop.archetype](prop_id)
 
-        if prop.type == "Array":
+        elif prop.type == "Array":
             data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
         elif (
                 hasattr(prop, "archetype")
@@ -217,13 +231,25 @@ def CreatePropertyConstructs(game_id: Game):
         else:
             data = PropertySubcons.get(prop.type, GreedyBytes)
 
-        if atomic or game_id < Game.ECHOES:
-            return data
-        return FocusedSeq(
-            "data",
-            "id" / Const(prop.id, Hex(Int32ub)),
-            "data" / Prefixed(Int16ub if game_id >= Game.ECHOES else Int32ub, data),
-        )
+        if not atomic and game_id >= Game.ECHOES:
+            data = FocusedSeq(
+                "data",
+                "id" / Const(prop.id, Hex(Int32ub)),
+                "data" / Prefixed(Int16ub if game_id >= Game.ECHOES else Int32ub, data),
+            )
+        
+        if prop.cook_preference == "Always":
+            pass # default behavior
+        elif prop.cook_preference == "OnlyIfModified":
+            # TODO: return default if parsing returns None
+            # TODO: build only if value != default
+            data = Optional(data)
+        elif prop.cook_preference == "Never":
+            data = Pass
+        elif prop.cook_preference == "Default":
+            data = Const(prop.default_value, data)
+
+        return data
 
     def get_property_name(prop, names):
         name = names.get(prop.id) or prop.name
@@ -237,7 +263,7 @@ def CreatePropertyConstructs(game_id: Game):
 
         def result(property_id=None):
             id_field = []
-            count_field = ["prop_count" / Const(len(properties), prefix)] if not atomic else []
+            count_field = ["prop_count" / prefix] if not atomic else [] # TODO: rebuild
             data = Struct(*extra_fields, *count_field, **properties)
 
             if game_id >= Game.ECHOES:
