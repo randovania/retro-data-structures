@@ -202,8 +202,9 @@ def CreatePropertyConstructs(game_id: Game):
 
     def get_subcon(prop, atomic=False):
         if prop.type == "Struct":
+            prop_id = prop.id if not atomic else None
             add_archetype(prop.archetype, game_template.property_archetypes[prop.archetype])
-            return archetypes[prop.archetype]
+            return archetypes[prop.archetype](prop_id)
 
         if prop.type == "Array":
             data = PrefixedArray(Int32ub, get_subcon(prop.item_archetype, True))
@@ -218,8 +219,9 @@ def CreatePropertyConstructs(game_id: Game):
 
         if atomic or game_id < Game.ECHOES:
             return data
-        return Struct(
-            "id" / Hex(Int32ub),
+        return FocusedSeq(
+            "data",
+            "id" / Const(prop.id, Hex(Int32ub)),
             "data" / Prefixed(Int16ub if game_id >= Game.ECHOES else Int32ub, data),
         )
 
@@ -230,21 +232,24 @@ def CreatePropertyConstructs(game_id: Game):
             name += f"0x{prop.id:X}"
         return name
 
-    def property_struct(properties, atomic):
+    def property_struct(properties, atomic, *extra_fields):
         prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
 
-        id_field = []
-        count_field = ["prop_count" / Const(len(properties), prefix)] if not atomic else []
-        data = Struct(*count_field, **properties)
+        def result(property_id=None):
+            id_field = []
+            count_field = ["prop_count" / Const(len(properties), prefix)] if not atomic else []
+            data = Struct(*extra_fields, *count_field, **properties)
 
-        if game_id >= Game.ECHOES:
-            id_field = ["id" / If(lambda this: not (atomic and hasattr(this._, "count")), Hex(Int32ub))]
-            data = IfThenElse(lambda this: not (atomic and hasattr(this._, "count")), Prefixed(prefix, data), data)
+            if game_id >= Game.ECHOES:
+                id_field = ["id" / If(lambda this: not (atomic and hasattr(this._, "count")), Const(property_id, Hex(Int32ub)))]
+                data = IfThenElse(lambda this: not (atomic and hasattr(this._, "count")), Prefixed(prefix, data), data)
 
-        return [
-            *id_field,
-            "data" / data,
-        ]  # , Computed(lambda this: print(this.data) if game_check.is_prime1(this) else None)]
+            return FocusedSeq(
+                "data",
+                *id_field,
+                "data" / data,
+            )
+        return result
 
     def add_archetype(name, archetype):
         if name in archetypes.keys():
@@ -256,7 +261,7 @@ def CreatePropertyConstructs(game_id: Game):
             {get_property_name(prop, names): get_subcon(prop, archetype.atomic) for prop in archetype.properties}
         )
 
-        archetypes[name] = Struct(*property_struct(properties, archetype.atomic))
+        archetypes[name] = property_struct(properties, archetype.atomic)
 
     for arch_name, archetype in game_template.property_archetypes.items():
         add_archetype(arch_name, archetype)
@@ -267,7 +272,7 @@ def CreatePropertyConstructs(game_id: Game):
         property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in obj.properties}
         properties = Container({get_property_name(prop, property_names): get_subcon(prop) for prop in obj.properties})
 
-        script_objects[script_name] = Struct("name" / Computed(obj.name), *property_struct(properties, False))
+        script_objects[script_name] = property_struct(properties, False, "_name" / Computed(obj.name))(0xFFFFFFFF)
 
     PropertyConstructs[game_id] = script_objects
 
