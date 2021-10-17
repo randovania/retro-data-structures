@@ -43,16 +43,16 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
     default_value_types = {
-        "Int": lambda el: int(el.text, 10),
+        "Int": lambda el: int(el.text, 10) & 0xFFFFFFFF,
         "Float": lambda el: float(el.text),
         "Bool": lambda el: el.text == "true",
-        "Short": lambda el: int(el.text, 10),
+        "Short": lambda el: int(el.text, 10) & 0xFFFF,
         "Color": lambda el: {e.tag: float(e.text) for e in el},
         "Vector": lambda el: {e.tag: float(e.text) for e in el},
-        "Flags": lambda el: int(el.text, 10),
-        "Choice": lambda el: int(el.text, 10),
-        "Enum": lambda el: int(el.text, 16),
-        "Sound": lambda el: int(el.text, 10),
+        "Flags": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Choice": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Enum": lambda el: int(el.text, 16) & 0xFFFFFFFF,
+        "Sound": lambda el: int(el.text, 10) & 0xFFFFFFFF,
     }
 
     default_value = None

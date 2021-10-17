@@ -97,22 +97,22 @@ def PropertyDef(*extra_fields, include_id=True):
 
 
 PropertySubcons = {
-    "Int": Int32sb,
+    "Int": Int32ub,
     "Bool": Flag,
     "Float": Float32b,
     "String": String,
     "Short": Int16ub,
     "Asset": AssetIdCorrect,
-    "Choice": Int32sb,
+    "Choice": Int32ub,
     # Struct
-    "Flags": Int32sb,
+    "Flags": Int32ub,
     # Array
     "Color": Struct("R" / Proportion, "G" / Proportion, "B" / Proportion, "A" / Default(Proportion, 1.0)),
     "Vector": Struct("X" / Float32b, "Y" / Float32b, "Z" / Float32b),
     "AnimationSet": Struct("AnimationCharacterSet" / AssetIdCorrect, "Character" / Int32ub, "DefaultAnim" / Int32ub),
     # TODO: Spline
-    "Sound": Hex(Int32sb),
-    "Enum": Int32sb,
+    "Sound": Hex(Int32ub),
+    "Enum": Int32ub,
 }
 
 
