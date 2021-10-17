@@ -51,13 +51,16 @@ def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
         "Vector": lambda el: {e.tag: float(e.text) for e in el},
         "Flags": lambda el: int(el.text, 10),
         "Choice": lambda el: int(el.text, 10),
-        "Enum": lambda el: int(el.text, 16)
+        "Enum": lambda el: int(el.text, 16),
+        "Sound": lambda el: int(el.text, 10),
     }
 
     default_value = None
+    has_default = False
     if (default_value_element := element.find("DefaultValue")) is not None:
         default_value = default_value_types.get(element.attrib["Type"], lambda el: el.text)(default_value_element)
-    return {"default_value": default_value}
+        has_default = True
+    return {"has_default": has_default, "default_value": default_value}
 
 
 def _prop_struct(element: Element, game_id: str, path: Path) -> dict:
