@@ -58,6 +58,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
 
+      - name: remove code outside of wheel
+        run: rm -rf retro_data_structures
+        shell: bash
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -77,8 +81,7 @@ jobs:
         shell: bash
 
       - name: test
-        run: python -m pytest test_pwe.py
-        working-directory: test
+        run: python -m pytest test/test_pwe.py
 
   pypi:
     runs-on: 'ubuntu-latest'
