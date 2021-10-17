@@ -24,6 +24,7 @@ from construct.core import (
     Peek,
     Prefixed,
     PrefixedArray,
+    Rebuild,
     Struct,
     Subconstruct,
     Switch,
@@ -264,16 +265,23 @@ def CreatePropertyConstructs(game_id: Game):
             name += f"0x{prop.id:X}"
         return name
 
+    def rebuild_count(props, names):
+        fixed_count = len([prop for prop in props if prop.cook_preference == "Always" or prop.cook_preference == "Default"])
+        optionals = [get_property_name(prop, names) for prop in props if prop.cook_preference == "OnlyIfModified"]
+        def _(context):
+            optional_count = len([name for name in optionals if context.get(name) is not None])
+            return fixed_count + optional_count
+        return _
+    
     def property_struct(_properties, atomic, *extra_fields):
-        prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
-        id_field = []
-        count_field = ["prop_count" / prefix] if not atomic else [] # TODO: rebuild
-
-        property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in _properties}
-        properties = Container({get_property_name(prop, property_names): get_subcon(prop, atomic) for prop in _properties})
-
         def result(property_id=None):
-            nonlocal id_field, count_field
+            prefix = Int16ub if game_id >= Game.ECHOES else Int32ub
+            
+            property_names = {prop.id: GetPropertyName(game_id, prop.id) for prop in _properties}
+            properties = Container({get_property_name(prop, property_names): get_subcon(prop, atomic) for prop in _properties})
+            
+            id_field = []
+            count_field = ["_prop_count" / Rebuild(prefix, rebuild_count(_properties, property_names))] if not atomic else []
             data = Struct(*extra_fields, *count_field, **properties)
 
             if game_id >= Game.ECHOES:
