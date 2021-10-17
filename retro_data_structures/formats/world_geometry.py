@@ -43,7 +43,7 @@ def SurfaceLookupTable(surface_group_count, surface_count):
 
 
 def GeometryCodec(category, context, path, encode, codec):
-    if category[0].size <= 0 or category[0]._decompressed == False:
+    if category[0]["size"] <= 0 or category[0]["decompressed"] == False:
         return category
 
     current_section = 0
@@ -71,10 +71,10 @@ def GeometryCodec(category, context, path, encode, codec):
         subcategory_codec("lightmap_uvs", GreedyRange(Array(2, Float16b)))
 
         if encode:
-            surface_count = len(category[current_section].data)
+            surface_count = len(category[current_section]["data"])
         subcategory_codec("surface_offsets", PrefixedArray(Int32ub, Int32ub))
         if not encode:
-            surface_count = len(category[current_section - 1].data)
+            surface_count = len(category[current_section - 1]["data"])
 
         subcategory_codec("surface", Surface, surface_count)
 
@@ -82,10 +82,10 @@ def GeometryCodec(category, context, path, encode, codec):
             continue
 
         if encode:
-            surface_group_count = len(category[current_section].data)
+            surface_group_count = len(category[current_section]["data"])
         subcategory_codec("surface_group_ids", SurfaceGroupIds(surface_count))
         if not encode:
-            surface_group_count = len(category[current_section - 1].data)
+            surface_group_count = len(category[current_section - 1]["data"])
 
         subcategory_codec("surface_lookup_table", SurfaceLookupTable(surface_group_count, surface_count))
 

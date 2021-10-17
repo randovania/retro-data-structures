@@ -99,7 +99,7 @@ class DataSectionGroupAdapter(Adapter):
                     hash=hashlib.sha256(data).hexdigest(),
                     size=section_size,
                     id=section_id,
-                    _decompressed=group.decompressed,
+                    decompressed=group.decompressed,
                 )
             )
 
@@ -108,7 +108,7 @@ class DataSectionGroupAdapter(Adapter):
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return {"data": b"".join([section.data for section in group])}
+        return {"data": b"".join([section["data"] for section in group])}
 
 
 class UncompressedDataSections(Adapter):
@@ -122,7 +122,7 @@ class UncompressedDataSections(Adapter):
                         32,
                         FixedSized(lambda this: this._root.header.data_section_sizes.value[this._index], GreedyBytes),
                     ),
-                    "_decompressed" / Computed(parse_block_func),
+                    "decompressed" / Computed(parse_block_func),
                 ),
             )
         )
@@ -134,17 +134,17 @@ class UncompressedDataSections(Adapter):
             section = sections[i]
             decoded.append(
                 Container(
-                    data=section.data,
-                    hash=hashlib.sha256(section.data).hexdigest(),
-                    size=len(section.data),
+                    data=section["data"],
+                    hash=hashlib.sha256(section["data"]).hexdigest(),
+                    size=len(section["data"]),
                     id=i,
-                    _decompressed=section._decompressed,
+                    decompressed=section["decompressed"],
                 )
             )
         return [ListContainer(decoded)]
 
     def _encode(self, sections, context, path):
-        return [{"data": section.data} for category in sections.values() for section in category]
+        return [{"data": section["data"]} for category in sections.values() for section in category]
 
 
 _all_categories = [
@@ -168,19 +168,19 @@ class SectionCategoryAdapter(Adapter):
         for i in range(len(category)):
             section = category[i]
 
-            if section.size > 0 and section._decompressed:
-                decoded = subcon._parse(io.BytesIO(section.data), context, path)
-                category[i].data = decoded
+            if section["size"] > 0 and section["decompressed"]:
+                decoded = subcon._parse(io.BytesIO(section["data"]), context, path)
+                category[i]["data"] = decoded
         return category
 
     def _encode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
 
-            if section.size > 0 and section._decompressed:
+            if section["size"] > 0 and section["decompressed"]:
                 encoded = io.BytesIO()
-                subcon._build(section.data, encoded, context, path)
-                category[i].data = encoded.getvalue()
+                subcon._build(section["data"], encoded, context, path)
+                category[i]["data"] = encoded.getvalue()
         return category
 
     def _category_encodings(self):
@@ -259,13 +259,13 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
             current_group = []
             current_group_size = 0
 
-        for cat_label, cat_sections in sorted(sections.items(), key=lambda item: item[1][0].id):
+        for cat_label, cat_sections in sorted(sections.items(), key=lambda item: item[1][0]["id"]):
             for section in cat_sections:
 
                 def start_new_group():
                     if current_group_size == 0:
                         return (False, "")
-                    if current_group_size + section.size > 0x20000:
+                    if current_group_size + section["size"] > 0x20000:
                         return (True, "Next section too big.")
                     if cat_label == "script_layers_section":
                         return (True, "New SCLY section.")
@@ -282,7 +282,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
                     add_group(reason)
 
                 current_group.append(section)
-                current_group_size += section.size
+                current_group_size += section["size"]
 
             previous_label = cat_label
 
@@ -354,7 +354,7 @@ def _used_categories(this):
 
 def MREAHeader():
     def get_section_id(category):
-        return lambda this: this._.sections[category][0].id
+        return lambda this: this._.sections[category][0]["id"]
 
     return Struct(
         "magic" / Const(0xDEADBEEF, Int32ub),
@@ -408,8 +408,8 @@ def MREAHeader():
                 this._.data_section_count,
                 True,
                 lambda this: sorted(
-                    [x for l in this._root.sections.values() for x in l], key=lambda section: section.id
-                )[this._index].size,
+                    [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
+                )[this._index]["size"],
             ),
         ),
         "categories" / Computed(_used_categories),
@@ -473,4 +473,4 @@ class Mrea:
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
         for section in self._raw.sections.script_layers_section:
-            yield ScriptLayerHelper(section.data, self.target_game)
+            yield ScriptLayerHelper(section["data"], self.target_game)
