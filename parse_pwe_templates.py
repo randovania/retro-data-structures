@@ -20,8 +20,11 @@ class EnumDefinition:
     values: typing.Dict[str, typing.Any]
 
 
-def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str = "w"):
-    code = '"""\nGenerated file.\n"""\nfrom enum import Enum\n' if mode == "w" else ""
+_enums_by_game: typing.Dict[str, typing.List[EnumDefinition]] = {}
+
+
+def create_enums_file(enums: typing.List[EnumDefinition]):
+    code = '"""\nGenerated file.\n"""\nfrom enum import Enum\n'
 
     def _scrub(string: str):
         s = re.sub(r'\W', '', string)  # remove non-word characters
@@ -35,9 +38,7 @@ def create_enums(game: str, enums: typing.List[EnumDefinition], mode: str = "w")
         for name, value in e.values.items():
             code += f"    {_scrub(name)} = {value}\n"
 
-    if game in _game_id_to_file:
-        with Path(__file__).parent.joinpath(f"retro_data_structures/enums/{_game_id_to_file[game]}.py").open(mode) as f:
-            f.write(code)
+    return code
 
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
@@ -148,7 +149,7 @@ def _parse_choice(properties: Element, game_id: str, path: Path) -> dict:
                 "choices": choices,
             }
 
-        create_enums(game_id, [EnumDefinition(name, choices)], "a")
+        _enums_by_game[game_id].append(EnumDefinition(name, choices))
 
     return {
         "type": _type,
@@ -219,7 +220,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     states = get_key_map(root.find("States"))
     messages = get_key_map(root.find("Messages"))
-    create_enums(game_id, [
+
+    _enums_by_game[game_id] = [
         EnumDefinition(
             "States",
             {
@@ -234,7 +236,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 for key, value in messages.items()
             }
         ),
-    ])
+    ]
 
     script_objects = {
         four_cc: parse_script_object_file(base_path / path, game_id)
@@ -279,6 +281,14 @@ def persist_data(parse_result):
     logging.info("Persisting the parsed properties")
     base_dir = Path(__file__).parent
 
+    # First write the enums
+    for game_id in parse_result.keys():
+        if game_id in _game_id_to_file:
+            base_dir.joinpath(f"retro_data_structures/enums/{_game_id_to_file[game_id]}.py").write_text(
+                create_enums_file(_enums_by_game[game_id])
+            )
+
+    # Now import these files, since they depend on the generated enum files
     from retro_data_structures.property_template import PropertyNames, GameTemplate
 
     encoded = PropertyNames.build(property_names)
