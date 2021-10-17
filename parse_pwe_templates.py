@@ -95,9 +95,11 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
     if include_id:
         parsed.update({"id": int(element.attrib["ID"], 16)})
     name = element.find("Name")
+    cook = element.find("CookPreference")
     parsed.update({
         "type": element.attrib["Type"],
-        "name": name.text if name is not None and name.text is not None else ""
+        "name": name.text if name is not None and name.text is not None else "",
+        "cook_preference": cook.text if cook is not None and cook.text is not None else "Always"
     })
 
     property_type_extras = {
