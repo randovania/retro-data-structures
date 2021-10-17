@@ -77,7 +77,8 @@ jobs:
         shell: bash
 
       - name: test
-        run: python -m pytest test/test_pwe.py
+        run: python -m pytest test_pwe.py
+        working-directory: test
 
   pypi:
     runs-on: 'ubuntu-latest'

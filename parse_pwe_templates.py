@@ -261,7 +261,8 @@ def parse_game_list(templates_path: Path) -> dict:
 
 
 def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
-    templates_path = Path("PrimeWorldEditor/templates")
+    base_dir = Path(__file__).parent
+    templates_path = base_dir.joinpath("PrimeWorldEditor/templates")
     read_property_names(templates_path / "PropertyMap.xml")
 
     game_list = parse_game_list(templates_path)
