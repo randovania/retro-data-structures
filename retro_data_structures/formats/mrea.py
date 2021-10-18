@@ -104,7 +104,7 @@ class DataSectionGroupAdapter(Adapter):
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return {"data": b"".join([section["data"] for section in group])}
+        return {"data": b"".join([section["data"].ljust(section["size"], b"\x00") for section in group])}
 
 
 class UncompressedDataSections(Adapter):
