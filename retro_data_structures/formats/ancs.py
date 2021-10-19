@@ -8,7 +8,7 @@ from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
-from retro_data_structures.construct_extensions import WithVersion, BeforeVersion
+from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
 from retro_data_structures.formats import meta_animation, evnt
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32

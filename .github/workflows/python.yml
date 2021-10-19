@@ -57,6 +57,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      - name: remove code outside of wheel
+        run: rm -rf retro_data_structures
+        shell: bash
 
       - name: Set up Python
         uses: actions/setup-python@v2
@@ -77,8 +84,7 @@ jobs:
         shell: bash
 
       - name: test
-        run: python -m pytest test/test_pwe.py
-        working-directory: test
+        run: python -m pytest test/
 
   pypi:
     runs-on: 'ubuntu-latest'

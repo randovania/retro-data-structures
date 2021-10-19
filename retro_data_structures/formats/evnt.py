@@ -2,7 +2,7 @@ from construct import Struct, Int32ub, PrefixedArray, Int16ub, Byte, Float32b, I
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import String, CharAnimTime
-from retro_data_structures.construct_extensions import WithVersion
+from retro_data_structures.construct_extensions.version import WithVersion
 
 BasePOINode = Struct(
     unk_1=Int16ub,

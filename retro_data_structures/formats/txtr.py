@@ -5,7 +5,7 @@ import enum
 
 from construct import Struct, Int16ub, Int32ub, GreedyBytes
 
-from retro_data_structures.construct_extensions import EnumAdapter
+from retro_data_structures.adapters.enum_adapter import EnumAdapter
 
 
 class ImageFormat(enum.IntEnum):

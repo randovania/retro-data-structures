@@ -6,7 +6,7 @@ import enum
 import construct
 from construct import Struct, Const, Int32ub, Array, Float32b, Switch, Int8ub
 
-from retro_data_structures.construct_extensions import EnumAdapter
+from retro_data_structures.adapters.enum_adapter import EnumAdapter
 
 
 class ParmType(enum.IntEnum):

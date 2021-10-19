@@ -1,4 +1,6 @@
+import enum
 from construct.core import (
+    Pointer,
     Rebuild,
     this,
     Aligned,
@@ -24,9 +26,15 @@ from construct.core import (
 )
 
 from retro_data_structures.common_types import AABox, Vector3
-from retro_data_structures.construct_extensions import ErrorWithMessage
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
 
-VersionEnum = Enum(Int32ub, prime1=3, prime23=4, dkcr=5)
+
+class AreaCollisionVersion(enum.IntEnum):
+    prime1 = 3
+    prime23 = 4
+    dkcr = 5
+
+VersionEnum = Enum(Int32ub, AreaCollisionVersion)
 
 _shared_materials = {
     "Unknown (Default)": 0x00000001,
@@ -167,13 +175,14 @@ CollisionIndex = Struct(
     "triangle_indices" / PrefixedArray(Int32ub, Int8ub),
     "edges" / PrefixedArray(Int32ub, Struct(vertexA=Int16ub, vertexB=Int16ub)),
     "triangles" / TriangleAdapter(PrefixedArray(Int32ub, Int16ub)),
-    "unknowns" / If(lambda this: int(this._.version) > int(VersionEnum.prime1), PrefixedArray(Int32ub, Int16ub)),
+    "unknowns" / If(lambda this: AreaCollisionVersion[this._.version] > AreaCollisionVersion.prime1, PrefixedArray(Int32ub, Int16ub)),
     "vertices" / PrefixedArray(Int32ub, Vector3),
 )
 
 AreaCollision = Struct(
     "unk" / Const(0x01000000, Int32ub),
-    "size" / Rebuild(Int32ub, this._size_end - this._size_start),
+    "_size_addr" / Tell,
+    Skip(1, Int32ub),
     "_size_start" / Tell,
     "magic" / Const(0xDEAFBABE, Int32ub),
     "version" / VersionEnum,
@@ -183,4 +192,5 @@ AreaCollision = Struct(
     / Prefixed(Int32ub, Switch(this.root_node_type, {"none": Pass, "branch": CollisionBranch, "leaf": CollisionLeaf})),
     "collision_indices" / CollisionIndex,
     "_size_end" / Tell,
+    "size" / Pointer(this._size_addr, Rebuild(Int32ub, this._size_end - this._size_start)),
 )

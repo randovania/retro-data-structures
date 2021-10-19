@@ -22,7 +22,8 @@ from construct import (
 from retro_data_structures import game_check
 from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
-from retro_data_structures.construct_extensions import AlignTo, AlignedPrefixed, LazyPatchedForBug
+from retro_data_structures.construct_extensions.alignment import AlignTo, AlignedPrefixed
+from retro_data_structures.construct_extensions.misc import LazyPatchedForBug
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),

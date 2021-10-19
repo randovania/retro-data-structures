@@ -1,6 +1,7 @@
 from construct import Tell, Pointer, Int32ub, Struct, Array, Rebuild, If
 
-from retro_data_structures.construct_extensions import AlignedPrefixed, Skip
+from retro_data_structures.construct_extensions.alignment import AlignedPrefixed
+from retro_data_structures.construct_extensions.misc import Skip
 
 
 def _get_current_section(context, increment=True):

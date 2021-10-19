@@ -39,7 +39,8 @@ import retro_data_structures.enums.corruption
 import retro_data_structures.enums.echoes
 import retro_data_structures.enums.prime
 from retro_data_structures.common_types import FourCC, String
-from retro_data_structures.construct_extensions import DictAdapter, DictStruct, ErrorWithMessage, LabeledOptional
+from retro_data_structures.construct_extensions.dict import DictAdapter, DictStruct
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, LabeledOptional
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
 Proportion = FocusedSeq("value", "value" / Float32b, Check(lambda t: 0.0 <= t.value <= 1.0))

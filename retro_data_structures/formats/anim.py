@@ -23,7 +23,7 @@ from construct import (
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
-from retro_data_structures.construct_extensions import BitwiseWith32Blocks
+from retro_data_structures.construct_extensions.misc import BitwiseWith32Blocks
 
 UncompressedAnimation = Struct(
     duration=CharAnimTime,

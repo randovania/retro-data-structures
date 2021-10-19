@@ -1,7 +1,5 @@
 from construct.core import (
-    Array,
     Const,
-    FixedSized,
     Hex,
     If,
     IfThenElse,
@@ -9,7 +7,9 @@ from construct.core import (
     Int32ub,
     Peek,
     Pointer,
+    Prefixed,
     PrefixedArray,
+    Seek,
     Struct,
     Tell,
     this,
@@ -18,7 +18,7 @@ from construct.lib import Container
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
-from retro_data_structures.construct_extensions import Skip
+from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 
@@ -28,12 +28,13 @@ ScriptLayerPrime = Struct(
     "_layer_count_address" / Tell,
     "_layer_count" / Peek(Int32ub),
     Skip(1, Int32ub),
-    "layer_sizes" / Array(this._layer_count, Int32ub),
+    "_layer_size_address" / Tell,
+    Seek(lambda this: (this._layer_count or len(this.layers)) * Int32ub.sizeof(), 1),
     "layers"
     / PrefixedArray(
         Pointer(this._._layer_count_address, Int32ub),
-        FixedSized(
-            lambda this: this._.layer_sizes[this._index],
+        Prefixed(
+            Pointer(lambda this: this._._layer_size_address + this._index * Int32ub.sizeof(), Int32ub),
             Struct(
                 "unk" / Hex(Int8ub),
                 "objects" / PrefixedArray(Int32ub, ScriptInstance),
