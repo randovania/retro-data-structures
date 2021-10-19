@@ -77,9 +77,9 @@ class AlignedPrefixed(Subconstruct):
 
 
 class PrefixedWithPaddingBefore(Subconstruct):
-    def __init__(self, length_field, subcon):
+    def __init__(self, length_field, subcon, padding=32):
         super().__init__(subcon)
-        self.padding = 32
+        self.padding = padding
         self.length_field = length_field
 
     def _parse(self, stream, context, path):

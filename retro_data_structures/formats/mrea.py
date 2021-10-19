@@ -5,22 +5,23 @@ import hashlib
 import io
 from enum import IntEnum
 from typing import Iterator
+import construct
 
 from construct.core import (
     Adapter,
     Aligned,
+    AlignedStruct,
     Array,
     Computed,
     Const,
-    Container,
     Enum,
     FixedSized,
     GreedyBytes,
     If,
-    IfThenElse,
     Int8ub,
     Int32ub,
-    ListContainer,
+    Pass,
+    Pointer,
     PrefixedArray,
     Rebuild,
     Sequence,
@@ -30,10 +31,13 @@ from construct.core import (
     this,
 )
 
+from construct.lib.containers import Container, ListContainer
+
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
+from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion, WithVersionElse
 from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
 from retro_data_structures.formats.area_collision import AreaCollision
@@ -57,37 +61,20 @@ class MREAVersion(IntEnum):
 from retro_data_structures.formats.world_geometry import GeometryCodec
 
 
-def DataSectionGroup(decompress):
-    return Struct(
-        "header" / Computed(lambda this: this._.headers[this._index]),
-        "address" / Tell,
-        "decompressed" / Computed(decompress),
-        "data"
-        / IfThenElse(
-            this.header.compressed_size > 0,
-            PrefixedWithPaddingBefore(
-                Computed(this.header.compressed_size),
-                IfThenElse(decompress, LZOCompressedBlock(this.header.uncompressed_size), GreedyBytes),
-            ),
-            DataSection(GreedyBytes, size=lambda: Computed(this.header.uncompressed_size)),
-        ),
-    )
-
-
 class DataSectionGroupAdapter(Adapter):
+    def __init__(self, subcon, header):
+        super().__init__(subcon)
+        self.header = header
+
     def _decode(self, group, context, path):
         sections = []
         offset = 0
 
-        for i in range(group.header.section_count):
+        for i in range(self.header.data_section_count):
             section_id = GetDataSectionId(context)
             section_size = GetDataSectionSize(context)
 
-            data = b""
-            if group.decompressed:
-                data = group.data[offset : offset + section_size]
-            elif i == 0:
-                data = group.data
+            data = group[offset : offset + section_size]
 
             sections.append(
                 Container(
@@ -95,7 +82,6 @@ class DataSectionGroupAdapter(Adapter):
                     hash=hashlib.sha256(data).hexdigest(),
                     size=section_size,
                     id=section_id,
-                    decompressed=group.decompressed,
                 )
             )
 
@@ -104,25 +90,20 @@ class DataSectionGroupAdapter(Adapter):
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return {"data": b"".join([section["data"].ljust(section["size"], b"\x00") for section in group])}
+        return b"".join([section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
 
 
 class UncompressedDataSections(Adapter):
-    def __init__(self, parse_block_func):
+    def __init__(self):
         super().__init__(
             Array(
                 this.header.data_section_count,
-                Struct(
-                    "data"
-                    / Aligned(
-                        32,
-                        FixedSized(lambda this: this._root.header.data_section_sizes.value[this._index], GreedyBytes),
-                    ),
-                    "decompressed" / Computed(parse_block_func),
-                ),
+                Aligned(32, FixedSized(
+                    lambda this: this._root.data_section_sizes.value[this._index],
+                    GreedyBytes
+                )),
             )
         )
-        self.parse_block_func = parse_block_func
 
     def _decode(self, sections, context, path):
         decoded = []
@@ -130,17 +111,16 @@ class UncompressedDataSections(Adapter):
             section = sections[i]
             decoded.append(
                 Container(
-                    data=section["data"],
-                    hash=hashlib.sha256(section["data"]).hexdigest(),
-                    size=len(section["data"]),
+                    data=section,
+                    hash=hashlib.sha256(section).hexdigest(),
+                    size=len(section),
                     id=i,
-                    decompressed=section["decompressed"],
                 )
             )
         return [ListContainer(decoded)]
 
     def _encode(self, sections, context, path):
-        return [{"data": section["data"]} for category in sections.values() for section in category]
+        return [section["data"] for category in sections.values() for section in category]
 
 
 _all_categories = [
@@ -163,8 +143,7 @@ class SectionCategoryAdapter(Adapter):
     def _decode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-
-            if section["size"] > 0 and section["decompressed"]:
+            if section["size"] > 0:
                 decoded = subcon._parse(io.BytesIO(section["data"]), context, path)
                 category[i]["data"] = decoded
         return category
@@ -172,8 +151,7 @@ class SectionCategoryAdapter(Adapter):
     def _encode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-
-            if section["size"] > 0 and section["decompressed"]:
+            if section["size"] > 0:
                 encoded = io.BytesIO()
                 subcon._build(section["data"], encoded, context, path)
                 category[i]["data"] = encoded.getvalue()
@@ -222,7 +200,7 @@ class SectionCategoryAdapter(Adapter):
                 end = _categories[i + 1]["value"]
             sections[c["label"]] = ListContainer(_sections[start:end])
 
-        GeometryCodec(sections["geometry_section"], context, path, encode=False, codec=self._decode_category)
+        # GeometryCodec(sections["geometry_section"], context, path, encode=False, codec=self._decode_category)
         for category, subcon in self._category_encodings().items():
             if category in sections or hasattr(sections, category):
                 self._decode_category(sections[category], subcon, context, path)
@@ -230,7 +208,8 @@ class SectionCategoryAdapter(Adapter):
         return sections
 
     def _encode(self, sections, context, path):
-        GeometryCodec(sections["geometry_section"], context, path, encode=True, codec=self._encode_category)
+        # FIXME: World Geometry is not building correctly
+        # GeometryCodec(sections["geometry_section"], context, path, encode=True, codec=self._encode_category)
         for category, subcon in self._category_encodings().items():
             if category in sections or hasattr(sections, category):
                 self._encode_category(sections[category], subcon, context, path)
@@ -239,41 +218,88 @@ class SectionCategoryAdapter(Adapter):
 
 
 class CompressedBlocksAdapter(SectionCategoryAdapter):
+    def __init__(self):
+        def get_size(ctx):
+            header = ctx._.headers[ctx._index]
+            if not header.compressed_size:
+                return header.uncompressed_size
+            return header.compressed_size + (-header.compressed_size % 32)
+        
+        super().__init__(AlignedStruct(32,
+            "headers" / PrefixedArray(
+                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                Struct(
+                    "buffer_size" / Int32ub,
+                    "uncompressed_size" / Int32ub,
+                    "compressed_size" / Int32ub,
+                    "data_section_count" / Int32ub,
+                ),
+            ),
+            "groups" / PrefixedArray(
+                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                FixedSized(get_size, GreedyBytes)
+            )
+        ))
+    
+    def _get_subcon(self, compressed_size, uncompressed_size, context):
+        if compressed_size:
+            return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
+        return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
+
+    def _decode(self, section_groups, context, path):
+        groups = section_groups.groups
+        for i in range(len(groups)):
+            header = section_groups.headers[i]
+            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
+            groups[i] = DataSectionGroupAdapter(subcon, header)._parsereport(io.BytesIO(groups[i]), context, path)
+
+        return super()._decode(groups, context, path)
+
+    def _start_new_group(self, group_size, section_size, curr_label, prev_label):
+        if group_size == 0:
+            return (False, "")
+        if group_size + section_size > 0x20000:
+            return (True, "Next section too big.")
+        if curr_label == "script_layers_section":
+            return (True, "New SCLY section.")
+        elif prev_label == "script_layers_section":
+            return (True, "Previous SCLY completed.")
+        if curr_label == "generated_script_objects_section":
+            return (True, "New SCGN section.")
+        elif prev_label == "generated_script_objects_section":
+            return (True, "Previous SCGN completed.")
+        return (False, "")
+
     def _encode(self, sections, context, path):
         sections = super()._encode(sections, context, path)
-
-        groups = []
+        
+        compressed_blocks = ListContainer()
 
         current_group_size = 0
-        current_group = []
+        current_group = ListContainer()
         previous_label = ""
 
         def add_group(r):
-            nonlocal current_group, current_group_size
+            nonlocal current_group_size, current_group
             # print(f"Group complete! {r} Group size: {current_group_size}")
-            groups.append(current_group)
+            compressed_blocks.append(Container(
+                header=Container(
+                    buffer_size=current_group_size,
+                    uncompressed_size=current_group_size,
+                    compressed_size=0,
+                    data_section_count=len(current_group)
+                ),
+                group=current_group,
+            ))
             current_group = []
             current_group_size = 0
 
         for cat_label, cat_sections in sorted(sections.items(), key=lambda item: item[1][0]["id"]):
             for section in cat_sections:
-
-                def start_new_group():
-                    if current_group_size == 0:
-                        return (False, "")
-                    if current_group_size + section["size"] > 0x20000:
-                        return (True, "Next section too big.")
-                    if cat_label == "script_layers_section":
-                        return (True, "New SCLY section.")
-                    elif previous_label == "script_layers_section":
-                        return (True, "Previous SCLY completed.")
-                    if cat_label == "generated_script_objects_section":
-                        return (True, "New SCGN section.")
-                    elif previous_label == "generated_script_objects_section":
-                        return (True, "Previous SCGN completed.")
-                    return (False, "")
-
-                start_new, reason = start_new_group()
+                start_new, reason = self._start_new_group(
+                    current_group_size, section["size"],
+                    previous_label, cat_label
+                )
                 if start_new:
                     add_group(reason)
 
@@ -281,67 +307,30 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
                 current_group_size += section["size"]
 
             previous_label = cat_label
-
         add_group("Final group.")
 
-        return groups
+        for block in compressed_blocks:
+            group = block.group
+            header = block.header
 
+            group = DataSectionGroupAdapter(Pass, header)._encode(group, context, path)
 
-def CompressedBlocks(parse_block_func):
-    return Aligned(
-        32, Array(this.header.compressed_block_count, DataSectionGroupAdapter(DataSectionGroup(parse_block_func)))
-    )
+            substream = io.BytesIO()
+            LZOCompressedBlock(header.uncompressed_size)._build(group, substream, context, path)
+            compressed_size = len(substream.getvalue())
+            if compressed_size < header.uncompressed_size:
+                header.compressed_size = compressed_size
+                header.buffer_size += 0x120
+            
+            substream = io.BytesIO()
+            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
+            subcon._build(group, substream, context, path)
+            block.group = substream.getvalue()
 
-
-def _previous_sections_group(this):
-    return sum([header.section_count for header in this._root.headers[0 : this._index]])
-
-
-def _previous_sections_uncompressed(this):
-    return this._index
-
-
-def _previous_sections(this):
-    if int(this._root.version) <= MREAVersion.Prime:
-        return _previous_sections_uncompressed(this)
-    return _previous_sections_group(this)
-
-
-def IncludeCategories(*categories):
-    def find_next_category(category, this):
-        root = this._root
-        cat_index = root.header[category]
-        next_index = root.header.data_section_count
-
-        for category in root.header.categories:
-            index = root.header[category]
-            if cat_index < index < next_index:
-                next_index = index
-
-        return next_index
-
-    def _inclusion(this):
-        root = this._root
-        previous_sections = _previous_sections(this)
-
-        for category in categories:
-            if root.header[category] != None and root.header[category] <= previous_sections < find_next_category(
-                category, this
-            ):
-                return True
-        return False
-
-    return _inclusion
-
-
-def IncludeScriptLayers(this):
-    """Parses only SCLY and SCGN sections."""
-    return IncludeCategories("script_layers_section", "generated_script_objects_section")(this)
-
-
-def IncludeAssetIdLayers(this):
-    """Parses only sections which hold single Asset IDs."""
-    return IncludeCategories("path_section", "portal_area_section", "static_geometry_map_section")(this)
+        return Container(
+            headers=[block.header for block in compressed_blocks],
+            groups=[block.group for block in compressed_blocks]
+        )
 
 
 def _used_categories(this):
@@ -395,60 +384,33 @@ def MREAHeader():
         "static_geometry_map_section"
         / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("static_geometry_map_section"))),
         # Number of compressed data blocks in the file.
-        "compressed_block_count" / WithVersion(MREAVersion.Echoes, Aligned(16, Rebuild(Int32ub, len_(this._.headers)))),
-        # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-        "data_section_sizes"
-        / Aligned(
-            32,
-            DataSectionSizes(
-                this._.data_section_count,
-                True,
-                lambda this: sorted(
-                    [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
-                )[this._index]["size"],
-            ),
-        ),
+        "compressed_block_count_addr" / WithVersion(MREAVersion.Echoes, Tell),
+        WithVersion(MREAVersion.Echoes, Skip(1, Int32ub)),
         "categories" / Computed(_used_categories),
     )
 
+MREA = AlignedStruct(32,
+    "_current_section" / Computed(0),
 
-def _MREA(parse_block_func=IncludeScriptLayers):
-    fields = [
-        "header" / Aligned(32, MREAHeader()),
-        "_current_section" / Computed(0),
-        "version" / Computed(this.header.version),
-        # Sections. Each group is compressed separately
-        "headers"
-        / WithVersion(
-            MREAVersion.Echoes,
-            Aligned(
-                32,
-                Array(
-                    this.header.compressed_block_count,
-                    Struct(
-                        "address" / Tell,
-                        # TODO: all of these should be rebuilt
-                        "buffer_size" / Int32ub,
-                        "uncompressed_size" / Int32ub,
-                        "compressed_size" / Int32ub,
-                        "section_count" / Int32ub,
-                    ),
-                ),
-            ),
-        ),
-        # FIXME: recompression doesn't match with original when building
-        "sections"
-        / WithVersionElse(
-            MREAVersion.Echoes,
-            CompressedBlocksAdapter(CompressedBlocks(parse_block_func)),
-            SectionCategoryAdapter(UncompressedDataSections(parse_block_func)),
-        ),
-    ]
+    "header" / MREAHeader(),
+    "version" / Computed(this.header.version),
 
-    return Struct(*fields)
+    # Array containing the size of each data section in the file. Every size is always a multiple of 32.
+    "data_section_sizes" / DataSectionSizes(
+        this._.header.data_section_count,
+        True,
+        lambda this: sorted(
+            [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
+        )[this._index]["size"],
+    ),
 
-
-MREA = _MREA()
+    "sections"
+    / WithVersionElse(
+        MREAVersion.Echoes,
+        CompressedBlocksAdapter(),
+        SectionCategoryAdapter(UncompressedDataSections())
+    ),
+)
 
 
 class Mrea:
