@@ -16,7 +16,7 @@ def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fal
     if save_file:
         file_path.parent.joinpath(save_file).write_bytes(encoded)
 
-    return (raw, encoded, data)
+    return raw, encoded, data
 
 
 def parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=None):
@@ -32,6 +32,7 @@ def parse_and_build_compare_parsed(module, game: Game, file_path: Path, print_da
         print(data2)
 
     assert purge_hidden(data) == purge_hidden(data2)
+
 
 def purge_hidden(data: Container) -> Container:
     data = {k: v for k, v in data.items() if not k.startswith("_")}

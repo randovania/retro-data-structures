@@ -1,11 +1,11 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
+import copy
 import hashlib
 import io
 from enum import IntEnum
 from typing import Iterator
-import construct
 
 from construct.core import (
     Adapter,
@@ -30,7 +30,6 @@ from construct.core import (
     len_,
     this,
 )
-
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
@@ -58,9 +57,6 @@ class MREAVersion(IntEnum):
     DonkeyKongCountryReturns = 0x20
 
 
-from retro_data_structures.formats.world_geometry import GeometryCodec
-
-
 class DataSectionGroupAdapter(Adapter):
     def __init__(self, subcon, header):
         super().__init__(subcon)
@@ -74,7 +70,7 @@ class DataSectionGroupAdapter(Adapter):
             section_id = GetDataSectionId(context)
             section_size = GetDataSectionSize(context)
 
-            data = group[offset : offset + section_size]
+            data = group[offset: offset + section_size]
 
             sections.append(
                 Container(
@@ -90,7 +86,8 @@ class DataSectionGroupAdapter(Adapter):
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return b"".join([section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
+        return b"".join(
+            [section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
 
 
 class UncompressedDataSections(Adapter):
@@ -141,21 +138,31 @@ _all_categories = [
 
 class SectionCategoryAdapter(Adapter):
     def _decode_category(self, category, subcon, context, path):
-        for i in range(len(category)):
-            section = category[i]
+        result = ListContainer()
+
+        for section in category:
+            item = copy.deepcopy(section)
+            result.append(item)
+
             if section["size"] > 0:
                 decoded = subcon._parse(io.BytesIO(section["data"]), context, path)
-                category[i]["data"] = decoded
-        return category
+                item["data"] = decoded
+
+        return result
 
     def _encode_category(self, category, subcon, context, path):
-        for i in range(len(category)):
-            section = category[i]
+        result = ListContainer()
+
+        for section in category:
+            item = copy.deepcopy(section)
+            result.append(item)
+
             if section["size"] > 0:
                 encoded = io.BytesIO()
                 subcon._build(section["data"], encoded, context, path)
-                category[i]["data"] = encoded.getvalue()
-        return category
+                item["data"] = encoded.getvalue()
+
+        return result
 
     def _category_encodings(self):
         return {
@@ -203,18 +210,20 @@ class SectionCategoryAdapter(Adapter):
         # GeometryCodec(sections["geometry_section"], context, path, encode=False, codec=self._decode_category)
         for category, subcon in self._category_encodings().items():
             if category in sections or hasattr(sections, category):
-                self._decode_category(sections[category], subcon, context, path)
+                sections[category] = self._decode_category(sections[category], subcon, context, path)
 
         return sections
 
     def _encode(self, sections, context, path):
         # FIXME: World Geometry is not building correctly
         # GeometryCodec(sections["geometry_section"], context, path, encode=True, codec=self._encode_category)
+        result = {}
+
         for category, subcon in self._category_encodings().items():
             if category in sections or hasattr(sections, category):
-                self._encode_category(sections[category], subcon, context, path)
+                result[category] = self._encode_category(sections[category], subcon, context, path)
 
-        return sections
+        return result
 
 
 class CompressedBlocksAdapter(SectionCategoryAdapter):
@@ -224,36 +233,39 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
             if not header.compressed_size:
                 return header.uncompressed_size
             return header.compressed_size + (-header.compressed_size % 32)
-        
+
         super().__init__(AlignedStruct(32,
-            "headers" / PrefixedArray(
-                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                Struct(
-                    "buffer_size" / Int32ub,
-                    "uncompressed_size" / Int32ub,
-                    "compressed_size" / Int32ub,
-                    "data_section_count" / Int32ub,
-                ),
-            ),
-            "groups" / PrefixedArray(
-                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                FixedSized(get_size, GreedyBytes)
-            )
-        ))
-    
+                                       "headers" / PrefixedArray(
+                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                                           Struct(
+                                               "buffer_size" / Int32ub,
+                                               "uncompressed_size" / Int32ub,
+                                               "compressed_size" / Int32ub,
+                                               "data_section_count" / Int32ub,
+                                           ),
+                                       ),
+                                       "groups" / PrefixedArray(
+                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                                           FixedSized(get_size, GreedyBytes)
+                                       )
+                                       ))
+
     def _get_subcon(self, compressed_size, uncompressed_size, context):
         if compressed_size:
             return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
         return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
 
     def _decode(self, section_groups, context, path):
-        groups = section_groups.groups
-        for i in range(len(groups)):
-            header = section_groups.headers[i]
-            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
-            groups[i] = DataSectionGroupAdapter(subcon, header)._parsereport(io.BytesIO(groups[i]), context, path)
+        result = ListContainer()
 
-        return super()._decode(groups, context, path)
+        for header, group in zip(section_groups.headers, section_groups.groups):
+            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
+
+            result.append(
+                DataSectionGroupAdapter(subcon, header)._parsereport(io.BytesIO(group), context, path)
+            )
+
+        return super()._decode(result, context, path)
 
     def _start_new_group(self, group_size, section_size, curr_label, prev_label):
         if group_size == 0:
@@ -272,7 +284,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
 
     def _encode(self, sections, context, path):
         sections = super()._encode(sections, context, path)
-        
+
         compressed_blocks = ListContainer()
 
         current_group_size = 0
@@ -321,7 +333,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
             if compressed_size < header.uncompressed_size:
                 header.compressed_size = compressed_size
                 header.buffer_size += 0x120
-            
+
             substream = io.BytesIO()
             subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
             subcon._build(group, substream, context, path)
@@ -389,7 +401,9 @@ def MREAHeader():
         "categories" / Computed(_used_categories),
     )
 
-MREA = AlignedStruct(32,
+
+MREA = AlignedStruct(
+    32,
     "_current_section" / Computed(0),
 
     "header" / MREAHeader(),
