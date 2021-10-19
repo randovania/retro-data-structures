@@ -26,7 +26,7 @@ def DataSectionSizes(section_count, include_value=False, rebuildfunc=lambda this
 
 
 def GetDataSectionSize(context):
-    return context._root.header.data_section_sizes.value[_get_current_section(context)]
+    return context._root.data_section_sizes.value[_get_current_section(context)]
 
 
 def GetDataSectionId(context):
