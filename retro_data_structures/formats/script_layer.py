@@ -1,3 +1,5 @@
+from typing import Optional
+
 from construct.core import (
     Const,
     Hex,
@@ -70,3 +72,13 @@ class ScriptLayerHelper:
     def instances(self):
         for instance in self._raw.script_instances:
             yield ScriptInstanceHelper(instance, self.target_game)
+
+    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
+        for instance in self.instances:
+            if instance.id == instance_id:
+                return instance
+
+    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+        for instance in self.instances:
+            if instance.name == name:
+                return instance

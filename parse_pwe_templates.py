@@ -43,21 +43,24 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
     default_value_types = {
-        "Int": lambda el: int(el.text, 10),
+        "Int": lambda el: int(el.text, 10) & 0xFFFFFFFF,
         "Float": lambda el: float(el.text),
         "Bool": lambda el: el.text == "true",
-        "Short": lambda el: int(el.text, 10),
+        "Short": lambda el: int(el.text, 10) & 0xFFFF,
         "Color": lambda el: {e.tag: float(e.text) for e in el},
         "Vector": lambda el: {e.tag: float(e.text) for e in el},
-        "Flags": lambda el: int(el.text, 10),
-        "Choice": lambda el: int(el.text, 10),
-        "Enum": lambda el: int(el.text, 16)
+        "Flags": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Choice": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Enum": lambda el: int(el.text, 16) & 0xFFFFFFFF,
+        "Sound": lambda el: int(el.text, 10) & 0xFFFFFFFF,
     }
 
     default_value = None
+    has_default = False
     if (default_value_element := element.find("DefaultValue")) is not None:
         default_value = default_value_types.get(element.attrib["Type"], lambda el: el.text)(default_value_element)
-    return {"default_value": default_value}
+        has_default = True
+    return {"has_default": has_default, "default_value": default_value}
 
 
 def _prop_struct(element: Element, game_id: str, path: Path) -> dict:
@@ -95,9 +98,11 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
     if include_id:
         parsed.update({"id": int(element.attrib["ID"], 16)})
     name = element.find("Name")
+    cook = element.find("CookPreference")
     parsed.update({
         "type": element.attrib["Type"],
-        "name": name.text if name is not None and name.text is not None else ""
+        "name": name.text if name is not None and name.text is not None else "",
+        "cook_preference": cook.text if cook is not None and cook.text is not None else "Always"
     })
 
     property_type_extras = {
