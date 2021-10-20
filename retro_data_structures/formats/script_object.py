@@ -7,7 +7,7 @@ from typing import Iterator
 
 import construct
 from construct import Container
-from construct.core import Adapter, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct
+from construct.core import Adapter, BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct, Union
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
@@ -55,7 +55,15 @@ ScriptInstance = Struct(
     instance=Prefixed(
         _prefix,
         Struct(
-            id=Hex(Int32ub),  # TODO: Union
+            id=Union(
+                "raw",
+                "raw" / Hex(Int32ub),
+                "parts" / BitStruct(
+                    "layer" / BitsInteger(6),
+                    "area" / BitsInteger(10),
+                    "instance" / BitsInteger(16)
+                )
+            ),
             connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
             # base_property=ScriptInstanceAdapter(ThisTypeAsString),
             base_property=GreedyBytes,
@@ -78,6 +86,20 @@ class ScriptInstanceHelper:
     def __eq__(self, other):
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
+    @classmethod
+    def new_instance(cls, target_game: Game, instance_type):
+        prop_construct = GetPropertyConstruct(target_game, instance_type, True)
+        # TODO: make this less ugly lmao
+        raw = ScriptInstance.parse(ScriptInstance.build({
+            "type": instance_type,
+            "instance": {
+                "id": {"raw": 0},
+                "connections": [],
+                "base_property": prop_construct.build({}, target_game=target_game)
+            }
+        }, target_game=target_game), target_game=target_game)
+        return cls(raw, target_game)
+
     @property
     def type(self) -> str:
         return self._raw.type
@@ -91,7 +113,7 @@ class ScriptInstanceHelper:
 
     @property
     def id(self) -> int:
-        return self._raw.instance.id
+        return self._raw.instance.id.raw
 
     @property
     def name(self) -> str:
@@ -117,3 +139,14 @@ class ScriptInstanceHelper:
         for name in chain:
             prop = prop[name]
         return prop
+    
+    @property
+    def connections(self):
+        return self._raw.instance.connections
+
+    def add_connection(self, state, message, target: "ScriptInstanceHelper"):
+        self.connections.append(Container(
+            state=state,
+            message=message,
+            target=target.id
+        ))

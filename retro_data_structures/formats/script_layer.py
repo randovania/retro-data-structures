@@ -70,3 +70,9 @@ class ScriptLayerHelper:
     def instances(self):
         for instance in self._raw.script_instances:
             yield ScriptInstanceHelper(instance, self.target_game)
+
+    def get_instance(self, instance_id) -> ScriptInstanceHelper:
+        return next((instance for instance in self.instances if instance.id == instance_id), None)
+
+    def get_instance_by_name(self, name) -> ScriptInstanceHelper:
+        return next((instance for instance in self.instances if instance.name == name), None)
