@@ -44,6 +44,7 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
+from retro_data_structures.formats.script_object import ScriptInstanceHelper
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
@@ -432,3 +433,9 @@ class Mrea:
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
         for section in self._raw.sections.script_layers_section:
             yield ScriptLayerHelper(section["data"], self.target_game)
+    
+    def get_instance(self, instance_id) -> ScriptInstanceHelper:
+        return next(filter(None, (layer.get_instance(instance_id) for layer in self.script_layers)))
+
+    def get_instance_by_name(self, name) -> ScriptInstanceHelper:
+        return next(filter(None, (layer.get_instance_by_name(name) for layer in self.script_layers)))
