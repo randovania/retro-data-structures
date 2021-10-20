@@ -4,8 +4,7 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 import hashlib
 import io
 from enum import IntEnum
-from typing import Iterator
-import construct
+from typing import Iterator, Optional
 
 from construct.core import (
     Adapter,
@@ -30,7 +29,6 @@ from construct.core import (
     len_,
     this,
 )
-
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
@@ -59,9 +57,6 @@ class MREAVersion(IntEnum):
     DonkeyKongCountryReturns = 0x20
 
 
-from retro_data_structures.formats.world_geometry import GeometryCodec
-
-
 class DataSectionGroupAdapter(Adapter):
     def __init__(self, subcon, header):
         super().__init__(subcon)
@@ -75,7 +70,7 @@ class DataSectionGroupAdapter(Adapter):
             section_id = GetDataSectionId(context)
             section_size = GetDataSectionSize(context)
 
-            data = group[offset : offset + section_size]
+            data = group[offset: offset + section_size]
 
             sections.append(
                 Container(
@@ -91,7 +86,8 @@ class DataSectionGroupAdapter(Adapter):
         return ListContainer(sections)
 
     def _encode(self, group, context, path):
-        return b"".join([section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
+        return b"".join(
+            [section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
 
 
 class UncompressedDataSections(Adapter):
@@ -225,23 +221,23 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
             if not header.compressed_size:
                 return header.uncompressed_size
             return header.compressed_size + (-header.compressed_size % 32)
-        
+
         super().__init__(AlignedStruct(32,
-            "headers" / PrefixedArray(
-                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                Struct(
-                    "buffer_size" / Int32ub,
-                    "uncompressed_size" / Int32ub,
-                    "compressed_size" / Int32ub,
-                    "data_section_count" / Int32ub,
-                ),
-            ),
-            "groups" / PrefixedArray(
-                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                FixedSized(get_size, GreedyBytes)
-            )
-        ))
-    
+                                       "headers" / PrefixedArray(
+                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                                           Struct(
+                                               "buffer_size" / Int32ub,
+                                               "uncompressed_size" / Int32ub,
+                                               "compressed_size" / Int32ub,
+                                               "data_section_count" / Int32ub,
+                                           ),
+                                       ),
+                                       "groups" / PrefixedArray(
+                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                                           FixedSized(get_size, GreedyBytes)
+                                       )
+                                       ))
+
     def _get_subcon(self, compressed_size, uncompressed_size, context):
         if compressed_size:
             return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
@@ -273,7 +269,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
 
     def _encode(self, sections, context, path):
         sections = super()._encode(sections, context, path)
-        
+
         compressed_blocks = ListContainer()
 
         current_group_size = 0
@@ -322,7 +318,7 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
             if compressed_size < header.uncompressed_size:
                 header.compressed_size = compressed_size
                 header.buffer_size += 0x120
-            
+
             substream = io.BytesIO()
             subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
             subcon._build(group, substream, context, path)
@@ -390,28 +386,29 @@ def MREAHeader():
         "categories" / Computed(_used_categories),
     )
 
+
 MREA = AlignedStruct(32,
-    "_current_section" / Computed(0),
+                     "_current_section" / Computed(0),
 
-    "header" / MREAHeader(),
-    "version" / Computed(this.header.version),
+                     "header" / MREAHeader(),
+                     "version" / Computed(this.header.version),
 
-    # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-    "data_section_sizes" / DataSectionSizes(
-        this._.header.data_section_count,
-        True,
-        lambda this: sorted(
-            [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
-        )[this._index]["size"],
-    ),
+                     # Array containing the size of each data section in the file. Every size is always a multiple of 32.
+                     "data_section_sizes" / DataSectionSizes(
+                         this._.header.data_section_count,
+                         True,
+                         lambda this: sorted(
+                             [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
+                         )[this._index]["size"],
+                     ),
 
-    "sections"
-    / WithVersionElse(
-        MREAVersion.Echoes,
-        CompressedBlocksAdapter(),
-        SectionCategoryAdapter(UncompressedDataSections())
-    ),
-)
+                     "sections"
+                     / WithVersionElse(
+                         MREAVersion.Echoes,
+                         CompressedBlocksAdapter(),
+                         SectionCategoryAdapter(UncompressedDataSections())
+                     ),
+                     )
 
 
 class Mrea:
@@ -433,9 +430,13 @@ class Mrea:
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
         for section in self._raw.sections.script_layers_section:
             yield ScriptLayerHelper(section["data"], self.target_game)
-    
-    def get_instance(self, instance_id) -> ScriptInstanceHelper:
-        return next(filter(None, (layer.get_instance(instance_id) for layer in self.script_layers)))
 
-    def get_instance_by_name(self, name) -> ScriptInstanceHelper:
-        return next(filter(None, (layer.get_instance_by_name(name) for layer in self.script_layers)))
+    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
+        for layer in self.script_layers:
+            if (instance := layer.get_instance(instance_id)) is not None:
+                return instance
+
+    def get_instance_by_name(self, name: str) -> Optional[ScriptInstanceHelper]:
+        for layer in self.script_layers:
+            if (instance := layer.get_instance_by_name(name)) is not None:
+                return instance

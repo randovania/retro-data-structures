@@ -7,7 +7,10 @@ from typing import Iterator
 
 import construct
 from construct import Container
-from construct.core import Adapter, BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed, PrefixedArray, Struct, Union
+from construct.core import (
+    Adapter, BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
+    PrefixedArray, Struct, Union,
+)
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
@@ -103,12 +106,12 @@ class ScriptInstanceHelper:
     @property
     def type(self) -> str:
         return self._raw.type
-    
+
     @property
     def type_name(self) -> str:
         try:
             return self.get_properties()["_name"]
-        except:
+        except Exception:
             return self.type
 
     @property
@@ -139,7 +142,7 @@ class ScriptInstanceHelper:
         for name in chain:
             prop = prop[name]
         return prop
-    
+
     @property
     def connections(self):
         return self._raw.instance.connections
