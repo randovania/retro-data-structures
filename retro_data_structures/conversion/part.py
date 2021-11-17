@@ -32,173 +32,59 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
 
             if element["type"] == "VMPC":
                 data["elements"].remove(element)
-
+                
             if element["type"] == "EMTR":
                 if element["body"]["type"] == "SEMR":
-                    if element["body"]["body"]["a"]["type"] == "RNDV":
-                        if element["body"]["body"]["a"]["body"]["type"] == "RAND":
-                            element["body"]["body"]["a"] = {
-                                "type": "CNST",
+                    if (
+                        element["body"]["body"]["a"]["type"] == "RNDV"
+                        and element["body"]["body"]["b"]["type"] == "RNDV"
+                    ):
+                        element["body"]["type"] = "SPHE"
+                        element["body"]["body"] = {
+                            "a": {
+                                "type": "RTOV",
+                                "body" : {
+                                    "type": "CNST",
+                                    "body": 0,
+                                },
+                            },
+                            "b": element["body"]["body"]["a"]["body"],
+                            "c": {
+                                "type": "RAND",
                                 "body": {
                                     "a": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
+                                        "type": "CNST",
+                                        "body": 0,
                                     },
-                                    "b": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "c": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
-                                    },
+                                    "b": element["body"]["body"]["b"]["body"],
                                 },
-                            }
-                        else:
-                            element["body"]["body"]["a"] = {
-                                "type": "CNST",
+                            },
+                        }
+                    if (
+                        element["body"]["body"]["a"]["type"] == "RNDV"
+                        and element["body"]["body"]["b"]["type"] == "CNST"
+                    ):
+                        element["body"]["type"] = "SPHE"
+                        element["body"]["body"] = {
+                            "a": {
+                                "type": "RTOV",
+                                "body": {
+                                    "type": "CNST",
+                                    "body": 0
+                                }
+                            },
+                            "b": element["body"]["body"]["a"]["body"],
+                            "c": {
+                                "type": "RAND",
                                 "body": {
                                     "a": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"],
-                                            },
-                                        },
+                                        "type": "CNST",
+                                        "body": 0
                                     },
-                                    "b": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "c": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["a"]["body"]["body"],
-                                            },
-                                        },
-                                    },
-                                },
+                                    "b": element["body"]["body"]["b"]["body"]["a"]
+                                }
                             }
-                    if element["body"]["body"]["b"]["type"] == "RNDV":
-                        if element["body"]["body"]["b"]["body"]["type"] == "RAND":
-                            element["body"]["body"]["b"] = {
-                                "type": "CNST",
-                                "body": {
-                                    "a": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "b": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "c": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["a"]["body"],
-                                            },
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"]["b"]["body"],
-                                            },
-                                        },
-                                    },
-                                },
-                            }
-                        else:
-                            element["body"]["body"]["b"] = {
-                                "type": "CNST",
-                                "body": {
-                                    "a": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "b": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"],
-                                            },
-                                        },
-                                    },
-                                    "c": {
-                                        "type": "RAND",
-                                        "body": {
-                                            "a": {"type": "CNST", "body": 0},
-                                            "b": {
-                                                "type": "CNST",
-                                                "body": element["body"]["body"]["b"]["body"]["body"],
-                                            },
-                                        },
-                                    },
-                                },
-                            }
+                        }
                 if element["body"]["type"] == "ELPS":
                     element["body"]["type"] = "SPHE"
                     element["body"]["body"]["b"] = element["body"]["body"]["b"]["body"]["a"]
@@ -217,30 +103,16 @@ def downgrade(data, converter: AssetConverter, source_game: Game):
                         new_colr_cnst_a_keyp_b = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_c = copy.deepcopy(element["body"]["body"]["a"])
                         new_colr_cnst_a_keyp_d = copy.deepcopy(element["body"]["body"]["a"])
-                        new_colr_cnst_a_keyp_a["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_b["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_c["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
-                        new_colr_cnst_a_keyp_d["body"]["keys"] = [None] * len(
-                            element["body"]["body"]["a"]["body"]["keys"]
-                        )
+                        new_colr_cnst_a_keyp_a["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_b["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_c["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
+                        new_colr_cnst_a_keyp_d["body"]["keys"] = [None] * len(element["body"]["body"]["a"]["body"]["keys"])
                         element["body"]["body"]["a"]["type"] = "CNST"
-                        for i, key in enumerate(org_colr_mado_a_keye):
-                            for j, t in enumerate(
-                                (
-                                    new_colr_cnst_a_keyp_a,
-                                    new_colr_cnst_a_keyp_b,
-                                    new_colr_cnst_a_keyp_c,
-                                    new_colr_cnst_a_keyp_d,
-                                )
-                            ):
-                                t["body"]["keys"][i] = key[j]
-
+                        for i,key in enumerate(org_colr_mado_a_keye):
+                            new_colr_cnst_a_keyp_a["body"]["keys"][i] = key[0]
+                            new_colr_cnst_a_keyp_b["body"]["keys"][i] = key[1]
+                            new_colr_cnst_a_keyp_c["body"]["keys"][i] = key[2]
+                            new_colr_cnst_a_keyp_d["body"]["keys"][i] = key[3]
                         element["body"]["body"]["a"]["body"] = {
                             "a": new_colr_cnst_a_keyp_a,
                             "b": new_colr_cnst_a_keyp_b,
