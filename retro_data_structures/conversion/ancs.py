@@ -90,6 +90,10 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
         character["unknown_2"] = 0
         character["unknown_3"] = 0
         _convert_character(character, converter, Game.PRIME)
+        if character["frozen_model"] == 0:
+            character["frozen_model"] = 0xFFFFFFFF
+        if character["frozen_skin"] == 0:
+            character["frozen_skin"] = 0xFFFFFFFF
         character["indexed_animation_aabb_array"] = ListContainer(character["animation_aabb_array"])
         for i, aabb_array in enumerate(character["indexed_animation_aabb_array"]):
             aabb_array["id"] = i
@@ -124,6 +128,10 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
             animation_name["unknown"] = ""
         character["unknown_1"] = 1
         _convert_character(character, converter, Game.ECHOES)
+        if character["frozen_model"] == 0xFFFFFFFF:
+            character["frozen_model"] = 0
+        if character["frozen_skin"] == 0xFFFFFFFF:
+            character["frozen_skin"] = 0
 
     _convert_meta_animations(data, converter, Game.ECHOES)
 
