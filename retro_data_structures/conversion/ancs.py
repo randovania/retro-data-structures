@@ -133,6 +133,9 @@ def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetC
         if character["frozen_skin"] == 0xFFFFFFFF:
             character["frozen_skin"] = 0
 
+    if details.asset_id == 0x41C2513F:
+        del data["animation_set"]["event_sets"][1]
+
     _convert_meta_animations(data, converter, Game.ECHOES)
 
     data["animation_set"]["animation_resources"] = []
