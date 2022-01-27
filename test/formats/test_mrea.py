@@ -8,7 +8,7 @@ from retro_data_structures.game_check import Game
 from test import test_lib
 
 _mrea_path_p1 = "Resources/Worlds/EndCinema/!EndCinema_Master/01_endcinema.MREA"
-_mrea_path_p2 = "Resources/Worlds/TempleHub/!TempleHub_Master/game_end_part5.MREA"
+_mrea_path_p2 = "Resources/Worlds/SandWorld/!SandWorld_Master/00_pickup_sand_d_dark.MREA"
 
 
 @pytest.fixture(name="p1_mrea_path")

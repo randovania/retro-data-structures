@@ -3,13 +3,13 @@ https://wiki.axiodl.com/w/STRG_(File_Format)
 """
 import typing
 
-import construct
 from construct import (
     Array,
     Byte,
     Computed,
     Const,
     CString,
+    Construct,
     Enum,
     GreedyRange,
     Pointer,
@@ -20,11 +20,11 @@ from construct import (
     this,
 )
 from construct import Struct, Int32ub, If
+import construct
 
 from retro_data_structures.adapters.offset import OffsetAdapter
-from retro_data_structures.common_types import FourCC
-from retro_data_structures.common_types import String
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import FourCC, String
 from retro_data_structures.game_check import Game
 
 
@@ -158,7 +158,7 @@ CorruptionString = Struct(
     "string" / String,
     "_size_end" / Tell,
     "size" / Pointer(this._start, Rebuild(Int32ub, this._size_end - this._size_start)),
-)
+)     
 
 STRG = Struct(
     "magic" / Const(0x87654321, Int32ub),
@@ -198,3 +198,64 @@ class Strg(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []
+    
+    def get_strings(self, language: str) -> typing.Iterator[str]:
+        found = False
+
+        if self._raw.prime3:
+            for i, lang in enumerate(self._raw.language_ids):
+                if lang != language:
+                    continue
+                for offset in self._raw.corruption_language_table[i].offsets:
+                    yield self._raw.string_table[offset].string
+                found = True
+                break
+        
+        else:
+            for i, lang in enumerate(self._raw.language_table):
+                if lang.lang != language:
+                    continue
+                for string in self._raw.string_tables[i].strings:
+                    yield string.string
+                found = True
+                break
+        
+        if not found:
+            raise ValueError(f"No language {language} found in STRG")
+    
+    def set_strings(self, language: str, strings: list[str]):
+        found = False
+
+        if self._raw.prime3:
+            for i, lang in enumerate(self._raw.language_ids):
+                if lang != language:
+                    continue
+                for j, offset in enumerate(self._raw.corruption_language_table[i].offsets):
+                    self._raw.string_table[offset].string = strings[j]
+                found = True
+                break
+        
+        else:
+            for i, lang in enumerate(self._raw.language_table):
+                if lang.lang != language:
+                    continue
+                for j, string in enumerate(self._raw.string_tables[i].strings):
+                    string.string = strings[j]
+                found = True
+                break
+        
+        if not found:
+            raise ValueError(f"No language {language} found in STRG")
+            
+    @property
+    def strings(self) -> list[str]:
+        return list(self.get_strings("ENGL"))
+    
+    @strings.setter
+    def strings(self, value: list[str]):
+        self.set_strings("ENGL", value)
+    
+    def set_string(self, index: int, value: str, *, language: str = "ENGL"):
+        strings = self.get_strings(language)
+        strings[index] = value
+        self.set_strings(language, strings)

@@ -1,8 +1,12 @@
+from __future__ import annotations
 import typing
 
 from construct import Construct, Container
 
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 AssetType = str
 AssetId = int
@@ -17,10 +21,12 @@ class Dependency(typing.NamedTuple):
 class BaseResource:
     _raw: Container
     target_game: Game
+    asset_manager: AssetManager
 
-    def __init__(self, raw: Container, target_game: Game):
+    def __init__(self, raw: Container, target_game: Game, asset_manager: typing.Optional[AssetManager] = None):
         self._raw = raw
         self.target_game = target_game
+        self.asset_manager = asset_manager
 
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
@@ -31,9 +37,9 @@ class BaseResource:
         raise NotImplementedError()
 
     @classmethod
-    def parse(cls, data: bytes, target_game: Game) -> "BaseResource":
+    def parse(cls, data: bytes, target_game: Game, asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
-                   target_game)
+                   target_game, asset_manager)
 
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
