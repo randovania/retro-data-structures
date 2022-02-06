@@ -34,13 +34,14 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
         )
 
         for key in data["anim"]["animation_keys"]:
-            key["channels"].append(
-                {
-                    "rotation": None,
-                    "translation": None,
-                    "scale": None,
-                }
-            )
+            if key["channels"] is not None:
+                key["channels"].append(
+                    {
+                        "rotation": None,
+                        "translation": None,
+                        "scale": None,
+                    }
+                )
 
     neworder = sorted(
         range(len(data["anim"]["bone_channel_descriptors"])),
