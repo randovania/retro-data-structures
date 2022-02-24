@@ -110,7 +110,7 @@ def dependencies_for(obj, target_game: Game):
     yield from _yield_dependency_if_valid(obj.model_id, "CMDL", target_game)
     yield from _yield_dependency_if_valid(obj.skin_id, "CSKR", target_game)
     yield from _yield_dependency_if_valid(obj.skeleton_id, "CINF", target_game)
-    yield from _yield_dependency_if_valid(obj.spatial_primitives_id, "CSPP", target_game)
+    yield from _yield_dependency_if_valid(obj.sand_id, "SAND", target_game)
 
     # ParticleResourceData
     psd = obj.particle_resource_data
@@ -120,7 +120,11 @@ def dependencies_for(obj, target_game: Game):
     _yield_dependency_array(psd.spawn_particles, "SPSC", target_game)
     _yield_dependency_array(obj.sound_resources, "CAUD", target_game)
 
-    #Overlays
+    # Overlays
     for overlay in obj.overlays:
         yield from _yield_dependency_if_valid(overlay.model_id, "CMDL", target_game)
         yield from _yield_dependency_if_valid(overlay.skin_id, "CSKR", target_game)
+
+    # Animations
+    for animation in obj.animation_aabb_array:
+        yield from _yield_dependency_if_valid(animation.anim_id, "ANIM", target_game)
