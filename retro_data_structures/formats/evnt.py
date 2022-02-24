@@ -1,7 +1,9 @@
-from construct import Struct, Int32ub, PrefixedArray, Int16ub, Byte, Float32b, If, Int32sb, Hex
+import construct
+from construct import Struct, Int64ub, Int32ub, PrefixedArray, Array, Int16ub, Int8ub, Byte, Float32b, If, IfThenElse, Int32sb, Hex, Switch
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import String, CharAnimTime
+from retro_data_structures.game_check import Game
+from retro_data_structures.common_types import String, CharAnimTime, MayaSpline
 from retro_data_structures.construct_extensions.version import WithVersion
 
 BasePOINode = Struct(
@@ -34,26 +36,38 @@ BoolPOINode = Struct(
 
 Int32POINode = Struct(
     base=BasePOINode,
-    value=Int32sb,
-    locator_name=String,
+    value=If(game_check.current_game_at_most(Game.ECHOES),Int32sb),
+    locator_name=If(game_check.current_game_at_most(Game.ECHOES),String),
+    corruption=If(game_check.is_prime3,
+        Struct(
+            unk_a=Int8ub,
+            unk_b=Int16ub,
+            unk_c=Int16ub,
+        ),
+    ),
 )
 
 ParticlePOINode = Struct(
-    # TODO: prime 3 stuff
     base=BasePOINode,
-    duration=Int32ub,
+    duration=If(game_check.current_game_at_most(Game.ECHOES),Int32ub),
     particle=game_check.ObjectTagCorrect,
     bone_name=If(game_check.is_prime1, String),
     bone_id=If(game_check.is_prime2, Int32ub),
-    effect_scale=Float32b,
-    transform_type=Int32ub,
+    effect_scale=If(game_check.current_game_at_most(Game.ECHOES),Float32b),
+    transform_type=If(game_check.current_game_at_most(Game.ECHOES),Int32ub),
+    unk_float=If(game_check.is_prime3, Float32b),
+    unk_id=If(game_check.is_prime3, Int32ub),
 )
 
 SoundPOINode = Struct(
     base=BasePOINode,
-    sound_id=Hex(Int32ub),
-    fall_off=Float32b,
-    max_distance=Float32b,
+    sound_id=IfThenElse(
+        game_check.current_game_at_most(Game.ECHOES),
+        Hex(Int32ub),
+        Hex(Int64ub),
+    ),
+    fall_off=If(game_check.current_game_at_most(Game.ECHOES),Float32b),
+    max_distance=If(game_check.current_game_at_most(Game.ECHOES),Float32b),
     echoes=If(
         game_check.is_prime2,
         Struct(
@@ -61,6 +75,24 @@ SoundPOINode = Struct(
             unk_b=Int16ub,
             unk_c=Int16ub,
             unk_d=Float32b,
+        ),
+    ),
+    corruption=If(
+        game_check.is_prime3,
+        Struct(
+            unk_a=Int32ub,
+            unk_b=Int32ub,
+            data=Array(2,
+                Struct(
+                    type=Int32ub,
+                    data=Switch(construct.this.type, 
+                        {
+                        1: Int32ub,
+                        2: MayaSpline,
+                        }
+                    ),
+                ),
+            ),
         ),
     ),
 )

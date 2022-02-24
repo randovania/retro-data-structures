@@ -18,18 +18,44 @@ from construct import (
     Int8ub,
     Rebuild,
     Pointer,
+    Pass,
     Tell,
     Seek,
     FocusedSeq,
     ExprAdapter,
+    RepeatUntil,
+    Sequence,
+    Probe,
 )
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
+from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Vector3, Color4f, Vector2f, FourCC
 from retro_data_structures.construct_extensions.alignment import AlignTo
-from retro_data_structures.construct_extensions.misc import Skip
+from retro_data_structures.construct_extensions.misc import Skip, ErrorWithMessage
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.game_check import Game
+
+UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
+
+def FourCCSwitch(element_types):
+    return Struct(type=FourCC, body=Switch(construct.this.type, element_types, UnknownType))
+
+
+GetPass = Struct(
+    _start=Tell,
+    size=Int32ub,
+    subtype=FourCC,
+    flags=Int32ub,
+    id=AssetId64 * "TXTR",
+    uv_source=Int32ub,
+    uv_animation=PrefixedArray(Int32ub,Byte),
+    _end=Tell,
+    _update_pass_size=Pointer(construct.this._start, Rebuild(Int32ub, construct.this._end - construct.this._start)),
+)
+
+GetClr = Struct(subtype=FourCC, value=Int32ub)
+
+GetInt = Struct(subtype=FourCC, value=Int32ub)
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -78,6 +104,18 @@ UVAnimation = Struct(
     parameters=Array(lambda this: param_count_per_uv_animtion_type[this.animation_type], Float32b),
 )
 
+MaterialHeader = Struct(
+    size=Int32ub, #Rebuild
+    _start=Tell,
+    flags=Int32ub,
+    group_index=Int32ub,
+    unk_a=Int32ub,
+    vertex_attribute_flags=Int32ub,
+    unk_b=Int32ub,
+    unk_c=Int32ub,
+    unk_d=Int32ub,
+)
+
 Material = Struct(
     flags=Int32ub,
     texture_indices=PrefixedArray(Int32ub, Int32ub),
@@ -97,21 +135,44 @@ Material = Struct(
     uv_animations=PrefixedArray(Int32ub, UVAnimation),
 )
 
-MaterialSet = Struct(
-    texture_file_ids=PrefixedArray(Int32ub, AssetId32),
-    _material_count=Rebuild(Int32ub, construct.len_(construct.this.materials)),
-    _material_end_offsets_address=Tell,
-    _material_end_offsets=Seek(construct.this["_material_count"] * Int32ub.length, 1),
-    _materials_start=Tell,
-    materials=Array(
-        construct.this["_material_count"],
-        FocusedSeq(
-            "material",
-            material=Material,
-            _end=Tell,
-            update_end_offset=Pointer(
-                lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
-                Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
+PASS_TYPES = {
+    "DIFF", "RIML", "BLOL", "BLOD", "CLR ", "TRAN", "INCA", "RFLV", "RFLD", "LRLD", "LURD", "BLOI", "XRAY", "TOON"
+}
+
+MATERIAL_PARAMETERS = {
+    "PASS": GetPass,
+    "CLR ": GetClr,
+    "INT ": GetInt,
+    "END ": Pass,
+}
+
+MaterialSet = IfThenElse(
+    game_check.current_game_at_most(Game.ECHOES),
+    Struct(
+        texture_file_ids=PrefixedArray(Int32ub, AssetId32),
+        _material_count=Rebuild(Int32ub, construct.len_(construct.this.materials)),
+        _material_end_offsets_address=Tell,
+        _material_end_offsets=Seek(construct.this["_material_count"] * Int32ub.length, 1),
+        _materials_start=Tell,
+        materials=Array(
+            construct.this["_material_count"],
+            FocusedSeq(
+                "material",
+                material=Material,
+                _end=Tell,
+                update_end_offset=Pointer(
+                    lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
+                    Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
+                ),
+            ),
+        ),
+    ),
+    PrefixedArray(Int32ub,
+        Struct(
+            header=MaterialHeader,
+            elements=RepeatUntil(
+                lambda x, lst, ctx: x.type == "END ",
+                FourCCSwitch(MATERIAL_PARAMETERS),
             ),
         ),
     ),
