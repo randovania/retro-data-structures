@@ -72,29 +72,15 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
 
 
 def dependencies_for(obj, target_game: Game):
-    for character in obj.character_set.characters:
-        yield from _yield_dependency_if_valid(character.model_id, "CMDL", target_game)
-        yield from _yield_dependency_if_valid(character.skin_id, "CSKR", target_game)
-        yield from _yield_dependency_if_valid(character.skeleton_id, "CINF", target_game)
-        yield from _yield_dependency_if_valid(character.frozen_model, "CMDL", target_game)
-        yield from _yield_dependency_if_valid(character.frozen_skin, "CSKR", target_game)
-        yield from _yield_dependency_if_valid(character.spatial_primitives_id, "CSPP", target_game)
+    for transition in obj.transitions:
+        yield from _yield_dependency_if_valid(transition.animation_id_a, "ANIM", target_game)
+        yield from _yield_dependency_if_valid(transition.animation_id_b, "ANIM", target_game)
 
-        # ParticleResourceData
-        psd = character.particle_resource_data
-        _yield_dependency_array(psd.generic_particles, "PART", target_game)
-        _yield_dependency_array(psd.swoosh_particles, "SWHC", target_game)
-        _yield_dependency_array(psd.electric_particles, "ELSC", target_game)
-        _yield_dependency_array(psd.spawn_particles, "SPSC", target_game)
+    for transition in obj.half_transitions:
+        yield from _yield_dependency_if_valid(transition.animation_id, "ANIM", target_game)
 
-    for animation in obj.animation_set.animations:
-        yield from meta_animation.dependencies_for(animation.meta, target_game)
+    for animation in obj.additive_animations:
+        yield from _yield_dependency_if_valid(animation.animation_id, "ANIM", target_game)
 
-    if obj.animation_set.animation_resources is not None:
-        for res in obj.animation_set.animation_resources:
-            yield from _yield_dependency_if_valid(res.anim_id, "ANIM", target_game)
-            yield from _yield_dependency_if_valid(res.event_id, "EVNT", target_game)
-
-    event_sets = obj.animation_set.event_sets or []
-    for event in event_sets:
-        yield from evnt.dependencies_for(event, target_game)
+    for anim in obj.anim_events:
+        yield from _yield_dependency_if_valid(anim.id, "ANIM", target_game)
