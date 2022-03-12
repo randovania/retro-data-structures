@@ -2,10 +2,15 @@
 https://wiki.axiodl.com/w/SCAN_(File_Format)
 """
 
-from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRange, Hex, IfThenElse, Int32ub, Struct
+import typing
+
+import construct
+from construct import Struct, Int32ub
+from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRange, Hex, IfThenElse
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32, FourCC
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
 from retro_data_structures.formats.script_object import ScriptInstance
@@ -55,3 +60,16 @@ def dependencies_for(obj, target_game: Game):
             yield "TXTR", image.texture
     else:
         yield from dgrp.dependencies_for(obj.dependencies, target_game)
+
+
+class Scan(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "SCAN"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return SCAN
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from dependencies_for(self.raw, self.target_game)

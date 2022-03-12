@@ -2,10 +2,15 @@
 https://wiki.axiodl.com/w/TXTR_(File_Format)
 """
 import enum
+import typing
 
-from construct import Struct, Int16ub, Int32ub, GreedyBytes
+import construct
+from construct import Int16ub, GreedyBytes
+from construct import Struct, Int32ub
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.game_check import Game
 
 
 class ImageFormat(enum.IntEnum):
@@ -31,3 +36,16 @@ TXTR = Struct(
     ),
     image_data=GreedyBytes,
 )
+
+
+class Txtr(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "TXTR"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return TXTR
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from []

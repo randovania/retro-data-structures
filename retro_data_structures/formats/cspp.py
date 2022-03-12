@@ -1,6 +1,13 @@
-from construct import Struct, PrefixedArray, Int32ub, Float32b
+import typing
 
-from retro_data_structures.common_types import Vector3, OBBox
+import construct
+from construct import Float32b
+from construct import Struct, PrefixedArray, Int32ub
+
+from retro_data_structures.common_types import OBBox
+from retro_data_structures.common_types import Vector3
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.game_check import Game
 
 SegId = Int32ub
 UnknownPair = Struct(
@@ -29,3 +36,16 @@ CSPP = Struct(
         ),
     ),
 )
+
+
+class Cspp(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "CSPP"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return CSPP
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from []

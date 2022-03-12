@@ -1,20 +1,20 @@
+import typing
+
 import construct
 from construct import (
-    Struct,
-    PrefixedArray,
-    Int32ub,
     Float32b,
     Prefixed,
     GreedyBytes,
     Int16ub,
-    Switch,
     IfThenElse,
     Array,
     If,
     Const,
 )
+from construct import Struct, PrefixedArray, Int32ub
 
 from retro_data_structures import game_check
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
 from retro_data_structures.game_check import Game
 
 Weight = Struct(
@@ -59,3 +59,16 @@ CSKR = Struct(
         OtherFooter,
     ),
 )
+
+
+class Cskr(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "CSKR"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return CSKR
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from []

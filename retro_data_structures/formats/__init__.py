@@ -21,22 +21,20 @@ from retro_data_structures.formats.txtr import TXTR
 
 ALL_FORMATS = {
     "ANCS": ANCS,
+    "ANIM": ANIM,
+    "CINF": CINF,
     "CMDL": CMDL,
+    "CSKR": CSKR,
+    "CSPP": CSPP,
+    "DGRP": DGRP,
+    "EVNT": EVNT,
     "MLVL": MLVL,
     "MREA": Mrea,
     "PAK": PAK,
-    "ANIM": ANIM,
-    "CINF": CINF,
-    "CHAR": CHAR,
-    "CSKR": CSKR,
-    "SAND": SAND,
-    "EVNT": EVNT,
     "PART": PART,
-    "TXTR": TXTR,
-    "CSPP": CSPP,
     "SCAN": SCAN,
-    "DGRP": DGRP,
     "STRG": STRG,
+    "TXTR": TXTR,
 }
 
 

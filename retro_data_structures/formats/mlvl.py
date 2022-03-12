@@ -1,12 +1,11 @@
 """
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
+import typing
+
 import construct
 from construct import (
     Array,
-    Struct,
-    Int32ub,
-    PrefixedArray,
     Int64ub,
     Float32b,
     Int16ub,
@@ -18,10 +17,14 @@ from construct import (
     Sequence,
     FocusedSeq,
 )
+from construct import Struct, PrefixedArray, Int32ub
 
-from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
+from retro_data_structures.common_types import AssetId32, AssetId64, FourCC
+from retro_data_structures.common_types import Vector3
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
 from retro_data_structures.formats.guid import GUID
+from retro_data_structures.game_check import Game
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,
@@ -198,3 +201,16 @@ MLVL = FocusedSeq(
         construct.Error,
     ),
 )
+
+
+class Mlvl(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "MLVL"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return MLVL
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        raise NotImplementedError()

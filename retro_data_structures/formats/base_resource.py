@@ -33,6 +33,9 @@ class BaseResource:
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
 
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        raise NotImplementedError()
+
     @property
     def raw(self) -> Container:
         return self._raw

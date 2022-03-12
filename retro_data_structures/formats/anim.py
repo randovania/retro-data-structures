@@ -1,3 +1,5 @@
+import typing
+
 import construct
 from construct import (
     Struct,
@@ -24,6 +26,8 @@ from construct import (
 from retro_data_structures import game_check
 from retro_data_structures.common_types import CharAnimTime
 from retro_data_structures.construct_extensions.misc import BitwiseWith32Blocks
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.game_check import Game
 
 UncompressedAnimation = Struct(
     duration=CharAnimTime,
@@ -153,3 +157,16 @@ ANIM = Struct(
     trailing_bytes=GreedyRange(Const(b"\xFF")),
     _terminated=Terminated,
 )
+
+
+class Anim(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "ANIM"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return ANIM
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from []

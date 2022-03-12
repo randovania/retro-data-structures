@@ -1,4 +1,5 @@
 import enum
+
 from construct.core import (
     Pointer,
     Rebuild,

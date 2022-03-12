@@ -1,7 +1,9 @@
 """
 https://wiki.axiodl.com/w/STRG_(File_Format)
 """
+import typing
 
+import construct
 from construct import (
     Array,
     Byte,
@@ -10,19 +12,20 @@ from construct import (
     CString,
     Enum,
     GreedyRange,
-    If,
-    Int32ub,
     Pointer,
     Rebuild,
     Seek,
-    Struct,
     Tell,
     len_,
     this,
 )
+from construct import Struct, Int32ub, If
 
 from retro_data_structures.adapters.offset import OffsetAdapter
-from retro_data_structures.common_types import FourCC, String
+from retro_data_structures.common_types import FourCC
+from retro_data_structures.common_types import String
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.game_check import Game
 
 
 class CorruptionLanguageOffsetAdapter(OffsetAdapter):
@@ -182,3 +185,16 @@ STRG = Struct(
     / If(this.prime3, Pointer(this.corr_lang_table_start, CorruptionLanguage[this.language_count])),
     "junk" / GreedyRange(Byte),
 )
+
+
+class Strg(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "STRG"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return STRG
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from []

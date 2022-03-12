@@ -1,27 +1,23 @@
 """
 Wiki: https://wiki.axiodl.com/w/SAND_(File_Format)
 """
+import typing
 from typing import Optional, List
 
 import construct
 from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, Int8ub, Float32b
 
-from retro_data_structures import game_check
-from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId64
-from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
-from retro_data_structures.formats import meta_animation, evnt
-from retro_data_structures.formats.evnt import EVNT, SoundPOINode, Int32POINode, ParticlePOINode
-from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
+from retro_data_structures.common_types import AssetId64
+from retro_data_structures.formats import BaseResource, AssetType
+from retro_data_structures.formats.evnt import SoundPOINode, Int32POINode, ParticlePOINode
 from retro_data_structures.formats.meta_transition import MetaTransition_v2
-from retro_data_structures.formats.pas_database import PASDatabase
-
-# This format is only for Prime 3, so AssetId is always 64-bit
 from retro_data_structures.game_check import Game
 
+# This format is only for Prime 3, so AssetId is always 64-bit
 AssetId = AssetId64
 
 Transition = Struct(
-    _unknown=Const(0,Int8ub),
+    _unknown=Const(0, Int8ub),
     animation_id_a=AssetId * "ANIM",
     animation_id_b=AssetId * "ANIM",
     transition=MetaTransition_v2,
@@ -34,7 +30,7 @@ AdditiveAnimation = Struct(
 )
 
 HalfTransitions = Struct(
-    _unknown=Const(0,Int8ub),
+    _unknown=Const(0, Int8ub),
     animation_id=AssetId * "ANIM",
     transition=MetaTransition_v2,
 )
@@ -84,3 +80,16 @@ def dependencies_for(obj, target_game: Game):
 
     for anim in obj.anim_events:
         yield from _yield_dependency_if_valid(anim.id, "ANIM", target_game)
+
+
+class Sand(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "SAND"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return SAND
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from dependencies_for(self.raw, self.target_game)

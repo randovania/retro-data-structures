@@ -1,6 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
+import typing
 from typing import Optional, List
 
 import construct
@@ -10,14 +11,14 @@ from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
 from retro_data_structures.formats import meta_animation, evnt
+from retro_data_structures.formats.base_resource import BaseResource, AssetType
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
-
-# This format is only for Prime 1 and 2, so AssetId is always 32-bit
 from retro_data_structures.game_check import Game
 
+# This format is only for Prime 1 and 2, so AssetId is always 32-bit
 AssetId = AssetId32
 
 AnimationName = Struct(
@@ -172,3 +173,16 @@ def dependencies_for(obj, target_game: Game):
     event_sets = obj.animation_set.event_sets or []
     for event in event_sets:
         yield from evnt.dependencies_for(event, target_game)
+
+
+class Ancs(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "ANCS"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return ANCS
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from dependencies_for(self.raw, self.target_game)

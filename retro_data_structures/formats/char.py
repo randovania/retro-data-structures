@@ -3,18 +3,17 @@ Wiki: https://wiki.axiodl.com/w/CHAR_(Metroid_Prime_3)
 
 To Do: DKCR CHAR Format
 """
+import typing
 from typing import Optional, List
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int8ub, Int32ub, Float32b, Array
+from construct import Const, Struct, PrefixedArray, Int8ub, Int32ub, Float32b, Array
 
-from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, AssetId64, FourCC
-from retro_data_structures.formats import evnt
-from retro_data_structures.formats.evnt import EVNT, SoundPOINode, ParticlePOINode
+from retro_data_structures.formats import BaseResource, AssetType
+from retro_data_structures.formats.evnt import SoundPOINode, ParticlePOINode
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId64
 from retro_data_structures.formats.pas_database import PASDatabase
-
 from retro_data_structures.game_check import Game
 
 # This format is only for Prime 3/DKCR, so AssetId is always 64-bit
@@ -52,8 +51,8 @@ SoundEvent = Struct(
 CharEventSet = Struct(
     id=Int32ub,
     name=String,
-    event_sets=PrefixedArray(Int32ub,EffectEvent),
-    sound_sets=PrefixedArray(Int32ub,SoundEvent),
+    event_sets=PrefixedArray(Int32ub, EffectEvent),
+    sound_sets=PrefixedArray(Int32ub, SoundEvent),
 )
 
 OverlayModel = Struct(
@@ -63,8 +62,8 @@ OverlayModel = Struct(
 )
 
 CollisionPrimitive = Struct(
-    unk_ints=Array(5,Int32ub),
-    unk_floats=Array(8,Float32b),
+    unk_ints=Array(5, Int32ub),
+    unk_floats=Array(8, Float32b),
     name=String,
     end_unk=Float32b,
 )
@@ -75,12 +74,12 @@ CollisionSet = Struct(
 )
 
 CHAR = Struct(
-    version=Int8ub, # 0x03/0x05 for Corruption 0x59 for DKCR
+    version=Int8ub,  # 0x03/0x05 for Corruption 0x59 for DKCR
     id=Int8ub,
     name=String,
     model_id=AssetId * "CMDL",
     skin_id=AssetId * "CSKR",
-    overlays=PrefixedArray(Int32ub,OverlayModel),
+    overlays=PrefixedArray(Int32ub, OverlayModel),
     skeleton_id=AssetId * "CINF",
     sand_id=AssetId * "SAND",
     pas_database=PASDatabase,
@@ -128,3 +127,16 @@ def dependencies_for(obj, target_game: Game):
     # Animations
     for animation in obj.animation_aabb_array:
         yield from _yield_dependency_if_valid(animation.anim_id, "ANIM", target_game)
+
+
+class Char(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "CHAR"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return CHAR
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from dependencies_for(self.raw, self.target_game)

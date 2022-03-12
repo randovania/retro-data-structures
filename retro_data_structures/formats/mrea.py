@@ -3,12 +3,14 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
 import hashlib
 import io
+import typing
 from enum import IntEnum
 from typing import Iterator, Optional
 
+import construct
+from construct import Struct, PrefixedArray, Int32ub, If, Aligned
 from construct.core import (
     Adapter,
-    Aligned,
     AlignedStruct,
     Array,
     Computed,
@@ -16,15 +18,11 @@ from construct.core import (
     Enum,
     FixedSized,
     GreedyBytes,
-    If,
     Int8ub,
-    Int32ub,
     Pass,
     Pointer,
-    PrefixedArray,
     Rebuild,
     Sequence,
-    Struct,
     Tell,
     len_,
     this,
@@ -38,13 +36,15 @@ from retro_data_structures.construct_extensions.alignment import PrefixedWithPad
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion, WithVersionElse
 from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
 from retro_data_structures.formats.script_object import ScriptInstanceHelper
 from retro_data_structures.formats.visi import VISI
-from retro_data_structures.game_check import AssetIdCorrect, Game
+from retro_data_structures.game_check import AssetIdCorrect
+from retro_data_structures.game_check import Game
 
 
 class MREAVersion(IntEnum):
@@ -411,20 +411,17 @@ MREA = AlignedStruct(32,
                      )
 
 
-class Mrea:
-    _raw: Container
-    target_game: Game
-
-    def __init__(self, raw: Container, target_game: Game):
-        self._raw = raw
-        self.target_game = target_game
+class Mrea(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "MREA"
 
     @classmethod
-    def parse(cls, data: bytes, target_game: Game) -> "Mrea":
-        return cls(MREA.parse(data, target_game=target_game), target_game)
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return MREA
 
-    def build(self) -> bytes:
-        return MREA.build(self._raw, target_game=self.target_game)
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        raise NotImplementedError()
 
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:

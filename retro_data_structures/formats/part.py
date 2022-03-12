@@ -1,29 +1,30 @@
+import typing
 from typing import Optional
 
 import construct
 from construct import (
-    Struct,
     Const,
     RepeatUntil,
     Switch,
     Flag,
     Int32sb,
     Float32b,
-    If,
     Sequence,
     Probe,
     Pass,
     IfThenElse,
-    Int32ub,
-    PrefixedArray,
     Byte,
     Array,
 )
+from construct import Struct, PrefixedArray, Int32ub, If
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import FourCC, Color4f, Vector3
+from retro_data_structures.common_types import FourCC, Color4f
+from retro_data_structures.common_types import Vector3
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
-from retro_data_structures.game_check import AssetIdCorrect, Game
+from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.game_check import AssetIdCorrect
+from retro_data_structures.game_check import Game
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
 
@@ -928,3 +929,16 @@ def dependencies_for(obj, target_game: Game):
         if element.type in ("IDTS", "ICTS", "IITS"):
             if element.body is not None:
                 yield from _yield_dependency_if_valid(element.body.body, "PART", target_game)
+
+
+class Part(BaseResource):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "PART"
+
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return PART
+
+    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+        yield from dependencies_for(self.raw, self.target_game)
