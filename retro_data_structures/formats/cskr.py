@@ -10,6 +10,8 @@ from construct import (
     Switch,
     IfThenElse,
     Array,
+    If,
+    Const,
 )
 
 from retro_data_structures import game_check
@@ -41,20 +43,19 @@ Prime1Footer = Struct(
     trailing_bytes=GreedyBytes,
 )
 
-Prime2Footer = Struct(
+OtherFooter = Struct(
     # These values are read by the game, but unknown purpose
     pool_to_skin_idx=PrefixedArray(Int32ub, Int16ub),
     trailing_bytes=Prefixed(Int32ub, GreedyBytes),
 )
 
 CSKR = Struct(
+    _magic=If(game_check.current_game_at_least(Game.CORRUPTION),Const(0x534B494E, Int32ub)),
+    unk=If(game_check.current_game_at_least(Game.CORRUPTION),Int32ub), # Version ?
     vertex_groups=PrefixedArray(Int32ub, VertexGroup),
-    footer=Switch(
-        game_check.get_current_game,
-        {
-            Game.PRIME: Prime1Footer,
-            Game.ECHOES: Prime2Footer,
-        },
-        construct.Error,
+    footer=IfThenElse(
+        game_check.is_prime1,
+        Prime1Footer,
+        OtherFooter,
     ),
 )

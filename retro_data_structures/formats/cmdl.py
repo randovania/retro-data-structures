@@ -18,18 +18,44 @@ from construct import (
     Int8ub,
     Rebuild,
     Pointer,
+    Pass,
     Tell,
     Seek,
     FocusedSeq,
     ExprAdapter,
+    RepeatUntil,
+    Sequence,
+    Probe,
 )
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import AABox, AssetId32, Vector3, Color4f, Vector2f
+from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Vector3, Color4f, Vector2f, FourCC
 from retro_data_structures.construct_extensions.alignment import AlignTo
-from retro_data_structures.construct_extensions.misc import Skip
+from retro_data_structures.construct_extensions.misc import Skip, ErrorWithMessage
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.game_check import Game
+
+UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
+
+def FourCCSwitch(element_types):
+    return Struct(type=FourCC, body=Switch(construct.this.type, element_types, UnknownType))
+
+
+GetPass = Struct(
+    size=Int32ub,
+    _start=Tell,
+    subtype=FourCC,
+    flags=Int32ub,
+    id=AssetId64 * "TXTR",
+    uv_source=Int32ub,
+    uv_animation=PrefixedArray(Int32ub,Byte),
+    _end=Tell,
+    _update_pass_size=Pointer(construct.this._start - Int32ub.length, Rebuild(Int32ub, construct.this._end - construct.this._start)),
+)
+
+GetClr = Struct(subtype=FourCC, value=Int32ub)
+
+GetInt = Struct(subtype=FourCC, value=Int32ub)
 
 TEVStage = Struct(
     color_input_flags=Int32ub,
@@ -73,35 +99,69 @@ param_count_per_uv_animtion_type = {
     8: 9,
 }
 
+PASS_TYPES = {
+    "DIFF", "RIML", "BLOL", "BLOD", "CLR ", "TRAN", "INCA", "RFLV", "RFLD", "LRLD", "LURD", "BLOI", "XRAY", "TOON"
+}
+
+MATERIAL_PARAMETERS = {
+    "PASS": GetPass,
+    "CLR ": GetClr,
+    "INT ": GetInt,
+    "END ": Pass,
+}
+
 UVAnimation = Struct(
     animation_type=Int32ub,
     parameters=Array(lambda this: param_count_per_uv_animtion_type[this.animation_type], Float32b),
 )
 
-Material = Struct(
-    flags=Int32ub,
-    texture_indices=PrefixedArray(Int32ub, Int32ub),
-    vertex_attribute_flags=Int32ub,
-    unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
-    unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
-    group_index=Int32ub,
-    konst_colors=If(construct.this.flags & 0x8, PrefixedArray(Int32ub, Int32ub)),
-    blend_destination_factor=Int16ub,
-    blend_source_factor=Int16ub,
-    reflection_indirect_texture_slot_index=If(construct.this.flags & 0x400, Int32ub),
-    color_channel_flags=PrefixedArray(Int32ub, Int32ub),
-    tev_stages=PrefixedArray(Int32ub, TEVStage),
-    tev_inputs=Array(construct.len_(construct.this.tev_stages), TEVInput),
-    texgen_flags=PrefixedArray(Int32ub, Int32ub),
-    material_animations_section_size=Int32ub,
-    uv_animations=PrefixedArray(Int32ub, UVAnimation),
+Material = IfThenElse(
+    game_check.current_game_at_most(Game.ECHOES),
+    Struct(
+        flags=Int32ub,
+        texture_indices=PrefixedArray(Int32ub, Int32ub),
+        vertex_attribute_flags=Int32ub,
+        unk_1=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
+        unk_2=If(game_check.current_game_at_least(Game.ECHOES), Int32ub),
+        group_index=Int32ub,
+        konst_colors=If(construct.this.flags & 0x8, PrefixedArray(Int32ub, Int32ub)),
+        blend_destination_factor=Int16ub,
+        blend_source_factor=Int16ub,
+        reflection_indirect_texture_slot_index=If(construct.this.flags & 0x400, Int32ub),
+        color_channel_flags=PrefixedArray(Int32ub, Int32ub),
+        tev_stages=PrefixedArray(Int32ub, TEVStage),
+        tev_inputs=Array(construct.len_(construct.this.tev_stages), TEVInput),
+        texgen_flags=PrefixedArray(Int32ub, Int32ub),
+        material_animations_section_size=Int32ub,
+        uv_animations=PrefixedArray(Int32ub, UVAnimation),
+    ),
+    Struct(
+        size=Int32ub,
+        _start=Tell,
+        flags=Int32ub,
+        group_index=Int32ub,
+        unk_a=Int32ub,
+        vertex_attribute_flags=Int32ub,
+        unk_b=Int32ub,
+        unk_c=Int32ub,
+        unk_d=Int32ub,
+        elements=RepeatUntil(
+            lambda x, lst, ctx: x.type == "END ",
+            FourCCSwitch(MATERIAL_PARAMETERS),
+        ),
+        _end=Tell,
+        _update_material_size=Pointer(
+            construct.this._start - Int32ub.length,
+            Rebuild(Int32ub, construct.this._end - construct.this._start),
+        ),
+    ),
 )
 
 MaterialSet = Struct(
-    texture_file_ids=PrefixedArray(Int32ub, AssetId32),
+    texture_file_ids=If(game_check.current_game_at_most(Game.ECHOES),PrefixedArray(Int32ub, AssetId32)),
     _material_count=Rebuild(Int32ub, construct.len_(construct.this.materials)),
     _material_end_offsets_address=Tell,
-    _material_end_offsets=Seek(construct.this["_material_count"] * Int32ub.length, 1),
+    _material_end_offsets=If(game_check.current_game_at_most(Game.ECHOES),Seek(construct.this["_material_count"] * Int32ub.length, 1)),
     _materials_start=Tell,
     materials=Array(
         construct.this["_material_count"],
@@ -109,9 +169,11 @@ MaterialSet = Struct(
             "material",
             material=Material,
             _end=Tell,
-            update_end_offset=Pointer(
-                lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
-                Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
+            update_end_offset=If(game_check.current_game_at_most(Game.ECHOES),
+                Pointer(
+                    lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
+                    Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
+                ),
             ),
         ),
     ),
@@ -269,6 +331,13 @@ CMDL = Struct(
 
 
 def dependencies_for(obj, target_game: Game):
-    for material_set in obj.material_sets:
-        for file_id in material_set.texture_file_ids:
-            yield "TXTR", file_id
+    if game_check.current_game_at_most(Game.ECHOES):
+        for material_set in obj.material_sets:
+            for file_id in material_set.texture_file_ids:
+                yield "TXTR", file_id
+    if game_check.current_game_at_least(Game.CORRUPTION):
+        for material_set in obj.material_sets:
+            for material in material_set.materials:
+                for element in material.element:
+                    if element.type == "PASS":
+                        yield "TXTR", element.body.id
