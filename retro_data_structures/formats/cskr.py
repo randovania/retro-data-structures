@@ -8,7 +8,6 @@ from construct import (
     GreedyBytes,
     Int16ub,
     Switch,
-    Terminated,
     IfThenElse,
     Array,
 )
@@ -58,5 +57,4 @@ CSKR = Struct(
         },
         construct.Error,
     ),
-    _end=Terminated,
 )
