@@ -1,3 +1,6 @@
+import dataclasses
+import typing
+
 import construct
 from construct import (
     Struct,
@@ -24,6 +27,9 @@ from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo, AlignedPrefixed
 from retro_data_structures.construct_extensions.misc import LazyPatchedForBug
+from retro_data_structures.formats import BaseResource
+from retro_data_structures.formats.base_resource import NameOrAssetId, resolve_asset_id, AssetId, AssetType, RawResource
+from retro_data_structures.game_check import Game
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),
@@ -141,3 +147,73 @@ def create():
 
 
 PAK = create()
+
+
+@dataclasses.dataclass(frozen=True)
+class PakFile:
+    asset_id: AssetId
+    asset_name: AssetType
+    data: bytes
+
+
+class Pak(BaseResource):
+    @classmethod
+    def construct_class(cls, target_game: Game) -> construct.Construct:
+        return PAK
+
+    @classmethod
+    def parse_stream(cls, stream: typing.BinaryIO, target_game: Game) -> "Pak":
+        return cls(cls.construct_class(target_game).parse_stream(stream, target_game=target_game),
+                   target_game)
+
+    def build_stream(self, stream: typing.BinaryIO) -> bytes:
+        return self.construct_class(self.target_game).build_stream(self._raw, stream, target_game=self.target_game)
+
+    @property
+    def all_assets(self) -> typing.Iterator[PakFile]:
+        for file in self.raw.resources:
+            yield PakFile(file.asset.id, file.asset.type, file.contents.value)
+
+    def get_asset(self, asset_id: AssetId) -> typing.Optional[RawResource]:
+        """
+        Gets the asset of given id, getting the bytes and type
+        :param asset_id:
+        :return:
+        """
+        for file in self.raw.resources:
+            if file.asset.id == asset_id:
+                return RawResource(file.asset.type, file.contents.value)
+
+        return None
+
+    def replace_asset(self, asset_id: AssetId, asset: RawResource):
+        for file in self.raw.resources:
+            if file.asset.id == asset_id:
+                file.asset.type = asset.type
+                file.contents = construct.Container(value=asset.data)
+
+        raise ValueError(f"Unknown asset id: {asset_id}")
+
+    def add_asset(self, asset_id: AssetId, asset: RawResource):
+        self.raw.resources.append(construct.Container(
+            compressed=0,
+            asset=construct.Container(
+                type=asset.type,
+                id=asset_id,
+            ),
+            contents=construct.Container(
+                value=asset.data,
+            ),
+        ))
+
+    def remove_asset(self, asset_id: AssetId):
+        for file in self.raw.named_resources:
+            if file.asset.id == asset_id:
+                raise ValueError(f"Asset id {asset_id} is named {file.name}, can't be removed.")
+
+        for file in list(self.raw.resources):
+            if file.asset.id == asset_id:
+                self.raw.resources.remove(file)
+
+        raise ValueError(f"Unknown asset id: {asset_id}")
+
