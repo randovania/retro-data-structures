@@ -7,7 +7,7 @@ from construct import (
     Prefixed,
     GreedyBytes,
     Int16ub,
-    Terminated,
+    Switch,
     IfThenElse,
     Array,
     If,
@@ -58,5 +58,4 @@ CSKR = Struct(
         Prime1Footer,
         OtherFooter,
     ),
-#    _end=Terminated,
 )
