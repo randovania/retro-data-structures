@@ -4,6 +4,7 @@ from retro_data_structures.common_types import AABox
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.game_check import Game
+from test_lib import parse_and_build_compare
 
 CMDLHeader = construct.Struct(
     magic=construct.Const(0xDEADBABE, construct.Int32ub),
@@ -19,7 +20,7 @@ CMDLHeader = construct.Struct(
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i : i + n]
+        yield lst[i: i + n]
 
 
 def test_compare(prime2_asset_manager):
@@ -36,3 +37,9 @@ def test_compare(prime2_asset_manager):
 
     assert custom_header == raw_header
     assert [int.from_bytes(c, "big") for c in chunks(encoded, 4)] == [int.from_bytes(c, "big") for c in chunks(raw, 4)]
+
+
+def test_compare_p2(prime2_pwe_project):
+    parse_and_build_compare(
+        CMDL, Game.ECHOES, prime2_pwe_project.joinpath("Resources/Uncategorized/Ship.CMDL")
+    )

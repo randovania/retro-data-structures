@@ -221,9 +221,8 @@ Surface = Struct(
         Struct(
             center_point=Vector3,
             material_index=Int32ub,
-            mantissa=Int16ub,
             _display_list_size_address=Tell,
-            _display_list_size=Rebuild(Int16ub, lambda ctx: 0),
+            _display_list_size=construct.Seek(Int32ub.sizeof()),
             parent_model_pointer_storage=Int32ub,
             next_surface_pointer_storage=Int32ub,
             _extra_data_size=Rebuild(Int32ub, construct.len_(construct.this.extra_data)),
@@ -233,9 +232,16 @@ Surface = Struct(
             extra_data=Bytes(construct.this["_extra_data_size"]),
         ),
     ),
-    _primitives_address=Tell,
-    primitives=GreedyRange(
-        Struct(
+    primitives=construct.Prefixed(
+        Pointer(
+            construct.this.header["_display_list_size_address"],
+            construct.ExprAdapter(
+                Int32ub,
+                decoder=lambda obj, ctx: obj & 0x7FFFFFFF,
+                encoder=lambda obj, ctx: obj | 0x7FFFFFFF,
+            ),
+        ),
+        GreedyRange(Struct(
             type=Byte,
             vertices=PrefixedArray(
                 Int16ub,
@@ -272,12 +278,7 @@ Surface = Struct(
                     ),
                 ),
             ),
-        )
-    ),
-    _size=Tell,
-    _update_display_size=Pointer(
-        construct.this.header["_display_list_size_address"],
-        Rebuild(Int16ub, lambda ctx: ((ctx["_size"] - ctx["_primitives_address"]) + 31) & ~31),
+        ))
     ),
 )
 
