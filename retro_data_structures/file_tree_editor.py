@@ -91,11 +91,11 @@ class FileTreeEditor:
                     for name, asset_id in json.load(f).items()
                 })
 
-        self.all_pkgs = list(
+        self.all_paks = list(
             self.provider.rglob("*.pak")
         )
 
-        for name in self.all_pkgs:
+        for name in self.all_paks:
             with self.provider.open_binary(name) as f:
                 pak_no_data = PAKNoData.parse_stream(f, target_game=self.target_game)
 
@@ -110,8 +110,8 @@ class FileTreeEditor:
         yield from self._files_for_asset_id.keys()
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
-        for pkg_name in self._files_for_asset_id[self._resolve_asset_id(asset_id)]:
-            yield pkg_name
+        for pak_name in self._files_for_asset_id[self._resolve_asset_id(asset_id)]:
+            yield pak_name
 
     def does_asset_exists(self, asset_id: NameOrAssetId) -> bool:
         """
@@ -126,7 +126,7 @@ class FileTreeEditor:
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
-        Gets the bytes data for the given asset name/id, optionally restricting from which pkg.
+        Gets the bytes data for the given asset name/id, optionally restricting from which pak.
         :raises ValueError if the asset doesn't exist.
         """
         original_name = asset_id
@@ -140,8 +140,8 @@ class FileTreeEditor:
                 return result
 
         for pak_name in self._files_for_asset_id[asset_id]:
-            pkg = self.get_pak(pak_name)
-            result = pkg.get_asset(asset_id)
+            pak = self.get_pak(pak_name)
+            result = pak.get_asset(asset_id)
             if result is not None:
                 return result
 
@@ -161,7 +161,7 @@ class FileTreeEditor:
         return format_class.parse(raw_asset.data, target_game=self.target_game)
 
     def add_new_asset(self, name: str, new_data: typing.Union[RawResource, BaseResource],
-                      in_pkgs: typing.Iterable[str]):
+                      in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
         """
@@ -169,14 +169,14 @@ class FileTreeEditor:
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{name} already exists")
 
-        in_pkgs = list(in_pkgs)
+        in_paks = list(in_paks)
         files_set = set()
 
         self._name_for_asset_id[asset_id] = name
         self._files_for_asset_id[asset_id] = files_set
         self.replace_asset(name, new_data)
-        for pkg_name in in_pkgs:
-            self.ensure_present(pkg_name, asset_id)
+        for pak_name in in_paks:
+            self.ensure_present(pak_name, asset_id)
 
     def replace_asset(self, asset_id: NameOrAssetId, new_data: typing.Union[RawResource, BaseResource]):
         """
@@ -225,7 +225,7 @@ class FileTreeEditor:
         if not self.does_asset_exists(asset_id):
             raise ValueError(f"Unknown asset: {asset_id}")
 
-        # If the pkg already has the given asset, do nothing
+        # If the pak already has the given asset, do nothing
         asset_id = self._resolve_asset_id(asset_id)
         if pak_name not in self._files_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
