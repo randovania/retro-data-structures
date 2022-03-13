@@ -148,7 +148,7 @@ class FileTreeEditor:
         """
         raw_asset = self.get_raw_asset(asset_id)
 
-        format_class = formats.format_for(raw_asset.type)
+        format_class = formats.resource_type_for(raw_asset.type)
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
