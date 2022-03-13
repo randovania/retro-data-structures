@@ -172,7 +172,7 @@ class Pak(BaseResource):
     @property
     def all_assets(self) -> typing.Iterator[PakFile]:
         for file in self.raw.resources:
-            yield PakFile(file.asset.id, file.asset.type, file.contents.value)
+            yield PakFile(file.asset.id, file.asset.type, file.contents.value())
 
     def get_asset(self, asset_id: AssetId) -> typing.Optional[RawResource]:
         """
@@ -182,7 +182,7 @@ class Pak(BaseResource):
         """
         for file in self.raw.resources:
             if file.asset.id == asset_id:
-                return RawResource(file.asset.type, file.contents.value)
+                return RawResource(file.asset.type, file.contents.value())
 
         return None
 

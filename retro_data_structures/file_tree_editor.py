@@ -25,7 +25,10 @@ class FileProvider:
     def rglob(self, pattern: str) -> Iterator[str]:
         raise NotImplementedError()
 
-    def open(self, name: str, mode: str):
+    def open_text(self, name: str) -> typing.TextIO:
+        raise NotImplementedError()
+
+    def open_binary(self, name: str) -> typing.BinaryIO:
         raise NotImplementedError()
 
 
@@ -40,8 +43,11 @@ class PathFileProvider(FileProvider):
         for it in self.root.rglob(name):
             yield it.relative_to(self.root).as_posix()
 
-    def open(self, name: str, mode: str):
-        return self.root.joinpath(name).open(mode)
+    def open_text(self, name: str) -> typing.TextIO:
+        return self.root.joinpath(name).open("r")
+
+    def open_binary(self, name: str) -> typing.BinaryIO:
+        return self.root.joinpath(name).open("rb")
 
 
 class FileTreeEditor:
@@ -79,7 +85,7 @@ class FileTreeEditor:
 
         self._name_for_asset_id = {}
         if self.provider.is_file("custom_names.json"):
-            with self.provider.open("custom_names.json", "r") as f:
+            with self.provider.open_text("custom_names.json") as f:
                 self._name_for_asset_id.update({
                     asset_id: name
                     for name, asset_id in json.load(f).items()
@@ -90,7 +96,7 @@ class FileTreeEditor:
         )
 
         for name in self.all_pkgs:
-            with self.provider.open(name, "rb") as f:
+            with self.provider.open_binary(name) as f:
                 pak_no_data = PAKNoData.parse_stream(f, target_game=self.target_game)
 
             self._ensured_asset_ids[name] = set()
@@ -230,8 +236,9 @@ class FileTreeEditor:
 
         if pak_name not in self._in_memory_paks:
             logger.info("Reading %s", pak_name)
-            with self.provider.open(pak_name, "rb") as f:
-                self._in_memory_paks[pak_name] = Pak.parse_stream(f, target_game=self.target_game)
+            with self.provider.open_binary(pak_name) as f:
+                self._in_memory_paks[pak_name] = Pak.parse(f.read(),
+                                                           target_game=self.target_game)
 
         return self._in_memory_paks[pak_name]
 
