@@ -330,11 +330,12 @@ CMDL = Struct(
 
 
 def dependencies_for(obj, target_game: Game):
-    if game_check.current_game_at_most(Game.ECHOES):
+    if target_game <= Game.ECHOES:
         for material_set in obj.material_sets:
             for file_id in material_set.texture_file_ids:
                 yield "TXTR", file_id
-    if game_check.current_game_at_least(Game.CORRUPTION):
+
+    if Game.CORRUPTION <= target_game:
         for material_set in obj.material_sets:
             for material in material_set.materials:
                 for element in material.element:
