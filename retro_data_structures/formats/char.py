@@ -9,6 +9,7 @@ from typing import Optional, List
 import construct
 from construct import Const, Struct, PrefixedArray, Int8ub, Int32ub, Float32b, Array
 
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import AABox, String, AssetId64, FourCC
 from retro_data_structures.formats import BaseResource, AssetType
 from retro_data_structures.formats.evnt import SoundPOINode, ParticlePOINode
@@ -17,19 +18,19 @@ from retro_data_structures.formats.pas_database import PASDatabase
 from retro_data_structures.game_check import Game
 
 # This format is only for Prime 3/DKCR, so AssetId is always 64-bit
-AssetId = AssetId64
+ConstructAssetId = AssetId64
 
 ParticleResourceData = Struct(
-    generic_particles=PrefixedArray(Int32ub, AssetId) * "PART",
-    swoosh_particles=PrefixedArray(Int32ub, AssetId) * "SWHC",
-    electric_particles=PrefixedArray(Int32ub, AssetId) * "ELSC",
-    spawn_particles=PrefixedArray(Int32ub, AssetId) * "SPSC",
+    generic_particles=PrefixedArray(Int32ub, ConstructAssetId) * "PART",
+    swoosh_particles=PrefixedArray(Int32ub, ConstructAssetId) * "SWHC",
+    electric_particles=PrefixedArray(Int32ub, ConstructAssetId) * "ELSC",
+    spawn_particles=PrefixedArray(Int32ub, ConstructAssetId) * "SPSC",
     _unk=Const(0, Int32ub),
     _unk1=Const(0, Int32ub),
 )
 
 AnimationAABB = Struct(
-    anim_id=AssetId * "ANIM",
+    anim_id=ConstructAssetId * "ANIM",
     bounding_box=AABox,
 )
 
@@ -57,8 +58,8 @@ CharEventSet = Struct(
 
 OverlayModel = Struct(
     type=FourCC,
-    model_id=AssetId * "CMDL",
-    skin_id=AssetId * "CSKR",
+    model_id=ConstructAssetId * "CMDL",
+    skin_id=ConstructAssetId * "CSKR",
 )
 
 CollisionPrimitive = Struct(
@@ -77,11 +78,11 @@ CHAR = Struct(
     version=Int8ub,  # 0x03/0x05 for Corruption 0x59 for DKCR
     id=Int8ub,
     name=String,
-    model_id=AssetId * "CMDL",
-    skin_id=AssetId * "CSKR",
+    model_id=ConstructAssetId * "CMDL",
+    skin_id=ConstructAssetId * "CSKR",
     overlays=PrefixedArray(Int32ub, OverlayModel),
-    skeleton_id=AssetId * "CINF",
-    sand_id=AssetId * "SAND",
+    skeleton_id=ConstructAssetId * "CINF",
+    sand_id=ConstructAssetId * "SAND",
     pas_database=PASDatabase,
     particle_resource_data=ParticleResourceData,
     event_sets=PrefixedArray(Int32ub, CharEventSet),
@@ -90,7 +91,7 @@ CHAR = Struct(
     bool=Int8ub,
     unk_bool_array=PrefixedArray(Int32ub, Int8ub),
     collision_sets=PrefixedArray(Int32ub, CollisionSet),
-    sound_resources=PrefixedArray(Int32ub, AssetId) * "CAUD",
+    sound_resources=PrefixedArray(Int32ub, ConstructAssetId) * "CAUD",
 )
 
 
@@ -138,5 +139,5 @@ class Char(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CHAR
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

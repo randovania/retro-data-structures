@@ -24,7 +24,7 @@ from construct import Struct, Int32ub, If
 from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.common_types import String
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 
@@ -196,5 +196,5 @@ class Strg(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return STRG
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []

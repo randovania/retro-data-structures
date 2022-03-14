@@ -9,6 +9,11 @@ AssetId = int
 NameOrAssetId = typing.Union[str, AssetId]
 
 
+class Dependency(typing.NamedTuple):
+    type: AssetType
+    id: AssetId
+
+
 class BaseResource:
     _raw: Container
     target_game: Game
@@ -33,7 +38,7 @@ class BaseResource:
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     @property

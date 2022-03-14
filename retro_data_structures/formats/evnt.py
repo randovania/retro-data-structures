@@ -10,7 +10,7 @@ from construct import (
 from retro_data_structures import game_check
 from retro_data_structures.common_types import String, CharAnimTime, MayaSpline
 from retro_data_structures.construct_extensions.version import WithVersion
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 BasePOINode = Struct(
@@ -127,5 +127,5 @@ class Evnt(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return EVNT
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

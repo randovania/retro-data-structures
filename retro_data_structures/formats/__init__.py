@@ -4,7 +4,7 @@ from construct import Construct
 
 from retro_data_structures.formats.ancs import ANCS, Ancs
 from retro_data_structures.formats.anim import ANIM, Anim
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType
 from retro_data_structures.formats.char import CHAR, Char
 from retro_data_structures.formats.cinf import CINF, Cinf
 from retro_data_structures.formats.cmdl import CMDL, Cmdl
@@ -68,3 +68,9 @@ def format_for(type_name: AssetType) -> Construct:
 
 def resource_type_for(type_name: AssetType) -> typing.Type[BaseResource]:
     return ALL_RESOURCE_TYPES[type_name.upper()]
+
+
+__all__ = [
+    "format_for",
+    "resource_type_for",
+]

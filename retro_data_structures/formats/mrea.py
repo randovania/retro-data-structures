@@ -36,7 +36,7 @@ from retro_data_structures.construct_extensions.alignment import PrefixedWithPad
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion, WithVersionElse
 from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
@@ -420,7 +420,7 @@ class Mrea(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MREA
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     @property

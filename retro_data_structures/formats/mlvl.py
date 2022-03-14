@@ -22,7 +22,7 @@ from construct import Struct, PrefixedArray, Int32ub
 from retro_data_structures.common_types import AssetId32, AssetId64, FourCC
 from retro_data_structures.common_types import Vector3
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.game_check import Game
 
@@ -212,5 +212,5 @@ class Mlvl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MLVL
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()

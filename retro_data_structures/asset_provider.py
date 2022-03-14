@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, BinaryIO, Optional
 
 from retro_data_structures import formats
-from retro_data_structures.formats import AssetType, AssetId
+from retro_data_structures.base_resource import AssetId, AssetType
 from retro_data_structures.formats.pak import CompressedPakResource, PAKNoData
 from retro_data_structures.game_check import Game
 

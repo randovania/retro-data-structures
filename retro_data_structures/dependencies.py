@@ -1,15 +1,11 @@
 import logging
-from typing import Iterator, Dict, Set, List, NamedTuple, Callable, Any
+from typing import Iterator, Dict, Set, List, Callable, Any
 
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
+from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part, AssetId, AssetType
+from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
 from retro_data_structures.game_check import Game
-
-
-class Dependency(NamedTuple):
-    type: AssetType
-    id: AssetId
 
 
 class InvalidDependency(Exception):
@@ -49,11 +45,11 @@ def direct_dependencies_for(obj, obj_type: AssetType, target_game: Game) -> Iter
 
 
 def _internal_dependencies_for(
-    get_asset: Callable[[AssetId], Any],
-    target_game: Game,
-    asset_id: AssetId,
-    obj_type: AssetType,
-    deps_by_asset_id: Dict[AssetId, Set[Dependency]],
+        get_asset: Callable[[AssetId], Any],
+        target_game: Game,
+        asset_id: AssetId,
+        obj_type: AssetType,
+        deps_by_asset_id: Dict[AssetId, Set[Dependency]],
 ):
     if asset_id in deps_by_asset_id:
         return

@@ -10,7 +10,7 @@ from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRang
 
 from retro_data_structures import game_check
 from retro_data_structures.common_types import AssetId32, FourCC
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
 from retro_data_structures.formats.script_object import ScriptInstance
@@ -71,5 +71,5 @@ class Scan(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SCAN
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

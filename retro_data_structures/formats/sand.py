@@ -7,36 +7,36 @@ from typing import Optional, List
 import construct
 from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, Int8ub, Float32b
 
+from retro_data_structures.base_resource import BaseResource, Dependency, AssetType
 from retro_data_structures.common_types import AssetId64
-from retro_data_structures.formats import BaseResource, AssetType
 from retro_data_structures.formats.evnt import SoundPOINode, Int32POINode, ParticlePOINode
 from retro_data_structures.formats.meta_transition import MetaTransition_v2
 from retro_data_structures.game_check import Game
 
 # This format is only for Prime 3, so AssetId is always 64-bit
-AssetId = AssetId64
+ConstructAssetId = AssetId64
 
 Transition = Struct(
     _unknown=Const(0, Int8ub),
-    animation_id_a=AssetId * "ANIM",
-    animation_id_b=AssetId * "ANIM",
+    animation_id_a=ConstructAssetId * "ANIM",
+    animation_id_b=ConstructAssetId * "ANIM",
     transition=MetaTransition_v2,
 )
 
 AdditiveAnimation = Struct(
-    animation_id=AssetId * "ANIM",
+    animation_id=ConstructAssetId * "ANIM",
     fade_in_time=Float32b,
     fade_out_time=Float32b,
 )
 
 HalfTransitions = Struct(
     _unknown=Const(0, Int8ub),
-    animation_id=AssetId * "ANIM",
+    animation_id=ConstructAssetId * "ANIM",
     transition=MetaTransition_v2,
 )
 
 AnimEventSet = Struct(
-    id=AssetId * "ANIM",
+    id=ConstructAssetId * "ANIM",
     unk=Int32ub,
     event_sets=PrefixedArray(Int32ub, ParticlePOINode),
     sound_sets=PrefixedArray(Int32ub, SoundPOINode),
@@ -91,5 +91,5 @@ class Sand(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SAND
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

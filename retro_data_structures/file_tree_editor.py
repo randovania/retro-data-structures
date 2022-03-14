@@ -9,7 +9,7 @@ import construct
 import nod
 
 from retro_data_structures import formats
-from retro_data_structures.formats.base_resource import (
+from retro_data_structures.base_resource import (
     AssetId, BaseResource, NameOrAssetId, RawResource,
     resolve_asset_id
 )

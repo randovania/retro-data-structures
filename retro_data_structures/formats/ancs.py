@@ -11,7 +11,7 @@ from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
 from retro_data_structures.formats import meta_animation, evnt
-from retro_data_structures.formats.base_resource import BaseResource, AssetType
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
@@ -19,7 +19,7 @@ from retro_data_structures.formats.pas_database import PASDatabase
 from retro_data_structures.game_check import Game
 
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
-AssetId = AssetId32
+ConstructAssetId = AssetId32
 
 AnimationName = Struct(
     animation_id=Int32ub,
@@ -27,11 +27,11 @@ AnimationName = Struct(
     name=String,
 )
 ParticleResourceData = Struct(
-    generic_particles=PrefixedArray(Int32ub, AssetId) * "PART",
-    swoosh_particles=PrefixedArray(Int32ub, AssetId) * "SWHC",
+    generic_particles=PrefixedArray(Int32ub, ConstructAssetId) * "PART",
+    swoosh_particles=PrefixedArray(Int32ub, ConstructAssetId) * "SWHC",
     unknown=WithVersion(6, Int32ub),
-    electric_particles=PrefixedArray(Int32ub, AssetId) * "ELSC",
-    spawn_particles=WithVersion(10, PrefixedArray(Int32ub, AssetId)) * "SPSC",
+    electric_particles=PrefixedArray(Int32ub, ConstructAssetId) * "ELSC",
+    spawn_particles=WithVersion(10, PrefixedArray(Int32ub, ConstructAssetId)) * "SPSC",
 )
 AnimationAABB = Struct(
     name=String,
@@ -59,9 +59,9 @@ Character = Struct(
     id=Int32ub,
     version=Int16ub,
     name=String,
-    model_id=AssetId * "CMDL",
-    skin_id=AssetId * "CSKR",
-    skeleton_id=AssetId * "CINF",
+    model_id=ConstructAssetId * "CMDL",
+    skin_id=ConstructAssetId * "CSKR",
+    skeleton_id=ConstructAssetId * "CINF",
     animation_names=PrefixedArray(Int32ub, AnimationName),
     pas_database=PASDatabase,
     particle_resource_data=ParticleResourceData,
@@ -69,10 +69,10 @@ Character = Struct(
     unknown_2=WithVersion(10, Int32ub),
     animation_aabb_array=WithVersion(2, PrefixedArray(Int32ub, AnimationAABB)),
     effect_array=WithVersion(2, PrefixedArray(Int32ub, Effect)),
-    frozen_model=WithVersion(4, AssetId) * "CMDL",
-    frozen_skin=WithVersion(4, AssetId) * "CSKR",
+    frozen_model=WithVersion(4, ConstructAssetId) * "CMDL",
+    frozen_skin=WithVersion(4, ConstructAssetId) * "CSKR",
     animation_id_map=WithVersion(5, PrefixedArray(Int32ub, Int32ub)),
-    spatial_primitives_id=WithVersion(10, AssetId) * "CSPP",
+    spatial_primitives_id=WithVersion(10, ConstructAssetId) * "CSPP",
     unknown_3=WithVersion(10, Int8ub),
     indexed_animation_aabb_array=WithVersion(10, PrefixedArray(Int32ub, IndexedAnimationAABB)),
 )
@@ -106,8 +106,8 @@ HalfTransitions = Struct(
 )
 
 AnimationResourcePair = Struct(
-    anim_id=AssetId * "ANIM",
-    event_id=AssetId * "EVNT",
+    anim_id=ConstructAssetId * "ANIM",
+    event_id=ConstructAssetId * "EVNT",
 )
 
 AnimationSet = Struct(
@@ -184,5 +184,5 @@ class Ancs(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return ANCS
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

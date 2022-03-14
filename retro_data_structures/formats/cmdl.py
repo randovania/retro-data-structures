@@ -31,7 +31,7 @@ from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Vect
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.misc import Skip, ErrorWithMessage
 from retro_data_structures.data_section import DataSectionSizes, DataSection
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
@@ -352,5 +352,5 @@ class Cmdl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CMDL
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

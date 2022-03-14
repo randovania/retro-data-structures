@@ -9,7 +9,7 @@ from construct import Int16ub, GreedyBytes
 from construct import Struct, Int32ub
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
-from retro_data_structures.formats.base_resource import BaseResource, AssetType, AssetId
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 
@@ -47,5 +47,5 @@ class Txtr(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return TXTR
 
-    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []

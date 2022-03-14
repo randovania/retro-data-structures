@@ -28,7 +28,7 @@ from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressed
 from retro_data_structures.construct_extensions.alignment import AlignTo, AlignedPrefixed
 from retro_data_structures.construct_extensions.misc import LazyPatchedForBug
 from retro_data_structures.formats import BaseResource
-from retro_data_structures.formats.base_resource import AssetId, AssetType, RawResource
+from retro_data_structures.base_resource import AssetId, AssetType, RawResource
 from retro_data_structures.game_check import Game
 
 PAKHeader = Struct(
