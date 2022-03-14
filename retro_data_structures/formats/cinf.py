@@ -42,5 +42,5 @@ class Cinf(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CINF
 
-    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
         yield from []

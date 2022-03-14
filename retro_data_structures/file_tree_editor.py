@@ -80,11 +80,11 @@ class FileTreeEditor:
     _ensured_asset_ids: mapping of pak name to assets we'll copy into it when saving
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
-    headers: dict[str, construct.Container]
-    _files_for_asset_id: dict[AssetId, set[str]]
-    _ensured_asset_ids: dict[str, set[AssetId]]
-    _modified_resources: dict[AssetId, Optional[RawResource]]
-    _in_memory_paks: dict[str, Pak]
+    headers: typing.Dict[str, construct.Container]
+    _files_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
+    _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
+    _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
+    _in_memory_paks: typing.Dict[str, Pak]
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider

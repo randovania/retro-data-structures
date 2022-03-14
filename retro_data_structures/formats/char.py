@@ -138,5 +138,5 @@ class Char(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CHAR
 
-    def dependencies_for(self) -> typing.Iterator[tuple[AssetType, AssetId]]:
+    def dependencies_for(self) -> typing.Iterator[typing.Tuple[AssetType, AssetId]]:
         yield from dependencies_for(self.raw, self.target_game)
