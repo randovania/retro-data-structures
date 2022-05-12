@@ -169,6 +169,11 @@ class Pak(BaseResource):
     def build_stream(self, stream: typing.BinaryIO) -> bytes:
         return self.construct_class(self.target_game).build_stream(self._raw, stream, target_game=self.target_game)
 
+    def offsets_for_asset(self, asset_id: AssetId) -> typing.Iterator[int]:
+        for file in self.raw.resources:
+            if file.asset.id == asset_id:
+                yield file._offset
+
     @property
     def all_assets(self) -> typing.Iterator[PakFile]:
         for file in self.raw.resources:
