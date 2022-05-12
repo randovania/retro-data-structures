@@ -192,12 +192,16 @@ class Pak(BaseResource):
         return None
 
     def replace_asset(self, asset_id: AssetId, asset: RawResource):
+        found = False
+
         for file in self.raw.resources:
             if file.asset.id == asset_id:
                 file.asset.type = asset.type
                 file.contents = construct.Container(value=asset.data)
+                found = True
 
-        raise ValueError(f"Unknown asset id: {asset_id}")
+        if not found:
+            raise ValueError(f"Unknown asset id: {asset_id}")
 
     def add_asset(self, asset_id: AssetId, asset: RawResource):
         self.raw.resources.append(construct.Container(
@@ -216,9 +220,12 @@ class Pak(BaseResource):
             if file.asset.id == asset_id:
                 raise ValueError(f"Asset id {asset_id} is named {file.name}, can't be removed.")
 
+        found = False
         for file in list(self.raw.resources):
             if file.asset.id == asset_id:
                 self.raw.resources.remove(file)
+                found = True
 
-        raise ValueError(f"Unknown asset id: {asset_id}")
+        if not found:
+            raise ValueError(f"Unknown asset id: {asset_id}")
 

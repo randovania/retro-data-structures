@@ -324,7 +324,7 @@ class FileTreeEditor:
             out_pak_path = output_path.joinpath(pak_name)
             logger.info("Writing %s", out_pak_path)
             out_pak_path.parent.mkdir(parents=True, exist_ok=True)
-            with out_pak_path.open("wb") as f:
+            with out_pak_path.open("w+b") as f:
                 pak.build_stream(f)
 
         custom_names = output_path.joinpath("custom_names.json")
