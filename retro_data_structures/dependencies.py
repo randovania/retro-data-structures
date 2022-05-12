@@ -1,9 +1,11 @@
 import logging
 from typing import Iterator, Dict, Set, List, Callable, Any
 
+from retro_data_structures import formats
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
-from retro_data_structures.base_resource import AssetId, AssetType, Dependency
+from retro_data_structures.base_resource import AssetId, AssetType, Dependency, BaseResource
 from retro_data_structures.conversion.asset_converter import AssetConverter
+from retro_data_structures.file_tree_editor import FileTreeEditor
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
 from retro_data_structures.game_check import Game
 
@@ -71,7 +73,9 @@ def _internal_dependencies_for(
             raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
-def recursive_dependencies_for(asset_provider: AssetProvider, asset_ids: List[AssetId]) -> Set[Dependency]:
+def recursive_dependencies_for(asset_provider: AssetProvider,
+                               asset_ids: List[AssetId],
+                               ) -> Set[Dependency]:
     deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
 
     for asset_id in asset_ids:
@@ -103,3 +107,43 @@ def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId,
             )
 
     return deps_by_asset_id
+
+
+def recursive_dependencies_for_editor(editor: FileTreeEditor,
+                                      asset_ids: List[AssetId],
+                                      ) -> Set[Dependency]:
+    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
+
+    def _recursive(asset_id: AssetId):
+        if asset_id in deps_by_asset_id:
+            return
+
+        raw_asset = editor.get_raw_asset(asset_id)
+        deps_by_asset_id[asset_id] = {Dependency(raw_asset.type, asset_id)}
+
+        try:
+            format_class = formats.resource_type_for(raw_asset.type)
+        except KeyError:
+            return
+
+        obj = format_class.parse(raw_asset.data, target_game=editor.target_game)
+
+        for new_type, new_asset_id in obj.dependencies_for():
+            deps_by_asset_id[asset_id].add(Dependency(new_type, new_asset_id))
+            try:
+                _recursive(new_asset_id)
+            except UnknownAssetId:
+                logging.warning(
+                    f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) " f"that doesn't exist."
+                )
+            except InvalidAssetId:
+                raise InvalidDependency(asset_id, new_asset_id, new_type)
+
+    for it in asset_ids:
+        _recursive(it)
+
+    result = set()
+    for deps in deps_by_asset_id.values():
+        result.update(deps)
+
+    return result
