@@ -11,7 +11,7 @@ import nod
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
     AssetId, BaseResource, NameOrAssetId, RawResource,
-    resolve_asset_id
+    resolve_asset_id, AssetType
 )
 from retro_data_structures.formats.pak import PAKNoData, Pak
 from retro_data_structures.game_check import Game
@@ -82,6 +82,7 @@ class FileTreeEditor:
     """
     headers: typing.Dict[str, construct.Container]
     _files_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
+    _types_for_asset_id: typing.Dict[AssetId, AssetType]
     _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
     _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
     _in_memory_paks: typing.Dict[str, Pak]
@@ -104,6 +105,7 @@ class FileTreeEditor:
     def _update_headers(self):
         self._ensured_asset_ids = {}
         self._files_for_asset_id = {}
+        self._types_for_asset_id = {}
 
         self._name_for_asset_id = {}
         if self.provider.is_file("custom_names.json"):
@@ -126,6 +128,7 @@ class FileTreeEditor:
             self._ensured_asset_ids[name] = set()
             for entry in pak_no_data.resources:
                 self._add_pak_name_for_asset_id(entry.asset.id, name)
+                self._types_for_asset_id[entry.asset.id] = entry.asset.type
 
     def all_asset_ids(self) -> Iterator[AssetId]:
         """
@@ -147,6 +150,27 @@ class FileTreeEditor:
             return self._modified_resources[asset_id] is not None
 
         return asset_id in self._files_for_asset_id
+
+    def get_asset_type(self, asset_id: NameOrAssetId) -> AssetType:
+        """
+        Gets the type that is associated with the given asset name/id in the pak headers.
+        :param asset_id:
+        :return:
+        """
+        original_name = asset_id
+        asset_id = self._resolve_asset_id(asset_id)
+
+        if asset_id in self._modified_resources:
+            result = self._modified_resources[asset_id]
+            if result is None:
+                raise ValueError(f"Deleted asset_id: {original_name}")
+            else:
+                return result.type
+
+        try:
+            return self._types_for_asset_id[asset_id]
+        except KeyError:
+            raise ValueError(f"Unknown asset_id: {original_name}") from None
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
@@ -280,7 +304,7 @@ class FileTreeEditor:
                 if asset_id not in asset_ids_to_copy:
                     asset_ids_to_copy[asset_id] = self.get_raw_asset(asset_id)
 
-        # Update the PKGs
+        # Update the PAKs
         for pak_name in modified_paks:
             logger.info("Updating %s", pak_name)
             pak = self._in_memory_paks.pop(pak_name)
