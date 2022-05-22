@@ -37,6 +37,9 @@ class PathFileProvider(FileProvider):
             raise FileNotFoundError(f"{root} is not a directory")
         self.root = root
 
+    def __repr__(self):
+        return f"<PathFileProvider {self.root}>"
+
     def is_file(self, name: str) -> bool:
         return self.root.joinpath(name).is_file()
 
@@ -58,7 +61,12 @@ class IsoFileProvider(FileProvider):
         self.data = self.disc.get_data_partition()
         if self.data is None:
             raise ValueError(f"{iso_path} does not have data")
+
         self.all_files = self.data.files()
+        self.iso_path = iso_path
+
+    def __repr__(self):
+        return f"<IsoFileProvider {self.iso_path}>"
 
     def is_file(self, name: str) -> bool:
         return name in self.all_files
@@ -209,11 +217,14 @@ class FileTreeEditor:
         return format_class.parse(raw_asset.data, target_game=self.target_game)
 
     def add_new_asset(self, name: str, new_data: typing.Union[RawResource, BaseResource],
-                      in_paks: typing.Iterable[str]):
+                      in_paks: typing.Iterable[str], *, custom_asset_id: int = None):
         """
         Adds an asset that doesn't already exist.
         """
-        asset_id = self._resolve_asset_id(name)
+        if custom_asset_id is None:
+            asset_id = self._resolve_asset_id(name)
+        else:
+            asset_id = custom_asset_id
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{name} already exists")
 
