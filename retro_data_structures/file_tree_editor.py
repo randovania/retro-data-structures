@@ -104,6 +104,8 @@ class FileTreeEditor:
         self._update_headers()
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
+        if value in self._custom_asset_ids:
+            return self._custom_asset_ids[value]
         return resolve_asset_id(self.target_game, value)
 
     def _add_pak_name_for_asset_id(self, asset_id: AssetId, pak_name: str):
@@ -115,13 +117,13 @@ class FileTreeEditor:
         self._files_for_asset_id = {}
         self._types_for_asset_id = {}
 
-        self._name_for_asset_id = {}
+        self._custom_asset_ids = {}
         if self.provider.is_file("custom_names.json"):
             with self.provider.open_binary("custom_names.json") as f:
                 custom_names_text = f.read().decode("utf-8")
 
-            self._name_for_asset_id.update({
-                asset_id: name
+            self._custom_asset_ids.update({
+                name: asset_id
                 for name, asset_id in json.loads(custom_names_text).items()
             })
 
@@ -216,22 +218,28 @@ class FileTreeEditor:
 
         return format_class.parse(raw_asset.data, target_game=self.target_game)
 
+    def register_custom_asset_name(self, name: str, asset_id: AssetId):
+        if self.does_asset_exists(asset_id):
+            raise ValueError(f"{asset_id} already exists")
+
+        if name in self._custom_asset_ids:
+            raise ValueError(f"{name} already exists")
+
+        self._custom_asset_ids[name] = asset_id
+
     def add_new_asset(self, name: str, new_data: typing.Union[RawResource, BaseResource],
-                      in_paks: typing.Iterable[str], *, custom_asset_id: int = None):
+                      in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
         """
-        if custom_asset_id is None:
-            asset_id = self._resolve_asset_id(name)
-        else:
-            asset_id = custom_asset_id
+        asset_id = self._resolve_asset_id(name)
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{name} already exists")
 
         in_paks = list(in_paks)
         files_set = set()
 
-        self._name_for_asset_id[asset_id] = name
+        self._custom_asset_ids[name] = asset_id
         self._files_for_asset_id[asset_id] = files_set
         self.replace_asset(name, new_data)
         for pak_name in in_paks:
@@ -343,7 +351,7 @@ class FileTreeEditor:
             json.dump(
                 {
                     name: asset_id
-                    for asset_id, name in self._name_for_asset_id.items()
+                    for name, asset_id in self._custom_asset_ids.items()
                 },
                 f,
                 indent=4,
