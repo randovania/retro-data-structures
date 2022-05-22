@@ -9,9 +9,10 @@ import construct
 import nod
 
 from retro_data_structures import formats
+from retro_data_structures.asset_reference import AssetReference
 from retro_data_structures.base_resource import (
-    AssetId, BaseResource, NameOrAssetId, RawResource,
-    resolve_asset_id, AssetType
+    AssetId, BaseResource, RawResource,
+    AssetType
 )
 from retro_data_structures.formats.pak import PAKNoData, Pak
 from retro_data_structures.game_check import Game
@@ -86,6 +87,7 @@ class FileTreeEditor:
     _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
     _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
     _in_memory_paks: typing.Dict[str, Pak]
+    _custom_asset_references: typing.Dict[str, AssetReference]
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider
@@ -95,8 +97,8 @@ class FileTreeEditor:
 
         self._update_headers()
 
-    def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
-        return resolve_asset_id(self.target_game, value)
+    def _resolve_asset_id(self, reference: AssetReference) -> AssetId:
+        return reference.asset_id
 
     def _add_pak_name_for_asset_id(self, asset_id: AssetId, pak_name: str):
         self._files_for_asset_id[asset_id] = self._files_for_asset_id.get(asset_id, set())
@@ -107,15 +109,16 @@ class FileTreeEditor:
         self._files_for_asset_id = {}
         self._types_for_asset_id = {}
 
-        self._name_for_asset_id = {}
         if self.provider.is_file("custom_names.json"):
             with self.provider.open_binary("custom_names.json") as f:
                 custom_names_text = f.read().decode("utf-8")
 
-            self._name_for_asset_id.update({
-                asset_id: name
+            self._custom_asset_references = {
+                name: AssetReference(asset_id, name, True)
                 for name, asset_id in json.loads(custom_names_text).items()
-            })
+            }
+        else:
+            self._custom_asset_references = {}
 
         self.all_paks = list(
             self.provider.rglob("*.pak")
@@ -130,60 +133,64 @@ class FileTreeEditor:
                 self._add_pak_name_for_asset_id(entry.asset.id, name)
                 self._types_for_asset_id[entry.asset.id] = entry.asset.type
 
+    def custom_reference_for(self, name: str) -> AssetReference:
+        if name in self._custom_asset_references:
+            return self._custom_asset_references[name]
+
+        # FIXME: implement asset id generation
+        self._custom_asset_references[name] = reference = AssetReference(
+            asset_id=new_asset_id,
+            description=name,
+            is_custom=True,
+        )
+        return reference
+
     def all_asset_ids(self) -> Iterator[AssetId]:
         """
         Returns an iterator of all asset ids in the available paks.
         """
         yield from self._files_for_asset_id.keys()
 
-    def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
-        for pak_name in self._files_for_asset_id[self._resolve_asset_id(asset_id)]:
+    def find_paks(self, reference: AssetReference) -> Iterator[str]:
+        for pak_name in self._files_for_asset_id[self._resolve_asset_id(reference)]:
             yield pak_name
 
-    def does_asset_exists(self, asset_id: NameOrAssetId) -> bool:
+    def does_asset_exists(self, reference: AssetReference) -> bool:
         """
         Checks if a given asset id exists.
         """
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self._resolve_asset_id(reference)
 
         if asset_id in self._modified_resources:
             return self._modified_resources[asset_id] is not None
 
         return asset_id in self._files_for_asset_id
 
-    def get_asset_type(self, asset_id: NameOrAssetId) -> AssetType:
+    def get_asset_type(self, reference: AssetReference) -> AssetType:
         """
         Gets the type that is associated with the given asset name/id in the pak headers.
-        :param asset_id:
+        :param reference:
         :return:
         """
-        original_name = asset_id
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self._resolve_asset_id(reference)
 
         if asset_id in self._modified_resources:
             result = self._modified_resources[asset_id]
             if result is None:
-                raise ValueError(f"Deleted asset_id: {original_name}")
+                raise ValueError(f"Deleted reference: {reference}")
             else:
                 return result.type
 
         try:
             return self._types_for_asset_id[asset_id]
         except KeyError:
-            raise ValueError(f"Unknown asset_id: {original_name}") from None
+            raise ValueError(f"Unknown reference: {reference}") from None
 
-    def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
-        """
-        Gets the bytes data for the given asset name/id, optionally restricting from which pak.
-        :raises ValueError if the asset doesn't exist.
-        """
-        original_name = asset_id
-        asset_id = self._resolve_asset_id(asset_id)
-
+    def _get_raw_asset_from_id(self, asset_id: AssetId) -> Optional[RawResource]:
         if asset_id in self._modified_resources:
             result = self._modified_resources[asset_id]
             if result is None:
-                raise ValueError(f"Deleted asset_id: {original_name}")
+                raise ValueError("Deleted reference")
             else:
                 return result
 
@@ -193,14 +200,25 @@ class FileTreeEditor:
             if result is not None:
                 return result
 
-        raise ValueError(f"Unknown asset_id: {original_name}")
+        return None
 
-    def get_parsed_asset(self, asset_id: NameOrAssetId, *,
+    def get_raw_asset(self, reference: AssetReference) -> RawResource:
+        """
+        Gets the bytes data for the given asset name/id, optionally restricting from which pak.
+        :raises ValueError if the asset doesn't exist.
+        """
+        asset_id = self._resolve_asset_id(reference)
+        result = self._get_raw_asset_from_id(asset_id)
+        if result is None:
+            raise ValueError(f"Unknown reference: {reference}")
+        return result
+
+    def get_parsed_asset(self, reference: AssetReference, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
         """
-        raw_asset = self.get_raw_asset(asset_id)
+        raw_asset = self.get_raw_asset(reference)
 
         format_class = formats.resource_type_for(raw_asset.type)
         if type_hint is not BaseResource and type_hint != format_class:
@@ -208,36 +226,39 @@ class FileTreeEditor:
 
         return format_class.parse(raw_asset.data, target_game=self.target_game)
 
-    def add_new_asset(self, name: str, new_data: typing.Union[RawResource, BaseResource],
+    def add_new_asset(self, reference: AssetReference, new_data: typing.Union[RawResource, BaseResource],
                       in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
         """
-        asset_id = self._resolve_asset_id(name)
-        if self.does_asset_exists(asset_id):
-            raise ValueError(f"{name} already exists")
+        asset_id = self._resolve_asset_id(reference)
+        if self.does_asset_exists(reference):
+            raise ValueError(f"{reference} already exists")
+
+        # Assets that exist must be replaced instead, so new assets will always use custom references
+        assert reference.is_custom
+        if self._custom_asset_references.get(reference.description) is not reference:
+            raise ValueError(f"{reference} was not created by this FileTreeEditor")
 
         in_paks = list(in_paks)
         files_set = set()
 
-        self._name_for_asset_id[asset_id] = name
         self._files_for_asset_id[asset_id] = files_set
-        self.replace_asset(name, new_data)
+        self.replace_asset(reference, new_data)
         for pak_name in in_paks:
-            self.ensure_present(pak_name, asset_id)
+            self.ensure_present(pak_name, reference)
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: typing.Union[RawResource, BaseResource]):
+    def replace_asset(self, reference: AssetReference, new_data: typing.Union[RawResource, BaseResource]):
         """
         Replaces an existing asset.
         See `add_new_asset` for new assets.
         """
-
         # Test if the asset exists
-        if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
+        if not self.does_asset_exists(reference):
+            raise ValueError(f"Unknown asset: {reference}")
 
         if isinstance(new_data, BaseResource):
-            logger.debug("Encoding %s", str(asset_id))
+            logger.debug("Encoding %s", reference)
             raw_asset = RawResource(
                 type=new_data.resource_type(),
                 data=new_data.build(),
@@ -246,14 +267,14 @@ class FileTreeEditor:
         else:
             raw_asset = new_data
 
-        self._modified_resources[self._resolve_asset_id(asset_id)] = raw_asset
+        self._modified_resources[self._resolve_asset_id(reference)] = raw_asset
 
-    def delete_asset(self, asset_id: NameOrAssetId):
+    def delete_asset(self, reference: AssetReference):
         # Test if the asset exists
-        if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
+        if not self.does_asset_exists(reference):
+            raise ValueError(f"Unknown asset: {reference}")
 
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self._resolve_asset_id(reference)
 
         self._modified_resources[asset_id] = None
 
@@ -262,7 +283,7 @@ class FileTreeEditor:
             if asset_id in ensured_ids:
                 ensured_ids.remove(asset_id)
 
-    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId):
+    def ensure_present(self, pak_name: str, reference: AssetReference):
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
@@ -270,11 +291,11 @@ class FileTreeEditor:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 
         # Test if the asset exists
-        if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
+        if not self.does_asset_exists(reference):
+            raise ValueError(f"Unknown asset: {reference}")
 
         # If the pak already has the given asset, do nothing
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self._resolve_asset_id(reference)
         if pak_name not in self._files_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
 
@@ -302,7 +323,7 @@ class FileTreeEditor:
         for asset_ids in self._ensured_asset_ids.values():
             for asset_id in asset_ids:
                 if asset_id not in asset_ids_to_copy:
-                    asset_ids_to_copy[asset_id] = self.get_raw_asset(asset_id)
+                    asset_ids_to_copy[asset_id] = self._get_raw_asset_from_id(asset_id)
 
         # Update the PAKs
         for pak_name in modified_paks:
@@ -327,16 +348,15 @@ class FileTreeEditor:
             with out_pak_path.open("w+b") as f:
                 pak.build_stream(f)
 
-        custom_names = output_path.joinpath("custom_names.json")
-        with custom_names.open("w") as f:
-            json.dump(
+        output_path.joinpath("custom_names.json").write_text(
+            json.dumps(
                 {
-                    name: asset_id
-                    for asset_id, name in self._name_for_asset_id.items()
+                    name: reference.asset_id
+                    for name, reference in self._custom_asset_references.items()
                 },
-                f,
                 indent=4,
             )
+        )
 
         self._modified_resources = {}
         self._update_headers()
