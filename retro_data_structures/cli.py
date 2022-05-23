@@ -182,22 +182,19 @@ def do_convert(args):
     target_game: Game = args.target_game
     asset_ids: List[int] = args.asset_ids
 
-    asset_provider = AssetManager(get_provider_from_argument(args), source_game)
-    next_id = 0xFFFF0000
+    next_generated_id = 0xFFFF0000
+    asset_manager = AssetManager(get_provider_from_argument(args), source_game)
 
     def id_generator(asset_type):
-        nonlocal next_id
-        result = next_id
-        while asset_provider.does_asset_exists(result):
-            result += 1
-
-        next_id = result + 1
-        asset_provider.register_custom_asset_name(f"custom_{asset_type}_{result}", result)
+        # Proper implementation would need an AssetManager for the target game.
+        nonlocal next_generated_id
+        result = next_generated_id
+        next_generated_id = result + 1
         return result
 
     converter = AssetConverter(
         target_game=target_game,
-        asset_providers={source_game: asset_provider},
+        asset_providers={source_game: asset_manager},
         id_generator=id_generator,
         converters=conversions.converter_for,
     )
