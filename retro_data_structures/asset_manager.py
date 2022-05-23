@@ -13,6 +13,7 @@ from retro_data_structures.base_resource import (
     AssetId, BaseResource, NameOrAssetId, RawResource,
     resolve_asset_id, AssetType
 )
+from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats.pak import PAKNoData, Pak
 from retro_data_structures.game_check import Game
 
@@ -148,8 +149,13 @@ class AssetManager:
         yield from self._paks_for_asset_id.keys()
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
-        for pak_name in self._paks_for_asset_id[self._resolve_asset_id(asset_id)]:
-            yield pak_name
+        original_name = asset_id
+        asset_id = self._resolve_asset_id(asset_id)
+        try:
+            for pak_name in self._paks_for_asset_id[asset_id]:
+                yield pak_name
+        except KeyError:
+            raise UnknownAssetId(asset_id, original_name) from None
 
     def does_asset_exists(self, asset_id: NameOrAssetId) -> bool:
         """
@@ -181,7 +187,7 @@ class AssetManager:
         try:
             return self._types_for_asset_id[asset_id]
         except KeyError:
-            raise ValueError(f"Unknown asset_id: {original_name}") from None
+            raise UnknownAssetId(asset_id, original_name) from None
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
@@ -198,13 +204,14 @@ class AssetManager:
             else:
                 return result
 
-        for pak_name in self._paks_for_asset_id[asset_id]:
-            pak = self.get_pak(pak_name)
-            result = pak.get_asset(asset_id)
-            if result is not None:
-                return result
-
-        raise ValueError(f"Unknown asset_id: {original_name}")
+        try:
+            for pak_name in self._paks_for_asset_id[asset_id]:
+                pak = self.get_pak(pak_name)
+                result = pak.get_asset(asset_id)
+                if result is not None:
+                    return result
+        except KeyError:
+            raise UnknownAssetId(asset_id, original_name) from None
 
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
@@ -242,6 +249,7 @@ class AssetManager:
         Adds an asset that doesn't already exist.
         """
         asset_id = self._resolve_asset_id(name)
+
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{name} already exists")
 
@@ -259,10 +267,12 @@ class AssetManager:
         Replaces an existing asset.
         See `add_new_asset` for new assets.
         """
+        original_name = asset_id
+        asset_id = self._resolve_asset_id(asset_id)
 
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
+            raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
             logger.debug("Encoding %s", str(asset_id))
@@ -274,14 +284,15 @@ class AssetManager:
         else:
             raw_asset = new_data
 
-        self._modified_resources[self._resolve_asset_id(asset_id)] = raw_asset
+        self._modified_resources[asset_id] = raw_asset
 
     def delete_asset(self, asset_id: NameOrAssetId):
+        original_name = asset_id
+        asset_id = self._resolve_asset_id(asset_id)
+
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
-
-        asset_id = self._resolve_asset_id(asset_id)
+            raise UnknownAssetId(asset_id, original_name)
 
         self._modified_resources[asset_id] = None
 
@@ -297,12 +308,14 @@ class AssetManager:
         if pak_name not in self._ensured_asset_ids:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 
+        original_name = asset_id
+        asset_id = self._resolve_asset_id(asset_id)
+
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
-            raise ValueError(f"Unknown asset: {asset_id}")
+            raise UnknownAssetId(asset_id, original_name)
 
         # If the pak already has the given asset, do nothing
-        asset_id = self._resolve_asset_id(asset_id)
         if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
 
