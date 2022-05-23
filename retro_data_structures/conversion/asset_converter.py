@@ -14,6 +14,13 @@ class AssetDetails:
     asset_type: AssetType
     original_game: Game
 
+    def __repr__(self):
+        if self.asset_id is None:
+            asset_str = "None"
+        else:
+            asset_str = f"0x{self.asset_id:08x}"
+        return f"AssetDetails<{asset_str}, a {self.asset_type} of {self.original_game.name}>"
+
 
 IdGenerator = Callable[[AssetDetails], AssetId]
 Resource = Any
