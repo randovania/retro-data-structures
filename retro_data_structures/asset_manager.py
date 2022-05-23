@@ -89,7 +89,7 @@ class AssetManager:
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
     headers: typing.Dict[str, construct.Container]
-    _files_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
+    _paks_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
     _types_for_asset_id: typing.Dict[AssetId, AssetType]
     _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
     _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
@@ -109,12 +109,12 @@ class AssetManager:
         return resolve_asset_id(self.target_game, value)
 
     def _add_pak_name_for_asset_id(self, asset_id: AssetId, pak_name: str):
-        self._files_for_asset_id[asset_id] = self._files_for_asset_id.get(asset_id, set())
-        self._files_for_asset_id[asset_id].add(pak_name)
+        self._paks_for_asset_id[asset_id] = self._paks_for_asset_id.get(asset_id, set())
+        self._paks_for_asset_id[asset_id].add(pak_name)
 
     def _update_headers(self):
         self._ensured_asset_ids = {}
-        self._files_for_asset_id = {}
+        self._paks_for_asset_id = {}
         self._types_for_asset_id = {}
 
         self._custom_asset_ids = {}
@@ -144,10 +144,10 @@ class AssetManager:
         """
         Returns an iterator of all asset ids in the available paks.
         """
-        yield from self._files_for_asset_id.keys()
+        yield from self._paks_for_asset_id.keys()
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
-        for pak_name in self._files_for_asset_id[self._resolve_asset_id(asset_id)]:
+        for pak_name in self._paks_for_asset_id[self._resolve_asset_id(asset_id)]:
             yield pak_name
 
     def does_asset_exists(self, asset_id: NameOrAssetId) -> bool:
@@ -159,7 +159,7 @@ class AssetManager:
         if asset_id in self._modified_resources:
             return self._modified_resources[asset_id] is not None
 
-        return asset_id in self._files_for_asset_id
+        return asset_id in self._paks_for_asset_id
 
     def get_asset_type(self, asset_id: NameOrAssetId) -> AssetType:
         """
@@ -197,7 +197,7 @@ class AssetManager:
             else:
                 return result
 
-        for pak_name in self._files_for_asset_id[asset_id]:
+        for pak_name in self._paks_for_asset_id[asset_id]:
             pak = self.get_pak(pak_name)
             result = pak.get_asset(asset_id)
             if result is not None:
@@ -240,7 +240,7 @@ class AssetManager:
         files_set = set()
 
         self._custom_asset_ids[name] = asset_id
-        self._files_for_asset_id[asset_id] = files_set
+        self._paks_for_asset_id[asset_id] = files_set
         self.replace_asset(name, new_data)
         for pak_name in in_paks:
             self.ensure_present(pak_name, asset_id)
@@ -294,7 +294,7 @@ class AssetManager:
 
         # If the pak already has the given asset, do nothing
         asset_id = self._resolve_asset_id(asset_id)
-        if pak_name not in self._files_for_asset_id[asset_id]:
+        if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
 
     def get_pak(self, pak_name: str) -> Pak:
@@ -315,7 +315,7 @@ class AssetManager:
         asset_ids_to_copy = {}
 
         for asset_id in self._modified_resources.keys():
-            modified_paks.update(self._files_for_asset_id[asset_id])
+            modified_paks.update(self._paks_for_asset_id[asset_id])
 
         # Read all asset ids we need to copy somewhere else
         for asset_ids in self._ensured_asset_ids.values():
@@ -329,7 +329,7 @@ class AssetManager:
             pak = self._in_memory_paks.pop(pak_name)
 
             for asset_id, raw_asset in self._modified_resources.items():
-                if pak_name in self._files_for_asset_id[asset_id]:
+                if pak_name in self._paks_for_asset_id[asset_id]:
                     if raw_asset is None:
                         pak.remove_asset(asset_id)
                     else:
