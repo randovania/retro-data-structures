@@ -100,6 +100,7 @@ class AssetManager:
         self.target_game = target_game
         self._modified_resources = {}
         self._in_memory_paks = {}
+        self._next_generated_id = 0xFFFF0000
 
         self._update_headers()
 
@@ -217,6 +218,14 @@ class AssetManager:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
         return format_class.parse(raw_asset.data, target_game=self.target_game)
+
+    def generate_asset_id(self):
+        result = self._next_generated_id
+        while self.does_asset_exists(result):
+            result += 1
+
+        self._next_generated_id = result + 1
+        return result
 
     def register_custom_asset_name(self, name: str, asset_id: AssetId):
         if self.does_asset_exists(asset_id):
