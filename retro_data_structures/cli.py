@@ -9,11 +9,12 @@ from pathlib import Path
 from typing import Optional, List
 
 from retro_data_structures import dependencies, formats
-from retro_data_structures.asset_provider import AssetProvider
+from retro_data_structures.base_resource import AssetId
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import mlvl, AssetId
+from retro_data_structures.file_tree_editor import FileTreeEditor, PathFileProvider, IsoFileProvider
+from retro_data_structures.formats import mlvl
 from retro_data_structures.game_check import Game
 
 types_per_game = {
@@ -51,6 +52,19 @@ def add_game_argument(parser: argparse.ArgumentParser, name="--game"):
     parser.add_argument(name, help="The game of the file", type=game_argument_type, choices=list(Game), required=True)
 
 
+def add_provider_argument(parser: argparse.ArgumentParser):
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("--input-path", type=Path, help="Path to where to find pak files")
+    group.add_argument("--input-iso", type=Path, help="Path to where to find ISO")
+
+
+def get_provider_from_argument(args):
+    if args.input_path is not None:
+        return PathFileProvider(args.input_path)
+    else:
+        return IsoFileProvider(args.input_iso)
+
+
 def create_parser():
     parser = argparse.ArgumentParser()
 
@@ -73,12 +87,12 @@ def create_parser():
 
     decode_from_paks = subparser.add_parser("decode-from-pak")
     add_game_argument(decode_from_paks)
-    decode_from_paks.add_argument("paks_path", type=Path, help="Path to where to find pak files")
+    add_provider_argument(decode_from_paks)
     decode_from_paks.add_argument("asset_id", type=lambda x: int(x, 0), help="Asset id to print")
 
     deps = subparser.add_parser("list-dependencies")
     add_game_argument(deps)
-    deps.add_argument("paks_path", type=Path, help="Path to where to find pak files")
+    add_provider_argument(deps)
     g = deps.add_mutually_exclusive_group()
     g.add_argument("--asset-ids", type=lambda x: int(x, 0), nargs="+", help="Asset id to list dependencies for")
     g.add_argument("--asset-type", type=str, help="List dependencies for all assets of the given type.")
@@ -86,7 +100,7 @@ def create_parser():
     convert = subparser.add_parser("convert")
     add_game_argument(convert, "--source-game")
     add_game_argument(convert, "--target-game")
-    convert.add_argument("paks_path", type=Path, help="Path to where to find source pak files")
+    add_provider_argument(convert)
     convert.add_argument("asset_ids", type=lambda x: int(x, 0), nargs="+", help="Asset id to list dependencies for")
 
     return parser
@@ -139,90 +153,88 @@ def do_decode(args):
 
 def do_decode_from_pak(args):
     game: Game = args.game
-    paks_path: Path = args.paks_path
     asset_id: int = args.asset_id
 
-    with AssetProvider(game, list(paks_path.glob("*.pak"))) as asset_provider:
-        print(asset_provider.get_asset(asset_id))
+    asset_provider = FileTreeEditor(get_provider_from_argument(args), game)
+    print(asset_provider.get_parsed_asset(asset_id).raw)
 
 
 def list_dependencies(args):
     game: Game = args.game
-    paks_path: Path = args.paks_path
     asset_ids: List[int]
 
-    with AssetProvider(game, list(paks_path.glob("*.pak"))) as asset_provider:
-        if args.asset_ids is not None:
-            asset_ids = args.asset_ids
-        else:
-            asset_ids = [
-                resource.asset.id
-                for resource in asset_provider.all_resource_headers
-                if resource.asset.type == args.asset_type.upper()
-            ]
+    asset_provider = FileTreeEditor(get_provider_from_argument(args), game)
+    if args.asset_ids is not None:
+        asset_ids = args.asset_ids
+    else:
+        asset_ids = [
+            asset_id
+            for asset_id in asset_provider.all_asset_ids()
+            if asset_provider.get_asset_type(asset_id) == args.asset_type.upper()
+        ]
 
-        for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
-            print("{}: {}".format(asset_type, hex(asset_id)))
+    for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
+        print("{}: {}".format(asset_type, hex(asset_id)))
 
 
 def do_convert(args):
     source_game: Game = args.source_game
     target_game: Game = args.target_game
-    paks_path: Path = args.paks_path
     asset_ids: List[int] = args.asset_ids
 
-    with AssetProvider(source_game, list(paks_path.glob("*.pak"))) as asset_provider:
-        next_id = 0xFFFF0000
+    asset_provider = FileTreeEditor(get_provider_from_argument(args), source_game)
+    next_id = 0xFFFF0000
 
-        def id_generator(asset_type):
-            nonlocal next_id
-            result = next_id
-            while asset_provider.asset_id_exists(result):
-                result += 1
+    def id_generator(asset_type):
+        nonlocal next_id
+        result = next_id
+        while asset_provider.does_asset_exists(result):
+            result += 1
 
-            next_id = result + 1
-            return result
+        next_id = result + 1
+        asset_provider.register_custom_asset_name(f"custom_{asset_type}_{result}", result)
+        return result
 
-        converter = AssetConverter(
-            target_game=target_game,
-            asset_providers={source_game: asset_provider},
-            id_generator=id_generator,
-            converters=conversions.converter_for,
+    converter = AssetConverter(
+        target_game=target_game,
+        asset_providers={source_game: asset_provider},
+        id_generator=id_generator,
+        converters=conversions.converter_for,
+    )
+
+    for asset_id in asset_ids:
+        converted = converter.convert_asset_by_id(asset_id, source_game)
+
+        print(
+            "\n========================="
+            "\n* Original Id: {:08x}"
+            "\n* Target Id: {:08x}"
+            "\n* Asset Type: {}"
+            "\n\n{}".format(
+                asset_id,
+                converted.id,
+                converted.type,
+                converted.resource,
+            )
         )
 
-        for asset_id in asset_ids:
-            converted = converter.convert_asset_by_id(asset_id, source_game)
+        for dependency in dependencies.direct_dependencies_for(converted.resource, converted.type, target_game):
+            print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
 
-            print(
-                "\n========================="
-                "\n* Original Id: {:08x}"
-                "\n* Target Id: {:08x}"
-                "\n* Asset Type: {}"
-                "\n\n{}".format(
-                    asset_id,
-                    converted.id,
-                    converted.type,
-                    converted.resource,
-                )
+    print("==================\n>> All converted assets")
+    reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
+        v: k for k, v in converter.converted_ids.items()
+    }
+
+    for converted_asset in converter.converted_assets.values():
+        print(
+            " {}: {:08x} from {:08x} ({})".format(
+                converted_asset.type,
+                converted_asset.id,
+                reverse_converted_ids[converted_asset.id][1],
+                reverse_converted_ids[converted_asset.id][0].name,
             )
-
-            for dependency in dependencies.direct_dependencies_for(converted.resource, converted.type, target_game):
-                print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
-
-        print("==================\n>> All converted assets")
-        reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
-            v: k for k, v in converter.converted_ids.items()
-        }
-
-        for converted_asset in converter.converted_assets.values():
-            print(
-                " {}: {:08x} from {:08x} ({})".format(
-                    converted_asset.type,
-                    converted_asset.id,
-                    reverse_converted_ids[converted_asset.id][1],
-                    reverse_converted_ids[converted_asset.id][0].name,
-                )
-            )
+        )
 
 
 def decode_encode_compare_file(file_path: Path, game: Game, file_format: str):
