@@ -13,7 +13,7 @@ from retro_data_structures.base_resource import AssetId
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.file_tree_editor import FileTreeEditor, PathFileProvider, IsoFileProvider
+from retro_data_structures.asset_manager import AssetManager, PathFileProvider, IsoFileProvider
 from retro_data_structures.formats import mlvl
 from retro_data_structures.game_check import Game
 
@@ -155,7 +155,7 @@ def do_decode_from_pak(args):
     game: Game = args.game
     asset_id: int = args.asset_id
 
-    asset_provider = FileTreeEditor(get_provider_from_argument(args), game)
+    asset_provider = AssetManager(get_provider_from_argument(args), game)
     print(asset_provider.get_parsed_asset(asset_id).raw)
 
 
@@ -163,7 +163,7 @@ def list_dependencies(args):
     game: Game = args.game
     asset_ids: List[int]
 
-    asset_provider = FileTreeEditor(get_provider_from_argument(args), game)
+    asset_provider = AssetManager(get_provider_from_argument(args), game)
     if args.asset_ids is not None:
         asset_ids = args.asset_ids
     else:
@@ -182,7 +182,7 @@ def do_convert(args):
     target_game: Game = args.target_game
     asset_ids: List[int] = args.asset_ids
 
-    asset_provider = FileTreeEditor(get_provider_from_argument(args), source_game)
+    asset_provider = AssetManager(get_provider_from_argument(args), source_game)
     next_id = 0xFFFF0000
 
     def id_generator(asset_type):

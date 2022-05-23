@@ -80,9 +80,9 @@ class IsoFileProvider(FileProvider):
         return self.data.read_file(name)
 
 
-class FileTreeEditor:
+class AssetManager:
     """
-    Manages efficiently reading all PKGs in the game and writing out modifications to a new path.
+    Manages efficiently reading all PAKs in the game and writing out modifications to a new path.
 
     _files_for_asset_id: mapping of asset id to all paks it can be found at
     _ensured_asset_ids: mapping of pak name to assets we'll copy into it when saving

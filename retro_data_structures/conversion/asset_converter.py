@@ -4,7 +4,7 @@ from typing import Callable, Dict, Tuple, Any, Optional
 
 from retro_data_structures.asset_provider import InvalidAssetId, UnknownAssetId
 from retro_data_structures.base_resource import AssetType, AssetId, BaseResource
-from retro_data_structures.file_tree_editor import FileTreeEditor
+from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.game_check import Game
 
 
@@ -29,7 +29,7 @@ class ConvertedAsset:
 
 class AssetConverter:
     target_game: Game
-    asset_providers: Dict[Game, FileTreeEditor]
+    asset_providers: Dict[Game, AssetManager]
     id_generator: IdGenerator
     converted_ids: Dict[Tuple[Game, AssetId], AssetId]
     converted_assets: Dict[AssetId, ConvertedAsset]
@@ -37,7 +37,7 @@ class AssetConverter:
     def __init__(
             self,
             target_game: Game,
-            asset_providers: Dict[Game, FileTreeEditor],
+            asset_providers: Dict[Game, AssetManager],
             id_generator: IdGenerator,
             converters: Callable[[AssetDetails], ResourceConverter],
     ):

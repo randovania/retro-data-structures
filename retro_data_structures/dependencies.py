@@ -5,7 +5,7 @@ from retro_data_structures import formats
 from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency, BaseResource
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.file_tree_editor import FileTreeEditor
+from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
 from retro_data_structures.game_check import Game
 
@@ -109,7 +109,7 @@ def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId,
     return deps_by_asset_id
 
 
-def recursive_dependencies_for_editor(editor: FileTreeEditor,
+def recursive_dependencies_for_editor(editor: AssetManager,
                                       asset_ids: List[AssetId],
                                       ) -> Set[Dependency]:
     deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
