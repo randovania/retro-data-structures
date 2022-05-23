@@ -2,10 +2,10 @@ import logging
 from typing import Iterator, Dict, Set, List, Callable, Any
 
 from retro_data_structures import formats
-from retro_data_structures.asset_provider import AssetProvider, UnknownAssetId, InvalidAssetId
-from retro_data_structures.base_resource import AssetId, AssetType, Dependency, BaseResource
-from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.asset_manager import AssetManager
+from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
+from retro_data_structures.base_resource import AssetId, AssetType, Dependency
+from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
 from retro_data_structures.game_check import Game
 
@@ -73,16 +73,17 @@ def _internal_dependencies_for(
             raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
-def recursive_dependencies_for(asset_provider: AssetProvider,
+def recursive_dependencies_for(asset_manager: AssetManager,
                                asset_ids: List[AssetId],
                                ) -> Set[Dependency]:
     deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
 
+    def get_asset(aid: AssetId):
+        return asset_manager.get_parsed_asset(aid).raw
+
     for asset_id in asset_ids:
-        obj_type = asset_provider.get_type_for_asset(asset_id)
-        _internal_dependencies_for(
-            asset_provider.get_asset, asset_provider.target_game, asset_id, obj_type, deps_by_asset_id
-        )
+        obj_type = asset_manager.get_asset_type(asset_id)
+        _internal_dependencies_for(get_asset, asset_manager.target_game, asset_id, obj_type, deps_by_asset_id)
 
     result = set()
     for deps in deps_by_asset_id.values():
