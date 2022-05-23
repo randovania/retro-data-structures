@@ -2,8 +2,9 @@ import copy
 import dataclasses
 from typing import Callable, Dict, Tuple, Any, Optional
 
-from retro_data_structures.asset_provider import AssetProvider, InvalidAssetId, UnknownAssetId
-from retro_data_structures.base_resource import AssetType, AssetId
+from retro_data_structures.asset_provider import InvalidAssetId, UnknownAssetId
+from retro_data_structures.base_resource import AssetType, AssetId, BaseResource
+from retro_data_structures.file_tree_editor import FileTreeEditor
 from retro_data_structures.game_check import Game
 
 
@@ -28,7 +29,7 @@ class ConvertedAsset:
 
 class AssetConverter:
     target_game: Game
-    asset_providers: Dict[Game, AssetProvider]
+    asset_providers: Dict[Game, FileTreeEditor]
     id_generator: IdGenerator
     converted_ids: Dict[Tuple[Game, AssetId], AssetId]
     converted_assets: Dict[AssetId, ConvertedAsset]
@@ -36,7 +37,7 @@ class AssetConverter:
     def __init__(
             self,
             target_game: Game,
-            asset_providers: Dict[Game, AssetProvider],
+            asset_providers: Dict[Game, FileTreeEditor],
             id_generator: IdGenerator,
             converters: Callable[[AssetDetails], ResourceConverter],
     ):
@@ -73,15 +74,15 @@ class AssetConverter:
         self._being_converted.add(asset_id)
 
         asset_provider = self.asset_providers[source_game]
-        source_asset = asset_provider.get_asset(asset_id)
+        source_asset: BaseResource = asset_provider.get_parsed_asset(asset_id)
         details = AssetDetails(
             asset_id=asset_id,
-            asset_type=asset_provider.get_type_for_asset(asset_id),
+            asset_type=source_asset.resource_type(),
             original_game=source_game,
         )
 
         try:
-            new_asset = self.convert_asset(source_asset, details)
+            new_asset = self.convert_asset(source_asset.raw, details)
         except Exception as e:
             raise InvalidAssetId(asset_id, f"Unable to convert {details}: {e}")
         self.converted_ids[(source_game, asset_id)] = new_asset.id
