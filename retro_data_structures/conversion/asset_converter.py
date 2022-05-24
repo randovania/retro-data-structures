@@ -1,5 +1,6 @@
 import copy
 import dataclasses
+import logging
 from typing import Callable, Dict, Tuple, Any, Optional
 
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
@@ -98,6 +99,7 @@ class AssetConverter:
         return new_asset
 
     def convert_asset(self, asset, details: AssetDetails) -> ConvertedAsset:
+        logging.debug("converting asset %s", details)
         new_asset_id = self.id_generator(details)
         converted_resource = self.converters(details)(copy.deepcopy(asset), details, self)
         converted_asset = ConvertedAsset(new_asset_id, details.asset_type, converted_resource)
