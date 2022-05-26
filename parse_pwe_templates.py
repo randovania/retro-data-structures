@@ -459,13 +459,14 @@ class Spline(BaseProperty):
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
-                         ) -> tuple[str, bool, typing.Optional[str], str, list[str], str]:
+                         ) -> tuple[str, bool, typing.Optional[str], str, list[str], str, str]:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
         comment = None
         parse_code = "None"
         build_code = []
+        from_json_code = "None"
         to_json_code = "None"
 
         if raw_type == "Struct":
@@ -475,6 +476,7 @@ class Spline(BaseProperty):
             meta["default_factory"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
+            from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
 
         elif prop['type'] == 'Choice':
@@ -485,6 +487,7 @@ class Spline(BaseProperty):
                 need_enums = True
                 parse_code = f"enums.{enum_name}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
+                from_json_code = f"{prop_type}.from_json({{obj}})"
                 to_json_code = "{obj}.to_json()"
 
                 for key, value in known_enums[enum_name].values.items():
@@ -496,6 +499,7 @@ class Spline(BaseProperty):
                 meta["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32
                 build_code.append('data.write(struct.pack(">L", {obj}))')
+                from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
         elif raw_type == "Flags":
@@ -506,6 +510,7 @@ class Spline(BaseProperty):
                 meta["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
+                from_json_code = f"{prop_type}.from_json({{obj}})"
                 to_json_code = "{obj}.to_json()"
             else:
                 prop_type = "int"
@@ -513,6 +518,7 @@ class Spline(BaseProperty):
                 meta["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32
                 build_code.append('data.write(struct.pack(">L", {obj}))')
+                from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
         elif raw_type in ["Asset", "Sound"]:
@@ -526,6 +532,7 @@ class Spline(BaseProperty):
 
             parse_code = _CODE_PARSE_UINT32
             build_code.append('data.write(struct.pack(">L", {obj}))')
+            from_json_code = "{obj}"
             to_json_code = "{obj}"
 
         elif raw_type in ["AnimationSet", "Spline"]:
@@ -536,11 +543,12 @@ class Spline(BaseProperty):
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
+            from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
-            inner_prop_type, need_enums, comment, inner_parse, inner_build, inner_to_json = get_prop_details(
+            inner_prop_type, need_enums, comment, inner_parse, inner_build, inner_from_json, inner_to_json = get_prop_details(
                 prop["item_archetype"], {}, needed_imports,
             )
             prop_type = f"list[{inner_prop_type}]"
@@ -552,6 +560,9 @@ class Spline(BaseProperty):
                 'for item in array:',
                 *['    ' + inner.format(obj="item") for inner in inner_build]
             ])
+            from_json_code = "[{inner} for item in {{obj}}]".format(
+                inner=inner_from_json.format(obj="item")
+            )
             to_json_code = "[{inner} for item in {{obj}}]".format(
                 inner=inner_to_json.format(obj="item")
             )
@@ -565,6 +576,7 @@ class Spline(BaseProperty):
                 'data.write({obj}.encode("utf-8"))',
                 f'data.write({null_byte})',
             ])
+            from_json_code = "{obj}"
             to_json_code = "{obj}"
 
         elif raw_type in ["Color", "Vector"]:
@@ -572,6 +584,7 @@ class Spline(BaseProperty):
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
             build_code.append("{obj}.to_stream(data)")
+            from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
 
             s = struct.Struct(">f")
@@ -594,6 +607,7 @@ class Spline(BaseProperty):
             prop_type = literal_prop.python_type
             parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
             build_code.append(f"data.write(struct.pack({repr(literal_prop.struct_format)}, {{obj}}))")
+            from_json_code = "{obj}"
             to_json_code = "{obj}"
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
@@ -605,7 +619,7 @@ class Spline(BaseProperty):
                 default_value = literal_prop.default
             meta["default"] = repr(default_value)
 
-        return prop_type, need_enums, comment, parse_code, build_code, to_json_code
+        return prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code
 
     def parse_struct(name: str, this, output_path: Path):
         if this["type"] != "Struct":
@@ -627,13 +641,14 @@ class Spline(BaseProperty):
         properties_decoder = ""
         properties_builder = ""
         json_builder = ""
+        json_parser = ""
 
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type, set_need_enums, comment, parse_code, build_code, to_json_code = get_prop_details(
+            prop_type, set_need_enums, comment, parse_code, build_code, from_json_code, to_json_code = get_prop_details(
                 prop, meta, needed_imports
             )
             need_enums = need_enums or set_need_enums
@@ -654,11 +669,12 @@ class Spline(BaseProperty):
                 class_code += f"  # {comment}"
             class_code += "\n"
 
+            json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
+            json_parser += f"            {prop_name}={from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
             if this["atomic"]:
                 properties_decoder += f"        result.{prop_name} = {parse_code}\n"
                 for build in build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
-                json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
             else:
                 need_else = bool(properties_decoder)
                 properties_decoder += "            "
@@ -678,7 +694,6 @@ class Spline(BaseProperty):
                 properties_builder += f"        data.seek(before)\n"
                 properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
                 properties_builder += f'        data.seek(after)\n'
-                json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
 
         # from stream
 
@@ -723,8 +738,9 @@ class Spline(BaseProperty):
         class_code += """
     @classmethod
     def from_json(cls, data: dict):
-        raise NotImplementedError()
+        return cls(
 """
+        class_code += json_parser + "        )\n"
 
         # to json
         class_code += """
