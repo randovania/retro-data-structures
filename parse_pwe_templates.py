@@ -403,13 +403,13 @@ class Spline:
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
-                         ) -> tuple[str, bool, typing.Optional[str], str, str]:
+                         ) -> tuple[str, bool, typing.Optional[str], str, list[str]]:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
         comment = None
         parse_code = "None"
-        build_code = "pass"
+        build_code = []
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -417,7 +417,7 @@ class Spline:
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             meta["default_factory"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
-            build_code = f"obj.to_stream(data)"
+            build_code.append(f"obj.to_stream(data)")
 
         elif prop['type'] == 'Choice':
             default_value = prop["default_value"] if prop['has_default'] else 0
@@ -426,7 +426,7 @@ class Spline:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
                 parse_code = f"enums.{enum_name}.from_stream(data)"
-                build_code = f"obj.to_stream(data)"
+                build_code.append(f"obj.to_stream(data)")
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
@@ -436,7 +436,7 @@ class Spline:
                 prop_type = "int"
                 meta["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32
-                build_code = f'data.write(struct.pack(">L", obj))'
+                build_code.append(f'data.write(struct.pack(">L", obj))')
 
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
@@ -445,13 +445,13 @@ class Spline:
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
-                build_code = f"obj.to_stream(data)"
+                build_code.append(f"obj.to_stream(data)")
             else:
                 prop_type = "int"
                 comment = "Flagset"
                 meta["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32
-                build_code = f'data.write(struct.pack(">L", obj))'
+                build_code.append(f'data.write(struct.pack(">L", obj))')
 
         elif raw_type in ["Asset", "Sound"]:
             prop_type = "AssetId"
@@ -463,7 +463,7 @@ class Spline:
                 meta["default"] = repr(prop["default_value"] if prop['has_default'] else 0)
 
             parse_code = _CODE_PARSE_UINT32
-            build_code = f'data.write(struct.pack(">L", obj))'
+            build_code.append(f'data.write(struct.pack(">L", obj))')
 
         elif raw_type in ["AnimationSet", "Spline"]:
             if raw_type == "AnimationSet":
@@ -472,7 +472,7 @@ class Spline:
                 prop_type = raw_type
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
-            build_code = f"obj.to_stream(data)"
+            build_code.append(f"obj.to_stream(data)")
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
@@ -482,19 +482,28 @@ class Spline:
             prop_type = f"list[{inner_prop_type}]"
             meta["default_factory"] = "list"
             parse_code = f"[{inner_parse} for _ in range({_CODE_PARSE_UINT32})]"
-            build_code = f'data.write(struct.pack(">L", len(array := obj))); for obj in array: {inner_build}'
+            build_code.extend([
+                'array = obj',
+                'data.write(struct.pack(">L", len(obj)))',
+                'for obj in array:',
+                *['    ' + inner for inner in inner_build]
+            ])
 
         elif raw_type == "String":
             prop_type = "str"
             meta["default"] = repr(prop["default_value"] if prop['has_default'] else "")
             parse_code = f'data.read({_CODE_PARSE_UINT32}).decode("utf-8")'
-            build_code = f'obj = obj.encode("utf-8"); data.write(struct.pack(">L", len(obj))); data.write(obj)'
+            build_code.extend([
+                'obj_bytes = obj.encode("utf-8")',
+                'data.write(struct.pack(">L", len(obj_bytes)))',
+                'data.write(obj_bytes)',
+            ])
 
         elif raw_type in ["Color", "Vector"]:
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
-            build_code = f"obj.to_stream(data)"
+            build_code.append(f"obj.to_stream(data)")
 
             s = struct.Struct(">f")
 
@@ -515,7 +524,7 @@ class Spline:
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
             parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
-            build_code = f"data.write(struct.pack({repr(literal_prop.struct_format)}, obj))"
+            build_code.append(f"data.write(struct.pack({repr(literal_prop.struct_format)}, obj))")
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
             try:
@@ -575,7 +584,8 @@ class Spline:
             if this["atomic"]:
                 properties_decoder += f"        result.{prop_name} = {parse_code}\n"
                 properties_builder += f"        obj = self.{prop_name}\n"
-                properties_builder += f"        {build_code}\n"
+                for build in build_code:
+                    properties_builder += f"        {build}\n"
             else:
                 need_else = bool(properties_decoder)
                 properties_decoder += "            "
@@ -590,7 +600,8 @@ class Spline:
                 properties_builder += f'        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
                 properties_builder += f"        before = data.tell()\n"
                 properties_builder += f"        data.write({placeholder})  # size placeholder\n"
-                properties_builder += f"        {build_code}\n"
+                for build in build_code:
+                    properties_builder += f"        {build}\n"
                 properties_builder += f"        after = data.tell()\n"
                 properties_builder += f"        data.seek(before)\n"
                 properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
