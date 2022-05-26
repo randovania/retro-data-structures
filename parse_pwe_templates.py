@@ -15,6 +15,9 @@ _game_id_to_file = {
     "DKCReturns": "dkc_returns",
 }
 
+_CODE_PARSE_UINT16 = 'struct.unpack(">H", data.read(2))[0]'
+_CODE_PARSE_UINT32 = 'struct.unpack(">L", data.read(4))[0]'
+
 
 @dataclasses.dataclass(frozen=True)
 class EnumDefinition:
@@ -35,12 +38,16 @@ def _scrub_enum(string: str):
 
 
 def create_enums_file(enums: typing.List[EnumDefinition]):
-    code = '"""\nGenerated file.\n"""\nimport enum\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\n'
 
     for e in enums:
         code += f"\n\nclass {_scrub_enum(e.name)}(enum.{e.enum_base}):\n"
         for name, value in e.values.items():
             code += f"    {_scrub_enum(name)} = {value}\n"
+
+        code += '\n    @classmethod\n'
+        code += '    def from_stream(cls, data: typing.BinaryIO):\n'
+        code += f'        return cls({_CODE_PARSE_UINT32})\n'
 
     return code
 
@@ -292,28 +299,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
     import_base = f"retro_data_structures.properties.{game_id.lower()}"
 
-    def use_as_literal(k):
-        return "default", repr(k)
+    class LiteralPropType(typing.NamedTuple):
+        python_type: str
+        byte_count: int
+        struct_format: str
+        default: typing.Any
 
-    def convert_color(k):
-        value = {"A": 0.0, **k}
-        return "default_factory", "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
-
-    def convert_vector(k):
-        return "default_factory", "lambda: Vector(x={X}, y={Y}, z={Z})".format(**k)
-
-    _prop_type_to_python_type = {
-        "Int": ("int", None, use_as_literal, None),
-        "Float": ("float", None, use_as_literal, None),
-        "Bool": ("bool", None, use_as_literal, None),
-        "String": ("str", None, use_as_literal, ("default", repr(""))),
-        "Color": ("Color", "core.Color", convert_color, None),
-        "Vector": ("Vector", "core.Vector", convert_vector, None),
-        "Short": ("int", None, use_as_literal, None),
-        "Sound": ("AssetId", "core.AssetId", use_as_literal, None),
-        "AnimationSet": ("AnimationParameters", "core.AnimationParameters", use_as_literal,
-                         ("default_factory", "AnimationParameters")),
-        "Spline": ("Spline", "core.Spline", use_as_literal, ("default_factory", "Spline")),
+    _literal_prop_types = {
+        "Int": LiteralPropType("int", 4, ">l", 0),
+        "Float": LiteralPropType("float", 4, ">f", 0.0),
+        "Bool": LiteralPropType("bool", 1, ">?", False),
+        "Short": LiteralPropType("int", 4, ">h", 0),
     }
 
     core_path = code_path.joinpath("core")
@@ -321,6 +317,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     core_path.joinpath("Color.py").write_text("""# Generated file
 import dataclasses
+import struct
+import typing
 
 
 @dataclasses.dataclass()
@@ -329,9 +327,15 @@ class Color:
     g: float = 0.0
     b: float = 0.0
     a: float = 0.0
+    
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO):
+        return cls(*struct.unpack('>ffff', data.read(16)))
 """)
     core_path.joinpath("Vector.py").write_text("""# Generated file
 import dataclasses
+import struct
+import typing
 
 
 @dataclasses.dataclass()
@@ -339,6 +343,10 @@ class Vector:
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
+    
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO):
+        return cls(*struct.unpack('>fff', data.read(12)))
 """)
     core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
     core_path.joinpath("AnimationParameters.py").write_text("""from .AssetId import AssetId
@@ -355,16 +363,20 @@ class AnimationParameters:
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
-    def get_prop_details(prop, meta: dict, needed_imports: dict[str, str]) -> tuple[str, bool, typing.Optional[str]]:
+    def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
+                         ) -> tuple[str, bool, typing.Optional[str], str]:
+        raw_type = prop["type"]
         prop_type = None
         need_enums = False
         comment = None
+        parse_code = "None"
 
-        if prop["type"] == "Struct":
+        if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             meta["default_factory"] = prop_type
+            parse_code = f"{prop_type}.from_stream(data)"
 
         elif prop['type'] == 'Choice':
             default_value = prop["default_value"] if prop['has_default'] else 0
@@ -372,6 +384,7 @@ class AnimationParameters:
             if enum_name in known_enums:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
+                parse_code = f"enums.{enum_name}.from_stream(data)"
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
@@ -380,41 +393,75 @@ class AnimationParameters:
                 comment = "Choice"
                 prop_type = "int"
                 meta["default"] = repr(default_value)
+                parse_code = _CODE_PARSE_UINT32
 
-        elif prop["type"] == "Asset":
-            prop_type = "AssetId"
-            needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
-            meta["metadata"] = repr({"asset_types": prop["type_filter"]})
-            meta["default"] = "0xFFFFFFFF"
-
-        elif prop["type"] == "Flags":
+        elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
             if "flagset_name" in prop:
                 prop_type = "enums." + prop["flagset_name"]
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
+                parse_code = f"{prop_type}.from_stream(data)"
             else:
                 prop_type = "int"
                 comment = "Flagset"
                 meta["default"] = default_value
+                parse_code = _CODE_PARSE_UINT32
 
-        elif prop["type"] == "Array":
-            inner_prop_type, need_enums, comment = get_prop_details(prop["item_archetype"], {}, needed_imports)
+        elif raw_type in ["Asset", "Sound"]:
+            prop_type = "AssetId"
+            needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
+            if raw_type == "Asset":
+                meta["metadata"] = repr({"asset_types": prop["type_filter"]})
+                meta["default"] = "0xFFFFFFFF"
+            else:
+                meta["default"] = repr(prop["default_value"] if prop['has_default'] else 0)
+
+            parse_code = _CODE_PARSE_UINT32
+
+        elif raw_type in ["AnimationSet", "Spline"]:
+            if raw_type == "AnimationSet":
+                prop_type = "AnimationParameters"
+            else:
+                prop_type = raw_type
+            needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
+            parse_code = f"{prop_type}.from_stream(data)"
+            meta["default_factory"] = prop_type
+
+        elif raw_type == "Array":
+            inner_prop_type, need_enums, comment, inner_parse = get_prop_details(
+                prop["item_archetype"], {}, needed_imports,
+            )
             prop_type = f"list[{inner_prop_type}]"
             meta["default_factory"] = "list"
 
-        elif prop['type'] in _prop_type_to_python_type:
-            prop_type, import_name, default_converter, default_default = _prop_type_to_python_type[prop['type']]
-            if import_name is not None:
-                needed_imports[f"{import_base}.{import_name}"] = prop_type
+        elif raw_type == "String":
+            prop_type = "str"
+            meta["default"] = repr(prop["default_value"] if prop['has_default'] else "")
+            parse_code = f'data.read({_CODE_PARSE_UINT32}).decode("utf-8")'
+
+        elif raw_type in ["Color", "Vector"]:
+            prop_type = raw_type
+            needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
+            parse_code = f"{prop_type}.from_stream(data)"
 
             if prop['has_default']:
-                meta_key, meta_value = default_converter(prop["default_value"])
+                if raw_type == "Color":
+                    value = {"A": 0.0, **prop["default_value"]}
+                    meta["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
+                else:
+                    meta["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**prop["default_value"])
             else:
-                meta_key, meta_value = default_default
-            meta[meta_key] = meta_value
+                meta["default_factory"] = prop_type
 
-        return prop_type, need_enums, comment
+        elif raw_type in _literal_prop_types:
+            # 'struct.unpack(">f", data.read(4))[0]'
+            literal_prop = _literal_prop_types[raw_type]
+            prop_type = literal_prop.python_type
+            parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
+            meta["default"] = repr(prop["default_value"] if prop['has_default'] else literal_prop.default)
+
+        return prop_type, need_enums, comment, parse_code
 
     def parse_struct(name: str, struct, output_path: Path):
         if struct["type"] != "Struct":
@@ -433,22 +480,18 @@ class AnimationParameters:
         class_path = name.replace("_", "/")
 
         class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
+        properties_decoder = ""
+
         for prop, prop_name in zip(struct["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type, set_need_enums, comment = get_prop_details(prop, meta, needed_imports)
+            prop_type, set_need_enums, comment, parse_code = get_prop_details(prop, meta, needed_imports)
             need_enums = need_enums or set_need_enums
 
             if prop_type is None:
-                prop_type = "object"
-                extra_comment = f"{prop['type']} ; {prop['name']} ; {property_names.get(prop['id'])}"
-                if comment is None:
-                    comment = extra_comment
-                else:
-                    comment = f"{comment} ; {extra_comment}"
-                print(comment)
+                raise ValueError(f"Unable to parse property {prop_name} of {name}")
 
             class_code += f"    {prop_name}: {prop_type}"
             if meta:
@@ -463,8 +506,35 @@ class AnimationParameters:
                 class_code += f"  # {comment}"
             class_code += "\n"
 
+            need_else = bool(properties_decoder)
+            properties_decoder += "            "
+            if need_else:
+                properties_decoder += "el"
+
+            properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
+            properties_decoder += f"                obj = {parse_code}\n"
+            properties_decoder += f"                result.{prop_name} = obj\n"
+
+        class_code += f"""
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO):
+        result = cls()
+        data.read(2)  # property size
+        property_count = {_CODE_PARSE_UINT16}
+        for _ in range(property_count):
+            property_id = {_CODE_PARSE_UINT32}
+            property_size = {_CODE_PARSE_UINT16}
+            start = data.tell()
+"""
+        class_code += properties_decoder
+        class_code += """            else:
+                data.read(property_size)  # skip unknown property
+            assert data.tell() - start == property_size
+        return result
+"""
+
         code_code = "# Generated File\n"
-        code_code += "import dataclasses\n"
+        code_code += "import dataclasses\nimport struct\nimport typing\n"
         if need_enums or needed_imports:
             code_code += "\n"
 
