@@ -6,6 +6,8 @@ from pathlib import Path
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
+import inflection
+
 _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
@@ -23,20 +25,21 @@ class EnumDefinition:
 _enums_by_game: typing.Dict[str, typing.List[EnumDefinition]] = {}
 
 
+def _scrub_enum(string: str):
+    s = re.sub(r'\W', '', string)  # remove non-word characters
+    s = re.sub(r'^(?=\d)', '_', s)  # add leading underscore to strings starting with a number
+    s = re.sub(r'^None$', '_None', s)  # add leading underscore to None
+    s = s or "_EMPTY"  # add name for empty string keys
+    return s
+
+
 def create_enums_file(enums: typing.List[EnumDefinition]):
     code = '"""\nGenerated file.\n"""\nfrom enum import Enum\n'
 
-    def _scrub(string: str):
-        s = re.sub(r'\W', '', string)  # remove non-word characters
-        s = re.sub(r'^(?=\d)', '_', s)  # add leading underscore to strings starting with a number
-        s = re.sub(r'^None$', '_None', s)  # add leading underscore to None
-        s = s or "_EMPTY"  # add name for empty string keys
-        return s
-
     for e in enums:
-        code += f"\n\nclass {_scrub(e.name)}(Enum):\n"
+        code += f"\n\nclass {_scrub_enum(e.name)}(Enum):\n"
         for name, value in e.values.items():
-            code += f"    {_scrub(name)} = {value}\n"
+            code += f"    {_scrub_enum(name)} = {value}\n"
 
     return code
 
@@ -215,6 +218,14 @@ def get_key_map(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
     }
 
 
+_to_snake_case_re = re.compile(r'(?<!^)(?=[A-Z])')
+_invalid_chars_table = str.maketrans("", "", "()?")
+
+
+def _filter_property_name(n: str) -> str:
+    return inflection.underscore(n.replace(" ", "_").replace("#", "Number")).translate(_invalid_chars_table).lower()
+
+
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     logging.info("Parsing templates for game %s: %s", game_id, game_xml)
 
@@ -251,6 +262,99 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         name: parse_property_archetypes(base_path / path, game_id)
         for name, path in get_paths(root.find("PropertyArchetypes")).items()
     }
+
+    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
+    import_base = f"retro_data_structures.properties.{game_id.lower()}"
+
+    _prop_type_to_python_type = {
+        "Int": ("int", None),
+        "Float": ("float", None),
+        "Bool": ("bool", None),
+        "String": ("str", None),
+        "Color": ("Color", "core.Color"),
+        "Vector": ("Vector", "core.Vector"),
+        # "Short": lambda el: int(el.text, 10) & 0xFFFF,
+        # "Vector": lambda el: {e.tag: float(e.text) for e in el},
+        # "Flags": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        # "Choice": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        # "Enum": lambda el: int(el.text, 16) & 0xFFFFFFFF,
+        # "Sound": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+    }
+
+    core_path = code_path.joinpath("core")
+    core_path.mkdir(parents=True, exist_ok=True)
+
+    core_path.joinpath("Color.py").write_text("""
+class Color:
+    r: float
+    g: float
+    b: float
+    a: float
+""")
+    core_path.joinpath("Vector.py").write_text("""
+class Vector:
+    x: float
+    y: float
+    z: float
+""")
+
+    known_enums = {_scrub_enum(e.name) for e in _enums_by_game[game_id]}
+
+    archetypes = code_path.joinpath("archetypes")
+    archetypes.mkdir(parents=True, exist_ok=True)
+    for name, archetype in property_archetypes.items():
+        if archetype["type"] != "Struct":
+            print("Ignoring archetype {}. Is a {}".format(name, archetype["type"]))
+            continue
+
+        all_names = [
+            _filter_property_name(prop["name"] or property_names.get(prop["id"]) or "unnamed")
+            for prop in archetype["properties"]
+        ]
+
+        needed_imports = {}
+        need_enums = False
+
+        class_code = f"@dataclasses.dataclass()\nclass {name}:\n"
+        for prop, prop_name in zip(archetype["properties"], all_names):
+            if all_names.count(prop_name) > 1:
+                prop_name += "_0x{:08x}".format(prop["id"])
+
+            prop_type = None
+            if prop["type"] == "Struct":
+                prop_type = prop["archetype"]
+                needed_imports[f"{import_base}.archetypes.{prop_type}"] = prop_type
+
+            elif prop['type'] == 'Choice':
+                enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
+                if enum_name in known_enums:
+                    prop_type = f"enums.{enum_name}"
+                    need_enums = True
+
+            elif prop['type'] in _prop_type_to_python_type:
+                prop_type, import_name = _prop_type_to_python_type[prop['type']]
+                if import_name is not None:
+                    needed_imports[f"{import_base}.{import_name}"] = prop_type
+
+            if prop_type is None:
+                prop_type = f"object  # {prop['type']} ; {prop['name']} ; {property_names.get(prop['id'])}"
+
+            class_code += f"    {prop_name}: {prop_type}\n"
+
+        code_code = "# Generated File\n"
+        code_code += "import dataclasses\n"
+        if need_enums or needed_imports:
+            code_code += "\n"
+
+        if need_enums:
+            code_code += f"import retro_data_structures.enums.{game_id.lower()} as enums\n"
+
+        for import_path, code_import in sorted(needed_imports.items()):
+            code_code += f"from {import_path} import {code_import}\n"
+
+        code_code += "\n\n"
+        code_code += class_code
+        archetypes.joinpath(f"{name}.py").write_text(code_code)
 
     return {
         "script_objects": script_objects,
@@ -307,4 +411,4 @@ def persist_data(parse_result):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    persist_data(parse(_game_id_to_file.keys()))
+    persist_data(parse(["Echoes"]))
