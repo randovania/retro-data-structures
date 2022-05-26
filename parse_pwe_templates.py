@@ -254,9 +254,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         ),
     ]
 
+    script_objects_paths = {
+        four_cc: path
+        for four_cc, path in get_paths(root.find("ScriptObjects")).items()
+    }
     script_objects = {
         four_cc: parse_script_object_file(base_path / path, game_id)
-        for four_cc, path in get_paths(root.find("ScriptObjects")).items()
+        for four_cc, path in script_objects_paths.items()
     }
     property_archetypes = {
         name: parse_property_archetypes(base_path / path, game_id)
@@ -274,11 +278,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         "Color": ("Color", "core.Color"),
         "Vector": ("Vector", "core.Vector"),
         # "Short": lambda el: int(el.text, 10) & 0xFFFF,
-        # "Vector": lambda el: {e.tag: float(e.text) for e in el},
         # "Flags": lambda el: int(el.text, 10) & 0xFFFFFFFF,
         # "Choice": lambda el: int(el.text, 10) & 0xFFFFFFFF,
         # "Enum": lambda el: int(el.text, 16) & 0xFFFFFFFF,
-        # "Sound": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Sound": ("AssetId", "core.AssetId"),
+        "AnimationSet": ("AnimationParameters", "core.AnimationParameters"),
     }
 
     core_path = code_path.joinpath("core")
@@ -297,29 +301,39 @@ class Vector:
     y: float
     z: float
 """)
+    core_path.joinpath("AssetId.py").write_text("""
+AssetId = int
+    """)
+    core_path.joinpath("AnimationParameters.py").write_text("""
+from .AssetId import AssetId
+    
+class AnimationParameters:
+    ancs: AssetId
+    character_index: int
+    initial_anim: int
+    """)
 
     known_enums = {_scrub_enum(e.name) for e in _enums_by_game[game_id]}
 
-    archetypes = code_path.joinpath("archetypes")
-    archetypes.mkdir(parents=True, exist_ok=True)
-    for name, archetype in property_archetypes.items():
-        if archetype["type"] != "Struct":
-            print("Ignoring archetype {}. Is a {}".format(name, archetype["type"]))
-            continue
+    def parse_struct(name: str, struct, output_path: Path):
+        if struct["type"] != "Struct":
+            print("Ignoring archetype {}. Is a {}".format(name, struct["type"]))
+            return
 
         all_names = [
             _filter_property_name(prop["name"] or property_names.get(prop["id"]) or "unnamed")
-            for prop in archetype["properties"]
+            for prop in struct["properties"]
         ]
 
         needed_imports = {}
         need_enums = False
 
         class_code = f"@dataclasses.dataclass()\nclass {name}:\n"
-        for prop, prop_name in zip(archetype["properties"], all_names):
+        for prop, prop_name in zip(struct["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
+            meta = {}
             prop_type = None
             if prop["type"] == "Struct":
                 prop_type = prop["archetype"]
@@ -331,10 +345,17 @@ class Vector:
                     prop_type = f"enums.{enum_name}"
                     need_enums = True
 
+            elif prop["type"] == "Asset":
+                prop_type = "AssetId"
+                needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
+                meta["asset_types"] = prop["type_filter"]
+
             elif prop['type'] in _prop_type_to_python_type:
                 prop_type, import_name = _prop_type_to_python_type[prop['type']]
                 if import_name is not None:
                     needed_imports[f"{import_base}.{import_name}"] = prop_type
+                # assert prop['has_default']
+                # print(prop)
 
             if prop_type is None:
                 prop_type = f"object  # {prop['type']} ; {prop['name']} ; {property_names.get(prop['id'])}"
@@ -354,7 +375,24 @@ class Vector:
 
         code_code += "\n\n"
         code_code += class_code
-        archetypes.joinpath(f"{name}.py").write_text(code_code)
+        output_path.joinpath(f"{name}.py").write_text(code_code)
+
+    getter_func = "def get_object(four_cc: str):\n"
+    path = code_path.joinpath("objects")
+    path.mkdir(parents=True, exist_ok=True)
+    for object_fourcc, script_object in script_objects.items():
+        stem = Path(script_objects_paths[object_fourcc]).stem
+        parse_struct(stem, script_object, path)
+        getter_func += f"    if four_cc == {repr(object_fourcc)}:\n"
+        getter_func += f"        from .{stem} import {stem}\n"
+        getter_func += f"        return {stem}\n"
+    getter_func += '    raise ValueError(f"Unknown four_cc: {four_cc}")\n'
+    path.joinpath("__init__.py").write_text(getter_func)
+
+    path = code_path.joinpath("archetypes")
+    path.mkdir(parents=True, exist_ok=True)
+    for archetype_name, archetype in property_archetypes.items():
+        parse_struct(archetype_name, archetype, path)
 
     return {
         "script_objects": script_objects,
