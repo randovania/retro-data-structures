@@ -331,9 +331,11 @@ import dataclasses
 import struct
 import typing
 
+from retro_data_structures.properties.base_property import BaseProperty
+
 
 @dataclasses.dataclass()
-class Color:
+class Color(BaseProperty):
     r: float = 0.0
     g: float = 0.0
     b: float = 0.0
@@ -348,7 +350,7 @@ class Color:
 
     @classmethod
     def from_json(cls, data: dict):
-        return cls(data["r"], data["g"], data["b"], data["a"])    
+        return cls(data["r"], data["g"], data["b"], data["a"])
 
     def to_json(self) -> dict:
         return {
@@ -363,9 +365,11 @@ import dataclasses
 import struct
 import typing
 
+from retro_data_structures.properties.base_property import BaseProperty
+
 
 @dataclasses.dataclass()
-class Vector:
+class Vector(BaseProperty):
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
@@ -379,7 +383,7 @@ class Vector:
 
     @classmethod
     def from_json(cls, data: dict):
-        return cls(data["x"], data["y"], data["z"])    
+        return cls(data["x"], data["y"], data["z"])
 
     def to_json(self) -> dict:
         return {
@@ -394,11 +398,12 @@ import dataclasses
 import struct
 import typing
 
+from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId
 
 
 @dataclasses.dataclass()
-class AnimationParameters:
+class AnimationParameters(BaseProperty):
     ancs: AssetId = 0xFFFFFFFF
     character_index: int = 0
     initial_anim: int = 0
@@ -412,7 +417,7 @@ class AnimationParameters:
 
     @classmethod
     def from_json(cls, data: dict):
-        return cls(data["ancs"], data["character_index"], data["initial_anim"])    
+        return cls(data["ancs"], data["character_index"], data["initial_anim"])
 
     def to_json(self) -> dict:
         return {
@@ -426,9 +431,11 @@ import dataclasses
 import typing
 import base64
 
+from retro_data_structures.properties.base_property import BaseProperty
+
 
 @dataclasses.dataclass()
-class Spline:
+class Spline(BaseProperty):
     data: bytes = b""
 
     @classmethod
@@ -443,9 +450,9 @@ class Spline:
 
     @classmethod
     def from_json(cls, data):
-        return cls(base64.b64decode(data))    
+        return cls(base64.b64decode(data))
 
-    def to_json(self) -> dict:
+    def to_json(self) -> str:
         return base64.b64encode(self.data).decode("ascii")
 """)
 
@@ -616,7 +623,7 @@ class Spline:
         class_name = name.split("_")[-1]
         class_path = name.replace("_", "/")
 
-        class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
+        class_code = f"@dataclasses.dataclass()\nclass {class_name}(BaseProperty):\n"
         properties_decoder = ""
         properties_builder = ""
         json_builder = ""
@@ -712,6 +719,13 @@ class Spline:
             class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
         class_code += properties_builder
 
+        # from json
+        class_code += """
+    @classmethod
+    def from_json(cls, data: dict):
+        raise NotImplementedError()
+"""
+
         # to json
         class_code += """
     def to_json(self) -> dict:
@@ -721,8 +735,7 @@ class Spline:
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
-        if need_enums or needed_imports:
-            code_code += "\n"
+        code_code += "\nfrom retro_data_structures.properties.base_property import BaseProperty\n"
 
         if need_enums:
             code_code += f"import retro_data_structures.enums.{game_id.lower()} as enums\n"

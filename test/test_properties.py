@@ -27,3 +27,5 @@ def test_import_and_create(path):
     decode = module_class.from_stream(stream, size)
 
     assert decode == obj
+
+    assert obj.to_json() is not None
