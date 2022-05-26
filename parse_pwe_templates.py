@@ -50,6 +50,9 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
         code += '    def from_stream(cls, data: typing.BinaryIO):\n'
         code += f'        return cls({_CODE_PARSE_UINT32})\n'
 
+        code += '\n    def to_stream(self, data: typing.BinaryIO):\n'
+        code += '        data.write(struct.pack(">L", self.value))\n'
+
     return code
 
 
@@ -349,23 +352,51 @@ class Vector:
     z: float = 0.0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO):
+    def from_stream(cls, data: typing.BinaryIO, size: int):
         return cls(*struct.unpack('>fff', data.read(12)))
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('>fff', self.x, self.y, self.z))
 """)
     core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
-    core_path.joinpath("AnimationParameters.py").write_text("""from .AssetId import AssetId
+    core_path.joinpath("AnimationParameters.py").write_text("""# Generated file
+import dataclasses
+import struct
+import typing
+
+from .AssetId import AssetId
 
 
+@dataclasses.dataclass()
 class AnimationParameters:
-    ancs: AssetId
-    character_index: int
-    initial_anim: int
+    ancs: AssetId = 0xFFFFFFFF
+    character_index: int = 0
+    initial_anim: int = 0
+
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO, size: int):
+        return cls(*struct.unpack('>LLL', data.read(12)))
+
+    def to_stream(self, data: typing.BinaryIO):
+        data.write(struct.pack('>LLL', self.ancs, self.character_index, self.initial_anim))
 """)
-    core_path.joinpath("Spline.py").write_text("""class Spline:
-    data: bytes
+    core_path.joinpath("Spline.py").write_text("""# Generated file
+import dataclasses
+import typing
+
+
+@dataclasses.dataclass()
+class Spline:
+    data: bytes = b""
+
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO, size: int):
+        result = cls()
+        result.data = data.read(size)
+        return result
+
+    def to_stream(self, data: typing.BinaryIO):
+        data.write(self.data)
 """)
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
@@ -384,7 +415,7 @@ class AnimationParameters:
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             meta["default_factory"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data)"
+            parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code = f"obj.to_stream(data)"
 
         elif prop['type'] == 'Choice':
@@ -393,7 +424,7 @@ class AnimationParameters:
             if enum_name in known_enums:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
-                parse_code = f"enums.{enum_name}.from_stream(data)"
+                parse_code = f"enums.{enum_name}.from_stream(data, property_size)"
                 build_code = f"obj.to_stream(data)"
 
                 for key, value in known_enums[enum_name].values.items():
@@ -412,7 +443,7 @@ class AnimationParameters:
                 prop_type = "enums." + prop["flagset_name"]
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
-                parse_code = f"{prop_type}.from_stream(data)"
+                parse_code = f"{prop_type}.from_stream(data, property_size)"
                 build_code = f"obj.to_stream(data)"
             else:
                 prop_type = "int"
@@ -439,7 +470,7 @@ class AnimationParameters:
             else:
                 prop_type = raw_type
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data)"
+            parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code = f"obj.to_stream(data)"
             meta["default_factory"] = prop_type
 
@@ -460,7 +491,7 @@ class AnimationParameters:
         elif raw_type in ["Color", "Vector"]:
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data)"
+            parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code = f"obj.to_stream(data)"
 
             if prop['has_default']:
@@ -473,12 +504,18 @@ class AnimationParameters:
                 meta["default_factory"] = prop_type
 
         elif raw_type in _literal_prop_types:
-            # 'struct.unpack(">f", data.read(4))[0]'
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
             parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
             build_code = f"data.write(struct.pack({repr(literal_prop.struct_format)}, obj))"
-            meta["default"] = repr(prop["default_value"] if prop['has_default'] else literal_prop.default)
+
+            default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
+            try:
+                struct.pack(literal_prop.struct_format, default_value)
+            except struct.error as e:
+                print(f"{hex(prop['id'])} has invalid default value  {default_value}: {e}")
+                default_value = literal_prop.default
+            meta["default"] = repr(default_value)
 
         return prop_type, need_enums, comment, parse_code, build_code
 
@@ -552,7 +589,7 @@ class AnimationParameters:
 
         class_code += f"""
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO):
+    def from_stream(cls, data: typing.BinaryIO, size: int):
         result = cls()
 """
         if this["atomic"]:
