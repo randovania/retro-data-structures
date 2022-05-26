@@ -327,7 +327,7 @@ class Color:
     g: float = 0.0
     b: float = 0.0
     a: float = 0.0
-    
+
     @classmethod
     def from_stream(cls, data: typing.BinaryIO):
         return cls(*struct.unpack('>ffff', data.read(16)))
@@ -343,7 +343,7 @@ class Vector:
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
-    
+
     @classmethod
     def from_stream(cls, data: typing.BinaryIO):
         return cls(*struct.unpack('>fff', data.read(12)))
@@ -463,14 +463,14 @@ class AnimationParameters:
 
         return prop_type, need_enums, comment, parse_code
 
-    def parse_struct(name: str, struct, output_path: Path):
-        if struct["type"] != "Struct":
-            print("Ignoring {}. Is a {}".format(name, struct["type"]))
+    def parse_struct(name: str, this, output_path: Path):
+        if this["type"] != "Struct":
+            print("Ignoring {}. Is a {}".format(name, this["type"]))
             return
 
         all_names = [
             _filter_property_name(prop["name"] or property_names.get(prop["id"]) or "unnamed")
-            for prop in struct["properties"]
+            for prop in this["properties"]
         ]
 
         needed_imports = {}
@@ -482,7 +482,7 @@ class AnimationParameters:
         class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
         properties_decoder = ""
 
-        for prop, prop_name in zip(struct["properties"], all_names):
+        for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
@@ -506,30 +506,39 @@ class AnimationParameters:
                 class_code += f"  # {comment}"
             class_code += "\n"
 
-            need_else = bool(properties_decoder)
-            properties_decoder += "            "
-            if need_else:
-                properties_decoder += "el"
+            if this["atomic"]:
+                properties_decoder += f"        result.{prop_name} = {parse_code}\n"
+            else:
+                need_else = bool(properties_decoder)
+                properties_decoder += "            "
+                if need_else:
+                    properties_decoder += "el"
 
-            properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
-            properties_decoder += f"                obj = {parse_code}\n"
-            properties_decoder += f"                result.{prop_name} = obj\n"
+                properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
+                properties_decoder += f"                result.{prop_name} = {parse_code}\n"
 
         class_code += f"""
     @classmethod
     def from_stream(cls, data: typing.BinaryIO):
         result = cls()
-        data.read(2)  # property size
+"""
+        if this["atomic"]:
+            class_code += properties_decoder
+        else:
+            class_code += f"""
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
             property_id = {_CODE_PARSE_UINT32}
             property_size = {_CODE_PARSE_UINT16}
             start = data.tell()
 """
-        class_code += properties_decoder
-        class_code += """            else:
+            class_code += properties_decoder
+            class_code += """            else:
                 data.read(property_size)  # skip unknown property
             assert data.tell() - start == property_size
+"""
+
+        class_code += f"""
         return result
 """
 

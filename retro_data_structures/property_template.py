@@ -2,6 +2,7 @@ import enum
 from pathlib import Path
 from typing import Dict
 
+import construct
 from construct.core import (
     Adapter,
     Check,
