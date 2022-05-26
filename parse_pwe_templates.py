@@ -492,11 +492,11 @@ class Spline:
         elif raw_type == "String":
             prop_type = "str"
             meta["default"] = repr(prop["default_value"] if prop['has_default'] else "")
-            parse_code = f'data.read({_CODE_PARSE_UINT32}).decode("utf-8")'
+            null_byte = repr(b"\x00")
+            parse_code = f'b"".join(iter(lambda: data.read(1), {null_byte})).decode("utf-8")'
             build_code.extend([
-                'obj_bytes = {obj}.encode("utf-8")',
-                'data.write(struct.pack(">L", len(obj_bytes)))',
-                'data.write(obj_bytes)',
+                'data.write({obj}.encode("utf-8"))',
+                f'data.write({null_byte})',
             ])
 
         elif raw_type in ["Color", "Vector"]:
