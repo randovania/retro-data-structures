@@ -749,7 +749,10 @@ class Spline(BaseProperty):
         final_path.parent.mkdir(parents=True, exist_ok=True)
         final_path.write_text(code_code)
 
-    getter_func = "def get_object(four_cc: str):\n"
+    getter_func = "# Generated File\n"
+    getter_func += "import typing\n\n"
+    getter_func += "from retro_data_structures.properties.base_property import BaseProperty\n"
+    getter_func += "\n\ndef get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
     path = code_path.joinpath("objects")
     path.mkdir(parents=True, exist_ok=True)
     for object_fourcc, script_object in script_objects.items():
