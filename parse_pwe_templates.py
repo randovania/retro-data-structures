@@ -53,6 +53,13 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
         code += '\n    def to_stream(self, data: typing.BinaryIO):\n'
         code += '        data.write(struct.pack(">L", self.value))\n'
 
+        code += '\n    @classmethod\n'
+        code += '    def from_json(cls, data):\n'
+        code += '        return cls(data)\n'
+
+        code += '\n    def to_json(self):\n'
+        code += '        return self.value\n'
+
     return code
 
 
@@ -338,6 +345,18 @@ class Color:
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('>ffff', self.r, self.g, self.b, self.a))
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(data["r"], data["g"], data["b"], data["a"])    
+
+    def to_json(self) -> dict:
+        return {
+            "r": self.r,
+            "g": self.g,
+            "b": self.b,
+            "a": self.a,
+        }
 """)
     core_path.joinpath("Vector.py").write_text("""# Generated file
 import dataclasses
@@ -357,6 +376,17 @@ class Vector:
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('>fff', self.x, self.y, self.z))
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(data["x"], data["y"], data["z"])    
+
+    def to_json(self) -> dict:
+        return {
+            "x": self.x,
+            "y": self.y,
+            "z": self.z,
+        }
 """)
     core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
     core_path.joinpath("AnimationParameters.py").write_text("""# Generated file
@@ -379,10 +409,22 @@ class AnimationParameters:
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('>LLL', self.ancs, self.character_index, self.initial_anim))
+
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(data["ancs"], data["character_index"], data["initial_anim"])    
+
+    def to_json(self) -> dict:
+        return {
+            "ancs": self.ancs,
+            "character_index": self.character_index,
+            "initial_anim": self.initial_anim,
+        }
 """)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses
 import typing
+import base64
 
 
 @dataclasses.dataclass()
@@ -398,18 +440,26 @@ class Spline:
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(self.data)
+
+    @classmethod
+    def from_json(cls, data):
+        return cls(base64.b64decode(data))    
+
+    def to_json(self) -> dict:
+        return base64.b64encode(self.data).decode("ascii")
 """)
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
-                         ) -> tuple[str, bool, typing.Optional[str], str, list[str]]:
+                         ) -> tuple[str, bool, typing.Optional[str], str, list[str], str]:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
         comment = None
         parse_code = "None"
         build_code = []
+        to_json_code = "None"
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -418,6 +468,7 @@ class Spline:
             meta["default_factory"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
+            to_json_code = "{obj}.to_json()"
 
         elif prop['type'] == 'Choice':
             default_value = prop["default_value"] if prop['has_default'] else 0
@@ -427,6 +478,7 @@ class Spline:
                 need_enums = True
                 parse_code = f"enums.{enum_name}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
+                to_json_code = "{obj}.to_json()"
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
@@ -437,6 +489,7 @@ class Spline:
                 meta["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32
                 build_code.append('data.write(struct.pack(">L", {obj}))')
+                to_json_code = "{obj}"
 
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
@@ -446,12 +499,14 @@ class Spline:
                 meta["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
+                to_json_code = "{obj}.to_json()"
             else:
                 prop_type = "int"
                 comment = "Flagset"
                 meta["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32
                 build_code.append('data.write(struct.pack(">L", {obj}))')
+                to_json_code = "{obj}"
 
         elif raw_type in ["Asset", "Sound"]:
             prop_type = "AssetId"
@@ -464,6 +519,7 @@ class Spline:
 
             parse_code = _CODE_PARSE_UINT32
             build_code.append('data.write(struct.pack(">L", {obj}))')
+            to_json_code = "{obj}"
 
         elif raw_type in ["AnimationSet", "Spline"]:
             if raw_type == "AnimationSet":
@@ -473,10 +529,11 @@ class Spline:
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
+            to_json_code = "{obj}.to_json()"
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
-            inner_prop_type, need_enums, comment, inner_parse, inner_build = get_prop_details(
+            inner_prop_type, need_enums, comment, inner_parse, inner_build, inner_to_json = get_prop_details(
                 prop["item_archetype"], {}, needed_imports,
             )
             prop_type = f"list[{inner_prop_type}]"
@@ -488,6 +545,9 @@ class Spline:
                 'for item in array:',
                 *['    ' + inner.format(obj="item") for inner in inner_build]
             ])
+            to_json_code = "[{inner} for item in {{obj}}]".format(
+                inner=inner_to_json.format(obj="item")
+            )
 
         elif raw_type == "String":
             prop_type = "str"
@@ -498,12 +558,14 @@ class Spline:
                 'data.write({obj}.encode("utf-8"))',
                 f'data.write({null_byte})',
             ])
+            to_json_code = "{obj}"
 
         elif raw_type in ["Color", "Vector"]:
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
             build_code.append("{obj}.to_stream(data)")
+            to_json_code = "{obj}.to_json()"
 
             s = struct.Struct(">f")
 
@@ -525,6 +587,7 @@ class Spline:
             prop_type = literal_prop.python_type
             parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
             build_code.append(f"data.write(struct.pack({repr(literal_prop.struct_format)}, {{obj}}))")
+            to_json_code = "{obj}"
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
             try:
@@ -535,7 +598,7 @@ class Spline:
                 default_value = literal_prop.default
             meta["default"] = repr(default_value)
 
-        return prop_type, need_enums, comment, parse_code, build_code
+        return prop_type, need_enums, comment, parse_code, build_code, to_json_code
 
     def parse_struct(name: str, this, output_path: Path):
         if this["type"] != "Struct":
@@ -556,13 +619,16 @@ class Spline:
         class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
         properties_decoder = ""
         properties_builder = ""
+        json_builder = ""
 
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type, set_need_enums, comment, parse_code, build_code = get_prop_details(prop, meta, needed_imports)
+            prop_type, set_need_enums, comment, parse_code, build_code, to_json_code = get_prop_details(
+                prop, meta, needed_imports
+            )
             need_enums = need_enums or set_need_enums
 
             if prop_type is None:
@@ -585,6 +651,7 @@ class Spline:
                 properties_decoder += f"        result.{prop_name} = {parse_code}\n"
                 for build in build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
+                json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
             else:
                 need_else = bool(properties_decoder)
                 properties_decoder += "            "
@@ -604,6 +671,9 @@ class Spline:
                 properties_builder += f"        data.seek(before)\n"
                 properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
                 properties_builder += f'        data.seek(after)\n'
+                json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
+
+        # from stream
 
         class_code += f"""
     @classmethod
@@ -630,6 +700,8 @@ class Spline:
         return result
 """
 
+        # to stream
+
         class_code += f"""
     def to_stream(self, data: typing.BinaryIO):
 """
@@ -639,6 +711,13 @@ class Spline:
             prop_count_repr = repr(struct.pack(">H", property_count))
             class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
         class_code += properties_builder
+
+        # to json
+        class_code += """
+    def to_json(self) -> dict:
+        return {
+"""
+        class_code += json_builder + "        }\n"
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
