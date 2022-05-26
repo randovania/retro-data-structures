@@ -47,7 +47,7 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
             code += f"    {_scrub_enum(name)} = {value}\n"
 
         code += '\n    @classmethod\n'
-        code += '    def from_stream(cls, data: typing.BinaryIO):\n'
+        code += '    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):\n'
         code += f'        return cls({_CODE_PARSE_UINT32})\n'
 
         code += '\n    def to_stream(self, data: typing.BinaryIO):\n'
@@ -313,7 +313,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         "Int": LiteralPropType("int", 4, ">l", 0),
         "Float": LiteralPropType("float", 4, ">f", 0.0),
         "Bool": LiteralPropType("bool", 1, ">?", False),
-        "Short": LiteralPropType("int", 4, ">h", 0),
+        "Short": LiteralPropType("int", 2, ">h", 0),
     }
 
     core_path = code_path.joinpath("core")
@@ -333,7 +333,7 @@ class Color:
     a: float = 0.0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         return cls(*struct.unpack('>ffff', data.read(16)))
 
     def to_stream(self, data: typing.BinaryIO):
@@ -352,7 +352,7 @@ class Vector:
     z: float = 0.0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         return cls(*struct.unpack('>fff', data.read(12)))
 
     def to_stream(self, data: typing.BinaryIO):
@@ -374,7 +374,7 @@ class AnimationParameters:
     initial_anim: int = 0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         return cls(*struct.unpack('>LLL', data.read(12)))
 
     def to_stream(self, data: typing.BinaryIO):
@@ -390,7 +390,8 @@ class Spline:
     data: bytes = b""
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+        assert size is not None
         result = cls()
         result.data = data.read(size)
         return result
@@ -424,7 +425,7 @@ class Spline:
             if enum_name in known_enums:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
-                parse_code = f"enums.{enum_name}.from_stream(data, property_size)"
+                parse_code = f"enums.{enum_name}.from_stream(data)"
                 build_code = f"obj.to_stream(data)"
 
                 for key, value in known_enums[enum_name].values.items():
@@ -443,7 +444,7 @@ class Spline:
                 prop_type = "enums." + prop["flagset_name"]
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
-                parse_code = f"{prop_type}.from_stream(data, property_size)"
+                parse_code = f"{prop_type}.from_stream(data)"
                 build_code = f"obj.to_stream(data)"
             else:
                 prop_type = "int"
@@ -480,7 +481,8 @@ class Spline:
             )
             prop_type = f"list[{inner_prop_type}]"
             meta["default_factory"] = "list"
-            # TODO: code for parse and build
+            parse_code = f"[{inner_parse} for _ in range({_CODE_PARSE_UINT32})]"
+            build_code = f'data.write(struct.pack(">L", len(array := obj))); for obj in array: {inner_build}'
 
         elif raw_type == "String":
             prop_type = "str"
@@ -491,15 +493,21 @@ class Spline:
         elif raw_type in ["Color", "Vector"]:
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data, property_size)"
+            parse_code = f"{prop_type}.from_stream(data)"
             build_code = f"obj.to_stream(data)"
 
+            s = struct.Struct(">f")
+
             if prop['has_default']:
+                default_value = {
+                    k: s.unpack(s.pack(v))[0]
+                    for k, v in prop["default_value"].items()
+                }
                 if raw_type == "Color":
-                    value = {"A": 0.0, **prop["default_value"]}
+                    value = {"A": 0.0, **default_value}
                     meta["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
                 else:
-                    meta["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**prop["default_value"])
+                    meta["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**default_value)
             else:
                 meta["default_factory"] = prop_type
 
@@ -511,7 +519,8 @@ class Spline:
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
             try:
-                struct.pack(literal_prop.struct_format, default_value)
+                s = struct.Struct(literal_prop.struct_format)
+                default_value = s.unpack(s.pack(default_value))[0]
             except struct.error as e:
                 print(f"{hex(prop['id'])} has invalid default value  {default_value}: {e}")
                 default_value = literal_prop.default
@@ -589,7 +598,7 @@ class Spline:
 
         class_code += f"""
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         result = cls()
 """
         if this["atomic"]:

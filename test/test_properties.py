@@ -21,6 +21,9 @@ def test_import_and_create(path):
 
     stream = io.BytesIO()
     obj.to_stream(stream)
+    size = stream.tell()
 
-    # stream.seek(0)
-    # decode = module_class.from_stream(stream)
+    stream.seek(0)
+    decode = module_class.from_stream(stream, size)
+
+    assert decode == obj
