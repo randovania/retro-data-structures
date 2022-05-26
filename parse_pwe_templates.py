@@ -20,6 +20,7 @@ _game_id_to_file = {
 class EnumDefinition:
     name: str
     values: typing.Dict[str, typing.Any]
+    enum_base: str = "Enum"
 
 
 _enums_by_game: typing.Dict[str, typing.List[EnumDefinition]] = {}
@@ -34,10 +35,10 @@ def _scrub_enum(string: str):
 
 
 def create_enums_file(enums: typing.List[EnumDefinition]):
-    code = '"""\nGenerated file.\n"""\nfrom enum import Enum\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\n'
 
     for e in enums:
-        code += f"\n\nclass {_scrub_enum(e.name)}(Enum):\n"
+        code += f"\n\nclass {_scrub_enum(e.name)}(enum.{e.enum_base}):\n"
         for name, value in e.values.items():
             code += f"    {_scrub_enum(name)} = {value}\n"
 
@@ -96,6 +97,26 @@ def _prop_choice(element: Element, game_id: str, path: Path) -> dict:
     return extras
 
 
+def _prop_flags(element: Element, game_id: str, path: Path) -> dict:
+    extras = _prop_default_value(element, game_id, path)
+    if (flags_element := element.find("Flags")) is not None:
+        extras["flags"] = {
+            element.attrib["Name"]: int(element.attrib["Mask"], 16)
+            for element in flags_element.findall("Element")
+        }
+
+        name = None
+        if element.find("Name") is not None:
+            name = element.find("Name").text
+        elif element.attrib.get("ID"):
+            name = property_names.get(int(element.attrib.get("ID"), 16))
+
+        _enums_by_game[game_id].append(EnumDefinition(name, extras["flags"], enum_base="IntFlag"))
+        extras["flagset_name"] = name
+
+    return extras
+
+
 def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool = True) -> dict:
     parsed = {}
     if include_id:
@@ -113,7 +134,8 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         "Asset": _prop_asset,
         "Array": _prop_array,
         "Enum": _prop_choice,
-        "Choice": _prop_choice
+        "Choice": _prop_choice,
+        "Flags": _prop_flags,
     }
 
     parsed.update(property_type_extras.get(element.attrib["Type"], _prop_default_value)(element, game_id, path))
@@ -270,54 +292,133 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
     import_base = f"retro_data_structures.properties.{game_id.lower()}"
 
+    def use_as_literal(k):
+        return "default", repr(k)
+
+    def convert_color(k):
+        value = {"A": 0.0, **k}
+        return "default_factory", "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
+
+    def convert_vector(k):
+        return "default_factory", "lambda: Vector(x={X}, y={Y}, z={Z})".format(**k)
+
     _prop_type_to_python_type = {
-        "Int": ("int", None),
-        "Float": ("float", None),
-        "Bool": ("bool", None),
-        "String": ("str", None),
-        "Color": ("Color", "core.Color"),
-        "Vector": ("Vector", "core.Vector"),
-        # "Short": lambda el: int(el.text, 10) & 0xFFFF,
-        # "Flags": lambda el: int(el.text, 10) & 0xFFFFFFFF,
-        # "Choice": lambda el: int(el.text, 10) & 0xFFFFFFFF,
-        # "Enum": lambda el: int(el.text, 16) & 0xFFFFFFFF,
-        "Sound": ("AssetId", "core.AssetId"),
-        "AnimationSet": ("AnimationParameters", "core.AnimationParameters"),
+        "Int": ("int", None, use_as_literal, None),
+        "Float": ("float", None, use_as_literal, None),
+        "Bool": ("bool", None, use_as_literal, None),
+        "String": ("str", None, use_as_literal, ("default", repr(""))),
+        "Color": ("Color", "core.Color", convert_color, None),
+        "Vector": ("Vector", "core.Vector", convert_vector, None),
+        "Short": ("int", None, use_as_literal, None),
+        "Sound": ("AssetId", "core.AssetId", use_as_literal, None),
+        "AnimationSet": ("AnimationParameters", "core.AnimationParameters", use_as_literal,
+                         ("default_factory", "AnimationParameters")),
+        "Spline": ("Spline", "core.Spline", use_as_literal, ("default_factory", "Spline")),
     }
 
     core_path = code_path.joinpath("core")
     core_path.mkdir(parents=True, exist_ok=True)
 
-    core_path.joinpath("Color.py").write_text("""
+    core_path.joinpath("Color.py").write_text("""# Generated file
+import dataclasses
+
+
+@dataclasses.dataclass()
 class Color:
-    r: float
-    g: float
-    b: float
-    a: float
+    r: float = 0.0
+    g: float = 0.0
+    b: float = 0.0
+    a: float = 0.0
 """)
-    core_path.joinpath("Vector.py").write_text("""
+    core_path.joinpath("Vector.py").write_text("""# Generated file
+import dataclasses
+
+
+@dataclasses.dataclass()
 class Vector:
-    x: float
-    y: float
-    z: float
+    x: float = 0.0
+    y: float = 0.0
+    z: float = 0.0
 """)
-    core_path.joinpath("AssetId.py").write_text("""
-AssetId = int
-    """)
-    core_path.joinpath("AnimationParameters.py").write_text("""
-from .AssetId import AssetId
-    
+    core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
+    core_path.joinpath("AnimationParameters.py").write_text("""from .AssetId import AssetId
+
+
 class AnimationParameters:
     ancs: AssetId
     character_index: int
     initial_anim: int
-    """)
+""")
+    core_path.joinpath("Spline.py").write_text("""class Spline:
+    data: bytes
+""")
 
-    known_enums = {_scrub_enum(e.name) for e in _enums_by_game[game_id]}
+    known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
+
+    def get_prop_details(prop, meta: dict, needed_imports: dict[str, str]) -> tuple[str, bool, typing.Optional[str]]:
+        prop_type = None
+        need_enums = False
+        comment = None
+
+        if prop["type"] == "Struct":
+            archetype_path: str = prop["archetype"].replace("_", ".")
+            prop_type = archetype_path.split(".")[-1]
+            needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
+            meta["default_factory"] = prop_type
+
+        elif prop['type'] == 'Choice':
+            default_value = prop["default_value"] if prop['has_default'] else 0
+            enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
+            if enum_name in known_enums:
+                prop_type = f"enums.{enum_name}"
+                need_enums = True
+
+                for key, value in known_enums[enum_name].values.items():
+                    if value == default_value:
+                        meta["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
+            else:
+                comment = "Choice"
+                prop_type = "int"
+                meta["default"] = repr(default_value)
+
+        elif prop["type"] == "Asset":
+            prop_type = "AssetId"
+            needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
+            meta["metadata"] = repr({"asset_types": prop["type_filter"]})
+            meta["default"] = "0xFFFFFFFF"
+
+        elif prop["type"] == "Flags":
+            default_value = repr(prop["default_value"] if prop['has_default'] else 0)
+            if "flagset_name" in prop:
+                prop_type = "enums." + prop["flagset_name"]
+                need_enums = True
+                meta["default"] = f"{prop_type}({default_value})"
+            else:
+                prop_type = "int"
+                comment = "Flagset"
+                meta["default"] = default_value
+
+        elif prop["type"] == "Array":
+            inner_prop_type, need_enums, comment = get_prop_details(prop["item_archetype"], {}, needed_imports)
+            prop_type = f"list[{inner_prop_type}]"
+            meta["default_factory"] = "list"
+
+        elif prop['type'] in _prop_type_to_python_type:
+            prop_type, import_name, default_converter, default_default = _prop_type_to_python_type[prop['type']]
+            if import_name is not None:
+                needed_imports[f"{import_base}.{import_name}"] = prop_type
+
+            if prop['has_default']:
+                meta_key, meta_value = default_converter(prop["default_value"])
+            else:
+                meta_key, meta_value = default_default
+            meta[meta_key] = meta_value
+
+        return prop_type, need_enums, comment
 
     def parse_struct(name: str, struct, output_path: Path):
         if struct["type"] != "Struct":
-            print("Ignoring archetype {}. Is a {}".format(name, struct["type"]))
+            print("Ignoring {}. Is a {}".format(name, struct["type"]))
             return
 
         all_names = [
@@ -328,39 +429,39 @@ class AnimationParameters:
         needed_imports = {}
         need_enums = False
 
-        class_code = f"@dataclasses.dataclass()\nclass {name}:\n"
+        class_name = name.split("_")[-1]
+        class_path = name.replace("_", "/")
+
+        class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
         for prop, prop_name in zip(struct["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type = None
-            if prop["type"] == "Struct":
-                prop_type = prop["archetype"]
-                needed_imports[f"{import_base}.archetypes.{prop_type}"] = prop_type
-
-            elif prop['type'] == 'Choice':
-                enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
-                if enum_name in known_enums:
-                    prop_type = f"enums.{enum_name}"
-                    need_enums = True
-
-            elif prop["type"] == "Asset":
-                prop_type = "AssetId"
-                needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
-                meta["asset_types"] = prop["type_filter"]
-
-            elif prop['type'] in _prop_type_to_python_type:
-                prop_type, import_name = _prop_type_to_python_type[prop['type']]
-                if import_name is not None:
-                    needed_imports[f"{import_base}.{import_name}"] = prop_type
-                # assert prop['has_default']
-                # print(prop)
+            prop_type, set_need_enums, comment = get_prop_details(prop, meta, needed_imports)
+            need_enums = need_enums or set_need_enums
 
             if prop_type is None:
-                prop_type = f"object  # {prop['type']} ; {prop['name']} ; {property_names.get(prop['id'])}"
+                prop_type = "object"
+                extra_comment = f"{prop['type']} ; {prop['name']} ; {property_names.get(prop['id'])}"
+                if comment is None:
+                    comment = extra_comment
+                else:
+                    comment = f"{comment} ; {extra_comment}"
+                print(comment)
 
-            class_code += f"    {prop_name}: {prop_type}\n"
+            class_code += f"    {prop_name}: {prop_type}"
+            if meta:
+                class_code += " = dataclasses.field({})".format(
+                    ", ".join(
+                        f"{key}={value}"
+                        for key, value in meta.items()
+                    )
+                )
+
+            if comment is not None:
+                class_code += f"  # {comment}"
+            class_code += "\n"
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\n"
@@ -375,7 +476,9 @@ class AnimationParameters:
 
         code_code += "\n\n"
         code_code += class_code
-        output_path.joinpath(f"{name}.py").write_text(code_code)
+        final_path = output_path.joinpath(class_path).with_suffix(".py")
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+        final_path.write_text(code_code)
 
     getter_func = "def get_object(four_cc: str):\n"
     path = code_path.joinpath("objects")
@@ -389,10 +492,12 @@ class AnimationParameters:
     getter_func += '    raise ValueError(f"Unknown four_cc: {four_cc}")\n'
     path.joinpath("__init__.py").write_text(getter_func)
 
+    print("> Creating archetypes")
     path = code_path.joinpath("archetypes")
     path.mkdir(parents=True, exist_ok=True)
     for archetype_name, archetype in property_archetypes.items():
         parse_struct(archetype_name, archetype, path)
+    print("> Done.")
 
     return {
         "script_objects": script_objects,
