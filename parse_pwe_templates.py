@@ -1,6 +1,7 @@
 import dataclasses
 import logging
 import re
+import struct
 import typing
 from pathlib import Path
 from xml.etree import ElementTree
@@ -331,6 +332,9 @@ class Color:
     @classmethod
     def from_stream(cls, data: typing.BinaryIO):
         return cls(*struct.unpack('>ffff', data.read(16)))
+
+    def to_stream(self, data: typing.BinaryIO):
+        data.write(struct.pack('>ffff', self.r, self.g, self.b, self.a))
 """)
     core_path.joinpath("Vector.py").write_text("""# Generated file
 import dataclasses
@@ -347,6 +351,9 @@ class Vector:
     @classmethod
     def from_stream(cls, data: typing.BinaryIO):
         return cls(*struct.unpack('>fff', data.read(12)))
+
+    def to_stream(self, data: typing.BinaryIO):
+        data.write(struct.pack('>fff', self.x, self.y, self.z))
 """)
     core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
     core_path.joinpath("AnimationParameters.py").write_text("""from .AssetId import AssetId
@@ -364,12 +371,13 @@ class AnimationParameters:
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
-                         ) -> tuple[str, bool, typing.Optional[str], str]:
+                         ) -> tuple[str, bool, typing.Optional[str], str, str]:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
         comment = None
         parse_code = "None"
+        build_code = "pass"
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -377,6 +385,7 @@ class AnimationParameters:
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             meta["default_factory"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
+            build_code = f"obj.to_stream(data)"
 
         elif prop['type'] == 'Choice':
             default_value = prop["default_value"] if prop['has_default'] else 0
@@ -385,6 +394,7 @@ class AnimationParameters:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
                 parse_code = f"enums.{enum_name}.from_stream(data)"
+                build_code = f"obj.to_stream(data)"
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
@@ -394,6 +404,7 @@ class AnimationParameters:
                 prop_type = "int"
                 meta["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32
+                build_code = f'data.write(struct.pack(">L", obj))'
 
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
@@ -402,11 +413,13 @@ class AnimationParameters:
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
+                build_code = f"obj.to_stream(data)"
             else:
                 prop_type = "int"
                 comment = "Flagset"
                 meta["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32
+                build_code = f'data.write(struct.pack(">L", obj))'
 
         elif raw_type in ["Asset", "Sound"]:
             prop_type = "AssetId"
@@ -418,6 +431,7 @@ class AnimationParameters:
                 meta["default"] = repr(prop["default_value"] if prop['has_default'] else 0)
 
             parse_code = _CODE_PARSE_UINT32
+            build_code = f'data.write(struct.pack(">L", obj))'
 
         elif raw_type in ["AnimationSet", "Spline"]:
             if raw_type == "AnimationSet":
@@ -426,24 +440,28 @@ class AnimationParameters:
                 prop_type = raw_type
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
+            build_code = f"obj.to_stream(data)"
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
-            inner_prop_type, need_enums, comment, inner_parse = get_prop_details(
+            inner_prop_type, need_enums, comment, inner_parse, inner_build = get_prop_details(
                 prop["item_archetype"], {}, needed_imports,
             )
             prop_type = f"list[{inner_prop_type}]"
             meta["default_factory"] = "list"
+            # TODO: code for parse and build
 
         elif raw_type == "String":
             prop_type = "str"
             meta["default"] = repr(prop["default_value"] if prop['has_default'] else "")
             parse_code = f'data.read({_CODE_PARSE_UINT32}).decode("utf-8")'
+            build_code = f'obj = obj.encode("utf-8"); data.write(struct.pack(">L", len(obj))); data.write(obj)'
 
         elif raw_type in ["Color", "Vector"]:
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
+            build_code = f"obj.to_stream(data)"
 
             if prop['has_default']:
                 if raw_type == "Color":
@@ -459,9 +477,10 @@ class AnimationParameters:
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
             parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
+            build_code = f"data.write(struct.pack({repr(literal_prop.struct_format)}, obj))"
             meta["default"] = repr(prop["default_value"] if prop['has_default'] else literal_prop.default)
 
-        return prop_type, need_enums, comment, parse_code
+        return prop_type, need_enums, comment, parse_code, build_code
 
     def parse_struct(name: str, this, output_path: Path):
         if this["type"] != "Struct":
@@ -481,13 +500,14 @@ class AnimationParameters:
 
         class_code = f"@dataclasses.dataclass()\nclass {class_name}:\n"
         properties_decoder = ""
+        properties_builder = ""
 
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type, set_need_enums, comment, parse_code = get_prop_details(prop, meta, needed_imports)
+            prop_type, set_need_enums, comment, parse_code, build_code = get_prop_details(prop, meta, needed_imports)
             need_enums = need_enums or set_need_enums
 
             if prop_type is None:
@@ -508,6 +528,8 @@ class AnimationParameters:
 
             if this["atomic"]:
                 properties_decoder += f"        result.{prop_name} = {parse_code}\n"
+                properties_builder += f"        obj = self.{prop_name}\n"
+                properties_builder += f"        {build_code}\n"
             else:
                 need_else = bool(properties_decoder)
                 properties_decoder += "            "
@@ -516,6 +538,17 @@ class AnimationParameters:
 
                 properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
                 properties_decoder += f"                result.{prop_name} = {parse_code}\n"
+                prop_id_bytes = struct.pack(">L", prop["id"])
+                placeholder = repr(b'\x00\x00')
+                properties_builder += f"\n        obj = self.{prop_name}\n"
+                properties_builder += f'        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
+                properties_builder += f"        before = data.tell()\n"
+                properties_builder += f"        data.write({placeholder})  # size placeholder\n"
+                properties_builder += f"        {build_code}\n"
+                properties_builder += f"        after = data.tell()\n"
+                properties_builder += f"        data.seek(before)\n"
+                properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
+                properties_builder += f'        data.seek(after)\n'
 
         class_code += f"""
     @classmethod
@@ -541,6 +574,16 @@ class AnimationParameters:
         class_code += f"""
         return result
 """
+
+        class_code += f"""
+    def to_stream(self, data: typing.BinaryIO):
+"""
+        if not this["atomic"]:
+            # TODO: respect cook preference
+            property_count = len(this["properties"])
+            prop_count_repr = repr(struct.pack(">H", property_count))
+            class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
+        class_code += properties_builder
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
