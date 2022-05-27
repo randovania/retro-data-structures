@@ -479,7 +479,7 @@ class Spline(BaseProperty):
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
 
-        elif prop['type'] == 'Choice':
+        elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
             enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
             if enum_name in known_enums:
@@ -526,12 +526,23 @@ class Spline(BaseProperty):
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
             if raw_type == "Asset":
                 meta["metadata"] = repr({"asset_types": prop["type_filter"]})
-                meta["default"] = "0xFFFFFFFF"
+                if game_id in ["Prime", "Echoes"]:
+                    default_value = 0xFFFFFFFF
+                else:
+                    default_value = 0xFFFFFFFFFFFFFFFF
             else:
-                meta["default"] = repr(prop["default_value"] if prop['has_default'] else 0)
+                default_value = prop["default_value"] if prop['has_default'] else 0
 
-            parse_code = _CODE_PARSE_UINT32
-            build_code.append('data.write(struct.pack(">L", {obj}))')
+            if game_id in ["Prime", "Echoes"]:
+                format_specifier = '">L"'
+                byte_count = 4
+            else:
+                format_specifier = '">Q"'
+                byte_count = 8
+
+            meta["default"] = hex(default_value)
+            parse_code = f'struct.unpack({format_specifier}, data.read({byte_count}))[0]'
+            build_code.append(f'data.write(struct.pack({format_specifier}, {{obj}}))')
             from_json_code = "{obj}"
             to_json_code = "{obj}"
 
@@ -619,6 +630,10 @@ class Spline(BaseProperty):
                 default_value = literal_prop.default
             meta["default"] = repr(default_value)
 
+        if prop_type is None:
+            print("what?")
+            print(prop)
+
         return prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code
 
     def parse_struct(name: str, this, output_path: Path):
@@ -671,7 +686,7 @@ class Spline(BaseProperty):
 
             json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
             json_parser += f"            {prop_name}={from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
-            if this["atomic"]:
+            if this["atomic"] or game_id == "Prime":
                 properties_decoder += f"        result.{prop_name} = {parse_code}\n"
                 for build in build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
@@ -702,7 +717,11 @@ class Spline(BaseProperty):
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         result = cls()
 """
-        if this["atomic"]:
+        if this["atomic"] or game_id == "Prime":
+            if game_id == "Prime":
+                class_code += f"        _ = {_CODE_PARSE_UINT32}  # unused file prop count\n"
+                class_code += "        property_size = None\n"
+
             class_code += properties_decoder
         else:
             class_code += f"""
@@ -730,7 +749,7 @@ class Spline(BaseProperty):
         if not this["atomic"]:
             # TODO: respect cook preference
             property_count = len(this["properties"])
-            prop_count_repr = repr(struct.pack(">H", property_count))
+            prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", property_count))
             class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
         class_code += properties_builder
 
@@ -842,4 +861,5 @@ def persist_data(parse_result):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    persist_data(parse(["Echoes"]))
+    # persist_data(parse(["Prime"]))
+    persist_data(parse(_game_id_to_file.keys()))
