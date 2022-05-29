@@ -9,6 +9,7 @@ from test.test_lib import parse_and_build_compare, parse_and_build_compare_parse
 _mrea_path_p1 = "Resources/Worlds/EndCinema/!EndCinema_Master/01_endcinema.MREA"
 _mrea_path_p2 = "Resources/Worlds/TempleHub/!TempleHub_Master/game_end_part5.MREA"
 
+
 @pytest.fixture(name="p1_mrea_path")
 def _p1_mrea_path(prime1_pwe_project) -> Path:
     return prime1_pwe_project.joinpath(_mrea_path_p1)

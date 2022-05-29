@@ -30,13 +30,13 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion, WithVersionElse
 from retro_data_structures.data_section import DataSection, DataSectionSizes, GetDataSectionId, GetDataSectionSize
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
@@ -222,21 +222,22 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
                 return header.uncompressed_size
             return header.compressed_size + (-header.compressed_size % 32)
 
-        super().__init__(AlignedStruct(32,
-                                       "headers" / PrefixedArray(
-                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                                           Struct(
-                                               "buffer_size" / Int32ub,
-                                               "uncompressed_size" / Int32ub,
-                                               "compressed_size" / Int32ub,
-                                               "data_section_count" / Int32ub,
-                                           ),
-                                       ),
-                                       "groups" / PrefixedArray(
-                                           Pointer(this._root.header.compressed_block_count_addr, Int32ub),
-                                           FixedSized(get_size, GreedyBytes)
-                                       )
-                                       ))
+        super().__init__(AlignedStruct(
+            32,
+            "headers" / PrefixedArray(
+                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                Struct(
+                    "buffer_size" / Int32ub,
+                    "uncompressed_size" / Int32ub,
+                    "compressed_size" / Int32ub,
+                    "data_section_count" / Int32ub,
+                ),
+            ),
+            "groups" / PrefixedArray(
+                Pointer(this._root.header.compressed_block_count_addr, Int32ub),
+                FixedSized(get_size, GreedyBytes)
+            )
+        ))
 
     def _get_subcon(self, compressed_size, uncompressed_size, context):
         if compressed_size:
@@ -254,18 +255,24 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
 
     def _start_new_group(self, group_size, section_size, curr_label, prev_label):
         if group_size == 0:
-            return (False, "")
+            return False, ""
+
         if group_size + section_size > 0x20000:
-            return (True, "Next section too big.")
+            return True, "Next section too big."
+
         if curr_label == "script_layers_section":
-            return (True, "New SCLY section.")
+            return True, "New SCLY section."
+
         elif prev_label == "script_layers_section":
-            return (True, "Previous SCLY completed.")
+            return True, "Previous SCLY completed."
+
         if curr_label == "generated_script_objects_section":
-            return (True, "New SCGN section.")
+            return True, "New SCGN section."
+
         elif prev_label == "generated_script_objects_section":
-            return (True, "Previous SCGN completed.")
-        return (False, "")
+            return True, "Previous SCGN completed."
+
+        return False, ""
 
     def _encode(self, sections, context, path):
         sections = super()._encode(sections, context, path)
@@ -341,74 +348,98 @@ def MREAHeader():
     return Struct(
         "magic" / Const(0xDEADBEEF, Int32ub),
         "version" / Enum(Int32ub, MREAVersion),
+
         # Matrix that represents the area's transform from the origin.
         # Most area data is pre-transformed, so this matrix is only used occasionally.
         "area_transform" / Transform4f,
+
         # Number of world models in this area.
         # TODO: rebuild
         "world_model_count" / Int32ub,
+
         # Number of script layers in this area.
-        "script_layer_count"
-        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, len_(this._.sections.script_layers_section))),
+        "script_layer_count" / WithVersion(
+            MREAVersion.Echoes, Rebuild(Int32ub, len_(this._.sections.script_layers_section))
+        ),
+
         # Number of data sections in the file.
         "data_section_count" / Rebuild(Int32ub, lambda this: sum(map(lambda cat: len(cat), this._.sections.values()))),
+
         # Section index for world geometry data. Always 0; starts on materials.
         "geometry_section" / Rebuild(Int32ub, get_section_id("geometry_section")),
+
         # Section index for script layer data.
         "script_layers_section" / Rebuild(Int32ub, get_section_id("script_layers_section")),
+
         # Section index for generated script object data.
-        "generated_script_objects_section"
-        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("generated_script_objects_section"))),
+        "generated_script_objects_section" / WithVersion(
+            MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("generated_script_objects_section"))
+        ),
+
         # Section index for collision data.
         "collision_section" / Rebuild(Int32ub, get_section_id("collision_section")),
+
         # Section index for first unknown section.
         "unknown_section_1" / Rebuild(Int32ub, get_section_id("unknown_section_1")),
+
         # Section index for light data.
         "lights_section" / Rebuild(Int32ub, get_section_id("lights_section")),
+
         # Section index for visibility tree data.
         "visibility_tree_section" / Rebuild(Int32ub, get_section_id("visibility_tree_section")),
+
         # Section index for path data.
         "path_section" / Rebuild(Int32ub, get_section_id("path_section")),
+
         # Section index for area octree data.
-        "area_octree_section"
-        / BeforeVersion(MREAVersion.EchoesDemo, Rebuild(Int32ub, get_section_id("area_octree_section"))),
+        "area_octree_section" / BeforeVersion(
+            MREAVersion.EchoesDemo, Rebuild(Int32ub, get_section_id("area_octree_section"))
+        ),
+
         # Section index for second unknown section.
         "unknown_section_2" / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("unknown_section_2"))),
+
         # Section index for portal area data.
-        "portal_area_section"
-        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("portal_area_section"))),
+        "portal_area_section" / WithVersion(
+            MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("portal_area_section"))
+        ),
+
         # Section index for static geometry map data.
-        "static_geometry_map_section"
-        / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("static_geometry_map_section"))),
+        "static_geometry_map_section" / WithVersion(
+            MREAVersion.Echoes, Rebuild(Int32ub, get_section_id("static_geometry_map_section"))
+        ),
+
         # Number of compressed data blocks in the file.
         "compressed_block_count_addr" / WithVersion(MREAVersion.Echoes, Tell),
+
         WithVersion(MREAVersion.Echoes, Skip(1, Int32ub)),
+
         "categories" / Computed(_used_categories),
     )
 
 
-MREA = AlignedStruct(32,
-                     "_current_section" / Computed(0),
+MREA = AlignedStruct(
+    32,
+    "_current_section" / Computed(0),
 
-                     "header" / MREAHeader(),
-                     "version" / Computed(this.header.version),
+    "header" / MREAHeader(),
+    "version" / Computed(this.header.version),
 
-                     # Array containing the size of each data section in the file. Every size is always a multiple of 32.
-                     "data_section_sizes" / DataSectionSizes(
-                         this._.header.data_section_count,
-                         True,
-                         lambda this: sorted(
-                             [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
-                         )[this._index]["size"],
-                     ),
+    # Array containing the size of each data section in the file. Every size is always a multiple of 32.
+    "data_section_sizes" / DataSectionSizes(
+        this._.header.data_section_count,
+        True,
+        lambda this: sorted(
+            [x for l in this._root.sections.values() for x in l], key=lambda section: section["id"]
+        )[this._index]["size"],
+    ),
 
-                     "sections"
-                     / WithVersionElse(
-                         MREAVersion.Echoes,
-                         CompressedBlocksAdapter(),
-                         SectionCategoryAdapter(UncompressedDataSections())
-                     ),
-                     )
+    "sections" / WithVersionElse(
+        MREAVersion.Echoes,
+        CompressedBlocksAdapter(),
+        SectionCategoryAdapter(UncompressedDataSections())
+    ),
+)
 
 
 class Mrea(BaseResource):
