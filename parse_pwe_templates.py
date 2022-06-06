@@ -703,7 +703,6 @@ class Spline(BaseProperty):
             _ensure_is_generated_dir(nested_dir)
             if maybe_file.is_file():
                 maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
-
             rename_root = nested_dir
 
         class_code = f"@dataclasses.dataclass()\nclass {class_name}(BaseProperty):\n"
