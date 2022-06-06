@@ -259,11 +259,13 @@ def get_key_map(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
 
 
 _to_snake_case_re = re.compile(r'(?<!^)(?=[A-Z])')
-_invalid_chars_table = str.maketrans("", "", "()?")
+_invalid_chars_table = str.maketrans("", "", "()?'")
+_to_underscore_table = str.maketrans("/ ", "__")
 
 
 def _filter_property_name(n: str) -> str:
-    return inflection.underscore(n.replace(" ", "_").replace("#", "Number")).translate(_invalid_chars_table).lower()
+    return inflection.underscore(n.translate(_to_underscore_table).replace("#", "Number")
+                                 ).translate(_invalid_chars_table).lower()
 
 
 def _add_gitignore(path: Path):
@@ -463,8 +465,19 @@ class Spline(BaseProperty):
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
+    @dataclasses.dataclass
+    class PropDetails:
+        prop_type: str
+        need_enums: bool
+        comment: typing.Optional[str]
+        parse_code: str
+        build_code: list[str]
+        from_json_code: str
+        to_json_code: str
+        custom_cook_pref: bool
+
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
-                         ) -> tuple[str, bool, typing.Optional[str], str, list[str], str, str]:
+                         ) -> PropDetails:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
@@ -510,7 +523,7 @@ class Spline(BaseProperty):
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
             if "flagset_name" in prop:
-                prop_type = "enums." + prop["flagset_name"]
+                prop_type = "enums." + _scrub_enum(prop["flagset_name"])
                 need_enums = True
                 meta["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
@@ -564,23 +577,26 @@ class Spline(BaseProperty):
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
-            inner_prop_type, need_enums, comment, inner_parse, inner_build, inner_from_json, inner_to_json = get_prop_details(
+            inner_prop = get_prop_details(
                 prop["item_archetype"], {}, needed_imports,
             )
-            prop_type = f"list[{inner_prop_type}]"
+
+            prop_type = f"list[{inner_prop.prop_type}]"
+            need_enums = inner_prop.need_enums
+            comment = inner_prop.comment
             meta["default_factory"] = "list"
-            parse_code = f"[{inner_parse} for _ in range({_CODE_PARSE_UINT32})]"
+            parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32})]"
             build_code.extend([
                 'array = {obj}',
                 'data.write(struct.pack(">L", len(array)))',
                 'for item in array:',
-                *['    ' + inner.format(obj="item") for inner in inner_build]
+                *['    ' + inner.format(obj="item") for inner in inner_prop.build_code]
             ])
             from_json_code = "[{inner} for item in {{obj}}]".format(
-                inner=inner_from_json.format(obj="item")
+                inner=inner_prop.from_json_code.format(obj="item")
             )
             to_json_code = "[{inner} for item in {{obj}}]".format(
-                inner=inner_to_json.format(obj="item")
+                inner=inner_prop.to_json_code.format(obj="item")
             )
 
         elif raw_type == "String":
@@ -639,7 +655,8 @@ class Spline(BaseProperty):
             print("what?")
             print(prop)
 
-        return prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code
+        return PropDetails(prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
+                           custom_cook_pref=prop['cook_preference'] != "Always")
 
     def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
@@ -653,6 +670,7 @@ class Spline(BaseProperty):
 
         needed_imports = {}
         need_enums = False
+        has_custom_cook_pref = False
 
         class_name = name.split("_")[-1]
         class_path = name.replace("_", "/")
@@ -668,15 +686,17 @@ class Spline(BaseProperty):
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             meta = {}
-            prop_type, set_need_enums, comment, parse_code, build_code, from_json_code, to_json_code = get_prop_details(
+            # prop_type, set_need_enums, comment, parse_code, build_code, from_json_code, to_json_code =
+            pdetails = get_prop_details(
                 prop, meta, needed_imports
             )
-            need_enums = need_enums or set_need_enums
+            need_enums = need_enums or pdetails.need_enums
+            has_custom_cook_pref = has_custom_cook_pref or pdetails.custom_cook_pref
 
-            if prop_type is None:
+            if pdetails.prop_type is None:
                 raise ValueError(f"Unable to parse property {prop_name} of {name}")
 
-            class_code += f"    {prop_name}: {prop_type}"
+            class_code += f"    {prop_name}: {pdetails.prop_type}"
             if meta:
                 class_code += " = dataclasses.field({})".format(
                     ", ".join(
@@ -685,15 +705,15 @@ class Spline(BaseProperty):
                     )
                 )
 
-            if comment is not None:
-                class_code += f"  # {comment}"
+            if pdetails.comment is not None:
+                class_code += f"  # {pdetails.comment}"
             class_code += "\n"
 
-            json_builder += f"            {repr(prop_name)}: {to_json_code.format(obj=f'self.{prop_name}')},\n"
-            json_parser += f"            {prop_name}={from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+            json_builder += f"            {repr(prop_name)}: {pdetails.to_json_code.format(obj=f'self.{prop_name}')},\n"
+            json_parser += f"            {prop_name}={pdetails.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
             if this["atomic"] or game_id == "Prime":
-                properties_decoder += f"        result.{prop_name} = {parse_code}\n"
-                for build in build_code:
+                properties_decoder += f"        result.{prop_name} = {pdetails.parse_code}\n"
+                for build in pdetails.build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
             else:
                 need_else = bool(properties_decoder)
@@ -702,13 +722,16 @@ class Spline(BaseProperty):
                     properties_decoder += "el"
 
                 properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
-                properties_decoder += f"                result.{prop_name} = {parse_code}\n"
+                properties_decoder += f"                result.{prop_name} = {pdetails.parse_code}\n"
                 prop_id_bytes = struct.pack(">L", prop["id"])
                 placeholder = repr(b'\x00\x00')
-                properties_builder += f'\n        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
+                properties_builder += "\n"
+                if pdetails.custom_cook_pref:
+                    properties_builder += f"        # Cook Preference: {prop['cook_preference']} (Not Implemented)\n"
+                properties_builder += f'        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
                 properties_builder += f"        before = data.tell()\n"
                 properties_builder += f"        data.write({placeholder})  # size placeholder\n"
-                for build in build_code:
+                for build in pdetails.build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
                 properties_builder += f"        after = data.tell()\n"
                 properties_builder += f"        data.seek(before)\n"
@@ -724,8 +747,9 @@ class Spline(BaseProperty):
 """
         if this["atomic"] or game_id == "Prime":
             if game_id == "Prime":
-                class_code += f"        _ = {_CODE_PARSE_UINT32}  # unused file prop count\n"
                 class_code += "        property_size = None\n"
+                if is_struct:
+                    class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
 
             class_code += properties_decoder
         else:
@@ -759,6 +783,12 @@ class Spline(BaseProperty):
         class_code += f"""
     def to_stream(self, data: typing.BinaryIO):
 """
+        if has_custom_cook_pref:
+            assert game_id != "Prime"
+
+        has_root_size_offset = False
+        property_count = len(this["properties"])
+
         if not this["atomic"]:
             if is_struct and game_id != "Prime":
                 null_bytes = repr(b"\xFF\xFF\xFF\xFF")
@@ -766,18 +796,36 @@ class Spline(BaseProperty):
                 placeholder = repr(b'\x00\x00')
                 class_code += "        root_size_offset = data.tell()\n"
                 class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
+                has_root_size_offset = True
 
-            # TODO: respect cook preference
-            property_count = len(this["properties"])
-            prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", property_count))
-            class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
+            elif has_custom_cook_pref:
+                class_code += "        num_properties_offset = data.tell()\n"
+
+            if game_id != "Prime" or is_struct:
+                prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", property_count))
+                class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
+                if has_custom_cook_pref:
+                    class_code += f"        num_properties_written = {property_count}\n"
+        else:
+            assert not has_custom_cook_pref
+
         class_code += properties_builder
 
-        if is_struct and game_id != "Prime":
-            class_code += "\n        root_size_offset_end = data.tell()\n"
+        if has_root_size_offset:
+            class_code += "\n        struct_end_offset = data.tell()\n"
             class_code += "        data.seek(root_size_offset)\n"
-            class_code += '        data.write(struct.pack(">H", root_size_offset_end - root_size_offset - 2))\n'
-            class_code += "        data.seek(root_size_offset_end)\n"
+            class_code += '        data.write(struct.pack(">H", struct_end_offset - root_size_offset - 2))\n'
+            if has_custom_cook_pref:
+                class_code += '        data.write(struct.pack(">H", num_properties_written))\n'
+            class_code += "        data.seek(struct_end_offset)\n"
+
+        elif has_custom_cook_pref:
+            class_code += "\n"
+            class_code += f"        if num_properties_written != {property_count}:\n"
+            class_code += "            struct_end_offset = data.tell()\n"
+            class_code += "            data.seek(num_properties_offset)\n"
+            class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
+            class_code += "            data.seek(struct_end_offset)\n"
 
         # from json
         class_code += """
