@@ -266,6 +266,10 @@ def _filter_property_name(n: str) -> str:
     return inflection.underscore(n.replace(" ", "_").replace("#", "Number")).translate(_invalid_chars_table).lower()
 
 
+def _add_gitignore(path: Path):
+    path.joinpath(".gitignore").write_text("*")
+
+
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     logging.info("Parsing templates for game %s: %s", game_id, game_xml)
 
@@ -325,6 +329,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     core_path = code_path.joinpath("core")
     core_path.mkdir(parents=True, exist_ok=True)
+    _add_gitignore(core_path)
 
     core_path.joinpath("Color.py").write_text("""# Generated file
 import dataclasses
@@ -782,6 +787,7 @@ class Spline(BaseProperty):
         code_code += class_code
         final_path = output_path.joinpath(class_path).with_suffix(".py")
         final_path.parent.mkdir(parents=True, exist_ok=True)
+        _add_gitignore(final_path.parent)
         final_path.write_text(code_code)
 
     getter_func = "# Generated File\n"
@@ -790,6 +796,7 @@ class Spline(BaseProperty):
     getter_func += "\n\ndef get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
     path = code_path.joinpath("objects")
     path.mkdir(parents=True, exist_ok=True)
+    _add_gitignore(path)
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path)
@@ -802,6 +809,7 @@ class Spline(BaseProperty):
     print("> Creating archetypes")
     path = code_path.joinpath("archetypes")
     path.mkdir(parents=True, exist_ok=True)
+    _add_gitignore(path)
     for archetype_name, archetype in property_archetypes.items():
         parse_struct(archetype_name, archetype, path)
     print("> Done.")
