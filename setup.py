@@ -20,7 +20,8 @@ class GenerateTemplateCommand(egg_info):
     """
 
     def run(self):
-        generate_property_templates()
+        if Path(__file__).parent.joinpath("PrimeWorldEditor").is_dir():
+            generate_property_templates()
         return egg_info.run(self)
 
 
