@@ -275,8 +275,12 @@ def _filter_property_name(n: str) -> str:
     return result
 
 
-def _add_gitignore(path: Path):
+def _ensure_is_generated_dir(path: Path):
+    path.mkdir(parents=True, exist_ok=True)
     path.joinpath(".gitignore").write_text("*")
+    init = path.joinpath("__init__.py")
+    if not init.is_file():
+        init.write_text("")
 
 
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
@@ -321,6 +325,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     }
 
     code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
+    _ensure_is_generated_dir(code_path)
     import_base = f"retro_data_structures.properties.{game_id.lower()}"
 
     class LiteralPropType(typing.NamedTuple):
@@ -337,8 +342,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     }
 
     core_path = code_path.joinpath("core")
-    core_path.mkdir(parents=True, exist_ok=True)
-    _add_gitignore(core_path)
+    _ensure_is_generated_dir(core_path)
 
     core_path.joinpath("Color.py").write_text("""# Generated file
 import dataclasses
@@ -690,6 +694,18 @@ class Spline(BaseProperty):
         class_name = name.split("_")[-1]
         class_path = name.replace("_", "/")
 
+        # We created a nested module, but there was already a class with that name.
+        rename_root = output_path
+        for part in class_path.split("/")[:-1]:
+            nested_dir = rename_root.joinpath(part)
+            maybe_file = rename_root.joinpath(part + ".py")
+
+            _ensure_is_generated_dir(nested_dir)
+            if maybe_file.is_file():
+                maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
+
+            rename_root = nested_dir
+
         class_code = f"@dataclasses.dataclass()\nclass {class_name}(BaseProperty):\n"
         properties_decoder = ""
         properties_builder = ""
@@ -875,24 +891,15 @@ class Spline(BaseProperty):
         if final_path.with_suffix("").is_dir():
             final_path = final_path.with_suffix("").joinpath("__init__.py")
 
-        _add_gitignore(final_path.parent)
+        _ensure_is_generated_dir(final_path.parent)
         final_path.write_text(code_code)
-
-        # We created a nested module, but there was already a class with that name.
-        rename_root = output_path
-        for part in class_path.split("/")[:-1]:
-            maybe_file = rename_root.joinpath(part + ".py")
-            if maybe_file.is_file():
-                maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
-            rename_root = rename_root.joinpath(part)
 
     getter_func = "# Generated File\n"
     getter_func += "import typing\n\n"
     getter_func += "from retro_data_structures.properties.base_property import BaseProperty\n"
     getter_func += "\n\ndef get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
     path = code_path.joinpath("objects")
-    path.mkdir(parents=True, exist_ok=True)
-    _add_gitignore(path)
+    _ensure_is_generated_dir(path)
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, is_struct=True)
@@ -904,8 +911,7 @@ class Spline(BaseProperty):
 
     print("> Creating archetypes")
     path = code_path.joinpath("archetypes")
-    path.mkdir(parents=True, exist_ok=True)
-    _add_gitignore(path)
+    _ensure_is_generated_dir(path)
     for archetype_name, archetype in property_archetypes.items():
         parse_struct(archetype_name, archetype, path, is_struct=False)
     print("> Done.")
