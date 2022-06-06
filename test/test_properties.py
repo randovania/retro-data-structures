@@ -10,12 +10,7 @@ from retro_data_structures.properties.base_property import BaseProperty
 _root = Path(__file__).parents[1]
 
 
-@pytest.mark.parametrize("path", [
-    pytest.param(p.relative_to(_root), id=p.relative_to(_root).as_posix())
-    for p in _root.joinpath("retro_data_structures", "properties", "echoes").rglob("*.py")
-    if p.name not in ("__init__.py", "AssetId.py")
-])
-def test_import_and_create(path):
+def perform_module_checks(path: Path):
     module_name = path.with_suffix("").as_posix().replace("/", ".")
     module = importlib.import_module(module_name)
 
@@ -35,6 +30,30 @@ def test_import_and_create(path):
     assert json_obj is not None
     decode = module_class.from_json(json_obj)
     assert decode == obj
+
+
+def _parametrize_for_game(game: str):
+    return [
+        pytest.param(p.relative_to(_root), id=p.relative_to(_root).as_posix())
+        for p in _root.joinpath("retro_data_structures", "properties", game).rglob("*.py")
+        if p.name not in ("__init__.py", "AssetId.py")
+    ]
+
+
+@pytest.mark.parametrize("path", _parametrize_for_game("prime"))
+def test_import_and_create_prime(path):
+    perform_module_checks(path)
+
+
+@pytest.mark.parametrize("path", _parametrize_for_game("echoes"))
+def test_import_and_create_echoes(path):
+    perform_module_checks(path)
+
+
+@pytest.mark.parametrize("path", _parametrize_for_game("corruption"))
+def test_import_and_create_corruption(path):
+    perform_module_checks(path)
+
 
 
 def test_door():
