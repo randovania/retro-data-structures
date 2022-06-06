@@ -330,15 +330,18 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     class LiteralPropType(typing.NamedTuple):
         python_type: str
-        byte_count: int
         struct_format: str
         default: typing.Any
 
+        @property
+        def byte_count(self):
+            return struct.calcsize(self.struct_format)
+
     _literal_prop_types = {
-        "Int": LiteralPropType("int", 4, ">l", 0),
-        "Float": LiteralPropType("float", 4, ">f", 0.0),
-        "Bool": LiteralPropType("bool", 1, ">?", False),
-        "Short": LiteralPropType("int", 2, ">h", 0),
+        "Int": LiteralPropType("int", ">l", 0),
+        "Float": LiteralPropType("float", ">f", 0.0),
+        "Bool": LiteralPropType("bool", ">?", False),
+        "Short": LiteralPropType("int", ">h", 0),
     }
 
     core_path = code_path.joinpath("core")
@@ -486,6 +489,7 @@ class Spline(BaseProperty):
         from_json_code: str
         to_json_code: str
         custom_cook_pref: bool
+        known_size: typing.Optional[int]
 
     def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
                          ) -> PropDetails:
@@ -497,6 +501,7 @@ class Spline(BaseProperty):
         build_code = []
         from_json_code = "None"
         to_json_code = "None"
+        known_size = None
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -511,6 +516,7 @@ class Spline(BaseProperty):
         elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
             enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
+            known_size = 4
 
             uses_known_enum = enum_name in known_enums and (
                     default_value in list(known_enums[enum_name].values.values())
@@ -538,6 +544,8 @@ class Spline(BaseProperty):
 
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
+            known_size = 4
+
             if "flagset_name" in prop:
                 prop_type = "enums." + _scrub_enum(prop["flagset_name"])
                 need_enums = True
@@ -579,6 +587,7 @@ class Spline(BaseProperty):
             build_code.append(f'data.write(struct.pack({format_specifier}, {{obj}}))')
             from_json_code = "{obj}"
             to_json_code = "{obj}"
+            known_size = byte_count
 
         elif raw_type in ["AnimationSet", "Spline"]:
             if raw_type == "AnimationSet":
@@ -635,6 +644,11 @@ class Spline(BaseProperty):
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
 
+            if raw_type == "Color":
+                known_size = 4 * 4  # float * 4
+            else:
+                known_size = 4 * 3  # float * 3
+
             s = struct.Struct(">f")
 
             if prop['has_default']:
@@ -657,6 +671,7 @@ class Spline(BaseProperty):
             build_code.append(f"data.write(struct.pack({repr(literal_prop.struct_format)}, {{obj}}))")
             from_json_code = "{obj}"
             to_json_code = "{obj}"
+            known_size = literal_prop.byte_count
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
             try:
@@ -675,7 +690,7 @@ class Spline(BaseProperty):
             print(prop)
 
         return PropDetails(prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
-                           custom_cook_pref=prop['cook_preference'] != "Always")
+                           custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size)
 
     def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
@@ -754,19 +769,28 @@ class Spline(BaseProperty):
                 properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
                 properties_decoder += f"                result.{prop_name} = {pdetails.parse_code}\n"
                 prop_id_bytes = struct.pack(">L", prop["id"])
-                placeholder = repr(b'\x00\x00')
+
                 properties_builder += "\n"
                 if pdetails.custom_cook_pref:
                     properties_builder += f"        # Cook Preference: {prop['cook_preference']} (Not Implemented)\n"
                 properties_builder += f'        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
-                properties_builder += f"        before = data.tell()\n"
-                properties_builder += f"        data.write({placeholder})  # size placeholder\n"
+
+                if pdetails.known_size is not None:
+                    placeholder = repr(struct.pack(">H", pdetails.known_size))
+                    properties_builder += f"        data.write({placeholder})  # size\n"
+                else:
+                    placeholder = repr(b'\x00\x00')
+                    properties_builder += f"        before = data.tell()\n"
+                    properties_builder += f"        data.write({placeholder})  # size placeholder\n"
+
                 for build in pdetails.build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
-                properties_builder += f"        after = data.tell()\n"
-                properties_builder += f"        data.seek(before)\n"
-                properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
-                properties_builder += f'        data.seek(after)\n'
+
+                if pdetails.known_size is None:
+                    properties_builder += f"        after = data.tell()\n"
+                    properties_builder += f"        data.seek(before)\n"
+                    properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
+                    properties_builder += f'        data.seek(after)\n'
 
         # from stream
 
