@@ -815,8 +815,7 @@ class Spline(BaseProperty):
             class_code += f"""
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
-            property_id = {_CODE_PARSE_UINT32}
-            property_size = {_CODE_PARSE_UINT16}
+            property_id, property_size = struct.unpack(">LH", data.read(6))
             start = data.tell()
 """
             class_code += properties_decoder
