@@ -641,7 +641,7 @@ class Spline(BaseProperty):
 
         return prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code
 
-    def parse_struct(name: str, this, output_path: Path):
+    def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
             print("Ignoring {}. Is a {}".format(name, this["type"]))
             return
@@ -729,6 +729,12 @@ class Spline(BaseProperty):
 
             class_code += properties_decoder
         else:
+            if is_struct:
+                class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
+                class_code += "        assert struct_id == 0xFFFFFFFF\n"
+                class_code += f"        size = {_CODE_PARSE_UINT16}\n"
+                class_code += "        root_size_start = data.tell()\n"
+
             class_code += f"""
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
@@ -737,10 +743,12 @@ class Spline(BaseProperty):
             start = data.tell()
 """
             class_code += properties_decoder
-            class_code += """            else:
-                data.read(property_size)  # skip unknown property
-            assert data.tell() - start == property_size
-"""
+            class_code += "            else:\n"
+            class_code += "                data.read(property_size)  # skip unknown property\n"
+            class_code += "            assert data.tell() - start == property_size\n"
+
+        if is_struct and not this["atomic"] and game_id != "Prime":
+            class_code += "        assert data.tell() - root_size_start == size\n"
 
         class_code += f"""
         return result
@@ -752,11 +760,24 @@ class Spline(BaseProperty):
     def to_stream(self, data: typing.BinaryIO):
 """
         if not this["atomic"]:
+            if is_struct and game_id != "Prime":
+                null_bytes = repr(b"\xFF\xFF\xFF\xFF")
+                class_code += f"        data.write({null_bytes})  # struct object id\n"
+                placeholder = repr(b'\x00\x00')
+                class_code += "        root_size_offset = data.tell()\n"
+                class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
+
             # TODO: respect cook preference
             property_count = len(this["properties"])
             prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", property_count))
             class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
         class_code += properties_builder
+
+        if is_struct and game_id != "Prime":
+            class_code += "\n        root_size_offset_end = data.tell()\n"
+            class_code += "        data.seek(root_size_offset)\n"
+            class_code += '        data.write(struct.pack(">H", root_size_offset_end - root_size_offset - 2))\n'
+            class_code += "        data.seek(root_size_offset_end)\n"
 
         # from json
         class_code += """
@@ -799,7 +820,7 @@ class Spline(BaseProperty):
     _add_gitignore(path)
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
-        parse_struct(stem, script_object, path)
+        parse_struct(stem, script_object, path, is_struct=True)
         getter_func += f"    if four_cc == {repr(object_fourcc)}:\n"
         getter_func += f"        from .{stem} import {stem}\n"
         getter_func += f"        return {stem}\n"
@@ -811,7 +832,7 @@ class Spline(BaseProperty):
     path.mkdir(parents=True, exist_ok=True)
     _add_gitignore(path)
     for archetype_name, archetype in property_archetypes.items():
-        parse_struct(archetype_name, archetype, path)
+        parse_struct(archetype_name, archetype, path, is_struct=False)
     print("> Done.")
 
     return {
@@ -854,17 +875,6 @@ def persist_data(parse_result):
             base_dir.joinpath(f"retro_data_structures/enums/{_game_id_to_file[game_id]}.py").write_text(
                 create_enums_file(_enums_by_game[game_id])
             )
-
-    # Now import these files, since they depend on the generated enum files
-    from retro_data_structures.property_template import PropertyNames, GameTemplate
-
-    encoded = PropertyNames.build(property_names)
-    base_dir.joinpath(f"retro_data_structures/properties/property_names.pname").write_bytes(encoded)
-
-    for game_id, template in parse_result.items():
-        if game_id in _game_id_to_file:
-            encoded = GameTemplate.build(template)
-            base_dir.joinpath(f"retro_data_structures/properties/{game_id}.prop").write_bytes(encoded)
 
 
 if __name__ == '__main__':

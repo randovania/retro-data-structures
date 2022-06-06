@@ -2,20 +2,18 @@
 https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
-import io
-from typing import Iterator
+from typing import Iterator, Type
 
-import construct
 from construct import Container
 from construct.core import (
-    Adapter, BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
+    BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
     PrefixedArray, Struct, Union,
 )
 
-from retro_data_structures import game_check
+from retro_data_structures import game_check, properties
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
-from retro_data_structures.property_template import GetPropertyConstruct
+from retro_data_structures.properties.base_property import BaseProperty
 
 
 def Connection(subcon):
@@ -24,31 +22,6 @@ def Connection(subcon):
         message=subcon,
         target=Hex(Int32ub),
     )
-
-
-class ScriptInstanceAdapter(Adapter):
-    def __init__(self, obj_id_func):
-        super().__init__(GreedyBytes)
-        self.obj_id_func = obj_id_func
-
-    def _get_property_construct(self, context):
-        game = construct.evaluate(game_check.get_current_game, context)
-        obj_id = construct.evaluate(self.obj_id_func, context)
-        return GetPropertyConstruct(game, obj_id)
-
-    def _decode(self, obj, context, path):
-        subcon = self._get_property_construct(context)
-        return subcon._parsereport(io.BytesIO(obj), context, path)
-
-    def _encode(self, obj, context, path):
-        subcon = self._get_property_construct(context)
-        encoded = io.BytesIO()
-        subcon._build(obj, encoded, context, path)
-        return encoded.getvalue()
-
-
-def ThisTypeAsString(this):
-    return f"0x{this._.type:X}" if isinstance(this._.type, int) else this._.type
 
 
 _prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
@@ -68,7 +41,6 @@ ScriptInstance = Struct(
                 )
             ),
             connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
-            # base_property=ScriptInstanceAdapter(ThisTypeAsString),
             base_property=GreedyBytes,
         ),
     ),
@@ -91,14 +63,15 @@ class ScriptInstanceHelper:
 
     @classmethod
     def new_instance(cls, target_game: Game, instance_type):
-        prop_construct = GetPropertyConstruct(target_game, instance_type, True)
+        property_type = properties.get_game_object(target_game, instance_type)
+
         # TODO: make this less ugly lmao
         raw = ScriptInstance.parse(ScriptInstance.build({
             "type": instance_type,
             "instance": {
                 "id": {"raw": 0},
                 "connections": [],
-                "base_property": prop_construct.build({}, target_game=target_game)
+                "base_property": property_type().to_bytes(),
             }
         }, target_game=target_game), target_game=target_game)
         return cls(raw, target_game)
@@ -109,10 +82,7 @@ class ScriptInstanceHelper:
 
     @property
     def type_name(self) -> str:
-        try:
-            return self.get_properties()["_name"]
-        except Exception:
-            return self.type
+        return self.type
 
     @property
     def id(self) -> int:
@@ -120,27 +90,25 @@ class ScriptInstanceHelper:
 
     @property
     def name(self) -> str:
-        return self.get_property(("EditorProperties", "Name"))
+        return self.get_property(("editor_properties", "name"))
 
     @property
-    def _property_construct(self):
-        return GetPropertyConstruct(self.target_game, self.type)
+    def _property_type(self) -> Type[BaseProperty]:
+        return properties.get_game_object(self.target_game, self.type)
 
     def get_properties(self):
-        return self._property_construct.parse(
-            self._raw.instance.base_property,
-            target_game=self.target_game,
-        )
+        return self._property_type.from_bytes(self._raw.instance.base_property)
 
-    def set_properties(self, data: Container):
-        self._raw.instance.base_property = self._property_construct.build(
-            data, target_game=self.target_game,
-        )
+    def set_properties(self, data: BaseProperty):
+        if not isinstance(data, self._property_type):
+            raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type}")
+
+        self._raw.instance.base_property = data.to_bytes()
 
     def get_property(self, chain: Iterator[str]):
         prop = self.get_properties()
         for name in chain:
-            prop = prop[name]
+            prop = getattr(prop, name)
         return prop
 
     @property
