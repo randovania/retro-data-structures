@@ -1,4 +1,5 @@
 import dataclasses
+import keyword
 import logging
 import re
 import struct
@@ -128,6 +129,9 @@ def _prop_flags(element: Element, game_id: str, path: Path) -> dict:
             name = element.find("Name").text
         elif element.attrib.get("ID"):
             name = property_names.get(int(element.attrib.get("ID"), 16))
+
+        if name == "Unknown" and element.attrib.get("ID"):
+            name += f'_{element.attrib.get("ID")}'
 
         _enums_by_game[game_id].append(EnumDefinition(name, extras["flags"], enum_base="IntFlag"))
         extras["flagset_name"] = name
@@ -264,8 +268,11 @@ _to_underscore_table = str.maketrans("/ ", "__")
 
 
 def _filter_property_name(n: str) -> str:
-    return inflection.underscore(n.translate(_to_underscore_table).replace("#", "Number")
-                                 ).translate(_invalid_chars_table).lower()
+    result = inflection.underscore(n.translate(_to_underscore_table).replace("#", "Number")
+                                   ).translate(_invalid_chars_table).lower()
+    if keyword.iskeyword(result):
+        result += "_"
+    return result
 
 
 def _add_gitignore(path: Path):
@@ -500,7 +507,11 @@ class Spline(BaseProperty):
         elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
             enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
-            if enum_name in known_enums:
+
+            uses_known_enum = enum_name in known_enums and (
+                    default_value in list(known_enums[enum_name].values.values())
+            )
+            if uses_known_enum:
                 prop_type = f"enums.{enum_name}"
                 need_enums = True
                 parse_code = f"enums.{enum_name}.from_stream(data)"
@@ -511,6 +522,7 @@ class Spline(BaseProperty):
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
                         meta["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
+                assert "default" in meta
             else:
                 comment = "Choice"
                 prop_type = "int"
@@ -651,6 +663,9 @@ class Spline(BaseProperty):
                 default_value = literal_prop.default
             meta["default"] = repr(default_value)
 
+        if "default" not in meta and "default_factory" not in meta:
+            raise ValueError(f"Unable to find default value for prop {prop}.")
+
         if prop_type is None:
             print("what?")
             print(prop)
@@ -746,10 +761,9 @@ class Spline(BaseProperty):
         result = cls()
 """
         if this["atomic"] or game_id == "Prime":
-            if game_id == "Prime":
-                class_code += "        property_size = None\n"
-                if is_struct:
-                    class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
+            class_code += "        property_size = None\n"
+            if game_id == "Prime" and is_struct:
+                class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
 
             class_code += properties_decoder
         else:
@@ -856,8 +870,21 @@ class Spline(BaseProperty):
         code_code += class_code
         final_path = output_path.joinpath(class_path).with_suffix(".py")
         final_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # There's already a module with same name as this class. Place it as the __init__.py inside
+        if final_path.with_suffix("").is_dir():
+            final_path = final_path.with_suffix("").joinpath("__init__.py")
+
         _add_gitignore(final_path.parent)
         final_path.write_text(code_code)
+
+        # We created a nested module, but there was already a class with that name.
+        rename_root = output_path
+        for part in class_path.split("/")[:-1]:
+            maybe_file = rename_root.joinpath(part + ".py")
+            if maybe_file.is_file():
+                maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
+            rename_root = rename_root.joinpath(part)
 
     getter_func = "# Generated File\n"
     getter_func += "import typing\n\n"
