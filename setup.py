@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from setuptools import setup
-from setuptools.command.build_py import build_py
+from setuptools.command.egg_info import egg_info
 
 
 def generate_property_templates():
@@ -14,18 +14,18 @@ def generate_property_templates():
     ], check=True)
 
 
-class BuildPyCommand(build_py):
+class GenerateTemplateCommand(egg_info):
     """
     Generate script templates code before building the package.
     """
 
     def run(self):
         generate_property_templates()
-        build_py.run(self)
+        return egg_info.run(self)
 
 
 setup(
     cmdclass={
-        'build_py': BuildPyCommand,
+        'egg_info': GenerateTemplateCommand,
     },
 )
