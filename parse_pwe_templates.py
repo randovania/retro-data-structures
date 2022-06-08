@@ -66,7 +66,7 @@ def create_enums_file(enums: typing.List[EnumDefinition]):
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
     default_value_types = {
-        "Int": lambda el: int(el.text, 10) & 0xFFFFFFFF,
+        "Int": lambda el: struct.unpack(">l", struct.pack(">L", (int(el.text, 10) & 0xFFFFFFFF)))[0],
         "Float": lambda el: float(el.text),
         "Bool": lambda el: el.text == "true",
         "Short": lambda el: int(el.text, 10) & 0xFFFF,
@@ -678,7 +678,7 @@ class Spline(BaseProperty):
                 s = struct.Struct(literal_prop.struct_format)
                 default_value = s.unpack(s.pack(default_value))[0]
             except struct.error as e:
-                print(f"{hex(prop['id'])} has invalid default value  {default_value}: {e}")
+                print(f"{hex(prop['id'])} ({prop['type']}) has invalid default value  {default_value}: {e}")
                 default_value = literal_prop.default
             meta["default"] = repr(default_value)
 
@@ -785,7 +785,7 @@ class Spline(BaseProperty):
                     build_prop.append(f"data.write({placeholder})  # size placeholder")
 
                 for build in pdetails.build_code:
-                    build_prop.append(f"{build.format(obj=f'self.{prop_name}')}")
+                    build_prop.append(build.format(obj=f'self.{prop_name}'))
 
                 if pdetails.known_size is None:
                     build_prop.append(f"after = data.tell()")
