@@ -726,6 +726,7 @@ class Spline(BaseProperty):
         json_builder = ""
         json_parser = ""
 
+        property_count = 0
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
@@ -771,26 +772,50 @@ class Spline(BaseProperty):
                 prop_id_bytes = struct.pack(">L", prop["id"])
 
                 properties_builder += "\n"
-                if pdetails.custom_cook_pref:
-                    properties_builder += f"        # Cook Preference: {prop['cook_preference']} (Not Implemented)\n"
-                properties_builder += f'        data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}\n'
+
+                build_prop = []
+                build_prop.append(f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}')
 
                 if pdetails.known_size is not None:
                     placeholder = repr(struct.pack(">H", pdetails.known_size))
-                    properties_builder += f"        data.write({placeholder})  # size\n"
+                    build_prop.append(f"data.write({placeholder})  # size")
                 else:
                     placeholder = repr(b'\x00\x00')
-                    properties_builder += f"        before = data.tell()\n"
-                    properties_builder += f"        data.write({placeholder})  # size placeholder\n"
+                    build_prop.append(f"before = data.tell()")
+                    build_prop.append(f"data.write({placeholder})  # size placeholder")
 
                 for build in pdetails.build_code:
-                    properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
+                    build_prop.append(f"{build.format(obj=f'self.{prop_name}')}")
 
                 if pdetails.known_size is None:
-                    properties_builder += f"        after = data.tell()\n"
-                    properties_builder += f"        data.seek(before)\n"
-                    properties_builder += f'        data.write(struct.pack(">H", after - before - 2))\n'
-                    properties_builder += f'        data.seek(after)\n'
+                    build_prop.append(f"after = data.tell()")
+                    build_prop.append(f"data.seek(before)")
+                    build_prop.append(f'data.write(struct.pack(">H", after - before - 2))')
+                    build_prop.append(f'data.seek(after)')
+                
+                if not pdetails.custom_cook_pref:
+                    build_prop = [f"        {text}" for text in build_prop]
+                    property_count += 1
+                    
+                elif prop['cook_preference'] == "Never":
+                    build_prop = []
+                
+                else:
+                    properties_builder += f"        {prop_name}_field = next(field for field in dataclasses.fields(self) if field.name == '{prop_name}')\n"
+                    properties_builder += f"        {prop_name}_default = {prop_name}_field.default if {prop_name}_field.default is not dataclasses.MISSING else {prop_name}_field.default_factory()\n"
+                    
+                    if prop['cook_preference'] == "Default":
+                        properties_builder += f"        self.{prop_name} = {prop_name}_default\n"
+                        build_prop = [f"        {text}" for text in build_prop]
+                        property_count += 1
+                    
+                    elif prop['cook_preference'] == "OnlyIfModified":
+                        properties_builder += f"        if self.{prop_name} != {prop_name}_default:\n"
+                        properties_builder += f"            num_properties_written += 1\n"
+                        build_prop = [f"            {text}" for text in build_prop]
+                
+                properties_builder += "\n".join(build_prop)
+                properties_builder += "\n"
 
         # from stream
 
@@ -839,7 +864,6 @@ class Spline(BaseProperty):
             assert game_id != "Prime"
 
         has_root_size_offset = False
-        property_count = len(this["properties"])
 
         if not this["atomic"]:
             if is_struct and game_id != "Prime":
