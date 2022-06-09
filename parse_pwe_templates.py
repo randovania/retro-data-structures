@@ -283,6 +283,135 @@ def _ensure_is_generated_dir(path: Path):
         init.write_text("")
 
 
+def _fix_module_name(output_path: Path, class_path: str):
+    # We created a nested module, but there was already a class with that name.
+    rename_root = output_path
+    for part in class_path.split("/")[:-1]:
+        nested_dir = rename_root.joinpath(part)
+        maybe_file = rename_root.joinpath(part + ".py")
+
+        _ensure_is_generated_dir(nested_dir)
+        if maybe_file.is_file():
+            maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
+        rename_root = nested_dir
+
+
+@dataclasses.dataclass
+class PropDetails:
+    prop_type: str
+    need_enums: bool
+    comment: typing.Optional[str]
+    parse_code: str
+    build_code: list[str]
+    from_json_code: str
+    to_json_code: str
+    custom_cook_pref: bool
+    known_size: typing.Optional[int]
+    meta: dict
+
+
+@dataclasses.dataclass
+class ClassDefinition:
+    game_id: str
+    raw_name: str
+    raw_def: dict
+    class_name: str
+    class_path: str
+
+    class_code: str = ""
+    after_class_code: str = ""
+    properties_decoder: str = ""
+    properties_builder: str = ""
+    json_builder: str = ""
+    json_parser: str = ""
+    property_count: int = 0
+
+    needed_imports: dict = dataclasses.field(default_factory=dict)
+    need_enums: bool = False
+    has_custom_cook_pref: bool = False
+
+    def add_prop(self, prop, pdetails: PropDetails, prop_name: str):
+        self.need_enums = self.need_enums or pdetails.need_enums
+        self.has_custom_cook_pref = self.has_custom_cook_pref or pdetails.custom_cook_pref
+
+        if pdetails.prop_type is None:
+            raise ValueError(f"Unable to parse property {prop_name} of {self.raw_name}")
+
+        self.class_code += f"    {prop_name}: {pdetails.prop_type}"
+        if pdetails.meta:
+            self.class_code += " = dataclasses.field({})".format(
+                ", ".join(
+                    f"{key}={value}"
+                    for key, value in pdetails.meta.items()
+                )
+            )
+
+        if pdetails.comment is not None:
+            self.class_code += f"  # {pdetails.comment}"
+        self.class_code += "\n"
+
+        self.json_builder += f"            {repr(prop_name)}: {pdetails.to_json_code.format(obj=f'self.{prop_name}')},\n"
+        self.json_parser += f"            {prop_name}={pdetails.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+        if self.raw_def["atomic"] or self.game_id == "Prime":
+            self.properties_decoder += f"        result.{prop_name} = {pdetails.parse_code}\n"
+            for build in pdetails.build_code:
+                self.properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
+        else:
+            # parse
+            signature = f"obj: {self.class_name}, data: typing.BinaryIO, property_size: int"
+            self.after_class_code += f"def _decode_{prop_name}({signature}) -> None:\n"
+            self.after_class_code += f"    obj.{prop_name} = {pdetails.parse_code}\n\n\n"
+            self.properties_decoder += f"    {hex(prop['id'])}: _decode_{prop_name},\n"
+
+            # build
+            prop_id_bytes = struct.pack(">L", prop["id"])
+            self.properties_builder += "\n"
+            build_prop = [
+                f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}'
+            ]
+
+            if pdetails.known_size is not None:
+                placeholder = repr(struct.pack(">H", pdetails.known_size))
+                build_prop.append(f"data.write({placeholder})  # size")
+            else:
+                placeholder = repr(b'\x00\x00')
+                build_prop.append(f"before = data.tell()")
+                build_prop.append(f"data.write({placeholder})  # size placeholder")
+
+            for build in pdetails.build_code:
+                build_prop.append(build.format(obj=f'self.{prop_name}'))
+
+            if pdetails.known_size is None:
+                build_prop.append(f"after = data.tell()")
+                build_prop.append(f"data.seek(before)")
+                build_prop.append(f'data.write(struct.pack(">H", after - before - 2))')
+                build_prop.append(f'data.seek(after)')
+
+            if not pdetails.custom_cook_pref:
+                build_prop = [f"        {text}" for text in build_prop]
+                self.property_count += 1
+
+            elif prop['cook_preference'] == "Never":
+                build_prop = []
+
+            else:
+                self.properties_builder += f"        {prop_name}_field = next(field for field in dataclasses.fields(self) if field.name == '{prop_name}')\n"
+                self.properties_builder += f"        {prop_name}_default = {prop_name}_field.default if {prop_name}_field.default is not dataclasses.MISSING else {prop_name}_field.default_factory()\n"
+
+                if prop['cook_preference'] == "Default":
+                    self.properties_builder += f"        self.{prop_name} = {prop_name}_default\n"
+                    build_prop = [f"        {text}" for text in build_prop]
+                    self.property_count += 1
+
+                elif prop['cook_preference'] == "OnlyIfModified":
+                    self.properties_builder += f"        if self.{prop_name} != {prop_name}_default:\n"
+                    self.properties_builder += f"            num_properties_written += 1\n"
+                    build_prop = [f"            {text}" for text in build_prop]
+
+            self.properties_builder += "\n".join(build_prop)
+            self.properties_builder += "\n"
+
+
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     logging.info("Parsing templates for game %s: %s", game_id, game_xml)
 
@@ -479,19 +608,7 @@ class Spline(BaseProperty):
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
-    @dataclasses.dataclass
-    class PropDetails:
-        prop_type: str
-        need_enums: bool
-        comment: typing.Optional[str]
-        parse_code: str
-        build_code: list[str]
-        from_json_code: str
-        to_json_code: str
-        custom_cook_pref: bool
-        known_size: typing.Optional[int]
-
-    def get_prop_details(prop, meta: dict, needed_imports: dict[str, str],
+    def get_prop_details(prop, needed_imports: dict[str, str],
                          ) -> PropDetails:
         raw_type = prop["type"]
         prop_type = None
@@ -502,6 +619,7 @@ class Spline(BaseProperty):
         from_json_code = "None"
         to_json_code = "None"
         known_size = None
+        meta = {}
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -603,7 +721,7 @@ class Spline(BaseProperty):
 
         elif raw_type == "Array":
             inner_prop = get_prop_details(
-                prop["item_archetype"], {}, needed_imports,
+                prop["item_archetype"], needed_imports,
             )
 
             prop_type = f"list[{inner_prop.prop_type}]"
@@ -690,7 +808,8 @@ class Spline(BaseProperty):
             print(prop)
 
         return PropDetails(prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
-                           custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size)
+                           custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
+                           meta=meta)
 
     def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
@@ -702,142 +821,43 @@ class Spline(BaseProperty):
             for prop in this["properties"]
         ]
 
-        needed_imports = {}
-        need_enums = False
-        has_custom_cook_pref = False
+        cls = ClassDefinition(
+            game_id=game_id,
+            raw_name=name,
+            raw_def=this,
+            class_name=name.split("_")[-1],
+            class_path=name.replace("_", "/"),
+        )
+        cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}(BaseProperty):\n"
+        _fix_module_name(output_path, cls.class_path)
 
-        class_name = name.split("_")[-1]
-        class_path = name.replace("_", "/")
-
-        # We created a nested module, but there was already a class with that name.
-        rename_root = output_path
-        for part in class_path.split("/")[:-1]:
-            nested_dir = rename_root.joinpath(part)
-            maybe_file = rename_root.joinpath(part + ".py")
-
-            _ensure_is_generated_dir(nested_dir)
-            if maybe_file.is_file():
-                maybe_file.replace(rename_root.joinpath(part, "__init__.py"))
-            rename_root = nested_dir
-
-        class_code = f"@dataclasses.dataclass()\nclass {class_name}(BaseProperty):\n"
-        after_class_code = ""
-        properties_decoder = ""
-        properties_builder = ""
-        json_builder = ""
-        json_parser = ""
-
-        property_count = 0
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
-            meta = {}
-            # prop_type, set_need_enums, comment, parse_code, build_code, from_json_code, to_json_code =
-            pdetails = get_prop_details(
-                prop, meta, needed_imports
-            )
-            need_enums = need_enums or pdetails.need_enums
-            has_custom_cook_pref = has_custom_cook_pref or pdetails.custom_cook_pref
-
-            if pdetails.prop_type is None:
-                raise ValueError(f"Unable to parse property {prop_name} of {name}")
-
-            class_code += f"    {prop_name}: {pdetails.prop_type}"
-            if meta:
-                class_code += " = dataclasses.field({})".format(
-                    ", ".join(
-                        f"{key}={value}"
-                        for key, value in meta.items()
-                    )
-                )
-
-            if pdetails.comment is not None:
-                class_code += f"  # {pdetails.comment}"
-            class_code += "\n"
-
-            json_builder += f"            {repr(prop_name)}: {pdetails.to_json_code.format(obj=f'self.{prop_name}')},\n"
-            json_parser += f"            {prop_name}={pdetails.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
-            if this["atomic"] or game_id == "Prime":
-                properties_decoder += f"        result.{prop_name} = {pdetails.parse_code}\n"
-                for build in pdetails.build_code:
-                    properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
-            else:
-                # parse
-                signature = f"obj: {class_name}, data: typing.BinaryIO, property_size: int"
-                after_class_code += f"def _decode_{prop_name}({signature}) -> None:\n"
-                after_class_code += f"    obj.{prop_name} = {pdetails.parse_code}\n\n\n"
-                properties_decoder += f"    {hex(prop['id'])}: _decode_{prop_name},\n"
-
-                # build
-                prop_id_bytes = struct.pack(">L", prop["id"])
-                properties_builder += "\n"
-                build_prop = [
-                    f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}'
-                ]
-
-                if pdetails.known_size is not None:
-                    placeholder = repr(struct.pack(">H", pdetails.known_size))
-                    build_prop.append(f"data.write({placeholder})  # size")
-                else:
-                    placeholder = repr(b'\x00\x00')
-                    build_prop.append(f"before = data.tell()")
-                    build_prop.append(f"data.write({placeholder})  # size placeholder")
-
-                for build in pdetails.build_code:
-                    build_prop.append(build.format(obj=f'self.{prop_name}'))
-
-                if pdetails.known_size is None:
-                    build_prop.append(f"after = data.tell()")
-                    build_prop.append(f"data.seek(before)")
-                    build_prop.append(f'data.write(struct.pack(">H", after - before - 2))')
-                    build_prop.append(f'data.seek(after)')
-                
-                if not pdetails.custom_cook_pref:
-                    build_prop = [f"        {text}" for text in build_prop]
-                    property_count += 1
-                    
-                elif prop['cook_preference'] == "Never":
-                    build_prop = []
-                
-                else:
-                    properties_builder += f"        {prop_name}_field = next(field for field in dataclasses.fields(self) if field.name == '{prop_name}')\n"
-                    properties_builder += f"        {prop_name}_default = {prop_name}_field.default if {prop_name}_field.default is not dataclasses.MISSING else {prop_name}_field.default_factory()\n"
-                    
-                    if prop['cook_preference'] == "Default":
-                        properties_builder += f"        self.{prop_name} = {prop_name}_default\n"
-                        build_prop = [f"        {text}" for text in build_prop]
-                        property_count += 1
-                    
-                    elif prop['cook_preference'] == "OnlyIfModified":
-                        properties_builder += f"        if self.{prop_name} != {prop_name}_default:\n"
-                        properties_builder += f"            num_properties_written += 1\n"
-                        build_prop = [f"            {text}" for text in build_prop]
-                
-                properties_builder += "\n".join(build_prop)
-                properties_builder += "\n"
+            cls.add_prop(prop, get_prop_details(prop, cls.needed_imports), prop_name)
 
         # from stream
 
-        class_code += f"""
+        cls.class_code += f"""
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         result = cls()
 """
         if this["atomic"] or game_id == "Prime":
-            class_code += "        property_size = None\n"
+            cls.class_code += "        property_size = None\n"
             if game_id == "Prime" and is_struct:
-                class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
+                cls.class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
 
-            class_code += properties_decoder
+            cls.class_code += cls.properties_decoder
         else:
             if is_struct:
-                class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
-                class_code += "        assert struct_id == 0xFFFFFFFF\n"
-                class_code += f"        size = {_CODE_PARSE_UINT16}\n"
-                class_code += "        root_size_start = data.tell()\n"
+                cls.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
+                cls.class_code += "        assert struct_id == 0xFFFFFFFF\n"
+                cls.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
+                cls.class_code += "        root_size_start = data.tell()\n"
 
-            class_code += f"""
+            cls.class_code += f"""
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
@@ -848,23 +868,23 @@ class Spline(BaseProperty):
                 data.read(property_size)  # skip unknown property
             assert data.tell() - start == property_size
 """
-            after_class_code += "_property_decoder = {\n"
-            after_class_code += properties_decoder
-            after_class_code += "}\n"
+            cls.after_class_code += "_property_decoder = {\n"
+            cls.after_class_code += cls.properties_decoder
+            cls.after_class_code += "}\n"
 
         if is_struct and not this["atomic"] and game_id != "Prime":
-            class_code += "        assert data.tell() - root_size_start == size\n"
+            cls.class_code += "        assert data.tell() - root_size_start == size\n"
 
-        class_code += f"""
+        cls.class_code += f"""
         return result
 """
 
         # to stream
 
-        class_code += f"""
+        cls.class_code += f"""
     def to_stream(self, data: typing.BinaryIO):
 """
-        if has_custom_cook_pref:
+        if cls.has_custom_cook_pref:
             assert game_id != "Prime"
 
         has_root_size_offset = False
@@ -872,72 +892,72 @@ class Spline(BaseProperty):
         if not this["atomic"]:
             if is_struct and game_id != "Prime":
                 null_bytes = repr(b"\xFF\xFF\xFF\xFF")
-                class_code += f"        data.write({null_bytes})  # struct object id\n"
+                cls.class_code += f"        data.write({null_bytes})  # struct object id\n"
                 placeholder = repr(b'\x00\x00')
-                class_code += "        root_size_offset = data.tell()\n"
-                class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
+                cls.class_code += "        root_size_offset = data.tell()\n"
+                cls.class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
                 has_root_size_offset = True
 
-            elif has_custom_cook_pref:
-                class_code += "        num_properties_offset = data.tell()\n"
+            elif cls.has_custom_cook_pref:
+                cls.class_code += "        num_properties_offset = data.tell()\n"
 
             if game_id != "Prime" or is_struct:
-                prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", property_count))
-                class_code += f"        data.write({prop_count_repr})  # {property_count} properties\n"
-                if has_custom_cook_pref:
-                    class_code += f"        num_properties_written = {property_count}\n"
+                prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", cls.property_count))
+                cls.class_code += f"        data.write({prop_count_repr})  # {cls.property_count} properties\n"
+                if cls.has_custom_cook_pref:
+                    cls.class_code += f"        num_properties_written = {cls.property_count}\n"
         else:
-            assert not has_custom_cook_pref
+            assert not cls.has_custom_cook_pref
 
-        class_code += properties_builder
+        cls.class_code += cls.properties_builder
 
         if has_root_size_offset:
-            class_code += "\n        struct_end_offset = data.tell()\n"
-            class_code += "        data.seek(root_size_offset)\n"
-            class_code += '        data.write(struct.pack(">H", struct_end_offset - root_size_offset - 2))\n'
-            if has_custom_cook_pref:
-                class_code += '        data.write(struct.pack(">H", num_properties_written))\n'
-            class_code += "        data.seek(struct_end_offset)\n"
+            cls.class_code += "\n        struct_end_offset = data.tell()\n"
+            cls.class_code += "        data.seek(root_size_offset)\n"
+            cls.class_code += '        data.write(struct.pack(">H", struct_end_offset - root_size_offset - 2))\n'
+            if cls.has_custom_cook_pref:
+                cls.class_code += '        data.write(struct.pack(">H", num_properties_written))\n'
+            cls.class_code += "        data.seek(struct_end_offset)\n"
 
-        elif has_custom_cook_pref:
-            class_code += "\n"
-            class_code += f"        if num_properties_written != {property_count}:\n"
-            class_code += "            struct_end_offset = data.tell()\n"
-            class_code += "            data.seek(num_properties_offset)\n"
-            class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
-            class_code += "            data.seek(struct_end_offset)\n"
+        elif cls.has_custom_cook_pref:
+            cls.class_code += "\n"
+            cls.class_code += f"        if num_properties_written != {cls.property_count}:\n"
+            cls.class_code += "            struct_end_offset = data.tell()\n"
+            cls.class_code += "            data.seek(num_properties_offset)\n"
+            cls.class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
+            cls.class_code += "            data.seek(struct_end_offset)\n"
 
         # from json
-        class_code += """
+        cls.class_code += """
     @classmethod
     def from_json(cls, data: dict):
         return cls(
 """
-        class_code += json_parser + "        )\n"
+        cls.class_code += cls.json_parser + "        )\n"
 
         # to json
-        class_code += """
+        cls.class_code += """
     def to_json(self) -> dict:
         return {
 """
-        class_code += json_builder + "        }\n"
+        cls.class_code += cls.json_builder + "        }\n"
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
         code_code += "\nfrom retro_data_structures.properties.base_property import BaseProperty\n"
 
-        if need_enums:
+        if cls.need_enums:
             code_code += f"import retro_data_structures.enums.{game_id.lower()} as enums\n"
 
-        for import_path, code_import in sorted(needed_imports.items()):
+        for import_path, code_import in sorted(cls.needed_imports.items()):
             code_code += f"from {import_path} import {code_import}\n"
 
         code_code += "\n\n"
-        code_code += class_code
-        if after_class_code:
+        code_code += cls.class_code
+        if cls.after_class_code:
             code_code += "\n\n"
-            code_code += after_class_code
-        final_path = output_path.joinpath(class_path).with_suffix(".py")
+            code_code += cls.after_class_code
+        final_path = output_path.joinpath(cls.class_path).with_suffix(".py")
         final_path.parent.mkdir(parents=True, exist_ok=True)
 
         # There's already a module with same name as this class. Place it as the __init__.py inside
