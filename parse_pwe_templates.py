@@ -329,8 +329,6 @@ class ClassDefinition:
     after_class_code: str = ""
     properties_decoder: str = ""
     properties_builder: str = ""
-    json_builder: str = ""
-    json_parser: str = ""
     property_count: int = 0
 
     all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
@@ -365,11 +363,7 @@ class ClassDefinition:
             self.class_code += f"  # {prop.comment}"
         self.class_code += "\n"
 
-        space = "            "
-        self.json_builder += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
-        self.json_parser += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
-
-        if self.raw_def["atomic"] or self.game_id == "Prime":
+        if self.atomic or self.game_id == "Prime":
             self.properties_decoder += f"        result.{prop_name} = {prop.parse_code}\n"
             for build in prop.build_code:
                 self.properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
@@ -520,6 +514,27 @@ class ClassDefinition:
             self.class_code += "            data.seek(num_properties_offset)\n"
             self.class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
             self.class_code += "            data.seek(struct_end_offset)\n"
+
+    def write_from_json(self):
+        self.class_code += """
+    @classmethod
+    def from_json(cls, data: dict):
+        return cls(
+"""
+        space = "            "
+        for prop_name, prop in self.all_props.items():
+            self.class_code += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+        self.class_code += "        )\n"
+
+    def write_to_json(self):
+        self.class_code += """
+    def to_json(self) -> dict:
+        return {
+"""
+        space = "            "
+        for prop_name, prop in self.all_props.items():
+            self.class_code += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
+        self.class_code += "        }\n"
 
 
 def _add_default_types(core_path: Path):
@@ -957,20 +972,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         # to stream
         cls.write_to_stream()
 
-        # from json
-        cls.class_code += """
-    @classmethod
-    def from_json(cls, data: dict):
-        return cls(
-"""
-        cls.class_code += cls.json_parser + "        )\n"
-
-        # to json
-        cls.class_code += """
-    def to_json(self) -> dict:
-        return {
-"""
-        cls.class_code += cls.json_builder + "        }\n"
+        # json stuff
+        cls.write_from_json()
+        cls.write_to_json()
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
