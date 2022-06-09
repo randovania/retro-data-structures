@@ -298,6 +298,7 @@ def _fix_module_name(output_path: Path, class_path: str):
 
 @dataclasses.dataclass
 class PropDetails:
+    raw: dict
     prop_type: str
     need_enums: bool
     comment: typing.Optional[str]
@@ -309,6 +310,10 @@ class PropDetails:
     known_size: typing.Optional[int]
     meta: dict
     needed_imports: dict[str, str]
+
+    @property
+    def id(self):
+        return self.raw["id"]
 
 
 @dataclasses.dataclass
@@ -327,86 +332,90 @@ class ClassDefinition:
     json_parser: str = ""
     property_count: int = 0
 
+    all_props: list[PropDetails] = dataclasses.field(default_factory=list)
     needed_imports: dict = dataclasses.field(default_factory=dict)
     need_enums: bool = False
     has_custom_cook_pref: bool = False
 
-    def add_prop(self, prop, pdetails: PropDetails, prop_name: str):
-        self.need_enums = self.need_enums or pdetails.need_enums
-        self.has_custom_cook_pref = self.has_custom_cook_pref or pdetails.custom_cook_pref
+    def add_prop(self, prop: PropDetails, prop_name: str):
+        self.all_props.append(prop)
+        self.need_enums = self.need_enums or prop.need_enums
+        self.has_custom_cook_pref = self.has_custom_cook_pref or prop.custom_cook_pref
 
-        self.needed_imports.update(pdetails.needed_imports)
+        self.needed_imports.update(prop.needed_imports)
 
-        if pdetails.prop_type is None:
+        if prop.prop_type is None:
             raise ValueError(f"Unable to parse property {prop_name} of {self.raw_name}")
 
-        self.class_code += f"    {prop_name}: {pdetails.prop_type}"
-        if pdetails.meta:
+        self.class_code += f"    {prop_name}: {prop.prop_type}"
+        if prop.meta:
             self.class_code += " = dataclasses.field({})".format(
                 ", ".join(
                     f"{key}={value}"
-                    for key, value in pdetails.meta.items()
+                    for key, value in prop.meta.items()
                 )
             )
 
-        if pdetails.comment is not None:
-            self.class_code += f"  # {pdetails.comment}"
+        if prop.comment is not None:
+            self.class_code += f"  # {prop.comment}"
         self.class_code += "\n"
 
-        self.json_builder += f"            {repr(prop_name)}: {pdetails.to_json_code.format(obj=f'self.{prop_name}')},\n"
-        self.json_parser += f"            {prop_name}={pdetails.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+        space = "            "
+        self.json_builder += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
+        self.json_parser += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+
         if self.raw_def["atomic"] or self.game_id == "Prime":
-            self.properties_decoder += f"        result.{prop_name} = {pdetails.parse_code}\n"
-            for build in pdetails.build_code:
+            self.properties_decoder += f"        result.{prop_name} = {prop.parse_code}\n"
+            for build in prop.build_code:
                 self.properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
         else:
             # parse
             signature = f"obj: {self.class_name}, data: typing.BinaryIO, property_size: int"
             self.after_class_code += f"def _decode_{prop_name}({signature}) -> None:\n"
-            self.after_class_code += f"    obj.{prop_name} = {pdetails.parse_code}\n\n\n"
-            self.properties_decoder += f"    {hex(prop['id'])}: _decode_{prop_name},\n"
+            self.after_class_code += f"    obj.{prop_name} = {prop.parse_code}\n\n\n"
+            self.properties_decoder += f"    {hex(prop.id)}: _decode_{prop_name},\n"
 
             # build
-            prop_id_bytes = struct.pack(">L", prop["id"])
+            prop_id_bytes = struct.pack(">L", prop.id)
             self.properties_builder += "\n"
             build_prop = [
-                f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}'
+                f'data.write({repr(prop_id_bytes)})  # {hex(prop.id)}'
             ]
 
-            if pdetails.known_size is not None:
-                placeholder = repr(struct.pack(">H", pdetails.known_size))
+            if prop.known_size is not None:
+                placeholder = repr(struct.pack(">H", prop.known_size))
                 build_prop.append(f"data.write({placeholder})  # size")
             else:
                 placeholder = repr(b'\x00\x00')
                 build_prop.append(f"before = data.tell()")
                 build_prop.append(f"data.write({placeholder})  # size placeholder")
 
-            for build in pdetails.build_code:
+            for build in prop.build_code:
                 build_prop.append(build.format(obj=f'self.{prop_name}'))
 
-            if pdetails.known_size is None:
+            if prop.known_size is None:
                 build_prop.append(f"after = data.tell()")
                 build_prop.append(f"data.seek(before)")
                 build_prop.append(f'data.write(struct.pack(">H", after - before - 2))')
                 build_prop.append(f'data.seek(after)')
 
-            if not pdetails.custom_cook_pref:
+            if not prop.custom_cook_pref:
                 build_prop = [f"        {text}" for text in build_prop]
                 self.property_count += 1
 
-            elif prop['cook_preference'] == "Never":
+            elif prop.raw['cook_preference'] == "Never":
                 build_prop = []
 
             else:
                 self.properties_builder += f"        {prop_name}_field = next(field for field in dataclasses.fields(self) if field.name == '{prop_name}')\n"
                 self.properties_builder += f"        {prop_name}_default = {prop_name}_field.default if {prop_name}_field.default is not dataclasses.MISSING else {prop_name}_field.default_factory()\n"
 
-                if prop['cook_preference'] == "Default":
+                if prop.raw['cook_preference'] == "Default":
                     self.properties_builder += f"        self.{prop_name} = {prop_name}_default\n"
                     build_prop = [f"        {text}" for text in build_prop]
                     self.property_count += 1
 
-                elif prop['cook_preference'] == "OnlyIfModified":
+                elif prop.raw['cook_preference'] == "OnlyIfModified":
                     self.properties_builder += f"        if self.{prop_name} != {prop_name}_default:\n"
                     self.properties_builder += f"            num_properties_written += 1\n"
                     build_prop = [f"            {text}" for text in build_prop]
@@ -809,7 +818,7 @@ class Spline(BaseProperty):
             print("what?")
             print(prop)
 
-        return PropDetails(prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
+        return PropDetails(prop, prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
                            custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
                            meta=meta, needed_imports=needed_imports)
 
@@ -837,7 +846,7 @@ class Spline(BaseProperty):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(prop, get_prop_details(prop), prop_name)
+            cls.add_prop(get_prop_details(prop), prop_name)
 
         # from stream
 
