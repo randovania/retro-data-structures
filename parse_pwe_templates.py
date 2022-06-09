@@ -427,8 +427,6 @@ class ClassDefinition:
                     raise ValueError(f"Unknown cook preference: {prop.raw['cook_preference']}")
 
             self.properties_builder += "\n".join(build_prop)
-            if self.is_struct:
-                self.properties_builder += f"\n        print({repr(prop_name)}, data.tell())"
             self.properties_builder += "\n"
 
     def finalize_props(self):
@@ -843,6 +841,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
                 inner_name = _filter_property_name(inner_prop["name"] or property_names.get(inner_prop["id"]))
                 assert inner_name is not None
+                if inner_name == "unknown":
+                    print(f"Ignoring default override for field {inner_prop['id']:08x}: no known name")
+                    continue
+
                 inner_details = get_prop_details(inner_prop)
                 default_override[inner_name] = _get_default(inner_details.meta)
                 needed_imports.update(inner_details.needed_imports)

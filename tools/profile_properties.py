@@ -77,6 +77,7 @@ def _parse_properties(game: Game, property_data: construct.Container, build: boo
     for instance in property_data.header:
         property_type = data.read(4).decode("ascii")
         property_class = properties.get_game_object(game, property_type)
+        type_name = property_class.__name__
 
         before = data.tell()
         try:
@@ -84,12 +85,12 @@ def _parse_properties(game: Game, property_data: construct.Container, build: boo
         except Exception as e:
             data.seek(before)
             data.read(instance.size)
-            print(f"Unable to decode instance {instance.identifier} of type {property_type}: {type(e)} - {e}")
+            print(f"Unable to decode instance {instance.identifier} of type {type_name}: {type(e)} - {e}")
             continue
 
         after = data.tell()
         if after - before != instance.size:
-            print(f"Instance {instance.identifier} of type {property_type} read {after - before} bytes, "
+            print(f"Instance {instance.identifier} of type {type_name} read {after - before} bytes, "
                   f"expected {instance.size}")
 
         if build:
@@ -99,7 +100,11 @@ def _parse_properties(game: Game, property_data: construct.Container, build: boo
                 data.seek(before)
                 original = data.read(after - before)
                 if new_encoded != original:
-                    print(f"Comparing instance {instance.identifier} of type {property_type} failed")
+                    re_decode = the_property.from_bytes(new_encoded)
+                    if re_decode != the_property:
+                        print(f"Comparing instance {instance.identifier} of type {type_name} failed")
+                    elif len(new_encoded) > len(original):
+                        print(f"Instance {instance.identifier} of type {type_name} is longer than the original")
 
     print("Processed properties in {:0.4f} seconds".format(time.time() - start_time))
 
