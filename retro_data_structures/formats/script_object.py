@@ -90,11 +90,18 @@ class ScriptInstanceHelper:
 
     @property
     def name(self) -> str:
-        return self.get_property(("editor_properties", "name"))
+        try:
+            return self.get_property(("editor_properties", "name"))
+        except Exception as e:
+            return f"Id 0x{self.id:08x}"
 
     @property
     def _property_type(self) -> Type[BaseProperty]:
         return properties.get_game_object(self.target_game, self.type)
+
+    @property
+    def raw_properties(self) -> bytes:
+        return self._raw.instance.base_property
 
     def get_properties(self):
         return self._property_type.from_bytes(self._raw.instance.base_property)
