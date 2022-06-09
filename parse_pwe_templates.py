@@ -327,7 +327,6 @@ class ClassDefinition:
 
     class_code: str = ""
     after_class_code: str = ""
-    properties_decoder: str = ""
     properties_builder: str = ""
     property_count: int = 0
 
@@ -365,15 +364,8 @@ class ClassDefinition:
 
         if self.atomic or self.game_id == "Prime":
             pass
-            # self.properties_decoder is handled in write_to_stream
             # self.properties_builder is handled in write_to_stream
         else:
-            # parse
-            signature = f"obj: {self.class_name}, data: typing.BinaryIO, property_size: int"
-            self.after_class_code += f"def _decode_{prop_name}({signature}) -> None:\n"
-            self.after_class_code += f"    obj.{prop_name} = {prop.parse_code}\n\n\n"
-            self.properties_decoder += f"    {hex(prop.id)}: _decode_{prop_name},\n"
-
             # build
             prop_id_bytes = struct.pack(">L", prop.id)
             self.properties_builder += "\n"
@@ -452,34 +444,39 @@ class ClassDefinition:
             self.class_code += f"        return cls({', '.join(prop_name for prop_name in self.all_props)})\n"
             return
 
-        self.class_code += "        result = cls()\n"
         if self.is_struct:
             self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
             self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
             self.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
-            self.class_code += "        root_size_start = data.tell()\n"
+            self.class_code += "        root_size_start = data.tell()\n\n"
 
-        self.class_code += f"""
+        self.class_code += f"""        present_fields = {{}}
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
             start = data.tell()
             try:
-                _property_decoder[property_id](result, data, property_size)
+                property_name, decoder = _property_decoder[property_id]
+                present_fields[property_name] = decoder(data, property_size)
             except KeyError:
                 data.read(property_size)  # skip unknown property
-            assert data.tell() - start == property_size
+            assert data.tell() - start == property_size\n
 """
-        self.after_class_code += "_property_decoder = {\n"
-        self.after_class_code += self.properties_decoder
-        self.after_class_code += "}\n"
-
         if self.is_struct:
             self.class_code += "        assert data.tell() - root_size_start == size\n"
 
-        self.class_code += f"""
-        return result
-"""
+        self.class_code += "        return cls(**present_fields)\n"
+
+        signature = f"data: typing.BinaryIO, property_size: int"
+        for prop_name, prop in self.all_props.items():
+            self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
+            self.after_class_code += f"    return {prop.parse_code}\n\n\n"
+
+        decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
+        self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
+        for prop_name, prop in self.all_props.items():
+            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, _decode_{prop_name}),\n"
+        self.after_class_code += "}\n"
 
     def write_to_stream(self):
         self.class_code += f"""
