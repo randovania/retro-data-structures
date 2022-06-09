@@ -308,6 +308,7 @@ class PropDetails:
     custom_cook_pref: bool
     known_size: typing.Optional[int]
     meta: dict
+    needed_imports: dict[str, str]
 
 
 @dataclasses.dataclass
@@ -333,6 +334,8 @@ class ClassDefinition:
     def add_prop(self, prop, pdetails: PropDetails, prop_name: str):
         self.need_enums = self.need_enums or pdetails.need_enums
         self.has_custom_cook_pref = self.has_custom_cook_pref or pdetails.custom_cook_pref
+
+        self.needed_imports.update(pdetails.needed_imports)
 
         if pdetails.prop_type is None:
             raise ValueError(f"Unable to parse property {prop_name} of {self.raw_name}")
@@ -608,8 +611,7 @@ class Spline(BaseProperty):
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
-    def get_prop_details(prop, needed_imports: dict[str, str],
-                         ) -> PropDetails:
+    def get_prop_details(prop) -> PropDetails:
         raw_type = prop["type"]
         prop_type = None
         need_enums = False
@@ -620,6 +622,7 @@ class Spline(BaseProperty):
         to_json_code = "None"
         known_size = None
         meta = {}
+        needed_imports = {}
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -720,9 +723,7 @@ class Spline(BaseProperty):
             meta["default_factory"] = prop_type
 
         elif raw_type == "Array":
-            inner_prop = get_prop_details(
-                prop["item_archetype"], needed_imports,
-            )
+            inner_prop = get_prop_details(prop["item_archetype"])
 
             prop_type = f"list[{inner_prop.prop_type}]"
             need_enums = inner_prop.need_enums
@@ -741,6 +742,7 @@ class Spline(BaseProperty):
             to_json_code = "[{inner} for item in {{obj}}]".format(
                 inner=inner_prop.to_json_code.format(obj="item")
             )
+            needed_imports.update(inner_prop.needed_imports)
 
         elif raw_type == "String":
             prop_type = "str"
@@ -809,7 +811,7 @@ class Spline(BaseProperty):
 
         return PropDetails(prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
                            custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
-                           meta=meta)
+                           meta=meta, needed_imports=needed_imports)
 
     def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
@@ -835,7 +837,7 @@ class Spline(BaseProperty):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(prop, get_prop_details(prop, cls.needed_imports), prop_name)
+            cls.add_prop(prop, get_prop_details(prop), prop_name)
 
         # from stream
 
