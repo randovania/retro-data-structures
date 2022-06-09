@@ -332,13 +332,13 @@ class ClassDefinition:
     json_parser: str = ""
     property_count: int = 0
 
-    all_props: list[PropDetails] = dataclasses.field(default_factory=list)
+    all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
     needed_imports: dict = dataclasses.field(default_factory=dict)
     need_enums: bool = False
     has_custom_cook_pref: bool = False
 
     def add_prop(self, prop: PropDetails, prop_name: str):
-        self.all_props.append(prop)
+        self.all_props[prop_name] = prop
         self.need_enums = self.need_enums or prop.need_enums
         self.has_custom_cook_pref = self.has_custom_cook_pref or prop.custom_cook_pref
 
@@ -423,71 +423,11 @@ class ClassDefinition:
             self.properties_builder += "\n".join(build_prop)
             self.properties_builder += "\n"
 
+    def finalize_props(self):
+        pass
 
-def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
-    logging.info("Parsing templates for game %s: %s", game_id, game_xml)
 
-    base_path = templates_path / game_xml.parent
-
-    t = ElementTree.parse(templates_path / game_xml)
-    root = t.getroot()
-
-    states = get_key_map(root.find("States"))
-    messages = get_key_map(root.find("Messages"))
-
-    _enums_by_game[game_id] = [
-        EnumDefinition(
-            "States",
-            {
-                value: repr(key)
-                for key, value in states.items()
-            }
-        ),
-        EnumDefinition(
-            "Messages",
-            {
-                value: repr(key)
-                for key, value in messages.items()
-            }
-        ),
-    ]
-
-    script_objects_paths = {
-        four_cc: path
-        for four_cc, path in get_paths(root.find("ScriptObjects")).items()
-    }
-    script_objects = {
-        four_cc: parse_script_object_file(base_path / path, game_id)
-        for four_cc, path in script_objects_paths.items()
-    }
-    property_archetypes = {
-        name: parse_property_archetypes(base_path / path, game_id)
-        for name, path in get_paths(root.find("PropertyArchetypes")).items()
-    }
-
-    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
-    _ensure_is_generated_dir(code_path)
-    import_base = f"retro_data_structures.properties.{game_id.lower()}"
-
-    class LiteralPropType(typing.NamedTuple):
-        python_type: str
-        struct_format: str
-        default: typing.Any
-
-        @property
-        def byte_count(self):
-            return struct.calcsize(self.struct_format)
-
-    _literal_prop_types = {
-        "Int": LiteralPropType("int", ">l", 0),
-        "Float": LiteralPropType("float", ">f", 0.0),
-        "Bool": LiteralPropType("bool", ">?", False),
-        "Short": LiteralPropType("int", ">h", 0),
-    }
-
-    core_path = code_path.joinpath("core")
-    _ensure_is_generated_dir(core_path)
-
+def _add_default_types(core_path: Path):
     core_path.joinpath("Color.py").write_text("""# Generated file
 import dataclasses
 import struct
@@ -617,6 +557,72 @@ class Spline(BaseProperty):
     def to_json(self) -> str:
         return base64.b64encode(self.data).decode("ascii")
 """)
+
+
+def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
+    logging.info("Parsing templates for game %s: %s", game_id, game_xml)
+
+    base_path = templates_path / game_xml.parent
+
+    t = ElementTree.parse(templates_path / game_xml)
+    root = t.getroot()
+
+    states = get_key_map(root.find("States"))
+    messages = get_key_map(root.find("Messages"))
+
+    _enums_by_game[game_id] = [
+        EnumDefinition(
+            "States",
+            {
+                value: repr(key)
+                for key, value in states.items()
+            }
+        ),
+        EnumDefinition(
+            "Messages",
+            {
+                value: repr(key)
+                for key, value in messages.items()
+            }
+        ),
+    ]
+
+    script_objects_paths = {
+        four_cc: path
+        for four_cc, path in get_paths(root.find("ScriptObjects")).items()
+    }
+    script_objects = {
+        four_cc: parse_script_object_file(base_path / path, game_id)
+        for four_cc, path in script_objects_paths.items()
+    }
+    property_archetypes = {
+        name: parse_property_archetypes(base_path / path, game_id)
+        for name, path in get_paths(root.find("PropertyArchetypes")).items()
+    }
+
+    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
+    _ensure_is_generated_dir(code_path)
+    import_base = f"retro_data_structures.properties.{game_id.lower()}"
+
+    class LiteralPropType(typing.NamedTuple):
+        python_type: str
+        struct_format: str
+        default: typing.Any
+
+        @property
+        def byte_count(self):
+            return struct.calcsize(self.struct_format)
+
+    _literal_prop_types = {
+        "Int": LiteralPropType("int", ">l", 0),
+        "Float": LiteralPropType("float", ">f", 0.0),
+        "Bool": LiteralPropType("bool", ">?", False),
+        "Short": LiteralPropType("int", ">h", 0),
+    }
+
+    core_path = code_path.joinpath("core")
+    _ensure_is_generated_dir(core_path)
+    _add_default_types(core_path)
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
@@ -847,6 +853,7 @@ class Spline(BaseProperty):
                 prop_name += "_0x{:08x}".format(prop["id"])
 
             cls.add_prop(get_prop_details(prop), prop_name)
+        cls.finalize_props()
 
         # from stream
 
