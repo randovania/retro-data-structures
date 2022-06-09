@@ -166,11 +166,13 @@ class SectionCategoryAdapter(Adapter):
             "portal_area_section": AssetIdCorrect,
             "static_geometry_map_section": AssetIdCorrect,
             "unknown_section_1": Struct(
-                "magic" / If(game_check.is_prime3, Const("LLTE", FourCC)), "data" / Const(1, Int32ub)
+                "magic" / If(game_check.is_prime3, Const("LLTE", FourCC)), 
+                "data" / Const(1, Int32ub)
             ),
-            "unknown_section_2": Sequence(
-                Const(0, Int32ub),
-                PrefixedArray(Int32ub, Const(0xFF, Int8ub)),  # TODO: rebuild according to surface group count
+            "unknown_section_2": Struct(
+                "unk1" / PrefixedArray(Int32ub, Int32ub),
+                # TODO: rebuild according to surface group count
+                "unk2" / PrefixedArray(Int32ub, Enum(Int8ub, ON=0xFF, OFF=0x00)),
             ),
         }
 
