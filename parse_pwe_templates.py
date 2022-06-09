@@ -440,24 +440,26 @@ class ClassDefinition:
         self.class_code += f"""
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
-        result = cls()
 """
         if self.atomic or game_id == "Prime":
-            self.class_code += "        property_size = None\n"
+            self.class_code += "        property_size = None  # Atomic\n"
             if game_id == "Prime" and self.is_struct:
                 self.class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
 
             for prop_name, prop in self.all_props.items():
-                self.class_code += f"        result.{prop_name} = {prop.parse_code}\n"
+                self.class_code += f"        {prop_name} = {prop.parse_code}\n"
 
-        else:
-            if self.is_struct:
-                self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
-                self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
-                self.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
-                self.class_code += "        root_size_start = data.tell()\n"
+            self.class_code += f"        return cls({', '.join(prop_name for prop_name in self.all_props)})\n"
+            return
 
-            self.class_code += f"""
+        self.class_code += "        result = cls()\n"
+        if self.is_struct:
+            self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
+            self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
+            self.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
+            self.class_code += "        root_size_start = data.tell()\n"
+
+        self.class_code += f"""
         property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
@@ -468,11 +470,11 @@ class ClassDefinition:
                 data.read(property_size)  # skip unknown property
             assert data.tell() - start == property_size
 """
-            self.after_class_code += "_property_decoder = {\n"
-            self.after_class_code += self.properties_decoder
-            self.after_class_code += "}\n"
+        self.after_class_code += "_property_decoder = {\n"
+        self.after_class_code += self.properties_decoder
+        self.after_class_code += "}\n"
 
-        if self.is_struct and not self.atomic and game_id != "Prime":
+        if self.is_struct:
             self.class_code += "        assert data.tell() - root_size_start == size\n"
 
         self.class_code += f"""
