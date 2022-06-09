@@ -940,19 +940,25 @@ class Spline(BaseProperty):
         _ensure_is_generated_dir(final_path.parent)
         final_path.write_text(code_code)
 
-    getter_func = "# Generated File\n"
-    getter_func += "import typing\n\n"
-    getter_func += "from retro_data_structures.properties.base_property import BaseProperty\n"
-    getter_func += "\n\ndef get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
     path = code_path.joinpath("objects")
     _ensure_is_generated_dir(path)
+
+    getter_func = "# Generated File\n"
+    getter_func += "import functools\nimport importlib\nimport typing\n\n"
+    getter_func += "from retro_data_structures.properties.base_property import BaseProperty\n\n"
+    getter_func += "_FOUR_CC_MAPPING = {\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, is_struct=True)
-        getter_func += f"    if four_cc == {repr(object_fourcc)}:\n"
-        getter_func += f"        from .{stem} import {stem}\n"
-        getter_func += f"        return {stem}\n"
-    getter_func += '    raise ValueError(f"Unknown four_cc: {four_cc}")\n'
+        getter_func += f"    {repr(object_fourcc)}: {repr(stem)},\n"
+
+    getter_func += "}\n\n\n"
+
+    getter_func += "@functools.cache\n"
+    getter_func += "def get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
+    getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
+    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.echoes.objects.{stem}")\n'
+    getter_func += "    return getattr(module, stem)\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
     print("> Creating archetypes")
