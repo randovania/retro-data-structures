@@ -364,9 +364,9 @@ class ClassDefinition:
         self.class_code += "\n"
 
         if self.atomic or self.game_id == "Prime":
-            self.properties_decoder += f"        result.{prop_name} = {prop.parse_code}\n"
-            for build in prop.build_code:
-                self.properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
+            pass
+            # self.properties_decoder is handled in write_to_stream
+            # self.properties_builder is handled in write_to_stream
         else:
             # parse
             signature = f"obj: {self.class_name}, data: typing.BinaryIO, property_size: int"
@@ -447,7 +447,9 @@ class ClassDefinition:
             if game_id == "Prime" and self.is_struct:
                 self.class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
 
-            self.class_code += self.properties_decoder
+            for prop_name, prop in self.all_props.items():
+                self.class_code += f"        result.{prop_name} = {prop.parse_code}\n"
+
         else:
             if self.is_struct:
                 self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
@@ -484,27 +486,37 @@ class ClassDefinition:
         if self.has_custom_cook_pref:
             assert self.game_id != "Prime"
 
+        if self.atomic or self.game_id == "Prime":
+            assert not self.has_custom_cook_pref
+
+            if self.game_id == "Prime" and self.is_struct:
+                num_props = len(self.all_props)
+                prop_count_repr = repr(struct.pack(">L", num_props))
+                self.class_code += f"        data.write({prop_count_repr})  # {num_props} properties\n"
+
+            for prop_name, prop in self.all_props.items():
+                for build in prop.build_code:
+                    self.class_code += f"        {build.format(obj=f'self.{prop_name}')}\n"
+            return
+
+        # After here we don't need to worry about Prime (or atomic)
         has_root_size_offset = False
 
-        if not self.atomic:
-            if self.is_struct and self.game_id != "Prime":
-                null_bytes = repr(b"\xFF\xFF\xFF\xFF")
-                self.class_code += f"        data.write({null_bytes})  # struct object id\n"
-                placeholder = repr(b'\x00\x00')
-                self.class_code += "        root_size_offset = data.tell()\n"
-                self.class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
-                has_root_size_offset = True
+        if self.is_struct:
+            null_bytes = repr(b"\xFF\xFF\xFF\xFF")
+            self.class_code += f"        data.write({null_bytes})  # struct object id\n"
+            placeholder = repr(b'\x00\x00')
+            self.class_code += "        root_size_offset = data.tell()\n"
+            self.class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
+            has_root_size_offset = True
 
-            elif self.has_custom_cook_pref:
-                self.class_code += "        num_properties_offset = data.tell()\n"
+        elif self.has_custom_cook_pref:
+            self.class_code += "        num_properties_offset = data.tell()\n"
 
-            if self.game_id != "Prime" or self.is_struct:
-                prop_count_repr = repr(struct.pack(">H" if self.game_id != "Prime" else ">L", self.property_count))
-                self.class_code += f"        data.write({prop_count_repr})  # {self.property_count} properties\n"
-                if self.has_custom_cook_pref:
-                    self.class_code += f"        num_properties_written = {self.property_count}\n"
-        else:
-            assert not self.has_custom_cook_pref
+        prop_count_repr = repr(struct.pack(">H", self.property_count))
+        self.class_code += f"        data.write({prop_count_repr})  # {self.property_count} properties\n"
+        if self.has_custom_cook_pref:
+            self.class_code += f"        num_properties_written = {self.property_count}\n"
 
         self.class_code += self.properties_builder
 
