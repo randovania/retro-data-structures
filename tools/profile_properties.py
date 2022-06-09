@@ -1,6 +1,7 @@
 import argparse
 import dataclasses
 import io
+import time
 from pathlib import Path
 
 import construct
@@ -27,7 +28,7 @@ SerializedData = construct.Struct(
         size=construct.VarInt,
     )),
     data=construct.GreedyBytes,
-)
+).compile()
 
 
 def do_dump_properties(game: Game, args):
@@ -70,11 +71,8 @@ def do_dump_properties(game: Game, args):
     )
 
 
-def do_parse_properties(game: Game, args):
-    path = Path(__file__).parent.joinpath(f"properties_{game.name}.bin")
-
-    property_data = SerializedData.parse_file(path)
-
+def _parse_properties(game: Game, property_data: construct.Container, compare: bool):
+    start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
         property_type = data.read(4).decode("ascii")
@@ -91,15 +89,27 @@ def do_parse_properties(game: Game, args):
 
         after = data.tell()
         if after - before != instance.size:
-            print(f"nstance {instance.identifier} of type {property_type} read {after - before} bytes, expected {instance.size}")
+            print(f"Instance {instance.identifier} of type {property_type} read {after - before} bytes, "
+                  f"expected {instance.size}")
 
-        if args.compare:
+        if compare:
             new_encoded = the_property.to_bytes()
 
             data.seek(before)
             original = data.read(after - before)
             if new_encoded != original:
                 print(f"Comparing instance {instance.identifier} of type {property_type} failed")
+
+    print("Processed properties in {:0.4f} seconds".format(time.time() - start_time))
+
+
+def do_parse_properties(game: Game, args):
+    path = Path(__file__).parent.joinpath(f"properties_{game.name}.bin")
+
+    property_data = SerializedData.parse_file(path)
+
+    for repeat in range(args.repeat):
+        _parse_properties(game, property_data, args.compare)
 
 
 def main():
@@ -110,6 +120,7 @@ def main():
     dump_properties = sub_parser.add_parser("dump-properties")
     dump_properties.add_argument("iso", type=Path)
     parse_properties = sub_parser.add_parser("parse-properties")
+    parse_properties.add_argument("--repeat", default=1, type=int, help="Perform the decoding this many times")
     parse_properties.add_argument("--compare", action="store_true", help="re-build and compare with original")
 
     args = parser.parse_args()
