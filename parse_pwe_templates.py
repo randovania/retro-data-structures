@@ -406,18 +406,27 @@ class ClassDefinition:
                 build_prop = []
 
             else:
-                self.properties_builder += f"        {prop_name}_field = next(field for field in dataclasses.fields(self) if field.name == '{prop_name}')\n"
-                self.properties_builder += f"        {prop_name}_default = {prop_name}_field.default if {prop_name}_field.default is not dataclasses.MISSING else {prop_name}_field.default_factory()\n"
+                if "default" in prop.meta:
+                    default_value = prop.meta["default"]
+                else:
+                    default_value: str = prop.meta["default_factory"]
+                    if default_value.startswith("lambda: "):
+                        default_value = default_value[len("lambda: "):]
+                    else:
+                        default_value += "()"
 
                 if prop.raw['cook_preference'] == "Default":
-                    self.properties_builder += f"        self.{prop_name} = {prop_name}_default\n"
+                    self.properties_builder += f"        self.{prop_name} = {default_value}  # Cooks with Default\n"
                     build_prop = [f"        {text}" for text in build_prop]
                     self.property_count += 1
 
                 elif prop.raw['cook_preference'] == "OnlyIfModified":
-                    self.properties_builder += f"        if self.{prop_name} != {prop_name}_default:\n"
+                    self.properties_builder += f"        if self.{prop_name} != {default_value}:\n"
                     self.properties_builder += f"            num_properties_written += 1\n"
                     build_prop = [f"            {text}" for text in build_prop]
+
+                else:
+                    raise ValueError(f"Unknown cook preference: {prop.raw['cook_preference']}")
 
             self.properties_builder += "\n".join(build_prop)
             self.properties_builder += "\n"
