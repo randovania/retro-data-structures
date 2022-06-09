@@ -71,7 +71,7 @@ def do_dump_properties(game: Game, args):
     )
 
 
-def _parse_properties(game: Game, property_data: construct.Container, compare: bool):
+def _parse_properties(game: Game, property_data: construct.Container, build: bool, compare: bool):
     start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
@@ -92,13 +92,14 @@ def _parse_properties(game: Game, property_data: construct.Container, compare: b
             print(f"Instance {instance.identifier} of type {property_type} read {after - before} bytes, "
                   f"expected {instance.size}")
 
-        if compare:
+        if build:
             new_encoded = the_property.to_bytes()
 
-            data.seek(before)
-            original = data.read(after - before)
-            if new_encoded != original:
-                print(f"Comparing instance {instance.identifier} of type {property_type} failed")
+            if compare:
+                data.seek(before)
+                original = data.read(after - before)
+                if new_encoded != original:
+                    print(f"Comparing instance {instance.identifier} of type {property_type} failed")
 
     print("Processed properties in {:0.4f} seconds".format(time.time() - start_time))
 
@@ -109,7 +110,7 @@ def do_parse_properties(game: Game, args):
     property_data = SerializedData.parse_file(path)
 
     for repeat in range(args.repeat):
-        _parse_properties(game, property_data, args.compare)
+        _parse_properties(game, property_data, args.build or args.compare, args.compare)
 
 
 def main():
@@ -121,6 +122,7 @@ def main():
     dump_properties.add_argument("iso", type=Path)
     parse_properties = sub_parser.add_parser("parse-properties")
     parse_properties.add_argument("--repeat", default=1, type=int, help="Perform the decoding this many times")
+    parse_properties.add_argument("--build", action="store_true", help="re-build and discard the result")
     parse_properties.add_argument("--compare", action="store_true", help="re-build and compare with original")
 
     args = parser.parse_args()
