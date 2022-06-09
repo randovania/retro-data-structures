@@ -323,6 +323,7 @@ class ClassDefinition:
     raw_def: dict
     class_name: str
     class_path: str
+    is_struct: bool
 
     class_code: str = ""
     after_class_code: str = ""
@@ -336,6 +337,10 @@ class ClassDefinition:
     needed_imports: dict = dataclasses.field(default_factory=dict)
     need_enums: bool = False
     has_custom_cook_pref: bool = False
+
+    @property
+    def atomic(self) -> bool:
+        return self.raw_def["atomic"]
 
     def add_prop(self, prop: PropDetails, prop_name: str):
         self.all_props[prop_name] = prop
@@ -425,6 +430,96 @@ class ClassDefinition:
 
     def finalize_props(self):
         pass
+
+    def write_from_stream(self):
+        game_id = self.game_id
+
+        self.class_code += f"""
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+        result = cls()
+"""
+        if self.atomic or game_id == "Prime":
+            self.class_code += "        property_size = None\n"
+            if game_id == "Prime" and self.is_struct:
+                self.class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
+
+            self.class_code += self.properties_decoder
+        else:
+            if self.is_struct:
+                self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
+                self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
+                self.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
+                self.class_code += "        root_size_start = data.tell()\n"
+
+            self.class_code += f"""
+        property_count = {_CODE_PARSE_UINT16}
+        for _ in range(property_count):
+            property_id, property_size = struct.unpack(">LH", data.read(6))
+            start = data.tell()
+            try:
+                _property_decoder[property_id](result, data, property_size)
+            except KeyError:
+                data.read(property_size)  # skip unknown property
+            assert data.tell() - start == property_size
+"""
+            self.after_class_code += "_property_decoder = {\n"
+            self.after_class_code += self.properties_decoder
+            self.after_class_code += "}\n"
+
+        if self.is_struct and not self.atomic and game_id != "Prime":
+            self.class_code += "        assert data.tell() - root_size_start == size\n"
+
+        self.class_code += f"""
+        return result
+"""
+
+    def write_to_stream(self):
+        self.class_code += f"""
+    def to_stream(self, data: typing.BinaryIO):
+"""
+        if self.has_custom_cook_pref:
+            assert self.game_id != "Prime"
+
+        has_root_size_offset = False
+
+        if not self.atomic:
+            if self.is_struct and self.game_id != "Prime":
+                null_bytes = repr(b"\xFF\xFF\xFF\xFF")
+                self.class_code += f"        data.write({null_bytes})  # struct object id\n"
+                placeholder = repr(b'\x00\x00')
+                self.class_code += "        root_size_offset = data.tell()\n"
+                self.class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
+                has_root_size_offset = True
+
+            elif self.has_custom_cook_pref:
+                self.class_code += "        num_properties_offset = data.tell()\n"
+
+            if self.game_id != "Prime" or self.is_struct:
+                prop_count_repr = repr(struct.pack(">H" if self.game_id != "Prime" else ">L", self.property_count))
+                self.class_code += f"        data.write({prop_count_repr})  # {self.property_count} properties\n"
+                if self.has_custom_cook_pref:
+                    self.class_code += f"        num_properties_written = {self.property_count}\n"
+        else:
+            assert not self.has_custom_cook_pref
+
+        self.class_code += self.properties_builder
+
+        if has_root_size_offset:
+            self.class_code += "\n        struct_end_offset = data.tell()\n"
+            self.class_code += "        data.seek(root_size_offset)\n"
+            self.class_code += '        data.write(struct.pack(">H", struct_end_offset - root_size_offset - 2))\n'
+            if self.has_custom_cook_pref:
+                self.class_code += '        data.write(struct.pack(">H", num_properties_written))\n'
+            self.class_code += "        data.seek(struct_end_offset)\n"
+
+        elif self.has_custom_cook_pref:
+            self.class_code += "\n"
+            self.class_code += f"        if num_properties_written != {self.property_count}:\n"
+            self.class_code += "            struct_end_offset = data.tell()\n"
+            self.class_code += "            data.seek(num_properties_offset)\n"
+            self.class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
+            self.class_code += "            data.seek(struct_end_offset)\n"
 
 
 def _add_default_types(core_path: Path):
@@ -844,6 +939,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             raw_def=this,
             class_name=name.split("_")[-1],
             class_path=name.replace("_", "/"),
+            is_struct=is_struct,
         )
         cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}(BaseProperty):\n"
         _fix_module_name(output_path, cls.class_path)
@@ -856,94 +952,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.finalize_props()
 
         # from stream
-
-        cls.class_code += f"""
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
-        result = cls()
-"""
-        if this["atomic"] or game_id == "Prime":
-            cls.class_code += "        property_size = None\n"
-            if game_id == "Prime" and is_struct:
-                cls.class_code += f"        property_count = {_CODE_PARSE_UINT32}\n"
-
-            cls.class_code += cls.properties_decoder
-        else:
-            if is_struct:
-                cls.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
-                cls.class_code += "        assert struct_id == 0xFFFFFFFF\n"
-                cls.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
-                cls.class_code += "        root_size_start = data.tell()\n"
-
-            cls.class_code += f"""
-        property_count = {_CODE_PARSE_UINT16}
-        for _ in range(property_count):
-            property_id, property_size = struct.unpack(">LH", data.read(6))
-            start = data.tell()
-            try:
-                _property_decoder[property_id](result, data, property_size)
-            except KeyError:
-                data.read(property_size)  # skip unknown property
-            assert data.tell() - start == property_size
-"""
-            cls.after_class_code += "_property_decoder = {\n"
-            cls.after_class_code += cls.properties_decoder
-            cls.after_class_code += "}\n"
-
-        if is_struct and not this["atomic"] and game_id != "Prime":
-            cls.class_code += "        assert data.tell() - root_size_start == size\n"
-
-        cls.class_code += f"""
-        return result
-"""
+        cls.write_from_stream()
 
         # to stream
-
-        cls.class_code += f"""
-    def to_stream(self, data: typing.BinaryIO):
-"""
-        if cls.has_custom_cook_pref:
-            assert game_id != "Prime"
-
-        has_root_size_offset = False
-
-        if not this["atomic"]:
-            if is_struct and game_id != "Prime":
-                null_bytes = repr(b"\xFF\xFF\xFF\xFF")
-                cls.class_code += f"        data.write({null_bytes})  # struct object id\n"
-                placeholder = repr(b'\x00\x00')
-                cls.class_code += "        root_size_offset = data.tell()\n"
-                cls.class_code += f"        data.write({placeholder})  # placeholder for root struct size\n"
-                has_root_size_offset = True
-
-            elif cls.has_custom_cook_pref:
-                cls.class_code += "        num_properties_offset = data.tell()\n"
-
-            if game_id != "Prime" or is_struct:
-                prop_count_repr = repr(struct.pack(">H" if game_id != "Prime" else ">L", cls.property_count))
-                cls.class_code += f"        data.write({prop_count_repr})  # {cls.property_count} properties\n"
-                if cls.has_custom_cook_pref:
-                    cls.class_code += f"        num_properties_written = {cls.property_count}\n"
-        else:
-            assert not cls.has_custom_cook_pref
-
-        cls.class_code += cls.properties_builder
-
-        if has_root_size_offset:
-            cls.class_code += "\n        struct_end_offset = data.tell()\n"
-            cls.class_code += "        data.seek(root_size_offset)\n"
-            cls.class_code += '        data.write(struct.pack(">H", struct_end_offset - root_size_offset - 2))\n'
-            if cls.has_custom_cook_pref:
-                cls.class_code += '        data.write(struct.pack(">H", num_properties_written))\n'
-            cls.class_code += "        data.seek(struct_end_offset)\n"
-
-        elif cls.has_custom_cook_pref:
-            cls.class_code += "\n"
-            cls.class_code += f"        if num_properties_written != {cls.property_count}:\n"
-            cls.class_code += "            struct_end_offset = data.tell()\n"
-            cls.class_code += "            data.seek(num_properties_offset)\n"
-            cls.class_code += '            data.write(struct.pack(">H", num_properties_written))\n'
-            cls.class_code += "            data.seek(struct_end_offset)\n"
+        cls.write_to_stream()
 
         # from json
         cls.class_code += """
