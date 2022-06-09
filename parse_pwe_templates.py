@@ -721,6 +721,7 @@ class Spline(BaseProperty):
             rename_root = nested_dir
 
         class_code = f"@dataclasses.dataclass()\nclass {class_name}(BaseProperty):\n"
+        after_class_code = ""
         properties_decoder = ""
         properties_builder = ""
         json_builder = ""
@@ -762,19 +763,18 @@ class Spline(BaseProperty):
                 for build in pdetails.build_code:
                     properties_builder += f"        {build.format(obj=f'self.{prop_name}')}\n"
             else:
-                need_else = bool(properties_decoder)
-                properties_decoder += "            "
-                if need_else:
-                    properties_decoder += "el"
+                # parse
+                signature = f"obj: {class_name}, data: typing.BinaryIO, property_size: int"
+                after_class_code += f"def _decode_{prop_name}({signature}) -> None:\n"
+                after_class_code += f"    obj.{prop_name} = {pdetails.parse_code}\n\n\n"
+                properties_decoder += f"    {hex(prop['id'])}: _decode_{prop_name},\n"
 
-                properties_decoder += f"if property_id == {hex(prop['id'])}:\n"
-                properties_decoder += f"                result.{prop_name} = {pdetails.parse_code}\n"
+                # build
                 prop_id_bytes = struct.pack(">L", prop["id"])
-
                 properties_builder += "\n"
-
-                build_prop = []
-                build_prop.append(f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}')
+                build_prop = [
+                    f'data.write({repr(prop_id_bytes)})  # {hex(prop["id"])}'
+                ]
 
                 if pdetails.known_size is not None:
                     placeholder = repr(struct.pack(">H", pdetails.known_size))
@@ -842,11 +842,15 @@ class Spline(BaseProperty):
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
             start = data.tell()
+            try:
+                _property_decoder[property_id](result, data, property_size)
+            except KeyError:
+                data.read(property_size)  # skip unknown property
+            assert data.tell() - start == property_size
 """
-            class_code += properties_decoder
-            class_code += "            else:\n"
-            class_code += "                data.read(property_size)  # skip unknown property\n"
-            class_code += "            assert data.tell() - start == property_size\n"
+            after_class_code += "_property_decoder = {\n"
+            after_class_code += properties_decoder
+            after_class_code += "}\n"
 
         if is_struct and not this["atomic"] and game_id != "Prime":
             class_code += "        assert data.tell() - root_size_start == size\n"
@@ -930,6 +934,9 @@ class Spline(BaseProperty):
 
         code_code += "\n\n"
         code_code += class_code
+        if after_class_code:
+            code_code += "\n\n"
+            code_code += after_class_code
         final_path = output_path.joinpath(class_path).with_suffix(".py")
         final_path.parent.mkdir(parents=True, exist_ok=True)
 
