@@ -317,6 +317,18 @@ class PropDetails:
         return self.raw["id"]
 
 
+def _get_default(meta: dict) -> str:
+    if "default" in meta:
+        default_value = meta["default"]
+    else:
+        default_value: str = meta["default_factory"]
+        if default_value.startswith("lambda: "):
+            default_value = default_value[len("lambda: "):]
+        else:
+            default_value += "()"
+    return default_value
+
+
 @dataclasses.dataclass
 class ClassDefinition:
     game_id: str
@@ -383,7 +395,7 @@ class ClassDefinition:
                 build_prop.append(f"data.write({placeholder})  # size placeholder")
 
             for build in prop.build_code:
-                build_prop.append(build.format(obj=f'self.{prop_name}'))
+                build_prop.append(build.replace("{obj}", f'self.{prop_name}'))
 
             if prop.known_size is None:
                 build_prop.append(f"after = data.tell()")
@@ -399,22 +411,15 @@ class ClassDefinition:
                 build_prop = []
 
             else:
-                if "default" in prop.meta:
-                    default_value = prop.meta["default"]
-                else:
-                    default_value: str = prop.meta["default_factory"]
-                    if default_value.startswith("lambda: "):
-                        default_value = default_value[len("lambda: "):]
-                    else:
-                        default_value += "()"
+                default_value = _get_default(prop.meta)
 
                 if prop.raw['cook_preference'] == "Default":
-                    self.properties_builder += f"        self.{prop_name} = {default_value}  # Cooks with Default\n"
+                    self.properties_builder += f"        self.{prop_name} = default_override.get({repr(prop_name)}, {default_value})  # Cooks with Default\n"
                     build_prop = [f"        {text}" for text in build_prop]
                     self.property_count += 1
 
                 elif prop.raw['cook_preference'] == "OnlyIfModified":
-                    self.properties_builder += f"        if self.{prop_name} != {default_value}:\n"
+                    self.properties_builder += f"        if self.{prop_name} != default_override.get({repr(prop_name)}, {default_value}):\n"
                     self.properties_builder += f"            num_properties_written += 1\n"
                     build_prop = [f"            {text}" for text in build_prop]
 
@@ -422,6 +427,8 @@ class ClassDefinition:
                     raise ValueError(f"Unknown cook preference: {prop.raw['cook_preference']}")
 
             self.properties_builder += "\n".join(build_prop)
+            if self.is_struct:
+                self.properties_builder += f"\n        print({repr(prop_name)}, data.tell())"
             self.properties_builder += "\n"
 
     def finalize_props(self):
@@ -473,7 +480,7 @@ class ClassDefinition:
 
         self.class_code += f"""
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None, default_override: typing.Optional[dict] = None):
 """
         if self.atomic or game_id == "Prime":
             self.class_code += "        property_size = None  # Atomic\n"
@@ -494,14 +501,14 @@ class ClassDefinition:
             self.class_code += f'        property_count = {_CODE_PARSE_UINT16}\n'
 
         if self._can_fast_decode():
-            self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
+            self.class_code += "        if default_override is None and (result := _fast_decode(data, property_count)) is not None:\n"
             self.class_code += "            return result\n\n"
 
             for fast_decode in self._create_fast_decode_body():
                 self.after_class_code += f"{fast_decode}\n"
             self.after_class_code += "\n\n"
 
-        self.class_code += f"""        present_fields = {{}}
+        self.class_code += f"""        present_fields = default_override or {{}}
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
             start = data.tell()
@@ -529,8 +536,9 @@ class ClassDefinition:
         self.after_class_code += "}\n"
 
     def write_to_stream(self):
-        self.class_code += f"""
-    def to_stream(self, data: typing.BinaryIO):
+        self.class_code += """
+    def to_stream(self, data: typing.BinaryIO, default_override: typing.Optional[dict] = None):
+        default_override = default_override or {}
 """
         if self.has_custom_cook_pref:
             assert self.game_id != "Prime"
@@ -825,10 +833,28 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             meta["default_factory"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data, property_size)"
-            build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
+
+            default_override = {}
+            for inner_prop in prop["properties"]:
+                if not inner_prop.get("has_default"):
+                    continue
+
+                inner_name = _filter_property_name(inner_prop["name"] or property_names.get(inner_prop["id"]))
+                assert inner_name is not None
+                inner_details = get_prop_details(inner_prop)
+                default_override[inner_name] = _get_default(inner_details.meta)
+                needed_imports.update(inner_details.needed_imports)
+                need_enums = need_enums or inner_details.need_enums
+
+            if default_override:
+                override = ", ".join(f"{repr(key)}: {value}" for key, value in default_override.items())
+                parse_code = f"{prop_type}.from_stream(data, property_size, default_override={{{override}}})"
+                build_code.append(f"{{obj}}.to_stream(data, default_override={{{override}}})")
+            else:
+                parse_code = f"{prop_type}.from_stream(data, property_size)"
+                build_code.append("{obj}.to_stream(data)")
 
         elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
