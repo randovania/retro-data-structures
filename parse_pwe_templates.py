@@ -310,6 +310,7 @@ class PropDetails:
     known_size: typing.Optional[int]
     meta: dict
     needed_imports: dict[str, str]
+    format_specifier: typing.Optional[str]
 
     @property
     def id(self):
@@ -426,6 +427,40 @@ class ClassDefinition:
     def finalize_props(self):
         pass
 
+    def _can_fast_decode(self) -> bool:
+        return all(
+            prop.format_specifier is not None
+            for prop in self.all_props.values()
+        )
+
+    def _create_fast_decode_body(self):
+        num_props = len(self.all_props)
+
+        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        yield f"    if property_count != {num_props}:"
+        yield "        return None"
+        yield ""
+
+        big_format = ">" + "".join(f"LH{prop.format_specifier}" for prop in self.all_props.values())
+        assert len(big_format) == 1 + 3 * num_props
+        yield f"    dec = struct.unpack({repr(big_format)}, data.read({struct.calcsize(big_format)}))"
+
+        ids = [hex(prop.id) for prop in self.all_props.values()]
+        left = [f"dec[{i * 3}]" for i in range(num_props)]
+        yield f"    if ({', '.join(left)}) != ({', '.join(ids)}):"
+        yield "        return None"
+        yield ""
+
+        yield f"    return {self.class_name}("
+        for i, prop in enumerate(self.all_props.values()):
+            value = f"dec[{i * 3 + 2}]"
+            if prop.prop_type.startswith("enums."):
+                yield f"        {prop.prop_type}({value}),"
+            else:
+                yield f"        {value},"
+
+        yield "    )"
+
     def write_from_stream(self):
         game_id = self.game_id
 
@@ -450,6 +485,14 @@ class ClassDefinition:
             self.class_code += "        root_size_start = data.tell() - 2\n\n"
         else:
             self.class_code += f'        property_count = {_CODE_PARSE_UINT16}\n'
+
+        if self._can_fast_decode():
+            self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
+            self.class_code += "            return result\n\n"
+
+            for fast_decode in self._create_fast_decode_body():
+                self.after_class_code += f"{fast_decode}\n"
+            self.after_class_code += "\n\n"
 
         self.class_code += f"""        present_fields = {{}}
         for _ in range(property_count):
@@ -741,13 +784,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         @property
         def byte_count(self):
-            return struct.calcsize(self.struct_format)
+            return struct.calcsize(">" + self.struct_format)
 
     _literal_prop_types = {
-        "Int": LiteralPropType("int", ">l", 0),
-        "Float": LiteralPropType("float", ">f", 0.0),
-        "Bool": LiteralPropType("bool", ">?", False),
-        "Short": LiteralPropType("int", ">h", 0),
+        "Int": LiteralPropType("int", "l", 0),
+        "Float": LiteralPropType("float", "f", 0.0),
+        "Bool": LiteralPropType("bool", "?", False),
+        "Short": LiteralPropType("int", "h", 0),
     }
 
     core_path = code_path.joinpath("core")
@@ -768,6 +811,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         known_size = None
         meta = {}
         needed_imports = {}
+        format_specifier = None
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -782,7 +826,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
             enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
-            known_size = 4
+            format_specifier = "L"
 
             uses_known_enum = enum_name in known_enums and (
                     default_value in list(known_enums[enum_name].values.values())
@@ -810,7 +854,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop['has_default'] else 0)
-            known_size = 4
+            format_specifier = "L"
 
             if "flagset_name" in prop:
                 prop_type = "enums." + _scrub_enum(prop["flagset_name"])
@@ -842,18 +886,18 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 default_value = prop["default_value"] if prop['has_default'] else 0
 
             if game_id in ["Prime", "Echoes"]:
-                format_specifier = '">L"'
+                format_specifier = "L"
                 byte_count = 4
             else:
-                format_specifier = '">Q"'
+                format_specifier = "Q"
                 byte_count = 8
 
             meta["default"] = hex(default_value)
-            parse_code = f'struct.unpack({format_specifier}, data.read({byte_count}))[0]'
-            build_code.append(f'data.write(struct.pack({format_specifier}, {{obj}}))')
+            format_with_prefix = f'">{format_specifier}"'
+            parse_code = f'struct.unpack({format_with_prefix}, data.read({byte_count}))[0]'
+            build_code.append(f'data.write(struct.pack({format_with_prefix}, {{obj}}))')
             from_json_code = "{obj}"
             to_json_code = "{obj}"
-            known_size = byte_count
 
         elif raw_type in ["AnimationSet", "Spline"]:
             if raw_type == "AnimationSet":
@@ -932,15 +976,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type in _literal_prop_types:
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
-            parse_code = f"struct.unpack({repr(literal_prop.struct_format)}, data.read({literal_prop.byte_count}))[0]"
-            build_code.append(f"data.write(struct.pack({repr(literal_prop.struct_format)}, {{obj}}))")
+            struct_format = ">" + literal_prop.struct_format
+            format_specifier = literal_prop.struct_format
+
+            parse_code = f"struct.unpack({repr(struct_format)}, data.read({literal_prop.byte_count}))[0]"
+            build_code.append(f"data.write(struct.pack({repr(struct_format)}, {{obj}}))")
             from_json_code = "{obj}"
             to_json_code = "{obj}"
-            known_size = literal_prop.byte_count
 
             default_value = prop["default_value"] if prop['has_default'] else literal_prop.default
             try:
-                s = struct.Struct(literal_prop.struct_format)
+                s = struct.Struct(struct_format)
                 default_value = s.unpack(s.pack(default_value))[0]
             except struct.error as e:
                 print(f"{hex(prop['id'])} ({prop['type']}) has invalid default value  {default_value}: {e}")
@@ -954,9 +1000,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             print("what?")
             print(prop)
 
+        if known_size is None and format_specifier is not None:
+            known_size = struct.calcsize(">" + format_specifier)
+
         return PropDetails(prop, prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
                            custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
-                           meta=meta, needed_imports=needed_imports)
+                           meta=meta, needed_imports=needed_imports, format_specifier=format_specifier)
 
     def parse_struct(name: str, this, output_path: Path, is_struct: bool):
         if this["type"] != "Struct":
