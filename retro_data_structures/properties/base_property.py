@@ -2,13 +2,16 @@ import io
 import typing
 
 
+Self = typing.TypeVar("Self", bound="BaseProperty")
+
+
 class BaseProperty:
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls: typing.Type[Self], data: typing.BinaryIO, size: typing.Optional[int] = None) -> Self:
         raise NotImplementedError()
 
     @classmethod
-    def from_bytes(cls, data: bytes):
+    def from_bytes(cls: typing.Type[Self], data: bytes) -> Self:
         stream = io.BytesIO(data)
         return cls.from_stream(stream, len(data))
 
@@ -21,7 +24,7 @@ class BaseProperty:
         return stream.getvalue()
 
     @classmethod
-    def from_json(cls, data: typing.Any):
+    def from_json(cls: typing.Type[Self], data: typing.Any) -> Self:
         raise NotImplementedError()
 
     def to_json(self) -> typing.Any:
