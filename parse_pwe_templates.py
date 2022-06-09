@@ -435,19 +435,26 @@ class ClassDefinition:
 
     def _create_fast_decode_body(self):
         num_props = len(self.all_props)
+        ids = [hex(prop.id) for prop in self.all_props.values()]
+        big_format = ">" + "".join(f"LH{prop.format_specifier}" for prop in self.all_props.values())
+        assert len(big_format) == 1 + 3 * num_props
+        yield f"_FAST_FORMAT = None"
+        yield f"_FAST_IDS = ({', '.join(ids)})"
+        yield ""
+        yield ""
 
         yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
         yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
+        yield "    global _FAST_FORMAT"
+        yield "    if _FAST_FORMAT is None:"
+        yield f"        _FAST_FORMAT = struct.Struct({repr(big_format)})"
+        yield ""
+        yield f"    dec = _FAST_FORMAT.unpack(data.read({struct.calcsize(big_format)}))"
 
-        big_format = ">" + "".join(f"LH{prop.format_specifier}" for prop in self.all_props.values())
-        assert len(big_format) == 1 + 3 * num_props
-        yield f"    dec = struct.unpack({repr(big_format)}, data.read({struct.calcsize(big_format)}))"
-
-        ids = [hex(prop.id) for prop in self.all_props.values()]
         left = [f"dec[{i * 3}]" for i in range(num_props)]
-        yield f"    if ({', '.join(left)}) != ({', '.join(ids)}):"
+        yield f"    if ({', '.join(left)}) != _FAST_IDS:"
         yield "        return None"
         yield ""
 
