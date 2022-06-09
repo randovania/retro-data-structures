@@ -445,13 +445,13 @@ class ClassDefinition:
             return
 
         if self.is_struct:
-            self.class_code += f"        struct_id = {_CODE_PARSE_UINT32}\n"
+            self.class_code += '        struct_id, size, property_count = struct.unpack(">LHH", data.read(8))\n'
             self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
-            self.class_code += f"        size = {_CODE_PARSE_UINT16}\n"
-            self.class_code += "        root_size_start = data.tell()\n\n"
+            self.class_code += "        root_size_start = data.tell() - 2\n\n"
+        else:
+            self.class_code += f'        property_count = {_CODE_PARSE_UINT16}\n'
 
         self.class_code += f"""        present_fields = {{}}
-        property_count = {_CODE_PARSE_UINT16}
         for _ in range(property_count):
             property_id, property_size = struct.unpack(">LH", data.read(6))
             start = data.tell()
