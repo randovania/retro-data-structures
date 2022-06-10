@@ -352,7 +352,7 @@ class Mlvl(BaseResource):
             area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
             yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i)
     
-    def get_area(self, asset_id: int) -> AreaWrapper:
+    def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
 
     _name_strg_cached: Strg = None
