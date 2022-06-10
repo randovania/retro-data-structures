@@ -43,8 +43,8 @@ def do_dump_properties(game: Game, args):
 
         try:
             mrea = manager.get_parsed_asset(asset_id, type_hint=Mrea)
-        except construct.ConstructError:
-            print(f"Unable to parse {asset_id:08x}")
+        except construct.ConstructError as e:
+            print(f"Unable to parse {asset_id:08x}: {e}")
             continue
 
         for layer in mrea.script_layers:
