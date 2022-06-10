@@ -226,6 +226,12 @@ class AssetManager:
 
         return format_class.parse(raw_asset.data, target_game=self.target_game)
 
+    def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:
+        """
+        Wrapper for get_parsed_asset. Override in subclasses for additional behavior such as automatic saving.
+        """
+        return self.get_parsed_asset(path, type_hint=type_hint)
+
     def generate_asset_id(self):
         result = self._next_generated_id
         while self.does_asset_exists(result):
@@ -238,7 +244,7 @@ class AssetManager:
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{asset_id} already exists")
 
-        if name in self._custom_asset_ids:
+        if name in self._custom_asset_ids and self._custom_asset_ids[name] != asset_id:
             raise ValueError(f"{name} already exists")
 
         self._custom_asset_ids[name] = asset_id

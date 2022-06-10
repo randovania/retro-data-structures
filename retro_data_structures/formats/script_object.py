@@ -2,7 +2,8 @@
 https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
-from typing import Iterator, Type
+from __future__ import annotations
+from typing import TYPE_CHECKING, Iterator, Type
 
 from construct import Container
 from construct.core import (
@@ -15,6 +16,9 @@ from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
 from retro_data_structures.properties.base_property import BaseProperty
 
+if TYPE_CHECKING:
+    from retro_data_structures.formats.script_layer import ScriptLayerHelper
+
 
 def Connection(subcon):
     return Struct(
@@ -26,20 +30,22 @@ def Connection(subcon):
 
 _prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
 
+InstanceId = Union(
+    "raw",
+    "raw" / Hex(Int32ub),
+    "parts" / BitStruct(
+        "layer" / BitsInteger(6),
+        "area" / BitsInteger(10),
+        "instance" / BitsInteger(16)
+    )
+)
+
 ScriptInstance = Struct(
     type=game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
     instance=Prefixed(
         _prefix,
         Struct(
-            id=Union(
-                "raw",
-                "raw" / Hex(Int32ub),
-                "parts" / BitStruct(
-                    "layer" / BitsInteger(6),
-                    "area" / BitsInteger(10),
-                    "instance" / BitsInteger(16)
-                )
-            ),
+            id=InstanceId,
             connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
             base_property=GreedyBytes,
         ),
@@ -62,14 +68,20 @@ class ScriptInstanceHelper:
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type):
+    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper):
         property_type = properties.get_game_object(target_game, instance_type)
 
         # TODO: make this less ugly lmao
         raw = ScriptInstance.parse(ScriptInstance.build({
             "type": instance_type,
             "instance": {
-                "id": {"raw": 0},
+                "id": {
+                    "parts": {
+                        "layer": layer._index,
+                        "area": layer._parent_area._index,
+                        "instance": layer._parent_area.next_instance_id
+                    }
+                },
                 "connections": [],
                 "base_property": property_type().to_bytes(),
             }
@@ -87,6 +99,14 @@ class ScriptInstanceHelper:
     @property
     def id(self) -> int:
         return self._raw.instance.id.raw
+    
+    @property
+    def id_struct(self) -> Container:
+        return self._raw.instance.id.parts
+    
+    def id_matches(self, id: int) -> bool:
+        parts = InstanceId.parse(InstanceId.build({"raw": id})).parts
+        return self.id_struct.area == parts.area and self.id_struct.instance == parts.instance
 
     @property
     def name(self) -> str:
@@ -121,6 +141,10 @@ class ScriptInstanceHelper:
     @property
     def connections(self):
         return self._raw.instance.connections
+    
+    @connections.setter
+    def connections(self, value):
+        self._raw.instance.connections = value
 
     def add_connection(self, state, message, target: "ScriptInstanceHelper"):
         self.connections.append(Container(
@@ -128,3 +152,8 @@ class ScriptInstanceHelper:
             message=message,
             target=target.id
         ))
+    
+    def remove_connections(self, target: Union[int, "ScriptInstanceHelper"]):
+        if isinstance(target, ScriptInstanceHelper):
+            target = target.id
+        self.connections = [c for c in self.connections if c.target != target]

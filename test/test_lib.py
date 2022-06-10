@@ -2,6 +2,7 @@ import dataclasses
 import json
 from pathlib import Path
 from typing import Tuple, Type, List
+import construct
 
 from construct.lib.containers import Container
 
@@ -32,15 +33,18 @@ ECHOES_ASSET_IDS = _parse_assets_file("assets_echoes.json")
 
 def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=None):
     raw = file_path.read_bytes()
+    construct.lib.setGlobalPrintFullStrings(True)
 
-    data = module.parse(raw, target_game=game)
+    data: Container = module.parse(raw, target_game=game)
     if print_data:
         print(data)
     encoded = module.build(data, target_game=game)
 
     if save_file:
-        file_path.parent.joinpath(save_file).write_bytes(encoded)
-
+        file_path.with_stem(file_path.stem+"_COPY").write_bytes(encoded)
+        file_path.with_suffix(file_path.suffix+".construct").write_text(str(data))
+        
+    construct.lib.setGlobalPrintFullStrings(False)
     return (raw, encoded, data)
 
 

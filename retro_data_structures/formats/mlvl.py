@@ -1,11 +1,22 @@
 """
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
-import typing
+from __future__ import annotations
 
+from itertools import count
+from typing import Iterator
+import typing
 import construct
 from construct import (
+    Adapter,
     Array,
+    Bitwise,
+    Container,
+    Error,
+    ListContainer,
+    Struct,
+    Int32ub,
+    PrefixedArray,
     Int64ub,
     Float32b,
     Int16ub,
@@ -16,15 +27,23 @@ from construct import (
     Peek,
     Sequence,
     FocusedSeq,
+    Flag,
+    len_
 )
-from construct import Struct, PrefixedArray, Int32ub
+from retro_data_structures.adapters.offset import OffsetAdapter
 
-from retro_data_structures.common_types import AssetId32, AssetId64, FourCC
-from retro_data_structures.common_types import Vector3
+
+from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, NameOrAssetId
 from retro_data_structures.formats.guid import GUID
+from retro_data_structures.formats.mrea import Mrea
+from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
+from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,
@@ -43,18 +62,51 @@ MLVLMemoryRelay = Struct(
     active=Int8ub,
 )
 
-MLVLAreaLayerFlags = Struct(
-    layer_count=Int32ub,
-    layer_flags=Int64ub,
-)
+class LayerFlags(Adapter):
+    def __init__(self):
+        super().__init__(Struct(
+            layer_count=Int32ub,
+            layer_flags=Bitwise(Array(64, Flag)),
+        ))
+    
+    def _decode(self, obj, context, path):
+        return ListContainer(reversed(obj.layer_flags))[:obj.layer_count]
+    
+    def _encode(self, obj, context, path):
+        flags = [True for i in range(64)]
+        flags[:len(obj)] = obj
+        return Container({
+            "layer_count": len(obj),
+            "layer_flags": reversed(flags)
+        })
 
+class LayerNameOffsetAdapter(OffsetAdapter):
+    def _get_table(self, context):
+        return context._.layer_names
+    
+    def _get_table_length(self, context):
+        return len(self._get_table(context))
+
+    def _get_item_size(self, item):
+        return len(item.encode('utf-8'))
+
+class AreaDependencyOffsetAdapter(OffsetAdapter):
+    def _get_table(self, context):
+        return context._.dependencies_b
+    
+    def _get_table_length(self, context):
+        return len_(self._get_table(context))
+    
+    def _get_item_size(self, item):
+        return 8
 
 def create_area(version: int, asset_id):
     MLVLAreaDependency = Struct(
         asset_id=asset_id,
         asset_type=FourCC,
     )
-
+    
+    # TODO: better offset stuff
     MLVLAreaDependencies = Struct(
         # Always empty
         dependencies_a=PrefixedArray(Int32ub, MLVLAreaDependency),
@@ -170,7 +222,7 @@ def create(version: int, asset_id):
 
     fields.extend(
         [
-            "area_layer_flags" / PrefixedArray(Int32ub, MLVLAreaLayerFlags),
+            "area_layer_flags" / PrefixedArray(Int32ub, LayerFlags()),
             "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
         ]
     )
@@ -192,15 +244,87 @@ MLVL = FocusedSeq(
     "mlvl",
     header=Peek(Sequence(Int32ub, Int32ub)),
     mlvl=Switch(
-        construct.this.header[1],
+        lambda this: this.header[1] if this._parsing else this.mlvl.version,
         {
             0x11: Prime1MLVL,
             0x17: Prime2MLVL,
             0x19: Prime3MLVL,
         },
-        construct.Error,
+        Error,
     ),
 )
+
+
+class AreaWrapper:
+    _flags: Container
+    _layer_names: ListContainer
+    _index: int
+
+    _mrea: Mrea = None
+    _strg: Strg = None
+
+    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int):
+        self._raw = raw
+        self.asset_manager = asset_manager
+        self._flags = flags
+        self._layer_names = names
+        self._index = index
+    
+    @property
+    def id(self) -> int:
+        return self._raw.internal_area_id
+
+    @property
+    def index(self) -> int:
+        return self._index
+    
+    @property
+    def name(self) -> str:
+        try:
+            return self.strg.strings[0]
+        except:
+            return "!!" + self._raw.get("internal_area_name", "Unknown")
+    
+    @name.setter
+    def name(self, value):
+        self.strg.set_string(0, value)
+    
+    @property
+    def strg(self) -> Strg:
+        if self._strg is None:
+            self._strg = self.asset_manager.get_file(self._raw.area_name_id, type_hint=Strg)
+        return self._strg
+
+    @property
+    def mrea(self) -> Mrea:
+        if self._mrea is None:
+            self._mrea = self.asset_manager.get_file(self.mrea_asset_id, type_hint=Mrea)
+        return self._mrea
+    
+    @property
+    def mrea_asset_id(self) -> int:
+        return self._raw.area_mrea_id
+    
+    @property
+    def layers(self) -> Iterator[ScriptLayerHelper]:
+        for i, layer in enumerate(self.mrea.script_layers):
+            yield ScriptLayerHelper.with_parent(layer, self, i)
+    
+    def get_layer(self, name: str) -> ScriptLayerHelper:
+        return next(layer for layer in self.layers if layer.name == name)
+    
+    def add_layer(self, name: str, active: bool = True) -> ScriptLayerHelper:
+        index = len(self._layer_names)
+        self._layer_names.append(name)
+        self._flags.append(active)
+        raw = new_layer(index, self.asset_manager.target_game)
+        self.mrea._raw.sections.script_layer_section.append(raw)
+        return self.get_layer(name)
+    
+    @property
+    def next_instance_id(self) -> int:
+        ids = [instance.id_struct.instance for layer in self.layers for instance in layer.instances]
+        return next(i for i in count() if i not in ids)
 
 
 class Mlvl(BaseResource):
@@ -214,3 +338,52 @@ class Mlvl(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
+
+    def __repr__(self) -> str:
+        if self.asset_manager.target_game == Game.ECHOES:
+            return f"{self.world_name} ({self.dark_world_name})"
+        return self.world_name
+    
+    @property
+    def areas(self) -> Iterator[AreaWrapper]:
+        offsets = self._raw.area_layer_name_offset
+        names = self._raw.layer_names
+        for i, area in enumerate(self._raw.areas):
+            area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
+            yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i)
+    
+    def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
+        return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
+
+    _name_strg_cached: Strg = None
+    _dark_strg_cached: Strg = None
+
+    @property
+    def _name_strg(self) -> Strg:
+        if self._name_strg_cached is None:
+            self._name_strg_cached = self.asset_manager.get_file(self._raw.world_name_id, type_hint=Strg)
+        return self._name_strg_cached
+    
+    @property
+    def _dark_strg(self) -> Strg:
+        if self.asset_manager.target_game != Game.ECHOES:
+            raise ValueError("Only Echoes has dark world names.")
+        if self._dark_strg_cached is None:
+            self._dark_strg_cached = self.asset_manager.get_file(self._raw.dark_world_name_id, type_hint=Strg)
+        return self._dark_strg_cached
+
+    @property
+    def world_name(self) -> str:
+        return self._name_strg.strings[0]
+    
+    @world_name.setter
+    def world_name(self, value: str):
+        self._name_strg.set_string(0, value)
+    
+    @property
+    def dark_world_name(self) -> str:
+        return self._dark_strg.strings[0]
+    
+    @dark_world_name.setter
+    def dark_world_name(self, value: str):
+        self._dark_strg.set_string(0, value)

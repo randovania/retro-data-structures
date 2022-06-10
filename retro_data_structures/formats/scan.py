@@ -13,7 +13,7 @@ from retro_data_structures.common_types import AssetId32, FourCC
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
-from retro_data_structures.formats.script_object import ScriptInstance
+from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 
 ScanImage = Struct(
@@ -73,3 +73,8 @@ class Scan(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)
+    
+    @property
+    def scannable_object_info(self) -> ScriptInstanceHelper:
+        assert self.target_game != Game.PRIME
+        return ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game)
