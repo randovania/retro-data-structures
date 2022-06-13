@@ -256,6 +256,6 @@ class Strg(BaseResource):
         self.set_strings("ENGL", value)
     
     def set_string(self, index: int, value: str, *, language: str = "ENGL"):
-        strings = self.get_strings(language)
+        strings = list(self.get_strings(language))
         strings[index] = value
         self.set_strings(language, strings)

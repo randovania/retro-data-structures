@@ -7,6 +7,7 @@ from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.dependencies import MlvlDependencies
 
 AssetType = str
 AssetId = int
@@ -38,14 +39,33 @@ class BaseResource:
 
     @classmethod
     def parse(cls, data: bytes, target_game: Game, asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
+        if asset_manager is not None:
+            print(asset_manager)
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
                    target_game, asset_manager)
 
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    @classmethod
+    def has_dependencies(cls, target_game: Game = None) -> bool:
+        test = cls(Container(), target_game)
+        try:
+            deps = list(test.dependencies_for())
+        except:
+            return True
+        return bool(deps)
+
+    def dependencies_for(self) -> typing.Iterator[AssetId]:
         raise NotImplementedError()
+    
+    def mlvl_dependencies_for(self, dep_manager: MlvlDependencies) -> typing.Iterator[AssetId]:
+        yield from self.dependencies_for()
+    
+    @staticmethod
+    def dependencies_to_asset_ids(dependencies: typing.Iterable[Dependency]) -> typing.Iterator[AssetId]:
+        for _, asset_id in dependencies:
+            yield asset_id
 
     @property
     def raw(self) -> Container:

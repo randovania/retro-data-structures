@@ -21,7 +21,7 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetId, BaseResource, AssetType, Dependency
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
@@ -465,3 +465,15 @@ class Mrea(BaseResource):
         for layer in self.script_layers:
             if (instance := layer.get_instance_by_name(name)) is not None:
                 return instance
+    
+    def get_non_layer_dependencies(self) -> Iterator[AssetId]:
+        def check_section(section: str):
+            if section in self.raw.sections:
+                data = self.raw.sections[section].data
+                if self.target_game.is_valid_asset_id(data):
+                    yield data
+        
+        yield from check_section("path_section")
+        yield from check_section("portal_area_section")
+        yield from check_section("static_geometry_section")
+        

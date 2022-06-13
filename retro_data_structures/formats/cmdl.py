@@ -353,4 +353,4 @@ class Cmdl(BaseResource):
         return CMDL
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+        yield from self.dependencies_to_asset_ids(dependencies_for(self.raw, self.target_game))

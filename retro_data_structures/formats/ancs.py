@@ -1,8 +1,10 @@
 """
 Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
+from __future__ import annotations
+
 import typing
-from typing import Optional, List
+from typing import Iterator, Optional, List, TYPE_CHECKING
 
 import construct
 from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b
@@ -11,12 +13,15 @@ from retro_data_structures import game_check
 from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
 from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
 from retro_data_structures.formats import meta_animation, evnt
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetId, BaseResource, AssetType, Dependency
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.dependencies import MlvlDependencies
 
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
 ConstructAssetId = AssetId32
@@ -146,8 +151,17 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
 
-def dependencies_for(obj, target_game: Game):
-    for character in obj.character_set.characters:
+def dependencies_for(obj, target_game: Game, dep_manager: MlvlDependencies = None):
+    if dep_manager is not None:
+        usage = dep_manager.ancs_usage[dep_manager._ancs_id]
+    
+    for i, character in enumerate(obj.character_set.characters):
+        if dep_manager is not None:
+            if dep_manager._char_id is not None and i != dep_manager._char_id:
+                continue
+            if i not in usage.characters:
+                continue
+        
         yield from _yield_dependency_if_valid(character.model_id, "CMDL", target_game)
         yield from _yield_dependency_if_valid(character.skin_id, "CSKR", target_game)
         yield from _yield_dependency_if_valid(character.skeleton_id, "CINF", target_game)
@@ -162,13 +176,19 @@ def dependencies_for(obj, target_game: Game):
         _yield_dependency_array(psd.electric_particles, "ELSC", target_game)
         _yield_dependency_array(psd.spawn_particles, "SPSC", target_game)
 
-    for animation in obj.animation_set.animations:
+    for i, animation in enumerate(obj.animation_set.animations):
+        if dep_manager is not None:
+            if dep_manager._char_id is not None and i not in obj.character_set.characters[dep_manager._char_id].animation_id_map:
+                continue
+            if i not in usage.animations:
+                continue
+        
         yield from meta_animation.dependencies_for(animation.meta, target_game)
 
-    if obj.animation_set.animation_resources is not None:
-        for res in obj.animation_set.animation_resources:
-            yield from _yield_dependency_if_valid(res.anim_id, "ANIM", target_game)
-            yield from _yield_dependency_if_valid(res.event_id, "EVNT", target_game)
+    # if obj.animation_set.animation_resources is not None:
+    #     for res in obj.animation_set.animation_resources:
+    #         yield from _yield_dependency_if_valid(res.anim_id, "ANIM", target_game)
+    #         yield from _yield_dependency_if_valid(res.event_id, "EVNT", target_game)
 
     event_sets = obj.animation_set.event_sets or []
     for event in event_sets:
@@ -185,4 +205,10 @@ class Ancs(BaseResource):
         return ANCS
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+        yield from self.dependencies_to_asset_ids(dependencies_for(self.raw, self.target_game))
+
+    def mlvl_dependencies_for(self, dep_manager: MlvlDependencies) -> typing.Iterator[AssetId]:
+        yield from self.dependencies_to_asset_ids(dependencies_for(self.raw, self.target_game, dep_manager))
+
+    def get_used_animations(self, char_id: int) -> Iterator[int]:
+        yield from self.raw.character_set.characters[char_id].animation_id_map

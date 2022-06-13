@@ -1,13 +1,19 @@
+from collections import defaultdict
 import logging
-from typing import Iterator, Dict, Set, List, Callable, Any
+from typing import Iterator, Dict, NamedTuple, Optional, Set, List, Callable, Any, Union
 
 from retro_data_structures import formats
+from retro_data_structures import asset_manager
 from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
-from retro_data_structures.base_resource import AssetId, AssetType, Dependency
+from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency, NameOrAssetId
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
+from retro_data_structures.formats.scan import Scan
+from retro_data_structures.formats.mlvl import AreaWrapper
+from retro_data_structures.formats.script_layer import ScriptLayerHelper
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties.base_property import BaseProperty
 
 
 class InvalidDependency(Exception):
@@ -148,3 +154,164 @@ def recursive_dependencies_for_editor(editor: AssetManager,
         result.update(deps)
 
     return result
+
+def recursive_dependencies(asset_manager: AssetManager, asset_id: NameOrAssetId) -> Iterator[Dependency]:
+    asset_type = asset_manager.get_asset_type(asset_id)
+    yield asset_type, asset_id
+
+    resource_type = formats.resource_type_for(asset_type)
+    if not resource_type.has_dependencies():
+        return
+
+    resource: BaseResource = asset_manager.get_parsed_asset(asset_id)
+    
+    for dependency in resource.dependencies_for():
+        yield from recursive_dependencies(asset_manager, dependency)
+
+
+class AncsUsage(NamedTuple):
+    characters: set[int] = set()
+    animations: set[int] = set()
+
+
+class AncsUsageDependencies:
+    usages: Dict[AssetId, AncsUsage]
+    _ancs: Dict[AssetId, ancs.Ancs]
+
+    asset_manager: AssetManager
+
+    def __init__(self, asset_manager: AssetManager):
+        self.asset_manager = asset_manager
+        self.usages = defaultdict(AncsUsage)
+        self._ancs = {}
+    
+    def _get_property_usages(self, prop: BaseProperty):
+        dep_type = type(prop).__name__
+
+        if dep_type == "AnimationParameters":
+            self.usages[prop.ancs].characters.add(prop.character_index)
+            if prop.ancs not in self._ancs:
+                self._ancs[prop.ancs] = self.asset_manager.get_parsed_asset(prop.ancs, ancs.Ancs)
+            self.usages[prop.ancs].animations = self.usages[prop.ancs].animations.union(self._ancs[prop.ancs].get_used_animations(prop.character_index))
+            return
+
+        for dependency in prop.mlvl_dependencies_for():
+            self._recursive_get_usages(dependency)
+
+    def _get_resource_usages(self, resource: NameOrAssetId):
+        asset_type = self.asset_manager.get_asset_type(resource)
+        if asset_type != "SCAN":
+            return
+        
+        scan_asset = self.asset_manager.get_parsed_asset(resource, type_hint=Scan)
+        self._get_property_usages(scan_asset.scannable_object_info.get_properties())
+    
+    def _recursive_get_usages(self, dependency: Union[BaseProperty, NameOrAssetId]):
+        if isinstance(dependency, BaseProperty):
+            self._get_property_usages(dependency)
+        else:
+            self._get_resource_usages(dependency)
+
+    def find_usage_for_area(self, area: AreaWrapper):
+        raise NotImplementedError()
+    
+    def find_usage_for_layer(self, layer: ScriptLayerHelper):
+        self.usages = defaultdict(AncsUsage)
+
+        for instance in layer.instances:
+            self._recursive_get_usages(instance.get_properties())
+
+class MlvlDependencies:
+    ancs_usage: AncsUsageDependencies
+    _ancs_id: Optional[AssetId]
+    _is_character_actor: bool
+    _char_id: Optional[int]
+    _properties_to_skip: set[str]
+
+    asset_manager: AssetManager
+
+    def __init__(self, asset_manager: AssetManager):
+        self.asset_manager = asset_manager
+        self.ancs_usage = AncsUsageDependencies()
+        self._reset()
+    
+    def _reset(self):
+        self._ancs_id = None
+        self._char_id = None
+        self._is_character_actor = False
+        self._properties_to_skip = set()
+    
+    @property
+    def game(self) -> Game:
+        return self.asset_manager.target_game
+
+    def _get_property_dependencies(self, prop: BaseProperty):
+        dep_type = type(prop).__name__
+
+        if dep_type == "StreamedAudio":
+            yield from []
+            return
+
+        if dep_type == "PlayerActor":
+            self._is_character_actor = True
+            if self.game == Game.CORRUPTION:
+                self._properties_to_skip = self._properties_to_skip.union(
+                    {f"{suit}_model" for suit in {"varia_suit", "varia_suit_grapple", "stage01_suit", "stage02_suit", "stage03_suit", "stage04_suit"}},
+                    {f"{suit}_skin_rule" for suit in {"varia_suit", "varia_suit_grapple", "stage01", "stage02", "stage03", "stage04"}}
+                )
+        
+        elif dep_type == "AnimationParameters" and self.game <= Game.ECHOES:
+            if self._is_character_actor:
+                if self.game == Game.PRIME:
+                    self._char_id = 5
+                elif self.game == Game.ECHOES:
+                    self._char_id = 3
+            else:
+                self._char_id = prop.character_index
+        
+        for dependency in prop.mlvl_dependencies_for(self._properties_to_skip):
+            yield from self._inner_mlvl_dependencies(dependency)
+
+        if dep_type == "AnimationParameters":
+            self._char_id = None
+        
+        elif dep_type == "PlayerActor":
+            self._is_character_actor = False
+            self._properties_to_skip = set()
+
+    
+    def _get_resource_dependencies(self, asset_id: NameOrAssetId):
+        asset_type = self.asset_manager.get_asset_type(asset_id)
+
+        if asset_type == "SCAN" and self.game == Game.PRIME:
+            yield from []
+            return
+        
+        yield asset_type, asset_id
+
+        resource_type = formats.resource_type_for(asset_type)
+        if not resource_type.has_dependencies():
+            return
+        
+        resource: BaseResource = self.asset_manager.get_parsed_asset(asset_id)
+
+        for dep in resource.mlvl_dependencies_for():
+            yield from self._inner_mlvl_dependencies(dep)
+
+    def _inner_mlvl_dependencies(self, dependency: Union[NameOrAssetId, BaseProperty]):
+        if isinstance(dependency, BaseProperty):
+            yield from self._get_property_dependencies(dependency)
+        else:
+            yield from self._get_resource_dependencies(dependency)
+    
+    def recursive_dependencies(self, dependency: Union[NameOrAssetId, BaseProperty]):
+        self._reset()
+        
+        yield from self._inner_mlvl_dependencies(dependency)
+
+    def recursive_dependencies_for_layer(self, layer: ScriptLayerHelper):
+        self.ancs_usage = AncsUsageDependencies()
+        self.ancs_usage.find_usage_for_layer(layer)
+
+        for instance in layer.instances:
+            yield from self.recursive_dependencies(instance.get_properties())

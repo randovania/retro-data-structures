@@ -2,9 +2,10 @@
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
+from copy import copy
 
 from itertools import count
-from typing import Iterator
+from typing import Iterator, List, Optional, Union
 import typing
 import construct
 from construct import (
@@ -79,7 +80,7 @@ class LayerFlags(Adapter):
         flags[:len(obj)] = obj
         return Container({
             "layer_count": len(obj),
-            "layer_flags": list(reversed(flags))
+            "layer_flags": ListContainer(reversed(flags))
         })
 
 class LayerNameOffsetAdapter(OffsetAdapter):
@@ -92,21 +93,19 @@ class LayerNameOffsetAdapter(OffsetAdapter):
     def _get_item_size(self, item):
         return len(item.encode('utf-8'))
 
-class AreaDependencyOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.dependencies_b
+
+class DependencyAdapter(Adapter):
+    def _decode(self, obj, context, path):
+        return Dependency(obj.asset_type, obj.asset_id)
     
-    def _get_table_length(self, context):
-        return len_(self._get_table(context))
-    
-    def _get_item_size(self, item):
-        return 8
+    def _encode(self, obj, context, path):
+        return Container(asset_id=obj.id, asset_type=obj.type)
 
 def create_area(version: int, asset_id):
-    MLVLAreaDependency = Struct(
+    MLVLAreaDependency = DependencyAdapter(Struct(
         asset_id=asset_id,
         asset_type=FourCC,
-    )
+    ))
     
     # TODO: better offset stuff
     MLVLAreaDependencies = Struct(
@@ -265,7 +264,13 @@ class AreaWrapper:
     _mrea: Mrea = None
     _strg: Strg = None
 
-    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int):
+    def __init__(self,
+                 raw: Container,
+                 asset_manager: AssetManager,
+                 flags: Container,
+                 names: Container,
+                 index: int,
+                ):
         self._raw = raw
         self.asset_manager = asset_manager
         self._flags = flags
@@ -311,10 +316,14 @@ class AreaWrapper:
     def mrea_asset_id(self) -> int:
         return self._raw.area_mrea_id
 
+    _layers: List[ScriptLayerHelper] = None
     @property
-    def layers(self) -> Iterator[ScriptLayerHelper]:
-        for i, layer in enumerate(self.mrea.script_layers):
-            yield ScriptLayerHelper.with_parent(layer, self, i)
+    def layers(self) -> List[ScriptLayerHelper]:
+        if self._layers is None:
+            self._layers = []
+            for i, layer in enumerate(self.mrea.script_layers):
+                self._layers.append(ScriptLayerHelper.with_parent(layer, self, i))
+        return self._layers
     
     def get_layer(self, name: str) -> ScriptLayerHelper:
         return next(layer for layer in self.layers if layer.name == name)
@@ -331,6 +340,38 @@ class AreaWrapper:
     def next_instance_id(self) -> int:
         ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
         return next(i for i in count() if i not in ids)
+    
+    def _build_dependencies(self):
+        deps = copy(self.get_dependencies)
+
+        for i, layer in enumerate(self.layers):
+            if layer.modified:
+                deps[i] = list(layer.recursive_mlvl_dependencies())
+        
+        self.set_dependencies(deps)
+
+    def get_dependencies(self) -> list[list[Dependency]]:
+        deps = []
+        offsets = self._raw.dependencies.dependencies_offset
+        all_deps = self._raw.dependencies.dependencies_b
+        for i in range(len(list(self.layers))):
+            deps.append(all_deps[offsets[i]:offsets[i+1]])
+        deps.append(all_deps[-1:]) # dependencies not for any layer
+        return deps
+    
+    def set_dependencies(self, value: list[list[Dependency]]):
+        all_deps = []
+        offsets = []
+
+        offset = 0
+        for deps in value:
+            offsets.append(offset)
+            all_deps.extend(deps)
+            offset += len(deps)
+        
+        self._raw.dependencies.dependencies_offset = offsets
+        self._raw.dependencies.dependencies_b = all_deps
+        
 
     def get_instance(self, instance_id: typing.Union[int, InstanceId]) -> typing.Optional[ScriptInstanceHelper]:
         if not isinstance(instance_id, InstanceId):
@@ -356,6 +397,11 @@ class Mlvl(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
+    
+    def build(self) -> bytes:
+        for area in self.areas:
+            area._build_dependencies()
+        return super().build()
 
     def __repr__(self) -> str:
         if self.asset_manager.target_game == Game.ECHOES:

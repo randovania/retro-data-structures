@@ -112,6 +112,9 @@ class ScriptInstanceHelper:
     def __eq__(self, other):
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
+    def __hash__(self) -> int:
+        return hash(self.get_properties())
+
     @classmethod
     def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
         property_type = properties.get_game_object(target_game, instance_type)
