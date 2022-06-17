@@ -1,11 +1,17 @@
 import io
 import typing
+from abc import ABC
 
+from retro_data_structures.game_check import Game
 
 Self = typing.TypeVar("Self", bound="BaseProperty")
 
 
 class BaseProperty:
+    @classmethod
+    def game(cls) -> Game:
+        raise NotImplementedError()
+
     @classmethod
     def from_stream(cls: typing.Type[Self], data: typing.BinaryIO, size: typing.Optional[int] = None) -> Self:
         raise NotImplementedError()
@@ -28,4 +34,10 @@ class BaseProperty:
         raise NotImplementedError()
 
     def to_json(self) -> typing.Any:
+        raise NotImplementedError()
+
+
+class BaseObjectType(BaseProperty, ABC):
+    @classmethod
+    def object_type(cls) -> str:
         raise NotImplementedError()

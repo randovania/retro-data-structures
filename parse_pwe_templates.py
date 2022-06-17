@@ -613,12 +613,19 @@ class ClassDefinition:
         self.class_code += "        }\n"
 
 
-def _add_default_types(core_path: Path):
+def _add_default_types(core_path: Path, game_id: str):
+    game_code = f"""
+    @classmethod
+    def game(cls) -> Game:
+        return Game.{game_id.upper()}
+"""
+
     core_path.joinpath("Color.py").write_text("""# Generated file
 import dataclasses
 import struct
 import typing
 
+from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 
 
@@ -647,12 +654,13 @@ class Color(BaseProperty):
             "b": self.b,
             "a": self.a,
         }
-""")
+""" + game_code)
     core_path.joinpath("Vector.py").write_text("""# Generated file
 import dataclasses
 import struct
 import typing
 
+from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 
 
@@ -679,13 +687,14 @@ class Vector(BaseProperty):
             "y": self.y,
             "z": self.z,
         }
-""")
+""" + game_code)
     core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
     core_path.joinpath("AnimationParameters.py").write_text("""# Generated file
 import dataclasses
 import struct
 import typing
 
+from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId
 
@@ -713,12 +722,13 @@ class AnimationParameters(BaseProperty):
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
         }
-""")
+""" + game_code)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses
 import typing
 import base64
 
+from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 
 
@@ -742,7 +752,7 @@ class Spline(BaseProperty):
 
     def to_json(self) -> str:
         return base64.b64encode(self.data).decode("ascii")
-""")
+""" + game_code)
 
 
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
@@ -808,7 +818,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     core_path = code_path.joinpath("core")
     _ensure_is_generated_dir(core_path)
-    _add_default_types(core_path)
+    _add_default_types(core_path, game_id)
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
@@ -1042,7 +1052,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                            custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
                            meta=meta, needed_imports=needed_imports, format_specifier=format_specifier)
 
-    def parse_struct(name: str, this, output_path: Path, is_struct: bool):
+    def parse_struct(name: str, this, output_path: Path, struct_fourcc: typing.Optional[str] = None):
+        is_struct = struct_fourcc is not None
         if this["type"] != "Struct":
             print("Ignoring {}. Is a {}".format(name, this["type"]))
             return
@@ -1060,7 +1071,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             class_path=name.replace("_", "/"),
             is_struct=is_struct,
         )
-        cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}(BaseProperty):\n"
+        base_class = "BaseObjectType" if is_struct else "BaseProperty"
+        cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}({base_class}):\n"
         _fix_module_name(output_path, cls.class_path)
 
         for prop, prop_name in zip(this["properties"], all_names):
@@ -1069,6 +1081,15 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
             cls.add_prop(get_prop_details(prop), prop_name)
         cls.finalize_props()
+
+        cls.class_code += "\n    @classmethod\n"
+        cls.class_code += "    def game(cls) -> Game:\n"
+        cls.class_code += f"        return Game.{game_id.upper()}\n"
+
+        if is_struct:
+            cls.class_code += "\n    @classmethod\n"
+            cls.class_code += "    def object_type(cls) -> str:\n"
+            cls.class_code += f"        return {repr(struct_fourcc)}\n"
 
         # from stream
         cls.write_from_stream()
@@ -1082,7 +1103,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
-        code_code += "\nfrom retro_data_structures.properties.base_property import BaseProperty\n"
+        code_code += "\nfrom retro_data_structures.game_check import Game\n"
+        code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
 
         if cls.need_enums:
             code_code += f"import retro_data_structures.enums.{game_id.lower()} as enums\n"
@@ -1110,17 +1132,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     getter_func = "# Generated File\n"
     getter_func += "import functools\nimport importlib\nimport typing\n\n"
-    getter_func += "from retro_data_structures.properties.base_property import BaseProperty\n\n"
+    getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n\n"
     getter_func += "_FOUR_CC_MAPPING = {\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
-        parse_struct(stem, script_object, path, is_struct=True)
+        parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
         getter_func += f"    {repr(object_fourcc)}: {repr(stem)},\n"
 
     getter_func += "}\n\n\n"
 
     getter_func += "@functools.lru_cache(maxsize=None)\n"
-    getter_func += "def get_object(four_cc: str) -> typing.Type[BaseProperty]:\n"
+    getter_func += "def get_object(four_cc: str) -> typing.Type[BaseObjectType]:\n"
     getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
     getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.echoes.objects.{stem}")\n'
     getter_func += "    return getattr(module, stem)\n"
@@ -1130,7 +1152,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     path = code_path.joinpath("archetypes")
     _ensure_is_generated_dir(path)
     for archetype_name, archetype in property_archetypes.items():
-        parse_struct(archetype_name, archetype, path, is_struct=False)
+        parse_struct(archetype_name, archetype, path, struct_fourcc=None)
     print("> Done.")
 
     return {
