@@ -87,7 +87,9 @@ class DataSectionGroupAdapter(Adapter):
 
     def _encode(self, group, context, path):
         return b"".join(
-            [section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00") for section in group])
+            section["data"].ljust(len(section["data"]) + (-len(section["data"]) % 32), b"\x00")
+            for section in group
+        )
 
 
 class UncompressedDataSections(Adapter):
@@ -140,18 +142,23 @@ class SectionCategoryAdapter(Adapter):
     def _decode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-            if section["size"] > 0:
+            if len(section["data"]) > 0:
                 decoded = subcon._parse(io.BytesIO(section["data"]), context, path)
                 category[i]["data"] = decoded
+            else:
+                category[i]["data"] = None
         return category
 
     def _encode_category(self, category, subcon, context, path):
         for i in range(len(category)):
             section = category[i]
-            if section["size"] > 0:
+            if section["data"] is not None:
                 encoded = io.BytesIO()
                 subcon._build(section["data"], encoded, context, path)
                 category[i]["data"] = encoded.getvalue()
+            else:
+                category[i]["data"] = b""
+
         return category
 
     def _category_encodings(self):
@@ -345,7 +352,7 @@ def _used_categories(this):
 
 def MREAHeader():
     def get_section_id(category):
-        return lambda this: this._.sections[category][0]["id"]
+        return lambda self: self._.sections[category][0]["id"]
 
     return Struct(
         "magic" / Const(0xDEADBEEF, Int32ub),
@@ -365,7 +372,7 @@ def MREAHeader():
         ),
 
         # Number of data sections in the file.
-        "data_section_count" / Rebuild(Int32ub, lambda this: sum(map(lambda cat: len(cat), this._.sections.values()))),
+        "data_section_count" / Rebuild(Int32ub, lambda self: sum(map(lambda cat: len(cat), self._.sections.values()))),
 
         # Section index for world geometry data. Always 0; starts on materials.
         "geometry_section" / Rebuild(Int32ub, get_section_id("geometry_section")),
