@@ -139,27 +139,26 @@ _all_categories = [
 
 
 class SectionCategoryAdapter(Adapter):
-    def _decode_category(self, category, subcon, context, path):
-        for i in range(len(category)):
-            section = category[i]
+    def _decode_category(self, category: ListContainer, subcon, context, path):
+        for section in category:
             if len(section["data"]) > 0:
                 decoded = subcon._parse(io.BytesIO(section["data"]), context, path)
-                category[i]["data"] = decoded
+                data = decoded
             else:
-                category[i]["data"] = None
-        return category
+                data = None
 
-    def _encode_category(self, category, subcon, context, path):
-        for i in range(len(category)):
-            section = category[i]
+            section.data = data
+
+    def _encode_category(self, category: ListContainer, subcon, context, path):
+        for section in category:
             if section["data"] is not None:
                 encoded = io.BytesIO()
                 subcon._build(section["data"], encoded, context, path)
-                category[i]["data"] = encoded.getvalue()
+                data = encoded.getvalue()
             else:
-                category[i]["data"] = b""
+                data = b""
 
-        return category
+            section.data = data
 
     def _category_encodings(self):
         return {
