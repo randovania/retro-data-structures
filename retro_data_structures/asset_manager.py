@@ -346,6 +346,10 @@ class AssetManager:
         for asset_id in self._modified_resources.keys():
             modified_paks.update(self._paks_for_asset_id[asset_id])
 
+        # Make sure all paks were loaded
+        for pak_name in modified_paks:
+            self.get_pak(pak_name)
+
         # Read all asset ids we need to copy somewhere else
         for asset_ids in self._ensured_asset_ids.values():
             for asset_id in asset_ids:
