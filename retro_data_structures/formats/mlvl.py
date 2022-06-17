@@ -77,7 +77,7 @@ class LayerFlags(Adapter):
         flags[:len(obj)] = obj
         return Container({
             "layer_count": len(obj),
-            "layer_flags": reversed(flags)
+            "layer_flags": list(reversed(flags))
         })
 
 class LayerNameOffsetAdapter(OffsetAdapter):
