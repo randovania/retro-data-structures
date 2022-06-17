@@ -4,7 +4,7 @@ from retro_data_structures.construct_extensions.alignment import AlignedPrefixed
 from retro_data_structures.construct_extensions.misc import Skip
 
 
-def _get_current_section(context, increment=True):
+def _get_current_section(context, increment=True) -> int:
     root = context._root
     section = root["_current_section"]
     if increment:
@@ -25,7 +25,7 @@ def DataSectionSizes(section_count, include_value=False, rebuildfunc=lambda this
     )
 
 
-def GetDataSectionSize(context):
+def GetDataSectionSize(context) -> int:
     return context._root.data_section_sizes.value[_get_current_section(context)]
 
 
