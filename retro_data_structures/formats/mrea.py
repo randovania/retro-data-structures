@@ -54,6 +54,7 @@ class MREAVersion(IntEnum):
     DonkeyKongCountryReturns = 0x20
 
 
+
 def _decode_data_section_group(subcon, header, stream, context, path):
     group = subcon._parsereport(stream, context, path)
 
@@ -119,6 +120,30 @@ _all_categories = [
     "portal_area_section",
     "static_geometry_map_section",
 ]
+
+
+_CATEGORY_ENCODINGS = {
+    "script_layers_section": SCLY,
+    "generated_script_objects_section": SCGN,
+    "area_octree_section": AROT,
+    "collision_section": AreaCollision,
+    "lights_section": Lights,
+    "visibility_tree_section": VISI,
+    "path_section": AssetIdCorrect,
+    "portal_area_section": AssetIdCorrect,
+    "static_geometry_map_section": AssetIdCorrect,
+    "unknown_section_1": Struct(
+        magic=If(game_check.is_prime3, Const("LLTE", FourCC)),
+        data=Const(1, Int32ub)
+    ),
+    "unknown_section_2": Struct(
+        unk1=PrefixedArray(Int32ub, Int32ub),
+        # TODO: rebuild according to surface group count
+        unk2=PrefixedArray(Int32ub, Enum(Int8ub, ON=0xFF, OFF=0x00)),
+    ),
+}
+
+
 
 
 class SectionCategoryAdapter(Adapter):
@@ -434,6 +459,7 @@ MREA = AlignedStruct(
     "_current_section" / Computed(0),
 
     "header" / MREAHeader(),
+    "header_end" / Tell,
     "version" / Computed(this.header.version),
 
     # Array containing the size of each data section in the file. Every size is always a multiple of 32.
@@ -451,7 +477,7 @@ MREA = AlignedStruct(
 )
 
 
-MREAHeader_v2 = Struct(
+MREAHeader_v2 = Aligned(32, Struct(
     "magic" / Const(0xDEADBEEF, Int32ub),
     "version" / Enum(Int32ub, MREAVersion),
 
@@ -506,7 +532,7 @@ MREAHeader_v2 = Struct(
 
     # Number of compressed data blocks in the file.
     "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
-)
+))
 
 CompressedBlockHeader = Struct(
     buffer_size=Int32ub,
@@ -516,28 +542,39 @@ CompressedBlockHeader = Struct(
 )
 
 
-def get_compressed_block_size(header):
+def _get_compressed_block_size(header):
     if not header.compressed_size:
         return header.uncompressed_size
     return header.compressed_size + (-header.compressed_size % 32)
 
 
-class MREAConstruct(construct.Construct):
-    def _parse(self, stream, context, path):
-        header = MREAHeader_v2._parsereport(stream, context, path)
+def _decode_category(category: typing.List[bytes], subcon, context, path):
+    result = ListContainer()
 
-        data_section_sizes = Array(header.data_section_count, Int32ub)._parsereport(stream, context, path)
-        compressed_block_headers = Array(header.compressed_block_count, CompressedBlockHeader)._parsereport(
-            stream, context, path
-        )
+    for section in category:
+        if len(section) > 0:
+            data = subcon._parse(io.BytesIO(section), context, path)
+        else:
+            data = None
+
+        result.append(data)
+
+    return result
+
+
+class MREAConstruct(construct.Construct):
+    def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> typing.List[bytes]:
+        compressed_block_headers = Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader)
+                                           )._parsereport(stream, context, path)
 
         # Read compressed blocks from stream
         compressed_blocks = [
-            FixedSized(get_compressed_block_size(header), GreedyBytes)._parsereport(stream, context, path)
+            Aligned(32, FixedSized(_get_compressed_block_size(header), GreedyBytes)
+                    )._parsereport(stream, context, path)
             for header in compressed_block_headers
         ]
 
-        #
+        # Decompress blocks into the data sections
         def _get_subcon(compressed_size, uncompressed_size):
             if compressed_size:
                 return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
@@ -545,12 +582,59 @@ class MREAConstruct(construct.Construct):
 
         data_sections = ListContainer()
         for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
-            subcon = _get_subcon(header.compressed_size, header.uncompressed_size)
-            data_sections.append(
-                _decode_data_section_group(subcon, header, io.BytesIO(compressed_block), context, path)
-            )
+            subcon = _get_subcon(compressed_header.compressed_size, compressed_header.uncompressed_size)
+            decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)
+            offset = 0
 
-    pass
+            for i in range(compressed_header.data_section_count):
+                section_size = data_section_sizes[len(data_sections)]
+                data = decompressed_block[offset: offset + section_size]
+                data_sections.append(data)
+                offset += section_size
+
+        return data_sections
+
+    def _parse(self, stream, context, path):
+        mrea_header = MREAHeader_v2._parsereport(stream, context, path)
+
+        data_section_sizes = Array(mrea_header.data_section_count, Int32ub)._parsereport(stream, context, path)
+
+        if mrea_header.compressed_block_count is not None:
+            data_sections = self._decode_compressed_blocks(mrea_header, data_section_sizes, stream, context, path)
+        else:
+            data_sections = Array(
+                mrea_header.data_section_count,
+                Aligned(32, FixedSized(lambda ctx: data_section_sizes[ctx._index], GreedyBytes)),
+            )._parsereport(stream, context, path)
+
+        # Split data sections into the named sections
+        categories = [
+            {"label": label, "value": mrea_header[label]}
+            for label in _all_categories
+            if mrea_header[label] is not None
+        ]
+        categories.sort(key=lambda c: c["value"])
+
+        sections = Container()
+        for i, c in enumerate(categories):
+            start = c["value"]
+            end = None
+            if i < len(categories) - 1:
+                end = categories[i + 1]["value"]
+            sections[c["label"]] = data_sections[start:end]
+
+        # Decode each category
+
+        for category, subcon in _CATEGORY_ENCODINGS.items():
+            if category in sections:
+                sections[category] = _decode_category(sections[category], subcon, context, path)
+
+        return Container(
+            version=mrea_header.version,
+            area_transform=mrea_header.area_transform,
+            world_model_count=mrea_header.world_model_count,
+            sections=sections,
+        )
 
 
 class Mrea(BaseResource):
