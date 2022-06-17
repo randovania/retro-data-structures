@@ -451,6 +451,108 @@ MREA = AlignedStruct(
 )
 
 
+MREAHeader_v2 = Struct(
+    "magic" / Const(0xDEADBEEF, Int32ub),
+    "version" / Enum(Int32ub, MREAVersion),
+
+    # Matrix that represents the area's transform from the origin.
+    # Most area data is pre-transformed, so this matrix is only used occasionally.
+    "area_transform" / Transform4f,
+
+    # Number of world models in this area.
+    "world_model_count" / Int32ub,
+
+    # Number of script layers in this area.
+    "script_layer_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+
+    # Number of data sections in the file.
+    "data_section_count" / Int32ub,
+
+    # Section index for world geometry data. Always 0; starts on materials.
+    "geometry_section" / Int32ub,
+
+    # Section index for script layer data.
+    "script_layers_section" / Int32ub,
+
+    # Section index for generated script object data.
+    "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+
+    # Section index for collision data.
+    "collision_section" / Int32ub,
+
+    # Section index for first unknown section.
+    "unknown_section_1" / Int32ub,
+
+    # Section index for light data.
+    "lights_section" / Int32ub,
+
+    # Section index for visibility tree data.
+    "visibility_tree_section" / Int32ub,
+
+    # Section index for path data.
+    "path_section" / Int32ub,
+
+    # Section index for area octree data.
+    "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
+
+    # Section index for second unknown section.
+    "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
+
+    # Section index for portal area data.
+    "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+
+    # Section index for static geometry map data.
+    "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+
+    # Number of compressed data blocks in the file.
+    "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+)
+
+CompressedBlockHeader = Struct(
+    buffer_size=Int32ub,
+    uncompressed_size=Int32ub,
+    compressed_size=Int32ub,
+    data_section_count=Int32ub,
+)
+
+
+def get_compressed_block_size(header):
+    if not header.compressed_size:
+        return header.uncompressed_size
+    return header.compressed_size + (-header.compressed_size % 32)
+
+
+class MREAConstruct(construct.Construct):
+    def _parse(self, stream, context, path):
+        header = MREAHeader_v2._parsereport(stream, context, path)
+
+        data_section_sizes = Array(header.data_section_count, Int32ub)._parsereport(stream, context, path)
+        compressed_block_headers = Array(header.compressed_block_count, CompressedBlockHeader)._parsereport(
+            stream, context, path
+        )
+
+        # Read compressed blocks from stream
+        compressed_blocks = [
+            FixedSized(get_compressed_block_size(header), GreedyBytes)._parsereport(stream, context, path)
+            for header in compressed_block_headers
+        ]
+
+        #
+        def _get_subcon(compressed_size, uncompressed_size):
+            if compressed_size:
+                return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
+            return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
+
+        data_sections = ListContainer()
+        for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
+            subcon = _get_subcon(header.compressed_size, header.uncompressed_size)
+            data_sections.append(
+                _decode_data_section_group(subcon, header, io.BytesIO(compressed_block), context, path)
+            )
+
+    pass
+
+
 class Mrea(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:
