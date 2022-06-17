@@ -5,6 +5,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator, Type
 
+import construct
 from construct import Container
 from construct.core import (
     BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
@@ -40,7 +41,7 @@ InstanceId = Union(
     )
 )
 
-ScriptInstance = Struct(
+ScriptInstanceInternal = Struct(
     type=game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
     instance=Prefixed(
         _prefix,
@@ -50,6 +51,24 @@ ScriptInstance = Struct(
             base_property=GreedyBytes,
         ),
     ),
+)
+
+ScriptInstance = construct.ExprAdapter(
+    ScriptInstanceInternal,
+    decoder=lambda obj, ctx: Container(
+        type=obj.type,
+        id=obj.instance.id,
+        connections=obj.instance.connections,
+        base_property=obj.instance.base_property,
+    ),
+    encoder=lambda obj, ctx: Container(
+        type=obj.type,
+        instance=Container(
+            id=obj.id,
+            connections=obj.connections,
+            base_property=obj.base_property,
+        )
+    )
 )
 
 
@@ -98,11 +117,11 @@ class ScriptInstanceHelper:
 
     @property
     def id(self) -> int:
-        return self._raw.instance.id.raw
+        return self._raw.id.raw
     
     @property
     def id_struct(self) -> Container:
-        return self._raw.instance.id.parts
+        return self._raw.id.parts
     
     def id_matches(self, id: int) -> bool:
         parts = InstanceId.parse(InstanceId.build({"raw": id})).parts
@@ -121,16 +140,16 @@ class ScriptInstanceHelper:
 
     @property
     def raw_properties(self) -> bytes:
-        return self._raw.instance.base_property
+        return self._raw.base_property
 
     def get_properties(self):
-        return self._property_type.from_bytes(self._raw.instance.base_property)
+        return self._property_type.from_bytes(self._raw.base_property)
 
     def set_properties(self, data: BaseProperty):
         if not isinstance(data, self._property_type):
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type}")
 
-        self._raw.instance.base_property = data.to_bytes()
+        self._raw.base_property = data.to_bytes()
 
     def get_property(self, chain: Iterator[str]):
         prop = self.get_properties()
@@ -140,11 +159,11 @@ class ScriptInstanceHelper:
 
     @property
     def connections(self):
-        return self._raw.instance.connections
+        return self._raw.connections
     
     @connections.setter
     def connections(self, value):
-        self._raw.instance.connections = value
+        self._raw.connections = value
 
     def add_connection(self, state, message, target: "ScriptInstanceHelper"):
         self.connections.append(Container(
