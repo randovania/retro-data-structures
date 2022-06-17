@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import typing
 from typing import Optional, Union
 
@@ -25,6 +26,7 @@ from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import AreaWrapper
@@ -60,6 +62,7 @@ def ScriptLayer(identifier):
         "script_instances" / PrefixedArray(Int32ub, ScriptInstance),
     )
 
+
 def new_layer(index: Optional[int], target_game: Game) -> Container:
     if target_game <= Game.PRIME:
         raise NotImplementedError()
@@ -70,6 +73,7 @@ def new_layer(index: Optional[int], target_game: Game) -> Container:
         "version": 1,
         "script_instances": []
     })
+
 
 SCLY = IfThenElse(game_check.current_game_at_least(game_check.Game.ECHOES), ScriptLayer("SCLY"), ScriptLayerPrime)
 SCGN = ScriptLayer("SCGN")
@@ -94,7 +98,7 @@ class ScriptLayerHelper:
         new._parent_area = parent
         new._index = index
         return new
-    
+
     @property
     def instances(self):
         for instance in self._raw.script_instances:
@@ -109,14 +113,19 @@ class ScriptLayerHelper:
         for instance in self.instances:
             if instance.name == name:
                 return instance
-    
+
     def add_instance(self, instance_type: str, name: Optional[str] = None) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_instance(self.target_game, instance_type, self)
         if name is not None:
             instance.name = name
         self._raw.script_instances.append(instance._raw)
         return self.get_instance(instance.id)
-    
+
+    def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstanceHelper:
+        instance = ScriptInstanceHelper.new_from_properties(object_properties, self)
+        self._raw.script_instances.append(instance._raw)
+        return self.get_instance(instance.id)
+
     def add_existing_instance(self, instance: ScriptInstanceHelper) -> ScriptInstanceHelper:
         if instance.id.area != self._parent_area.id:
             new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
@@ -126,7 +135,7 @@ class ScriptLayerHelper:
         instance.id = new_id
         self._raw.script_instances.append(instance._raw)
         return self.get_instance(instance.id)
-    
+
     def remove_instance(self, instance: Union[int, str, ScriptInstanceHelper]):
         if isinstance(instance, str):
             instance = self.get_instance_by_name(instance)
@@ -148,7 +157,7 @@ class ScriptLayerHelper:
             raise AttributeError(f"{self} has no parent!")
         if self._index is None:
             raise AttributeError(f"{self} has no index!")
-    
+
     @property
     def has_parent(self) -> bool:
         return self._parent_area is not None and self._index is not None
@@ -157,18 +166,21 @@ class ScriptLayerHelper:
     def active(self) -> bool:
         self.assert_parent()
         return self._parent_area._flags[self._index]
-    
+
     @active.setter
     def active(self, value: bool):
         self.assert_parent()
         self._parent_area._flags[self._index] = value
-    
+
     @property
     def name(self) -> str:
         self.assert_parent()
         return self._parent_area._layer_names[self._index]
-    
+
     @name.setter
     def name(self, value: str):
         self.assert_parent()
         self._parent_area._layer_names[self._index] = value
+
+    def new_instance_id(self) -> InstanceId:
+        return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)

@@ -15,7 +15,7 @@ from construct.core import (
 from retro_data_structures import game_check, properties
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
-from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.base_property import BaseProperty, BaseObjectType
 
 if TYPE_CHECKING:
     from retro_data_structures.formats.script_layer import ScriptLayerHelper
@@ -112,16 +112,26 @@ class ScriptInstanceHelper:
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> "ScriptInstanceHelper":
+    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
         property_type = properties.get_game_object(target_game, instance_type)
 
         raw = Container(
             type=instance_type,
-            id=InstanceId.new(layer._index, layer._parent_area._index, layer._parent_area.next_instance_id),
+            id=layer.new_instance_id(),
             connections=construct.ListContainer(),
             base_property=property_type().to_bytes(),
         )
         return cls(raw, target_game)
+
+    @classmethod
+    def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
+        raw = Container(
+            type=object_properties.object_type(),
+            id=layer.new_instance_id(),
+            connections=construct.ListContainer(),
+            base_property=object_properties.to_bytes(),
+        )
+        return cls(raw, object_properties.game())
 
     @property
     def type(self) -> str:
@@ -159,17 +169,17 @@ class ScriptInstanceHelper:
         self.set_properties(props)
 
     @property
-    def _property_type(self) -> Type[BaseProperty]:
+    def _property_type(self) -> Type[BaseObjectType]:
         return properties.get_game_object(self.target_game, self.type)
 
     @property
     def raw_properties(self) -> bytes:
         return self._raw.base_property
 
-    def get_properties(self):
+    def get_properties(self) -> BaseObjectType:
         return self._property_type.from_bytes(self._raw.base_property)
 
-    def set_properties(self, data: BaseProperty):
+    def set_properties(self, data: BaseObjectType):
         if not isinstance(data, self._property_type):
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type}")
 
