@@ -273,7 +273,7 @@ class AssetManager:
         Replaces an existing asset.
         See `add_new_asset` for new assets.
         """
-        original_name = asset_id
+        original_name = str(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
 
         # Test if the asset exists
@@ -281,7 +281,7 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
-            logger.debug("Encoding %s", str(asset_id))
+            logger.debug("Encoding 0x%08x (%s)", asset_id, original_name)
             raw_asset = RawResource(
                 type=new_data.resource_type(),
                 data=new_data.build(),
