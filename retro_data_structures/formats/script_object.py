@@ -3,15 +3,15 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Iterator, Type
 
 import construct
 from construct import Container
 from construct.core import (
-    BitStruct, BitsInteger, GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
+    GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
     PrefixedArray, Struct, Union,
 )
-
 from retro_data_structures import game_check, properties
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
@@ -29,24 +29,49 @@ def Connection(subcon):
     )
 
 
-_prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
+class InstanceId(int):
+    # 32 bits:
+    # top 6 for layer
+    # middle 10 for area
+    # last 16 for instance
 
-InstanceId = Union(
-    "raw",
-    "raw" / Hex(Int32ub),
-    "parts" / BitStruct(
-        "layer" / BitsInteger(6),
-        "area" / BitsInteger(10),
-        "instance" / BitsInteger(16)
-    )
+    @classmethod
+    def new(cls, layer: int, area: int, instance: int) -> "InstanceId":
+        assert 0 <= layer < 64
+        assert 0 <= area < 1024
+        assert 0 <= instance < 65536
+        return InstanceId(layer << 26 + area << 16 + instance)
+
+    def __str__(self):
+        return f"0x{self:08x}"
+
+    @property
+    def layer(self) -> int:
+        return self >> 26
+
+    @property
+    def area(self) -> int:
+        return (self >> 16) & 0x3ff
+
+    @property
+    def instance(self) -> int:
+        return self & 0xffff
+
+
+InstanceIdInternal = construct.ExprAdapter(
+    Hex(Int32ub),
+    decoder=lambda obj, ctx: InstanceId(obj),
+    encoder=lambda obj, ctx: int(obj),
 )
+
+_prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
 
 ScriptInstanceInternal = Struct(
     type=game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
     instance=Prefixed(
         _prefix,
         Struct(
-            id=InstanceId,
+            id=InstanceIdInternal,
             connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
             base_property=GreedyBytes,
         ),
@@ -87,24 +112,15 @@ class ScriptInstanceHelper:
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper):
+    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> "ScriptInstanceHelper":
         property_type = properties.get_game_object(target_game, instance_type)
 
-        # TODO: make this less ugly lmao
-        raw = ScriptInstance.parse(ScriptInstance.build({
-            "type": instance_type,
-            "instance": {
-                "id": {
-                    "parts": {
-                        "layer": layer._index,
-                        "area": layer._parent_area._index,
-                        "instance": layer._parent_area.next_instance_id
-                    }
-                },
-                "connections": [],
-                "base_property": property_type().to_bytes(),
-            }
-        }, target_game=target_game), target_game=target_game)
+        raw = Container(
+            type=instance_type,
+            id=InstanceId.new(layer._index, layer._parent_area._index, layer._parent_area.next_instance_id),
+            connections=construct.ListContainer(),
+            base_property=property_type().to_bytes(),
+        )
         return cls(raw, target_game)
 
     @property
@@ -116,16 +132,18 @@ class ScriptInstanceHelper:
         return self.type
 
     @property
-    def id(self) -> int:
-        return self._raw.id.raw
-    
-    @property
-    def id_struct(self) -> Container:
-        return self._raw.id.parts
-    
-    def id_matches(self, id: int) -> bool:
-        parts = InstanceId.parse(InstanceId.build({"raw": id})).parts
-        return self.id_struct.area == parts.area and self.id_struct.instance == parts.instance
+    def id(self) -> InstanceId:
+        return self._raw.id
+
+    @id.setter
+    def id(self, value):
+        self._raw.id = InstanceId(value)
+
+    def id_matches(self, id: InstanceId) -> bool:
+        if not isinstance(id, InstanceId):
+            id = InstanceId(id)
+
+        return self.id.area == id.area and self.id.instance == id.instance
 
     @property
     def name(self) -> str:
@@ -160,7 +178,7 @@ class ScriptInstanceHelper:
     @property
     def connections(self):
         return self._raw.connections
-    
+
     @connections.setter
     def connections(self, value):
         self._raw.connections = value
@@ -171,7 +189,7 @@ class ScriptInstanceHelper:
             message=message,
             target=target.id
         ))
-    
+
     def remove_connections(self, target: Union[int, "ScriptInstanceHelper"]):
         if isinstance(target, ScriptInstanceHelper):
             target = target.id

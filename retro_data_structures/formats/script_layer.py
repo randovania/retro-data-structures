@@ -23,7 +23,7 @@ from construct.lib.containers import Container
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
@@ -118,11 +118,12 @@ class ScriptLayerHelper:
         return self.get_instance(instance.id)
     
     def add_existing_instance(self, instance: ScriptInstanceHelper) -> ScriptInstanceHelper:
-        instance.id_struct.layer = self._index
-        old_area = instance.id_struct.area
-        if old_area != self._parent_area.id:
-            instance.id_struct.area = self._parent_area.id
-            instance.id_struct.instance = self._parent_area.next_instance_id
+        if instance.id.area != self._parent_area.id:
+            new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
+        else:
+            new_id = InstanceId.new(self._index, instance.id.area, instance.id.instance)
+
+        instance.id = new_id
         self._raw.script_instances.append(instance._raw)
         return self.get_instance(instance.id)
     

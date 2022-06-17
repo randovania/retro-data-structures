@@ -323,7 +323,7 @@ class AreaWrapper:
     
     @property
     def next_instance_id(self) -> int:
-        ids = [instance.id_struct.instance for layer in self.layers for instance in layer.instances]
+        ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
         return next(i for i in count() if i not in ids)
 
 
