@@ -224,7 +224,8 @@ class AssetManager:
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
-        return format_class.parse(raw_asset.data, target_game=self.target_game)
+        return format_class.parse(raw_asset.data, target_game=self.target_game,
+                                  asset_manager=self)
 
     def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:
         """
