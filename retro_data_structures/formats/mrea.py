@@ -192,8 +192,7 @@ class SectionCategoryAdapter(Adapter):
         _categories.sort(key=lambda c: c["value"])
 
         sections = Container()
-        for i in range(len(_categories)):
-            c = _categories[i]
+        for i, c in enumerate(_categories):
             start = c["value"]
             end = None
             if i < len(_categories) - 1:
