@@ -152,6 +152,12 @@ class ScriptInstanceHelper:
         except Exception as e:
             return f"Id 0x{self.id:08x}"
 
+    @name.setter
+    def name(self, value: str):
+        props = self.get_properties()
+        props.editor_properties.name = value
+        self.set_properties(props)
+
     @property
     def _property_type(self) -> Type[BaseProperty]:
         return properties.get_game_object(self.target_game, self.type)
