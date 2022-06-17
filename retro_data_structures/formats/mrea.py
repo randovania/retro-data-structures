@@ -188,10 +188,8 @@ class SectionCategoryAdapter(Adapter):
         def cat(label):
             return {"label": label, "value": context.header[label] if isinstance(context.header[label], int) else -1}
 
-        _categories = sorted(
-            list(filter(lambda item: item["value"] != -1, list(map(lambda label: cat(label), _all_categories)))),
-            key=lambda cat: cat["value"],
-        )
+        _categories = [c for label in _all_categories if (c := cat(label))["value"] != -1]
+        _categories.sort(key=lambda c: c["value"])
 
         sections = Container()
         for i in range(len(_categories)):
