@@ -132,9 +132,10 @@ class ScriptLayerHelper:
             instance = self.get_instance_by_name(instance)
         if isinstance(instance, ScriptInstanceHelper):
             instance = instance.id
+
         self._raw.script_instances = [
             i for i in self._raw.script_instances
-            if i.id.raw != instance
+            if i.id != instance
         ]
 
     def remove_instances(self):
