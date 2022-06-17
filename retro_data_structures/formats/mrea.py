@@ -75,7 +75,6 @@ class DataSectionGroupAdapter(Adapter):
             sections.append(
                 Container(
                     data=data,
-                    hash=hashlib.sha256(data).hexdigest(),
                     size=section_size,
                     id=section_id,
                 )
@@ -106,12 +105,10 @@ class UncompressedDataSections(Adapter):
 
     def _decode(self, sections, context, path):
         decoded = []
-        for i in range(len(sections)):
-            section = sections[i]
+        for i, section in enumerate(sections):
             decoded.append(
                 Container(
                     data=section,
-                    hash=hashlib.sha256(section).hexdigest(),
                     size=len(section),
                     id=i,
                 )
@@ -253,13 +250,16 @@ class CompressedBlocksAdapter(SectionCategoryAdapter):
         return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
 
     def _decode(self, section_groups, context, path):
-        groups = section_groups.groups
-        for i in range(len(groups)):
-            header = section_groups.headers[i]
-            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
-            groups[i] = DataSectionGroupAdapter(subcon, header)._parsereport(io.BytesIO(groups[i]), context, path)
+        assert len(section_groups.headers) == len(section_groups.groups)
+        decoded = ListContainer()
 
-        return super()._decode(groups, context, path)
+        for header, group in zip(section_groups.headers, section_groups.groups):
+            subcon = self._get_subcon(header.compressed_size, header.uncompressed_size, context)
+            decoded.append(
+                DataSectionGroupAdapter(subcon, header)._parsereport(io.BytesIO(group), context, path)
+            )
+
+        return super()._decode(decoded, context, path)
 
     def _start_new_group(self, group_size, section_size, curr_label, prev_label):
         if group_size == 0:
