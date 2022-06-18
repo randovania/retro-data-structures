@@ -113,6 +113,7 @@ class ScriptLayerHelper:
         for instance in self.instances:
             if instance.name == name:
                 return instance
+        raise KeyError(name)
 
     def add_instance(self, instance_type: str, name: Optional[str] = None) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_instance(self.target_game, instance_type, self)
@@ -142,10 +143,16 @@ class ScriptLayerHelper:
         if isinstance(instance, ScriptInstanceHelper):
             instance = instance.id
 
-        self._raw.script_instances = [
+        matching_instances = [
             i for i in self._raw.script_instances
-            if i.id != instance
+            if i.id == instance
         ]
+
+        if not matching_instances:
+            raise KeyError(instance)
+
+        for i in matching_instances:
+            self._raw.script_instances.remove(i)
 
     def remove_instances(self):
         self._raw.script_instances = []

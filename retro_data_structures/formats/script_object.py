@@ -134,12 +134,12 @@ class ScriptInstanceHelper:
         return cls(raw, object_properties.game())
 
     @property
-    def type(self) -> str:
-        return self._raw.type
+    def type(self) -> Type[BaseObjectType]:
+        return properties.get_game_object(self.target_game, self.type_name)
 
     @property
     def type_name(self) -> str:
-        return self.type
+        return self._raw.type
 
     @property
     def id(self) -> InstanceId:
@@ -169,19 +169,15 @@ class ScriptInstanceHelper:
         self.set_properties(props)
 
     @property
-    def _property_type(self) -> Type[BaseObjectType]:
-        return properties.get_game_object(self.target_game, self.type)
-
-    @property
     def raw_properties(self) -> bytes:
         return self._raw.base_property
 
     def get_properties(self) -> BaseObjectType:
-        return self._property_type.from_bytes(self._raw.base_property)
+        return self.type.from_bytes(self._raw.base_property)
 
     def set_properties(self, data: BaseObjectType):
-        if not isinstance(data, self._property_type):
-            raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type}")
+        if not isinstance(data, self.type):
+            raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type_name}")
 
         self._raw.base_property = data.to_bytes()
 
@@ -199,14 +195,14 @@ class ScriptInstanceHelper:
     def connections(self, value):
         self._raw.connections = value
 
-    def add_connection(self, state, message, target: "ScriptInstanceHelper"):
+    def add_connection(self, state, message, target: ScriptInstanceHelper):
         self.connections.append(Container(
             state=state,
             message=message,
             target=target.id
         ))
 
-    def remove_connections(self, target: Union[int, "ScriptInstanceHelper"]):
+    def remove_connections(self, target: Union[int, ScriptInstanceHelper]):
         if isinstance(target, ScriptInstanceHelper):
             target = target.id
         self.connections = [c for c in self.connections if c.target != target]

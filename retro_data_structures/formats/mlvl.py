@@ -283,12 +283,16 @@ class AreaWrapper:
         try:
             return self.strg.strings[0]
         except Exception as e:
-            return "!!" + self._raw.get("internal_area_name", "Unknown")
+            return "!!" + self.internal_name
     
     @name.setter
     def name(self, value):
         self.strg.set_string(0, value)
-    
+
+    @property
+    def internal_name(self) -> str:
+        return self._raw.get("internal_area_name", "Unknown")
+
     @property
     def strg(self) -> Strg:
         if self._strg is None:
