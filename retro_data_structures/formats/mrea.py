@@ -613,7 +613,8 @@ class MREAConstruct(construct.Construct):
 
     def _parse(self, stream, context, path):
         mrea_header = MREAHeader_v2._parsereport(stream, context, path)
-        data_section_sizes = Array(mrea_header.data_section_count, Int32ub)._parsereport(stream, context, path)
+        data_section_sizes = Aligned(32, Array(mrea_header.data_section_count, Int32ub)
+                                     )._parsereport(stream, context, path)
 
         if mrea_header.compressed_block_count is not None:
             data_sections = self._decode_compressed_blocks(mrea_header, data_section_sizes, stream, context, path)
