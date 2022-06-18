@@ -54,7 +54,6 @@ class MREAVersion(IntEnum):
     DonkeyKongCountryReturns = 0x20
 
 
-
 def _decode_data_section_group(subcon, header, stream, context, path):
     group = subcon._parsereport(stream, context, path)
 
@@ -108,6 +107,7 @@ class UncompressedDataSections(Adapter):
 
 _all_categories = [
     "geometry_section",
+    "unknown_section_2",
     "script_layers_section",
     "generated_script_objects_section",
     "collision_section",
@@ -116,11 +116,9 @@ _all_categories = [
     "visibility_tree_section",
     "path_section",
     "area_octree_section",
-    "unknown_section_2",
     "portal_area_section",
     "static_geometry_map_section",
 ]
-
 
 _CATEGORY_ENCODINGS = {
     "script_layers_section": SCLY,
@@ -142,8 +140,6 @@ _CATEGORY_ENCODINGS = {
         unk2=PrefixedArray(Int32ub, Enum(Int8ub, ON=0xFF, OFF=0x00)),
     ),
 }
-
-
 
 
 class SectionCategoryAdapter(Adapter):
@@ -476,7 +472,6 @@ MREA = AlignedStruct(
     ),
 )
 
-
 MREAHeader_v2 = Aligned(32, Struct(
     "magic" / Const(0xDEADBEEF, Int32ub),
     "version" / Enum(Int32ub, MREAVersion),
@@ -548,7 +543,13 @@ def _get_compressed_block_size(header):
     return header.compressed_size + (-header.compressed_size % 32)
 
 
-def _decode_category(category: typing.List[bytes], subcon, context, path):
+def _get_compressed_block_subcon(compressed_size, uncompressed_size):
+    if compressed_size:
+        return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
+    return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
+
+
+def _decode_category(category: typing.List[bytes], subcon: construct.Construct, context, path):
     result = ListContainer()
 
     for section in category:
@@ -562,28 +563,44 @@ def _decode_category(category: typing.List[bytes], subcon, context, path):
     return result
 
 
+def _encode_category(category: typing.List, subcon: construct.Construct, context, path) -> typing.List[bytes]:
+    result = ListContainer()
+
+    for section in category:
+        if section is not None:
+            stream = io.BytesIO()
+            Aligned(32, subcon)._build(section, stream, context, path)
+            data = stream.getvalue()
+        else:
+            data = b""
+
+        result.append(data)
+
+    return result
+
+
 class MREAConstruct(construct.Construct):
     def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> typing.List[bytes]:
         compressed_block_headers = Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader)
                                            )._parsereport(stream, context, path)
-
         # Read compressed blocks from stream
-        compressed_blocks = [
+        compressed_blocks = construct.ListContainer(
             Aligned(32, FixedSized(_get_compressed_block_size(header), GreedyBytes)
                     )._parsereport(stream, context, path)
             for header in compressed_block_headers
-        ]
+        )
 
         # Decompress blocks into the data sections
-        def _get_subcon(compressed_size, uncompressed_size):
-            if compressed_size:
-                return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
-            return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
-
         data_sections = ListContainer()
         for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
-            subcon = _get_subcon(compressed_header.compressed_size, compressed_header.uncompressed_size)
+            subcon = _get_compressed_block_subcon(compressed_header.compressed_size,
+                                                  compressed_header.uncompressed_size)
             decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)
+            if len(decompressed_block) != compressed_header.uncompressed_size:
+                raise construct.ConstructError(
+                    f"Expected {compressed_header.uncompressed_size} bytes, got {len(decompressed_block)}",
+                    path,
+                )
             offset = 0
 
             for i in range(compressed_header.data_section_count):
@@ -596,7 +613,6 @@ class MREAConstruct(construct.Construct):
 
     def _parse(self, stream, context, path):
         mrea_header = MREAHeader_v2._parsereport(stream, context, path)
-
         data_section_sizes = Array(mrea_header.data_section_count, Int32ub)._parsereport(stream, context, path)
 
         if mrea_header.compressed_block_count is not None:
@@ -624,7 +640,6 @@ class MREAConstruct(construct.Construct):
             sections[c["label"]] = data_sections[start:end]
 
         # Decode each category
-
         for category, subcon in _CATEGORY_ENCODINGS.items():
             if category in sections:
                 sections[category] = _decode_category(sections[category], subcon, context, path)
@@ -636,6 +651,151 @@ class MREAConstruct(construct.Construct):
             sections=sections,
         )
 
+    def _encode_compressed_blocks(self, data_sections: typing.List[bytes],
+                                  category_starts: typing.Dict[str, typing.Optional[int]],
+                                  context, path):
+        def _start_new_group(group_size, section_size, curr_label, prev_label):
+            if group_size == 0:
+                return False, ""
+
+            if group_size + section_size > 0x20000:
+                return True, "Next section too big."
+
+            if curr_label == "script_layers_section":
+                return True, "New SCLY section."
+
+            elif prev_label == "script_layers_section":
+                return True, "Previous SCLY completed."
+
+            if curr_label == "generated_script_objects_section":
+                return True, "New SCGN section."
+
+            elif prev_label == "generated_script_objects_section":
+                return True, "Previous SCGN completed."
+
+            return False, ""
+
+        compressed_blocks = ListContainer()
+        filtered_starts = [(cat, start) for cat, start in category_starts.items() if start is not None]
+        filtered_starts.sort(key=lambda it: it[1])
+        category_starts = dict(filtered_starts)
+
+        current_group_size = 0
+        current_group = []
+        previous_label = ""
+
+        def add_group(r):
+            nonlocal current_group_size, current_group
+            # print(f"Group complete! {r} Group size: {current_group_size}")
+
+            # The padding is not included in the block's uncompressed size
+            merged_and_padded_group = b"".join(
+                item.ljust(len(item) + (-len(item) % 32), b"\x00")
+                for item in current_group
+            )
+            header = Container(
+                buffer_size=current_group_size,
+                uncompressed_size=current_group_size,
+                compressed_size=0,
+                data_section_count=len(current_group)
+            )
+
+            substream = io.BytesIO()
+            LZOCompressedBlock(header.uncompressed_size)._build(merged_and_padded_group, substream, context, path)
+            data = substream.getvalue()
+            compressed_size = len(data)
+            compressed_pad = (32 - (compressed_size % 32)) & 0x1F
+            if compressed_size + compressed_pad < header.uncompressed_size:
+                header.compressed_size = compressed_size
+                header.buffer_size += 0x120
+            else:
+                data = merged_and_padded_group
+
+            compressed_blocks.append(Container(
+                header=header,
+                data=data,
+            ))
+            current_group = ListContainer()
+            current_group_size = 0
+
+        for i, section in enumerate(data_sections):
+            all_garbage = [cat for cat, start in category_starts.items() if i >= start]
+            cat_label = all_garbage[-1]
+
+            start_new, reason = _start_new_group(
+                current_group_size, len(section),
+                previous_label, cat_label
+            )
+            if start_new:
+                add_group(reason)
+
+            current_group.append(section)
+            current_group_size += len(section)
+
+            previous_label = cat_label
+
+        add_group("Final group.")
+        return compressed_blocks
+
+    def _build(self, obj: Container, stream, context, path):
+        mrea_header = Container()
+
+        # Encode each category
+        sections = Container()
+        for category, values in obj.sections.items():
+            sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category, GreedyBytes),
+                                                  context, f"{path} -> {category}")
+
+        # Combine all sections into the data sections array
+        data_sections = ListContainer()
+
+        for category in _all_categories:
+            if category in sections:
+                mrea_header[category] = len(data_sections)
+                data_sections.extend(sections[category])
+            else:
+                mrea_header[category] = None
+
+        # Compress the data sections
+        if int(obj.version) >= MREAVersion.Echoes.value:
+            compressed_blocks = self._encode_compressed_blocks(
+                data_sections,
+                mrea_header,
+                context,
+                path
+            )
+            mrea_header.compressed_block_count = len(compressed_blocks)
+        else:
+            compressed_blocks = None
+            raise RuntimeError("Not implemented yet")
+
+        mrea_header.version = obj.version
+        mrea_header.area_transform = obj.area_transform
+        mrea_header.world_model_count = obj.world_model_count
+        mrea_header.script_layer_count = len(obj.sections.script_layers_section)
+        mrea_header.data_section_count = len(data_sections)
+
+        MREAHeader_v2._build(mrea_header, stream, context, path)
+        Array(mrea_header.data_section_count, Int32ub)._build(
+            [len(section) for section in data_sections],
+            stream, context, path,
+        )
+        if compressed_blocks is not None:
+            Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader))._build(
+                [block.header for block in compressed_blocks],
+                stream, context, path,
+            )
+            for compressed_block in compressed_blocks:
+                block_header = compressed_block.header
+                if block_header.compressed_size:
+                    subcon = PrefixedWithPaddingBefore(Computed(block_header.compressed_size), GreedyBytes)
+                else:
+                    subcon = DataSection(GreedyBytes, size=lambda: Computed(block_header.uncompressed_size))
+                subcon._build(compressed_block.data, stream, context, path)
+        else:
+            # TODO
+            pass
+
 
 class Mrea(BaseResource):
     @classmethod
@@ -644,7 +804,7 @@ class Mrea(BaseResource):
 
     @classmethod
     def construct_class(cls, target_game: Game) -> construct.Construct:
-        return MREA
+        return MREAConstruct()
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
