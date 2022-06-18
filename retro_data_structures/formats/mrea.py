@@ -588,6 +588,7 @@ class MREAConstruct(construct.Construct):
             Array(mrea_header.compressed_block_count, CompressedBlockHeader),
             stream, context, path
         )
+
         # Read compressed blocks from stream
         compressed_blocks = construct.ListContainer(
             self._aligned_parse(
@@ -783,7 +784,7 @@ class MREAConstruct(construct.Construct):
         mrea_header.data_section_count = len(data_sections)
 
         MREAHeader_v2._build(mrea_header, stream, context, path)
-        Array(mrea_header.data_section_count, Int32ub)._build(
+        Aligned(32, Array(mrea_header.data_section_count, Int32ub))._build(
             [len(section) for section in data_sections],
             stream, context, path,
         )
@@ -819,7 +820,7 @@ class Mrea(BaseResource):
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
         for section in self._raw.sections.script_layers_section:
-            yield ScriptLayerHelper(section["data"], self.target_game)
+            yield ScriptLayerHelper(section, self.target_game)
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for layer in self.script_layers:
