@@ -40,7 +40,7 @@ class InstanceId(int):
         assert 0 <= layer < 64
         assert 0 <= area < 1024
         assert 0 <= instance < 65536
-        return InstanceId(layer << 26 + area << 16 + instance)
+        return InstanceId((layer << 26) + (area << 16) + instance)
 
     def __str__(self):
         return f"0x{self:08x}"
