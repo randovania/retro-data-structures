@@ -4,6 +4,7 @@ For checking which game is being parsed
 from enum import Enum
 from typing import Any, Callable
 
+import construct
 from construct.core import IfThenElse
 
 from retro_data_structures import common_types
@@ -89,8 +90,26 @@ def current_game_at_least(target: Game) -> Callable[[Any], bool]:
     return result
 
 
+class CurrentGameCheck(IfThenElse):
+    def __init__(self, target: Game, subcon1, subcon2):
+        super().__init__(current_game_at_least(target), subcon1, subcon2)
+        self.target_game = target
+
+    def _emitparse(self, code: construct.CodeGen):
+        code.append("from retro_data_structures import game_check")
+        return "((%s) if (game_check.get_current_game(this) >= game_check.Game.%s) else (%s))" % (
+            self.thensubcon._compileparse(code),
+            self.target_game.name,
+            self.elsesubcon._compileparse(code),
+        )
+
+    def _emitbuild(self, code: construct.CodeGen):
+        code.append("from retro_data_structures import game_check")
+        return f"(({self.thensubcon._compilebuild(code)}) if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name}) else ({self.elsesubcon._compilebuild(code)}))"
+
+
 def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:
-    return IfThenElse(current_game_at_least(target), subcon1, subcon2)
+    return CurrentGameCheck(target, subcon1, subcon2)
 
 
 def uses_asset_id_32(ctx):

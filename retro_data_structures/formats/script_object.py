@@ -76,7 +76,7 @@ ScriptInstanceInternal = Struct(
             base_property=GreedyBytes,
         ),
     ),
-)
+).compile()
 
 ScriptInstance = construct.ExprAdapter(
     ScriptInstanceInternal,
