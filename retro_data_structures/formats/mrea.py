@@ -179,7 +179,11 @@ def _encode_category(category: typing.List, subcon: construct.Construct, context
     for section in category:
         if section is not None:
             stream = io.BytesIO()
-            Aligned(32, subcon)._build(section, stream, context, path)
+            if isinstance(section, bytes) or subcon is None:
+                this_subcon = GreedyBytes
+            else:
+                this_subcon = subcon
+            Aligned(32, this_subcon)._build(section, stream, context, path)
             data = stream.getvalue()
         else:
             data = b""
@@ -258,9 +262,10 @@ class MREAConstruct(construct.Construct):
             sections[c["label"]] = data_sections[start:end]
 
         # Decode each category
-        for category, subcon in _CATEGORY_ENCODINGS.items():
-            if category in sections:
-                sections[category] = _decode_category(sections[category], subcon, context, path)
+        if context.get("decode_categories", True):
+            for category, subcon in _CATEGORY_ENCODINGS.items():
+                if category in sections:
+                    sections[category] = _decode_category(sections[category], subcon, context, path)
 
         return Container(
             version=mrea_header.version,
@@ -361,7 +366,7 @@ class MREAConstruct(construct.Construct):
         # Encode each category
         sections = Container()
         for category, values in obj.sections.items():
-            sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category, GreedyBytes),
+            sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category),
                                                   context, f"{path} -> {category}")
 
         # Combine all sections into the data sections array
@@ -432,7 +437,11 @@ class Mrea(BaseResource):
 
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
-        for section in self._raw.sections.script_layers_section:
+        for i, section in enumerate(self._raw.sections.script_layers_section):
+            if isinstance(section, bytes):
+                section = _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game)
+                self._raw.sections.script_layers_section[i] = section
+
             yield ScriptLayerHelper(section, self.target_game)
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
