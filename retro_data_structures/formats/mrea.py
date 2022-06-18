@@ -580,13 +580,20 @@ def _encode_category(category: typing.List, subcon: construct.Construct, context
 
 
 class MREAConstruct(construct.Construct):
+    def _aligned_parse(self, conn: construct.Construct, stream, context, path):
+        return Aligned(32, conn)._parsereport(stream, context, path)
+
     def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> typing.List[bytes]:
-        compressed_block_headers = Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader)
-                                           )._parsereport(stream, context, path)
+        compressed_block_headers = self._aligned_parse(
+            Array(mrea_header.compressed_block_count, CompressedBlockHeader),
+            stream, context, path
+        )
         # Read compressed blocks from stream
         compressed_blocks = construct.ListContainer(
-            Aligned(32, FixedSized(_get_compressed_block_size(header), GreedyBytes)
-                    )._parsereport(stream, context, path)
+            self._aligned_parse(
+                FixedSized(_get_compressed_block_size(header), GreedyBytes),
+                stream, context, path,
+            )
             for header in compressed_block_headers
         )
 
@@ -613,8 +620,7 @@ class MREAConstruct(construct.Construct):
 
     def _parse(self, stream, context, path):
         mrea_header = MREAHeader_v2._parsereport(stream, context, path)
-        data_section_sizes = Aligned(32, Array(mrea_header.data_section_count, Int32ub)
-                                     )._parsereport(stream, context, path)
+        data_section_sizes = self._aligned_parse(Array(mrea_header.data_section_count, Int32ub), stream, context, path)
 
         if mrea_header.compressed_block_count is not None:
             data_sections = self._decode_compressed_blocks(mrea_header, data_section_sizes, stream, context, path)
