@@ -54,7 +54,7 @@ def do_dump_properties(game: Game, args):
                     instance_id=instance.id,
                     size=len(instance.raw_properties),
                 ))
-                data.append(instance.type.encode("ascii"))
+                data.append(instance.type_name.encode("ascii"))
                 data.append(instance.raw_properties)
 
         print(f"Wrote properties for {asset_id:08x}")

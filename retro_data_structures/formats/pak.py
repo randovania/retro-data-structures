@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import typing
 
@@ -11,24 +13,14 @@ from construct import (
     PascalString,
     IfThenElse,
     FocusedSeq,
-    Pointer,
-    Aligned,
-    Tell,
     Rebuild,
-    GreedyBytes,
-    Array,
-    Seek,
-    Computed,
-    RawCopy,
 )
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import AssetId, AssetType, RawResource, BaseType, Dependency
 from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
-from retro_data_structures.construct_extensions.alignment import AlignTo, AlignedPrefixed
-from retro_data_structures.construct_extensions.misc import LazyPatchedForBug
-from retro_data_structures.formats import BaseResource
-from retro_data_structures.base_resource import AssetId, AssetType, RawResource
+from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.game_check import Game
 
 PAKHeader = Struct(
@@ -54,40 +46,7 @@ PAKNoData = Struct(
         ),
     ),
     resources=PrefixedArray(Int32ub, ResourceHeader),
-)
-
-
-def header_field(offset):
-    def result(ctx):
-        parents = [ctx]
-        while "_" in parents[-1]:
-            parents.append(parents[-1]["_"])
-
-        start_headers = None
-        index = None
-
-        for c in reversed(parents):
-            if "_start_headers" in c:
-                start_headers = c["_start_headers"]
-                break
-
-        for c in parents:
-            if "_resource_index" in c:
-                index = c["_resource_index"]
-                break
-
-        if index is None or start_headers is None:
-            raise ValueError("Missing required context key")
-
-        return start_headers + (index * ResourceHeader.sizeof()) + offset
-
-    return result
-
-
-def skip_headers(ctx):
-    result = ResourceHeader.sizeof() * ctx["_num_resources"]
-    return result
-
+).compile()
 
 CompressedPakResource = FocusedSeq(
     "data",
@@ -100,84 +59,164 @@ CompressedPakResource = FocusedSeq(
 )
 
 
-def create():
-    return "PAK" / Struct(
-        _header=PAKHeader,
-        named_resources=PrefixedArray(
-            Int32ub,
-            Struct(
-                asset=ObjectTag_32,
-                name=PascalString(Int32ub, "utf-8"),
-            ),
-        ),
-        _num_resources=Rebuild(Int32ub, construct.len_(construct.this.resources)),
-        _start_headers=Tell,
-        _skip_headers=Seek(skip_headers, 1),
-        _align=AlignTo(32),
-        resources=Array(
-            construct.this["_num_resources"],
-            Aligned(
-                32,
-                Struct(
-                    _start=Tell,
-                    _resource_index=Computed(lambda ctx: ctx["_index"]),
-                    compressed=Pointer(header_field(0x0), Int32ub),
-                    asset=Pointer(header_field(0x4), ObjectTag_32),
-                    contents=RawCopy(
-                        LazyPatchedForBug(
-                            AlignedPrefixed(
-                                Pointer(header_field(0xC), Int32ub),
-                                IfThenElse(
-                                    construct.this.compressed > 0,
-                                    CompressedPakResource,
-                                    GreedyBytes,
-                                ),
-                                32,
-                                Int32ub.length,
-                            )
-                        )
-                    ),
-                    _end=Tell,
-                    size=Pointer(header_field(0xC), Rebuild(Int32ub, construct.this.contents.length)),
-                    _offset=Pointer(header_field(0x10), Rebuild(Int32ub, lambda ctx: ctx["_start"])),
-                ),
-            ),
-        ),
-    )
-
-
-PAK = create()
-
-
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass
 class PakFile:
     asset_id: AssetId
-    asset_name: AssetType
-    data: bytes
+    asset_type: AssetType
+    should_compress: bool
+    uncompressed_data: typing.Optional[bytes]
+    compressed_data: typing.Optional[bytes]
+
+    def get_decompressed(self, target_game: Game) -> bytes:
+        if self.uncompressed_data is None:
+            self.uncompressed_data = CompressedPakResource.parse(
+                self.compressed_data,
+                target_game=target_game,
+            )
+
+        return self.uncompressed_data
+
+    def get_compressed(self, target_game: Game) -> bytes:
+        if self.compressed_data is None:
+            self.compressed_data = CompressedPakResource.build(
+                self.uncompressed_data,
+                target_game=target_game,
+            )
+
+        return self.compressed_data
+
+    def set_new_data(self, data: bytes):
+        self.uncompressed_data = data
+        self.compressed_data = None
 
 
-class Pak(BaseResource):
+@dataclasses.dataclass
+class PakBody:
+    named_resources: typing.Dict[str, Dependency]
+    files: typing.List[PakFile]
+
+
+class PAKNew(construct.Construct):
+    def _parse(self, stream, context, path) -> PakBody:
+        header = PAKNoData._parsereport(stream, context, f"{path} -> header")
+
+        AlignTo(32)._parse(stream, context, path)
+
+        files = []
+        for i, resource in enumerate(header.resources):
+            if resource.offset != construct.stream_tell(stream, path):
+                raise construct.ConstructError(f"Expected resource at {resource.offset}", path)
+
+            data = construct.stream_read(stream, resource.size, path)
+            # TODO: There's some padding here
+            if resource.compressed > 0:
+                uncompressed_data = None
+                compressed_data = data
+            else:
+                uncompressed_data = data
+                compressed_data = None
+
+            files.append(PakFile(
+                resource.asset.id,
+                resource.asset.type,
+                resource.compressed > 0,
+                uncompressed_data,
+                compressed_data,
+            ))
+
+        return PakBody(
+            named_resources={
+                named.name: Dependency(type=named.asset.type, id=named.asset.id)
+                for named in header.named_resources
+            },
+            files=files,
+        )
+
+    def _build(self, obj: PakBody, stream, context, path):
+        assert isinstance(obj, PakBody)
+
+        header = construct.Container(
+            _header=construct.Container(),
+            named_resources=construct.ListContainer(
+                construct.Container(
+                    asset=construct.Container(
+                        type=dep.type,
+                        id=dep.id,
+                    ),
+                    name=name,
+                )
+                for name, dep in obj.named_resources.items()
+            ),
+            resources=construct.ListContainer(
+                construct.Container(
+                    compressed=0,
+                    asset=construct.Container(
+                        type=file.asset_type,
+                        id=file.asset_id,
+                    ),
+                    size=0,
+                    offset=0,
+                )
+                for file in obj.files
+            ),
+        )
+
+        header_start = construct.stream_tell(stream, path)
+        PAKNoData._build(header, stream, context, path)
+        AlignTo(32)._build(None, stream, context, path)
+
+        for i, file in enumerate(obj.files):
+            compressed = file.should_compress
+            if compressed:
+                data = file.get_compressed(game_check.get_current_game(context))
+            else:
+                data = file.get_decompressed(game_check.get_current_game(context))
+
+            # TODO: don't compress if it ends up bigger
+            # if len(data) > len(file.data):
+            #     compressed = False
+            #     data = file.data
+
+            pad = 32 - (len(data) % 32)
+            if pad < 32:
+                data += b"\xFF" * pad
+
+            header.resources[i].offset = construct.stream_tell(stream, path)
+            header.resources[i].size = len(data)
+            header.resources[i].compressed = int(compressed)
+            construct.stream_write(stream, data, len(data), path)
+
+        # Update header
+        files_end = construct.stream_tell(stream, path)
+        construct.stream_seek(stream, header_start, 0, path)
+        PAKNoData._build(header, stream, context, path)
+        construct.stream_seek(stream, files_end, 0, path)
+
+
+PAK = PAKNew()
+
+
+class Pak:
+    _raw: PakBody
+    target_game: Game
+
+    def __init__(self, raw: PakBody, target_game: Game):
+        self._raw = raw
+        self.target_game = target_game
+
     @classmethod
-    def construct_class(cls, target_game: Game) -> construct.Construct:
-        return PAK
+    def parse(cls: typing.Type[Pak], data: bytes, target_game: Game) -> Pak:
+        return cls(PAK.parse(data, target_game=target_game), target_game)
+
+    def build(self) -> bytes:
+        return PAK.build(self._raw, target_game=self.target_game)
 
     @classmethod
     def parse_stream(cls, stream: typing.BinaryIO, target_game: Game) -> "Pak":
-        return cls(cls.construct_class(target_game).parse_stream(stream, target_game=target_game),
-                   target_game)
+        return cls(PAK.parse_stream(stream, target_game=target_game), target_game)
 
     def build_stream(self, stream: typing.BinaryIO) -> bytes:
-        return self.construct_class(self.target_game).build_stream(self._raw, stream, target_game=self.target_game)
-
-    def offsets_for_asset(self, asset_id: AssetId) -> typing.Iterator[int]:
-        for file in self.raw.resources:
-            if file.asset.id == asset_id:
-                yield file._offset
-
-    @property
-    def all_assets(self) -> typing.Iterator[PakFile]:
-        for file in self.raw.resources:
-            yield PakFile(file.asset.id, file.asset.type, file.contents.value())
+        return PAK.build_stream(self._raw, stream, target_game=self.target_game)
 
     def get_asset(self, asset_id: AssetId) -> typing.Optional[RawResource]:
         """
@@ -185,47 +224,43 @@ class Pak(BaseResource):
         :param asset_id:
         :return:
         """
-        for file in self.raw.resources:
-            if file.asset.id == asset_id:
-                return RawResource(file.asset.type, file.contents.value())
+        for file in self._raw.files:
+            if file.asset_id == asset_id:
+                return RawResource(file.asset_type, file.get_decompressed(self.target_game))
 
         return None
 
     def replace_asset(self, asset_id: AssetId, asset: RawResource):
         found = False
 
-        for file in self.raw.resources:
-            if file.asset.id == asset_id:
-                file.asset.type = asset.type
-                file.contents = construct.Container(value=asset.data)
+        for file in self._raw.files:
+            if file.asset_id == asset_id:
+                file.asset_type = asset.type
+                file.set_new_data(asset.data)
                 found = True
 
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
 
     def add_asset(self, asset_id: AssetId, asset: RawResource):
-        self.raw.resources.append(construct.Container(
-            compressed=0,
-            asset=construct.Container(
-                type=asset.type,
-                id=asset_id,
-            ),
-            contents=construct.Container(
-                value=asset.data,
-            ),
+        self._raw.files.append(PakFile(
+            asset_id=asset_id,
+            asset_type=asset.type,
+            should_compress=False,
+            uncompressed_data=asset.data,
+            compressed_data=None,
         ))
 
     def remove_asset(self, asset_id: AssetId):
-        for file in self.raw.named_resources:
-            if file.asset.id == asset_id:
-                raise ValueError(f"Asset id {asset_id} is named {file.name}, can't be removed.")
+        for name, file in self._raw.named_resources.items():
+            if file.id == asset_id:
+                raise ValueError(f"Asset id {asset_id:08x} is named {name}, can't be removed.")
 
         found = False
-        for file in list(self.raw.resources):
-            if file.asset.id == asset_id:
-                self.raw.resources.remove(file)
+        for file in list(self._raw.files):
+            if file.asset_id == asset_id:
+                self._raw.files.remove(file)
                 found = True
 
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
-
