@@ -17,7 +17,7 @@ from construct import (
 )
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetId, AssetType, RawResource, BaseType, Dependency
+from retro_data_structures.base_resource import AssetId, AssetType, RawResource, Dependency
 from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
