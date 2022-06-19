@@ -1,6 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
+import copy
 import io
 import typing
 from enum import IntEnum
@@ -261,17 +262,12 @@ class MREAConstruct(construct.Construct):
                 end = categories[i + 1]["value"]
             sections[c["label"]] = data_sections[start:end]
 
-        # Decode each category
-        if context.get("decode_categories", True):
-            for category, subcon in _CATEGORY_ENCODINGS.items():
-                if category in sections:
-                    sections[category] = _decode_category(sections[category], subcon, context, path)
-
         return Container(
             version=mrea_header.version,
             area_transform=mrea_header.area_transform,
             world_model_count=mrea_header.world_model_count,
-            sections=sections,
+            raw_sections=sections,
+            sections=construct.Container(),
         )
 
     def _encode_compressed_blocks(self, data_sections: typing.List[bytes],
@@ -363,19 +359,20 @@ class MREAConstruct(construct.Construct):
     def _build(self, obj: Container, stream, context, path):
         mrea_header = Container()
 
+        raw_sections = copy.copy(obj.raw_sections)
+
         # Encode each category
-        sections = Container()
         for category, values in obj.sections.items():
-            sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category),
-                                                  context, f"{path} -> {category}")
+            raw_sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category),
+                                                      context, f"{path} -> {category}")
 
         # Combine all sections into the data sections array
         data_sections = ListContainer()
 
         for category in _all_categories:
-            if category in sections:
+            if category in raw_sections:
                 mrea_header[category] = len(data_sections)
-                data_sections.extend(sections[category])
+                data_sections.extend(raw_sections[category])
             else:
                 mrea_header[category] = None
 
@@ -395,7 +392,7 @@ class MREAConstruct(construct.Construct):
         mrea_header.version = obj.version
         mrea_header.area_transform = obj.area_transform
         mrea_header.world_model_count = obj.world_model_count
-        mrea_header.script_layer_count = len(obj.sections.script_layers_section)
+        mrea_header.script_layer_count = len(obj.raw_sections.script_layers_section)
         mrea_header.data_section_count = len(data_sections)
 
         MREAHeader._build(mrea_header, stream, context, path)
@@ -435,8 +432,23 @@ class Mrea(BaseResource):
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
+    def _ensure_decoded_section(self, section_name: str):
+        if section_name not in self._raw.sections:
+            context = Container(target_game=self.target_game)
+            context._parsing = True
+            context._building = False
+            context._sizing = False
+            context._params = context
+
+            self._raw.sections[section_name] = _decode_category(
+                self._raw.raw_sections[section_name],
+                _CATEGORY_ENCODINGS[section_name],
+                context, "",
+            )
+
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
+        self._ensure_decoded_section("script_layers_section")
         for i, section in enumerate(self._raw.sections.script_layers_section):
             if isinstance(section, bytes):
                 section = _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game)

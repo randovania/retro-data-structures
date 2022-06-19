@@ -189,8 +189,9 @@ AreaCollision = Struct(
     "version" / VersionEnum,
     "bounding_box" / AABox,
     "root_node_type" / NodeTypeEnum(Int32ub),
-    "octree"
-    / Prefixed(Int32ub, Switch(this.root_node_type, {"none": Pass, "branch": CollisionBranch, "leaf": CollisionLeaf})),
+    "octree" / Prefixed(Int32ub, Switch(this.root_node_type, {
+        "none": Pass, "branch": CollisionBranch, "leaf": CollisionLeaf,
+    })),
     "collision_indices" / CollisionIndex,
     "_size_end" / Tell,
     "size" / Pointer(this._size_addr, Rebuild(Int32ub, this._size_end - this._size_start)),

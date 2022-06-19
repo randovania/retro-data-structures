@@ -79,7 +79,8 @@ def parse_and_build_compare_from_manager(
         print(decoded)
 
     encoded = decoded.build()
+    decoded2 = resource_class.parse(encoded, target_game=asset_manager.target_game)
 
-    assert encoded == resource.data
+    assert purge_hidden(decoded2.raw) == purge_hidden(decoded.raw)
 
     return resource, decoded, encoded
