@@ -4,6 +4,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 
 from __future__ import annotations
 
+import typing
 from typing import TYPE_CHECKING, Iterator, Type
 
 import construct
@@ -149,7 +150,7 @@ class ScriptInstanceHelper:
     def id(self, value):
         self._raw.id = InstanceId(value)
 
-    def id_matches(self, id: InstanceId) -> bool:
+    def id_matches(self, id: typing.Union[int, InstanceId]) -> bool:
         if not isinstance(id, InstanceId):
             id = InstanceId(id)
 

@@ -100,6 +100,10 @@ class ScriptLayerHelper:
         return new
 
     @property
+    def index(self):
+        return self._index
+
+    @property
     def instances(self):
         for instance in self._raw.script_instances:
             yield ScriptInstanceHelper(instance, self.target_game)
@@ -108,6 +112,7 @@ class ScriptLayerHelper:
         for instance in self.instances:
             if instance.id_matches(instance_id):
                 return instance
+        return None
 
     def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         for instance in self.instances:
@@ -115,17 +120,22 @@ class ScriptLayerHelper:
                 return instance
         raise KeyError(name)
 
+    def _internal_add_instance(self, instance: ScriptInstanceHelper):
+        if self.get_instance(instance.id) is not None:
+            raise RuntimeError(f"Instance with id {instance.id} already exists.")
+
+        self._raw.script_instances.append(instance._raw)
+        return self.get_instance(instance.id)
+
     def add_instance(self, instance_type: str, name: Optional[str] = None) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_instance(self.target_game, instance_type, self)
         if name is not None:
             instance.name = name
-        self._raw.script_instances.append(instance._raw)
-        return self.get_instance(instance.id)
+        return self._internal_add_instance(instance)
 
     def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_from_properties(object_properties, self)
-        self._raw.script_instances.append(instance._raw)
-        return self.get_instance(instance.id)
+        return self._internal_add_instance(instance)
 
     def add_existing_instance(self, instance: ScriptInstanceHelper) -> ScriptInstanceHelper:
         if instance.id.area != self._parent_area.id:
@@ -134,8 +144,7 @@ class ScriptLayerHelper:
             new_id = InstanceId.new(self._index, instance.id.area, instance.id.instance)
 
         instance.id = new_id
-        self._raw.script_instances.append(instance._raw)
-        return self.get_instance(instance.id)
+        return self._internal_add_instance(instance)
 
     def remove_instance(self, instance: Union[int, str, ScriptInstanceHelper]):
         if isinstance(instance, str):
