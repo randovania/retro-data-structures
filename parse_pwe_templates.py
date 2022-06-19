@@ -214,7 +214,15 @@ _parse_choice.unknowns = {}
 def parse_script_object_file(path: Path, game_id: str) -> dict:
     t = ElementTree.parse(path)
     root = t.getroot()
-    return _parse_properties(root.find("Properties"), game_id, path)
+    result = _parse_properties(root.find("Properties"), game_id, path)
+
+    if modules := root.find("Modules"):
+        result["modules"] = [
+            item.text
+            for item in modules.findall("Element")
+        ]
+
+    return result
 
 
 def parse_property_archetypes(path: Path, game_id: str) -> dict:
@@ -342,6 +350,7 @@ class ClassDefinition:
     after_class_code: str = ""
     properties_builder: str = ""
     property_count: int = 0
+    modules: typing.List[str] = dataclasses.field(default_factory=list)
 
     all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
     needed_imports: dict = dataclasses.field(default_factory=dict)
@@ -1075,6 +1084,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}({base_class}):\n"
         _fix_module_name(output_path, cls.class_path)
 
+        if "modules" in this:
+            cls.modules.extend(this["modules"])
+
         for prop, prop_name in zip(this["properties"], all_names):
             if all_names.count(prop_name) > 1:
                 prop_name += "_0x{:08x}".format(prop["id"])
@@ -1090,6 +1102,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             cls.class_code += "\n    @classmethod\n"
             cls.class_code += "    def object_type(cls) -> str:\n"
             cls.class_code += f"        return {repr(struct_fourcc)}\n"
+
+        if cls.modules:
+            cls.class_code += "\n    @classmethod\n"
+            cls.class_code += "    def modules(cls) -> typing.List[str]:\n"
+            cls.class_code += f"        return {repr(cls.modules)}\n"
 
         # from stream
         cls.write_from_stream()
@@ -1199,5 +1216,5 @@ def persist_data(parse_result):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    # persist_data(parse(["Prime"]))
-    persist_data(parse(_game_id_to_file.keys()))
+    persist_data(parse(["Echoes"]))
+    # persist_data(parse(_game_id_to_file.keys()))

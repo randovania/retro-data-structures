@@ -41,3 +41,7 @@ class BaseObjectType(BaseProperty, ABC):
     @classmethod
     def object_type(cls) -> str:
         raise NotImplementedError()
+
+    @classmethod
+    def modules(cls) -> typing.List[str]:
+        return []
