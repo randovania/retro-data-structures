@@ -12,6 +12,7 @@ from retro_data_structures.formats.cskr import CSKR, Cskr
 from retro_data_structures.formats.cspp import CSPP, Cspp
 from retro_data_structures.formats.dgrp import DGRP, Dgrp
 from retro_data_structures.formats.evnt import EVNT, Evnt
+from retro_data_structures.formats.mapw import Mapw
 from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.pak import PAK, Pak
@@ -51,6 +52,7 @@ ALL_RESOURCE_TYPES = {
     "CSPP": Cspp,
     "DGRP": Dgrp,
     "EVNT": Evnt,
+    "MAPW": Mapw,
     "MLVL": Mlvl,
     "MREA": Mrea,
     "PAK": Pak,
