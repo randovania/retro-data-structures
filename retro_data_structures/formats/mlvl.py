@@ -36,6 +36,7 @@ from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, NameOrAssetId
+from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
@@ -196,7 +197,7 @@ def create(version: int, asset_id):
 
     # DKCR
     if version <= 0x1B:
-        fields.append("world_map_id" / asset_id)
+        fields.append("world_map_id" / asset_id)  # MAPW
 
         # This is presumably the same unknown value as at the beginning of the SCLY format. Always 0.
         fields.append("unknown_scly_field" / Const(0, Int8ub))
@@ -309,7 +310,7 @@ class AreaWrapper:
     @property
     def mrea_asset_id(self) -> int:
         return self._raw.area_mrea_id
-    
+
     @property
     def layers(self) -> Iterator[ScriptLayerHelper]:
         for i, layer in enumerate(self.mrea.script_layers):
@@ -343,6 +344,8 @@ class AreaWrapper:
 
 
 class Mlvl(BaseResource):
+    _mapw: Mapw = None
+
     @classmethod
     def resource_type(cls) -> AssetType:
         return "MLVL"
@@ -402,3 +405,9 @@ class Mlvl(BaseResource):
     @dark_world_name.setter
     def dark_world_name(self, value: str):
         self._dark_strg.set_string(0, value)
+
+    @property
+    def mapw(self) -> Mapw:
+        if self._mapw is None:
+            self._mapw = self.asset_manager.get_file(self.raw.world_map_id, type_hint=Mapw)
+        return self._mapw

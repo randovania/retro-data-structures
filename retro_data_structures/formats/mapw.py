@@ -2,7 +2,7 @@ import typing
 
 import construct
 
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, AssetId
 from retro_data_structures.game_check import Game, AssetIdCorrect
 
 MAPW = construct.Struct(
@@ -28,3 +28,6 @@ class Mapw(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)
+
+    def get_mapa_id(self, index: int) -> AssetId:
+        return self.raw.area_map[index]
