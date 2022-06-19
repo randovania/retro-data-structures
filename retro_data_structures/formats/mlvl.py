@@ -39,6 +39,7 @@ from retro_data_structures.base_resource import BaseResource, AssetType, Depende
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
+from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
 
@@ -329,6 +330,16 @@ class AreaWrapper:
     def next_instance_id(self) -> int:
         ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
         return next(i for i in count() if i not in ids)
+
+    def get_instance(self, instance_id: typing.Union[int, InstanceId]) -> typing.Optional[ScriptInstanceHelper]:
+        if not isinstance(instance_id, InstanceId):
+            instance_id = InstanceId(instance_id)
+
+        for layer in self.layers:
+            if instance_id.layer == layer.index:
+                return layer.get_instance(instance_id)
+
+        return None
 
 
 class Mlvl(BaseResource):
