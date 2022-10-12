@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import fnmatch
 import json
 import logging
@@ -8,17 +10,18 @@ from typing import Optional, Iterator
 import construct
 import nod
 
-from retro_data_structures import formats
 from retro_data_structures.base_resource import (
     AssetId, BaseResource, NameOrAssetId, RawResource,
     resolve_asset_id, AssetType
 )
 from retro_data_structures.exceptions import UnknownAssetId
-from retro_data_structures.formats.pak import PAKNoData, Pak
 from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
 logger = logging.getLogger(__name__)
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.formats.pak import Pak
 
 
 class FileProvider:
@@ -115,6 +118,8 @@ class AssetManager:
         self._paks_for_asset_id[asset_id].add(pak_name)
 
     def _update_headers(self):
+        from retro_data_structures.formats.pak import PAKNoData
+
         self._ensured_asset_ids = {}
         self._paks_for_asset_id = {}
         self._types_for_asset_id = {}
@@ -220,6 +225,7 @@ class AssetManager:
         """
         raw_asset = self.get_raw_asset(asset_id)
 
+        from retro_data_structures import formats
         format_class = formats.resource_type_for(raw_asset.type)
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
@@ -327,6 +333,8 @@ class AssetManager:
             self._ensured_asset_ids[pak_name].add(asset_id)
 
     def get_pak(self, pak_name: str) -> Pak:
+        from retro_data_structures.formats.pak import Pak
+
         if pak_name not in self._ensured_asset_ids:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 

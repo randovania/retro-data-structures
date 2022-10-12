@@ -39,8 +39,6 @@ class BaseResource:
 
     @classmethod
     def parse(cls, data: bytes, target_game: Game, asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
-        if asset_manager is not None:
-            print(asset_manager)
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
                    target_game, asset_manager)
 

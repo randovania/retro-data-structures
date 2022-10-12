@@ -101,6 +101,7 @@ class DependencyAdapter(Adapter):
     def _encode(self, obj, context, path):
         return Container(asset_id=obj.id, asset_type=obj.type)
 
+
 def create_area(version: int, asset_id):
     MLVLAreaDependency = DependencyAdapter(Struct(
         asset_id=asset_id,

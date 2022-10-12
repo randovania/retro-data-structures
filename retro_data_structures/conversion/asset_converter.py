@@ -1,12 +1,15 @@
 import copy
 import dataclasses
 import logging
+import typing
 from typing import Callable, Dict, Tuple, Any, Optional
 
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetType, AssetId, BaseResource
-from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 
 @dataclasses.dataclass(frozen=True)

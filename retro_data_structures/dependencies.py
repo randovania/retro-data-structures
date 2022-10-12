@@ -1,19 +1,22 @@
+import typing
 from collections import defaultdict
 import logging
 from typing import Iterator, Dict, NamedTuple, Optional, Set, List, Callable, Any, Union
 
 from retro_data_structures import formats
-from retro_data_structures import asset_manager
-from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency, NameOrAssetId
-from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
 from retro_data_structures.formats.scan import Scan
-from retro_data_structures.formats.mlvl import AreaWrapper
 from retro_data_structures.formats.script_layer import ScriptLayerHelper
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
+
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.conversion.asset_converter import AssetConverter
+    from retro_data_structures.formats.mlvl import AreaWrapper
 
 
 class InvalidDependency(Exception):
@@ -221,6 +224,7 @@ class AncsUsageDependencies:
         for instance in layer.instances:
             self._recursive_get_usages(instance.get_properties())
 
+
 class MlvlDependencies:
     ancs_usage: AncsUsageDependencies
     _ancs_id: Optional[AssetId]
@@ -232,7 +236,7 @@ class MlvlDependencies:
 
     def __init__(self, asset_manager: AssetManager):
         self.asset_manager = asset_manager
-        self.ancs_usage = AncsUsageDependencies()
+        self.ancs_usage = AncsUsageDependencies(asset_manager)
         self._reset()
     
     def _reset(self):
@@ -279,7 +283,6 @@ class MlvlDependencies:
             self._is_character_actor = False
             self._properties_to_skip = set()
 
-    
     def _get_resource_dependencies(self, asset_id: NameOrAssetId):
         asset_type = self.asset_manager.get_asset_type(asset_id)
 
@@ -310,7 +313,7 @@ class MlvlDependencies:
         yield from self._inner_mlvl_dependencies(dependency)
 
     def recursive_dependencies_for_layer(self, layer: ScriptLayerHelper):
-        self.ancs_usage = AncsUsageDependencies()
+        self.ancs_usage = AncsUsageDependencies(self.asset_manager)
         self.ancs_usage.find_usage_for_layer(layer)
 
         for instance in layer.instances:

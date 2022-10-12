@@ -26,7 +26,6 @@ from retro_data_structures.base_resource import AssetId, Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
-from retro_data_structures.dependencies import MlvlDependencies, recursive_mlvl_dependencies
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -205,6 +204,8 @@ class ScriptLayerHelper:
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
     
     def recursive_mlvl_dependencies(self) -> Iterator[Dependency]:
+        from retro_data_structures.dependencies import MlvlDependencies
+
         self.assert_parent()
         dependencies = MlvlDependencies(self._parent_area.asset_manager)
         yield from dependencies.recursive_dependencies_for_layer(self)
