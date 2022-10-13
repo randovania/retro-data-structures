@@ -50,7 +50,7 @@ class BaseProperty:
             elif "asset_types" in field.metadata:
                 yield field.name, field.metadata["asset_types"]
 
-    def mlvl_dependencies_for(self, to_skip: set[str] = set()) -> typing.Iterator[typing.Union[AssetId, "BaseProperty"]]:
+    def mlvl_dependencies_for(self, to_skip: set[str] = set()) -> typing.Iterator[typing.Union[AssetId, Self]]:
         for field in dataclasses.fields(self):
             if field.name not in to_skip and (issubclass(field.type, BaseProperty) or "asset_types" in field.metadata):
                 yield getattr(self, field.name)

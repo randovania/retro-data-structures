@@ -152,8 +152,9 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
 
 
 def dependencies_for(obj, target_game: Game, dep_manager: MlvlDependencies = None):
+    dep_manager = None
     if dep_manager is not None:
-        usage = dep_manager.ancs_usage[dep_manager._ancs_id]
+        usage = dep_manager.ancs_usage.usages[dep_manager._ancs_id]
     
     for i, character in enumerate(obj.character_set.characters):
         if dep_manager is not None:

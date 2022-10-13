@@ -188,8 +188,8 @@ class AncsUsageDependencies:
 
     asset_provider: AssetProvider
 
-    def __init__(self, asset_manager: AssetProvider):
-        self.asset_provider = asset_manager
+    def __init__(self, asset_provider: AssetProvider):
+        self.asset_provider = asset_provider
         self.usages = defaultdict(AncsUsage)
         self._ancs = {}
     
@@ -242,11 +242,11 @@ class MlvlDependencies:
     _char_id: Optional[int]
     _properties_to_skip: set[str]
 
-    asset_manager: AssetManager
+    asset_provider: AssetProvider
 
-    def __init__(self, asset_manager: AssetManager):
-        self.asset_manager = asset_manager
-        self.ancs_usage = AncsUsageDependencies(asset_manager)
+    def __init__(self, asset_provider: AssetProvider):
+        self.asset_provider = asset_provider
+        self.ancs_usage = AncsUsageDependencies(asset_provider)
         self._reset()
     
     def _reset(self):
@@ -257,7 +257,7 @@ class MlvlDependencies:
     
     @property
     def game(self) -> Game:
-        return self.asset_manager.game
+        return self.asset_provider.game
 
     def _get_property_dependencies(self, prop: BaseProperty):
         dep_type = type(prop).__name__
@@ -297,7 +297,7 @@ class MlvlDependencies:
         if not self.game.is_valid_asset_id(asset_id):
             return
 
-        asset_type = self.asset_manager.get_asset_type(asset_id)
+        asset_type = self.asset_provider.get_asset_type(asset_id)
 
         if asset_type == "SCAN" and self.game == Game.PRIME:
             yield from []
@@ -305,11 +305,11 @@ class MlvlDependencies:
         
         yield asset_type, asset_id
 
-        resource_type = formats.resource_type_for(asset_type)
-        if not resource_type.has_dependencies():
-            return
+        # resource_type = formats.resource_type_for(asset_type)
+        # if not resource_type.has_dependencies():
+        #     return
         
-        resource: BaseResource = self.asset_manager.get_parsed_asset(asset_id)
+        resource: BaseResource = self.asset_provider.get_parsed_asset(asset_id)
 
         for dep in resource.mlvl_dependencies_for(self):
             yield from self._inner_mlvl_dependencies(dep)
@@ -322,11 +322,16 @@ class MlvlDependencies:
     
     def recursive_dependencies(self, dependency: Union[NameOrAssetId, BaseProperty]):
         self._reset()
-        
-        yield from self._inner_mlvl_dependencies(dependency)
+
+        used = set()
+        for asset_type, asset_id in self._inner_mlvl_dependencies(dependency):
+            if asset_id in used:
+                continue
+            used.add(asset_id)
+            yield Dependency(asset_type, asset_id)
 
     def recursive_dependencies_for_layer(self, layer: ScriptLayerHelper):
-        self.ancs_usage = AncsUsageDependencies(self.asset_manager)
+        self.ancs_usage = AncsUsageDependencies(self.asset_provider)
         self.ancs_usage.find_usage_for_layer(layer)
 
         for instance in layer.instances:

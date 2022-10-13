@@ -697,7 +697,7 @@ class Vector(BaseProperty):
             "z": self.z,
         }
 """ + game_code)
-    core_path.joinpath("AssetId.py").write_text("AssetId = int\n")
+    core_path.joinpath("Id.py").write_text("AssetId = int\nSoundId = int\n")
     core_path.joinpath("AnimationParameters.py").write_text("""# Generated file
 import dataclasses
 import struct
@@ -705,12 +705,12 @@ import typing
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
-from .AssetId import AssetId
+from .Id import AssetId
 
 
 @dataclasses.dataclass()
 class AnimationParameters(BaseProperty):
-    ancs: AssetId = 0xFFFFFFFF
+    ancs: AssetId = dataclasses.field(metadata={'asset_types': ['ANCS']}, default=0xFFFFFFFF)
     character_index: int = 0
     initial_anim: int = 0
 
@@ -928,15 +928,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 to_json_code = "{obj}"
 
         elif raw_type in ["Asset", "Sound"]:
-            prop_type = "AssetId"
-            needed_imports[f"{import_base}.core.AssetId"] = "AssetId"
             if raw_type == "Asset":
+                prop_type = "AssetId"
+                needed_imports[f"{import_base}.core.Id"] = "AssetId"
                 meta["metadata"] = repr({"asset_types": prop["type_filter"]})
                 if game_id in ["Prime", "Echoes"]:
                     default_value = 0xFFFFFFFF
                 else:
                     default_value = 0xFFFFFFFFFFFFFFFF
-            else:
+            elif raw_type == "Sound":
+                prop_type = "SoundId"
+                needed_imports[f"{import_base}.core.Id"] = "SoundId"
                 default_value = prop["default_value"] if prop['has_default'] else 0
 
             if game_id in ["Prime", "Echoes"]:

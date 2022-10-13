@@ -158,12 +158,15 @@ ANIM = Struct(
     _terminated=Terminated,
 )
 
+
 def _yield_dependency_if_valid(asset_id: typing.Optional[int], asset_type: str, game: Game):
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
+
 def dependencies_for(obj, target_game: Game):
-    yield from _yield_dependency_if_valid(obj.event_id, "EVNT", target_game)
+    yield from _yield_dependency_if_valid(obj.anim.event_id, "EVNT", target_game)
+
 
 class Anim(BaseResource):
     @classmethod
@@ -175,4 +178,4 @@ class Anim(BaseResource):
         return ANIM
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self, self.target_game)
+        yield from dependencies_for(self.raw, self.target_game)

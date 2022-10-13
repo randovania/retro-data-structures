@@ -50,7 +50,7 @@ class BaseResource:
         test = cls(Container(), target_game)
         try:
             deps = list(test.dependencies_for())
-        except:
+        except Exception:
             return True
         return bool(deps)
 
