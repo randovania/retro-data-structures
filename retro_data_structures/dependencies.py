@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+import dataclasses
 import typing
 from collections import defaultdict
 import logging
 from typing import Iterator, Dict, NamedTuple, Optional, Set, List, Callable, Any, Union
 
 from retro_data_structures import formats
+from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency, NameOrAssetId
 from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
@@ -14,7 +18,6 @@ from retro_data_structures.properties.base_property import BaseProperty
 
 
 if typing.TYPE_CHECKING:
-    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.conversion.asset_converter import AssetConverter
     from retro_data_structures.formats.mlvl import AreaWrapper
 
@@ -119,7 +122,7 @@ def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId,
     return deps_by_asset_id
 
 
-def recursive_dependencies_for_editor(editor: AssetManager,
+def recursive_dependencies_for_editor(editor: AssetProvider,
                                       asset_ids: List[AssetId],
                                       ) -> Set[Dependency]:
     deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
@@ -136,7 +139,7 @@ def recursive_dependencies_for_editor(editor: AssetManager,
         except KeyError:
             return
 
-        obj = format_class.parse(raw_asset.data, target_game=editor.target_game)
+        obj = format_class.parse(raw_asset.data, target_game=editor.game)
 
         for new_type, new_asset_id in obj.dependencies_for():
             deps_by_asset_id[asset_id].add(Dependency(new_type, new_asset_id))
@@ -158,6 +161,7 @@ def recursive_dependencies_for_editor(editor: AssetManager,
 
     return result
 
+
 def recursive_dependencies(asset_manager: AssetManager, asset_id: NameOrAssetId) -> Iterator[Dependency]:
     asset_type = asset_manager.get_asset_type(asset_id)
     yield asset_type, asset_id
@@ -172,41 +176,47 @@ def recursive_dependencies(asset_manager: AssetManager, asset_id: NameOrAssetId)
         yield from recursive_dependencies(asset_manager, dependency)
 
 
-class AncsUsage(NamedTuple):
-    characters: set[int] = set()
-    animations: set[int] = set()
+@dataclasses.dataclass()
+class AncsUsage:
+    characters: set[int] = dataclasses.field(default_factory=set)
+    animations: set[int] = dataclasses.field(default_factory=set)
 
 
 class AncsUsageDependencies:
     usages: Dict[AssetId, AncsUsage]
     _ancs: Dict[AssetId, ancs.Ancs]
 
-    asset_manager: AssetManager
+    asset_provider: AssetProvider
 
-    def __init__(self, asset_manager: AssetManager):
-        self.asset_manager = asset_manager
+    def __init__(self, asset_manager: AssetProvider):
+        self.asset_provider = asset_manager
         self.usages = defaultdict(AncsUsage)
         self._ancs = {}
     
     def _get_property_usages(self, prop: BaseProperty):
-        dep_type = type(prop).__name__
+        from retro_data_structures.properties.prime.core import AnimationParameters as p1Anim
+        from retro_data_structures.properties.echoes.core import AnimationParameters as p2Anim
+        from retro_data_structures.properties.corruption.core import AnimationParameters as p3Anim
+        if isinstance(prop, (p1Anim.AnimationParameters, p2Anim.AnimationParameters, p3Anim.AnimationParameters)):
+            if not self.asset_provider.game.is_valid_asset_id(prop.ancs):
+                return
 
-        if dep_type == "AnimationParameters":
             self.usages[prop.ancs].characters.add(prop.character_index)
             if prop.ancs not in self._ancs:
-                self._ancs[prop.ancs] = self.asset_manager.get_parsed_asset(prop.ancs, ancs.Ancs)
+                self._ancs[prop.ancs] = self.asset_provider.get_parsed_asset(prop.ancs, type_hint=ancs.Ancs)
             self.usages[prop.ancs].animations = self.usages[prop.ancs].animations.union(self._ancs[prop.ancs].get_used_animations(prop.character_index))
             return
 
         for dependency in prop.mlvl_dependencies_for():
-            self._recursive_get_usages(dependency)
+            if self.asset_provider.game.is_valid_asset_id(dependency):
+                self._recursive_get_usages(dependency)
 
     def _get_resource_usages(self, resource: NameOrAssetId):
-        asset_type = self.asset_manager.get_asset_type(resource)
+        asset_type = self.asset_provider.get_asset_type(resource)
         if asset_type != "SCAN":
             return
         
-        scan_asset = self.asset_manager.get_parsed_asset(resource, type_hint=Scan)
+        scan_asset = self.asset_provider.get_parsed_asset(resource, type_hint=Scan)
         self._get_property_usages(scan_asset.scannable_object_info.get_properties())
     
     def _recursive_get_usages(self, dependency: Union[BaseProperty, NameOrAssetId]):
@@ -247,7 +257,7 @@ class MlvlDependencies:
     
     @property
     def game(self) -> Game:
-        return self.asset_manager.target_game
+        return self.asset_manager.game
 
     def _get_property_dependencies(self, prop: BaseProperty):
         dep_type = type(prop).__name__
@@ -284,6 +294,9 @@ class MlvlDependencies:
             self._properties_to_skip = set()
 
     def _get_resource_dependencies(self, asset_id: NameOrAssetId):
+        if not self.game.is_valid_asset_id(asset_id):
+            return
+
         asset_type = self.asset_manager.get_asset_type(asset_id)
 
         if asset_type == "SCAN" and self.game == Game.PRIME:
@@ -298,7 +311,7 @@ class MlvlDependencies:
         
         resource: BaseResource = self.asset_manager.get_parsed_asset(asset_id)
 
-        for dep in resource.mlvl_dependencies_for():
+        for dep in resource.mlvl_dependencies_for(self):
             yield from self._inner_mlvl_dependencies(dep)
 
     def _inner_mlvl_dependencies(self, dependency: Union[NameOrAssetId, BaseProperty]):

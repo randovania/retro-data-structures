@@ -22,7 +22,7 @@ from construct.core import (
 from construct.lib.containers import Container
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetId, Dependency
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
@@ -87,7 +87,6 @@ class ScriptLayerHelper:
     def __init__(self, raw: Container, target_game: Game) -> None:
         self._raw = raw
         self.target_game = target_game
-        self._original_instances_hash = tuple(hash(instance) for instance in self.instances)
 
     def __repr__(self) -> str:
         if self.has_parent:
@@ -202,19 +201,19 @@ class ScriptLayerHelper:
 
     def new_instance_id(self) -> InstanceId:
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
-    
+
     def recursive_mlvl_dependencies(self) -> Iterator[Dependency]:
         from retro_data_structures.dependencies import MlvlDependencies
 
         self.assert_parent()
-        dependencies = MlvlDependencies(self._parent_area.asset_manager)
+        dependencies = MlvlDependencies(self._parent_area.asset_provider)
         yield from dependencies.recursive_dependencies_for_layer(self)
-    
+
     def dependencies_for(self) -> Iterator[Dependency]:
         for instance in self.instances:
             props = instance.get_properties()
             yield from props.dependencies_for()
-    
+
     def get_dependencies(self) -> list[Dependency]:
         self.assert_parent()
         return self._parent_area.get_dependencies()[self._index]
@@ -224,13 +223,8 @@ class ScriptLayerHelper:
         deps = self._parent_area.get_dependencies()
         deps[self._index] = value
         self._parent_area.set_dependencies(deps)
-    
+
     def add_dependency(self, dependency: Dependency):
         deps = self.get_dependencies()
         deps.append(dependency)
         self.set_dependencies(deps)
-    
-    @property
-    def modified(self) -> bool:
-        # this technically could have false negatives but cmon what are the chances of that right
-        return self._original_instances_hash != tuple(hash(instance) for instance in self.instances)

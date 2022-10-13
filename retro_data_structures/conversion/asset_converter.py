@@ -1,15 +1,12 @@
 import copy
 import dataclasses
 import logging
-import typing
 from typing import Callable, Dict, Tuple, Any, Optional
 
-from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
+from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.base_resource import AssetType, AssetId, BaseResource
+from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.game_check import Game
-
-if typing.TYPE_CHECKING:
-    from retro_data_structures.asset_manager import AssetManager
 
 
 @dataclasses.dataclass(frozen=True)
@@ -40,7 +37,7 @@ class ConvertedAsset:
 
 class AssetConverter:
     target_game: Game
-    asset_providers: Dict[Game, AssetManager]
+    asset_providers: Dict[Game, AssetProvider]
     id_generator: IdGenerator
     converted_ids: Dict[Tuple[Game, AssetId], AssetId]
     converted_assets: Dict[AssetId, ConvertedAsset]
@@ -48,7 +45,7 @@ class AssetConverter:
     def __init__(
             self,
             target_game: Game,
-            asset_providers: Dict[Game, AssetManager],
+            asset_providers: Dict[Game, AssetProvider],
             id_generator: IdGenerator,
             converters: Callable[[AssetDetails], ResourceConverter],
     ):

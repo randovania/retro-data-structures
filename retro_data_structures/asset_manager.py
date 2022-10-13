@@ -10,6 +10,7 @@ from typing import Optional, Iterator
 import construct
 import nod
 
+from retro_data_structures.asset_provider import AssetProvider
 from retro_data_structures.base_resource import (
     AssetId, BaseResource, NameOrAssetId, RawResource,
     resolve_asset_id, AssetType
@@ -84,7 +85,7 @@ class IsoFileProvider(FileProvider):
         return self.data.read_file(name)
 
 
-class AssetManager:
+class AssetManager(AssetProvider):
     """
     Manages efficiently reading all PAKs in the game and writing out modifications to a new path.
 
@@ -107,6 +108,10 @@ class AssetManager:
         self._next_generated_id = 0xFFFF0000
 
         self._update_headers()
+
+    @property
+    def game(self) -> Game:
+        return self.target_game
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if value in self._custom_asset_ids:
@@ -197,7 +202,7 @@ class AssetManager:
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
         Gets the bytes data for the given asset name/id, optionally restricting from which pak.
-        :raises ValueError if the asset doesn't exist.
+        :raises: ValueError if the asset doesn't exist.
         """
         original_name = asset_id
         asset_id = self._resolve_asset_id(asset_id)
@@ -221,7 +226,7 @@ class AssetManager:
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
         """
-        Gets the resource with the given name and decodes it based on the extension.
+        Gets the resource with the given name and decodes it based on the type listed in the PAK.
         """
         raw_asset = self.get_raw_asset(asset_id)
 
@@ -232,12 +237,6 @@ class AssetManager:
 
         return format_class.parse(raw_asset.data, target_game=self.target_game,
                                   asset_manager=self)
-
-    def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:
-        """
-        Wrapper for get_parsed_asset. Override in subclasses for additional behavior such as automatic saving.
-        """
-        return self.get_parsed_asset(path, type_hint=type_hint)
 
     def generate_asset_id(self):
         result = self._next_generated_id

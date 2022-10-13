@@ -51,9 +51,7 @@ class Game(Enum):
             return (1 << 64) - 1
 
     def is_valid_asset_id(self, asset_id: int) -> bool:
-        if self == Game.PRIME and asset_id == 0:
-            return False
-        return asset_id != self.invalid_asset_id
+        return asset_id not in (self.invalid_asset_id, 0)
 
 
 def get_current_game(ctx):

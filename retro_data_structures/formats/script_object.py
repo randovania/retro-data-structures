@@ -113,7 +113,8 @@ class ScriptInstanceHelper:
         return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
     def __hash__(self) -> int:
-        return hash(self.get_properties())
+        props = self.get_properties()
+        return hash(props)
 
     @classmethod
     def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
