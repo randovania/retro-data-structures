@@ -36,6 +36,7 @@ from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, NameOrAssetId
+from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
@@ -284,7 +285,7 @@ class AreaWrapper:
     def name(self) -> str:
         try:
             return self.strg.strings[0]
-        except Exception as e:
+        except UnknownAssetId as e:
             return "!!" + self.internal_name
     
     @name.setter
@@ -358,9 +359,12 @@ class Mlvl(BaseResource):
         raise NotImplementedError()
 
     def __repr__(self) -> str:
-        if self.asset_manager.target_game == Game.ECHOES:
-            return f"{self.world_name} ({self.dark_world_name})"
-        return self.world_name
+        try:
+            if self.asset_manager.target_game == Game.ECHOES:
+                return f"{self.world_name} ({self.dark_world_name})"
+            return self.world_name
+        except UnknownAssetId:
+            return super().__repr__()
     
     @property
     def areas(self) -> Iterator[AreaWrapper]:
