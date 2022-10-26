@@ -1172,7 +1172,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "@functools.lru_cache(maxsize=None)\n"
     getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
     getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
-    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.echoes.objects.{stem}")\n'
+    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.' + game_id.lower() + \
+                   '.objects.{stem}")\n'
     getter_func += "    return getattr(module, stem)\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
