@@ -39,7 +39,7 @@ class BaseProperty:
 
 class BaseObjectType(BaseProperty, ABC):
     @classmethod
-    def object_type(cls) -> str:
+    def object_type(cls) -> typing.Union[str, int]:
         raise NotImplementedError()
 
     @classmethod

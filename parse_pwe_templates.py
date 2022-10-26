@@ -1100,8 +1100,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         if is_struct:
             cls.class_code += "\n    @classmethod\n"
-            cls.class_code += "    def object_type(cls) -> str:\n"
-            cls.class_code += f"        return {repr(struct_fourcc)}\n"
+            if game_id == "Prime":
+                cls.class_code += "    def object_type(cls) -> int:\n"
+                cls.class_code += f"        return {struct_fourcc}\n"
+            else:
+                cls.class_code += "    def object_type(cls) -> str:\n"
+                cls.class_code += f"        return {repr(struct_fourcc)}\n"
 
         if cls.modules:
             cls.class_code += "\n    @classmethod\n"
@@ -1147,6 +1151,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     path = code_path.joinpath("objects")
     _ensure_is_generated_dir(path)
 
+    if game_id == 'Prime':
+        four_cc_wrap = lambda it: it
+        four_cc_type = "int"
+    else:
+        four_cc_wrap = repr
+        four_cc_type = "str"
+
     getter_func = "# Generated File\n"
     getter_func += "import functools\nimport importlib\nimport typing\n\n"
     getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n\n"
@@ -1154,12 +1165,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
-        getter_func += f"    {repr(object_fourcc)}: {repr(stem)},\n"
+        getter_func += f"    {four_cc_wrap(object_fourcc)}: {repr(stem)},\n"
 
     getter_func += "}\n\n\n"
 
     getter_func += "@functools.lru_cache(maxsize=None)\n"
-    getter_func += "def get_object(four_cc: str) -> typing.Type[BaseObjectType]:\n"
+    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
     getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
     getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.echoes.objects.{stem}")\n'
     getter_func += "    return getattr(module, stem)\n"
@@ -1216,5 +1227,5 @@ def persist_data(parse_result):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    persist_data(parse(["Echoes"]))
-    # persist_data(parse(_game_id_to_file.keys()))
+    # persist_data(parse(["Prime"]))
+    persist_data(parse(_game_id_to_file.keys()))

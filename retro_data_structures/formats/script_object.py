@@ -139,7 +139,7 @@ class ScriptInstanceHelper:
         return properties.get_game_object(self.target_game, self.type_name)
 
     @property
-    def type_name(self) -> str:
+    def type_name(self) -> typing.Union[int, str]:
         return self._raw.type
 
     @property

@@ -10,7 +10,7 @@ from retro_data_structures import properties
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
 from retro_data_structures.formats import Mrea
 from retro_data_structures.game_check import Game
-
+from retro_data_structures.properties.prime import objects as prime_objects
 
 @dataclasses.dataclass()
 class Object:
@@ -54,7 +54,11 @@ def do_dump_properties(game: Game, args):
                     instance_id=instance.id,
                     size=len(instance.raw_properties),
                 ))
-                data.append(instance.type_name.encode("ascii"))
+                if game == Game.PRIME:
+                    name = prime_objects.get_object(instance.type_name).__name__
+                else:
+                    name = instance.type_name
+                data.append(name.encode("ascii"))
                 data.append(instance.raw_properties)
 
         print(f"Wrote properties for {asset_id:08x}")
