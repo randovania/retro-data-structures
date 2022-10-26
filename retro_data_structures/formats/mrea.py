@@ -449,12 +449,17 @@ class Mrea(BaseResource):
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
         self._ensure_decoded_section("script_layers_section")
-        for i, section in enumerate(self._raw.sections.script_layers_section):
-            if isinstance(section, bytes):
-                section = _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game)
-                self._raw.sections.script_layers_section[i] = section
+        if self.target_game == Game.PRIME:
+            section = self._raw.sections.script_layers_section[0]
+            for layer in section.layers:
+                yield ScriptLayerHelper(layer, self.target_game)
+        else:
+            for i, section in enumerate(self._raw.sections.script_layers_section):
+                if isinstance(section, bytes):
+                    section = _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game)
+                    self._raw.sections.script_layers_section[i] = section
 
-            yield ScriptLayerHelper(section, self.target_game)
+                yield ScriptLayerHelper(section, self.target_game)
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for layer in self.script_layers:

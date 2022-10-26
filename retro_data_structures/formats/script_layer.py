@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from typing import Optional, Union
 
+import construct
 from construct.core import (
     Const,
     Hex,
@@ -17,7 +18,6 @@ from construct.core import (
     Seek,
     Struct,
     Tell,
-    this,
 )
 from construct.lib.containers import Container
 
@@ -39,14 +39,13 @@ ScriptLayerPrime = Struct(
     Skip(1, Int32ub),
     "_layer_size_address" / Tell,
     Seek(lambda this: (this._layer_count or len(this.layers)) * Int32ub.sizeof(), 1),
-    "layers"
-    / PrefixedArray(
-        Pointer(this._._layer_count_address, Int32ub),
+    "layers" / PrefixedArray(
+        Pointer(construct.this._._layer_count_address, Int32ub),
         Prefixed(
             Pointer(lambda this: this._._layer_size_address + this._index * Int32ub.sizeof(), Int32ub),
             Struct(
                 "unk" / Hex(Int8ub),
-                "objects" / PrefixedArray(Int32ub, ScriptInstance),
+                "script_instances" / PrefixedArray(Int32ub, ScriptInstance),
             ),
         ),
     ),
