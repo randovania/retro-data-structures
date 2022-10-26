@@ -18,6 +18,7 @@ from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.pak import PAK, Pak
 from retro_data_structures.formats.part import PART, Part
 from retro_data_structures.formats.sand import SAND, Sand
+from retro_data_structures.formats.savw import SAVW, Savw
 from retro_data_structures.formats.scan import SCAN, Scan
 from retro_data_structures.formats.strg import STRG, Strg
 from retro_data_structures.formats.txtr import TXTR, Txtr
@@ -37,6 +38,7 @@ ALL_FORMATS = {
     "PAK": PAK,
     "PART": PART,
     "SAND": SAND,
+    "SAVW": SAVW,
     "SCAN": SCAN,
     "STRG": STRG,
     "TXTR": TXTR,
@@ -58,6 +60,7 @@ ALL_RESOURCE_TYPES = {
     "PAK": Pak,
     "PART": Part,
     "SAND": Sand,
+    "SAVW": Savw,
     "SCAN": Scan,
     "STRG": Strg,
     "TXTR": Txtr,
