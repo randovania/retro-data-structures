@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from retro_data_structures.formats.script_layer import ScriptLayerHelper
 
 
+PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
+
+
 def Connection(subcon):
     return Struct(
         state=subcon,
@@ -175,6 +178,11 @@ class ScriptInstanceHelper:
 
     def get_properties(self) -> BaseObjectType:
         return self.type.from_bytes(self._raw.base_property)
+
+    def get_properties_as(self, type_cls: Type[PropertyType]) -> PropertyType:
+        props = self.get_properties()
+        assert isinstance(props, type_cls)
+        return props
 
     def set_properties(self, data: BaseObjectType):
         if not isinstance(data, self.type):
