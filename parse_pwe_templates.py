@@ -1,3 +1,4 @@
+import collections
 import dataclasses
 import keyword
 import logging
@@ -805,9 +806,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         for name, path in get_paths(root.find("PropertyArchetypes")).items()
     }
 
-    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", game_id.lower())
+    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", _game_id_to_file[game_id])
     _ensure_is_generated_dir(code_path)
-    import_base = f"retro_data_structures.properties.{game_id.lower()}"
+    import_base = f"retro_data_structures.properties.{_game_id_to_file[game_id]}"
 
     class LiteralPropType(typing.NamedTuple):
         python_type: str
@@ -1128,7 +1129,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
 
         if cls.need_enums:
-            code_code += f"import retro_data_structures.enums.{game_id.lower()} as enums\n"
+            code_code += f"import retro_data_structures.enums.{_game_id_to_file[game_id]} as enums\n"
 
         for import_path, code_import in sorted(cls.needed_imports.items()):
             code_code += f"from {import_path} import {code_import}\n"
@@ -1172,7 +1173,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "@functools.lru_cache(maxsize=None)\n"
     getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
     getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
-    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.' + game_id.lower() + \
+    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.' + _game_id_to_file[game_id] + \
                    '.objects.{stem}")\n'
     getter_func += "    return getattr(module, stem)\n"
     path.joinpath("__init__.py").write_text(getter_func)
@@ -1199,6 +1200,73 @@ def parse_game_list(templates_path: Path) -> dict:
     }
 
 
+def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]):
+    imports = []
+    declarations = []
+    base = "import retro_data_structures.properties."
+
+    for object_name, games in sorted(all_objects.items()):
+        if len(games) < 2:
+            continue
+
+        import_name = object_name.replace("_", ".")
+        type_name = object_name.split("_")[-1]
+
+        for game in games:
+            imports.append(
+                f"{base}{_game_id_to_file[game]}.{kind}.{import_name} as _{object_name}_{game}"
+            )
+        declarations.append("{} = typing.Union[{}]".format(
+            object_name,
+            ", ".join(f"_{object_name}_{game}.{type_name}" for game in games)
+        ))
+
+    output_file.write_text("# Generated File\nimport typing\n\n{imports}\n\n{declarations}\n".format(
+        imports="\n".join(imports),
+        declarations="\n".join(declarations),
+    ))
+
+
+def write_shared_types_helpers(all_games: dict):
+    all_objects = collections.defaultdict(list)
+    all_archetypes = collections.defaultdict(list)
+
+    for game_id, game_data in all_games.items():
+        for script_object in game_data["script_objects"].values():
+            if game_id in all_objects[script_object["name"]]:
+                continue
+            all_objects[script_object["name"]].append(game_id)
+
+        for archetype in game_data["property_archetypes"].values():
+            if "name" not in archetype:
+                continue
+            if "UnknownStruct" in archetype["name"]:
+                continue
+            if game_id in all_archetypes[archetype["name"]]:
+                continue
+            all_archetypes[archetype["name"]].append(game_id)
+
+    path_to_props = Path(__file__).parent.joinpath("retro_data_structures", "properties")
+    write_shared_type(
+        path_to_props.joinpath("shared_objects.py"),
+        "objects",
+        all_objects,
+    )
+    write_shared_type(
+        path_to_props.joinpath("shared_archetypes.py"),
+        "archetypes",
+        all_archetypes,
+    )
+    write_shared_type(
+        path_to_props.joinpath("shared_core.py"),
+        "core",
+        {
+            name: ["Prime", "Echoes", "Corruption", "DKCReturns"]
+            for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
+        },
+    )
+
+
 def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
     base_dir = Path(__file__).parent
     templates_path = base_dir.joinpath("PrimeWorldEditor/templates")
@@ -1207,11 +1275,13 @@ def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
     game_list = parse_game_list(templates_path)
     _parse_choice.unknowns = {game: 0 for game in game_list.keys()}
 
-    return {
+    all_games = {
         _id: parse_game(templates_path, game_path, _id)
         for _id, game_path in game_list.items()
         if game_ids is None or _id in game_ids
     }
+    write_shared_types_helpers(all_games)
+    return all_games
 
 
 def persist_data(parse_result):
