@@ -466,7 +466,8 @@ class Mrea(BaseResource):
             if (instance := layer.get_instance(instance_id)) is not None:
                 return instance
 
-    def get_instance_by_name(self, name: str) -> Optional[ScriptInstanceHelper]:
+    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         for layer in self.script_layers:
-            if (instance := layer.get_instance_by_name(name)) is not None:
+            if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
                 return instance
+        raise KeyError(name)

@@ -113,11 +113,12 @@ class ScriptLayerHelper:
                 return instance
         return None
 
-    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+    def get_instance_by_name(self, name: str, *, raise_if_missing: bool = True) -> ScriptInstanceHelper:
         for instance in self.instances:
             if instance.name == name:
                 return instance
-        raise KeyError(name)
+        if raise_if_missing:
+            raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstanceHelper):
         if self.get_instance(instance.id) is not None:
