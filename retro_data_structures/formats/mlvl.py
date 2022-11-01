@@ -314,8 +314,8 @@ class AreaWrapper:
 
     @property
     def layers(self) -> Iterator[ScriptLayerHelper]:
-        for i, layer in enumerate(self.mrea.script_layers):
-            yield ScriptLayerHelper.with_parent(layer, self, i)
+        for layer in self.mrea.script_layers:
+            yield layer.with_parent(self)
     
     def get_layer(self, name: str) -> ScriptLayerHelper:
         return next(layer for layer in self.layers if layer.name == name)

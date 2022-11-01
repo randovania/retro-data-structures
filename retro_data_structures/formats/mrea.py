@@ -184,6 +184,7 @@ def _encode_category(category: typing.List, subcon: construct.Construct, context
                 this_subcon = GreedyBytes
             else:
                 this_subcon = subcon
+
             Aligned(32, this_subcon)._build(section, stream, context, path)
             data = stream.getvalue()
         else:
@@ -421,6 +422,8 @@ MREA = MREAConstruct()
 
 
 class Mrea(BaseResource):
+    _script_layer_helpers: Optional[typing.Dict[int, ScriptLayerHelper]] = None
+
     @classmethod
     def resource_type(cls) -> AssetType:
         return "MREA"
@@ -432,7 +435,7 @@ class Mrea(BaseResource):
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
-    def _ensure_decoded_section(self, section_name: str):
+    def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
         if section_name not in self._raw.sections:
             context = Container(target_game=self.target_game)
             context._parsing = True
@@ -442,24 +445,39 @@ class Mrea(BaseResource):
 
             self._raw.sections[section_name] = _decode_category(
                 self._raw.raw_sections[section_name],
-                _CATEGORY_ENCODINGS[section_name],
+                GreedyBytes if lazy_load else _CATEGORY_ENCODINGS[section_name],
                 context, "",
             )
 
+    def build(self) -> bytes:
+        for i, section in (self._script_layer_helpers or {}).items():
+            if section.is_modified():
+                self._raw.sections.script_layers_section[i] = section._raw
+        return super().build()
+
     @property
     def script_layers(self) -> Iterator[ScriptLayerHelper]:
-        self._ensure_decoded_section("script_layers_section")
+        self._ensure_decoded_section("script_layers_section", lazy_load=self.target_game != Game.PRIME)
+
         if self.target_game == Game.PRIME:
             section = self._raw.sections.script_layers_section[0]
-            for layer in section.layers:
-                yield ScriptLayerHelper(layer, self.target_game)
+            for i, layer in enumerate(section.layers):
+                yield ScriptLayerHelper(layer, i, self.target_game)
         else:
-            for i, section in enumerate(self._raw.sections.script_layers_section):
-                if isinstance(section, bytes):
-                    section = _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game)
-                    self._raw.sections.script_layers_section[i] = section
+            if self._script_layer_helpers is None:
+                self._script_layer_helpers = {}
 
-                yield ScriptLayerHelper(section, self.target_game)
+            for i, section in enumerate(self._raw.sections.script_layers_section):
+                if i not in self._script_layer_helpers:
+                    self._script_layer_helpers[i] = ScriptLayerHelper(
+                        _CATEGORY_ENCODINGS["script_layers_section"].parse(
+                            section, target_game=self.target_game
+                        ),
+                        i,
+                        self.target_game
+                    )
+
+            yield from self._script_layer_helpers.values()
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for layer in self.script_layers:

@@ -80,23 +80,22 @@ SCGN = ScriptLayer("SCGN")
 
 class ScriptLayerHelper:
     _parent_area: Optional[AreaWrapper] = None
-    _index: Optional[int] = None
+    _index: int
+    _modified: bool = False
 
-    def __init__(self, raw: Container, target_game: Game) -> None:
+    def __init__(self, raw: Container, index: int, target_game: Game) -> None:
         self._raw = raw
         self.target_game = target_game
+        self._index = index
 
     def __repr__(self) -> str:
         if self.has_parent:
             return f"{self.name} ({'Active' if self.active else 'Inactive'})"
         return super().__repr__()
 
-    @classmethod
-    def with_parent(cls, child: "ScriptLayerHelper", parent: AreaWrapper, index: int):
-        new = cls(child._raw, child.target_game)
-        new._parent_area = parent
-        new._index = index
-        return new
+    def with_parent(self, parent: AreaWrapper) -> ScriptLayerHelper:
+        self._parent_area = parent
+        return self
 
     @property
     def index(self):
@@ -105,7 +104,7 @@ class ScriptLayerHelper:
     @property
     def instances(self):
         for instance in self._raw.script_instances:
-            yield ScriptInstanceHelper(instance, self.target_game)
+            yield ScriptInstanceHelper(instance, self.target_game, on_modify=self.mark_modified)
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for instance in self.instances:
@@ -124,6 +123,7 @@ class ScriptLayerHelper:
         if self.get_instance(instance.id) is not None:
             raise RuntimeError(f"Instance with id {instance.id} already exists.")
 
+        self._modified = True
         self._raw.script_instances.append(instance._raw)
         return self.get_instance(instance.id)
 
@@ -160,10 +160,12 @@ class ScriptLayerHelper:
         if not matching_instances:
             raise KeyError(instance)
 
+        self._modified = True
         for i in matching_instances:
             self._raw.script_instances.remove(i)
 
     def remove_instances(self):
+        self._modified = True
         self._raw.script_instances = []
 
     def assert_parent(self):
@@ -186,6 +188,7 @@ class ScriptLayerHelper:
     @active.setter
     def active(self, value: bool):
         self.assert_parent()
+        self._modified = True
         self._parent_area._flags[self._index] = value
 
     @property
@@ -196,7 +199,14 @@ class ScriptLayerHelper:
     @name.setter
     def name(self, value: str):
         self.assert_parent()
+        self._modified = True
         self._parent_area._layer_names[self._index] = value
 
     def new_instance_id(self) -> InstanceId:
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
+
+    def is_modified(self) -> bool:
+        return self._modified
+
+    def mark_modified(self):
+        self._modified = True

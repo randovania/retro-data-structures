@@ -105,9 +105,10 @@ class ScriptInstanceHelper:
     _raw: Container
     target_game: Game
 
-    def __init__(self, raw: Container, target_game: Game):
+    def __init__(self, raw: Container, target_game: Game, on_modify: typing.Callable[[], None] = lambda: None):
         self._raw = raw
         self.target_game = target_game
+        self.on_modify = on_modify
 
     def __str__(self):
         return "<ScriptInstance {} 0x{:08x}>".format(self.type_name, self.id)
@@ -152,6 +153,7 @@ class ScriptInstanceHelper:
     @id.setter
     def id(self, value):
         self._raw.id = InstanceId(value)
+        self.on_modify()
 
     def id_matches(self, id: typing.Union[int, InstanceId]) -> bool:
         if not isinstance(id, InstanceId):
@@ -189,6 +191,7 @@ class ScriptInstanceHelper:
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type_name}")
 
         self._raw.base_property = data.to_bytes()
+        self.on_modify()
 
     def get_property(self, chain: Iterator[str]):
         prop = self.get_properties()
@@ -210,8 +213,11 @@ class ScriptInstanceHelper:
             message=message,
             target=target.id
         ))
+        self.on_modify()
 
     def remove_connections(self, target: Union[int, ScriptInstanceHelper]):
         if isinstance(target, ScriptInstanceHelper):
             target = target.id
+
         self.connections = [c for c in self.connections if c.target != target]
+        self.on_modify()
