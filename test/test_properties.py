@@ -118,7 +118,7 @@ def test_door():
             b'\x00\x04?\x00\x00\x00\xcd\xcaY+\x00\x04?\x00\x00\x00\xcc\x00\x9f5\x00\x01\x00\xc2\x97e\xea\x00'
             b'\x01\x00\x9e\xc6\'\x12\x00\x0c\x00\x01\xb9N\x9b\xe7\x00\x04\xff\xff\xff\xff')
 
-    from retro_data_structures.properties.echoes.objects.Door import Door
+    from retro_data_structures.properties.echoes.objects import Door
     from retro_data_structures.properties.echoes.core.Color import Color
     from retro_data_structures.properties.echoes.archetypes.WeaponVulnerability import WeaponVulnerability
     from retro_data_structures.enums.echoes import Effect

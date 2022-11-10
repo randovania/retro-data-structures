@@ -1179,22 +1179,24 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         four_cc_type = "str"
 
     getter_func = "# Generated File\n"
-    getter_func += "import functools\nimport importlib\nimport typing\n\n"
-    getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n\n"
-    getter_func += "_FOUR_CC_MAPPING = {\n"
+    getter_func += "import functools\nimport typing\n\n"
+    getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n"
+
+    base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
+    fourcc_mapping = "\n_FOUR_CC_MAPPING = {\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
-        getter_func += f"    {four_cc_wrap(object_fourcc)}: {repr(stem)},\n"
 
+        getter_func += f"from {base_import_path}{stem} import {stem}\n"
+        fourcc_mapping += f"    {four_cc_wrap(object_fourcc)}: {stem},\n"
+
+    getter_func += fourcc_mapping
     getter_func += "}\n\n\n"
 
     getter_func += "@functools.lru_cache(maxsize=None)\n"
     getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
-    getter_func += "    stem = _FOUR_CC_MAPPING[four_cc]\n"
-    getter_func += '    module = importlib.import_module(f"retro_data_structures.properties.' + _game_id_to_file[game_id] + \
-                   '.objects.{stem}")\n'
-    getter_func += "    return getattr(module, stem)\n"
+    getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
     print("> Creating archetypes")
@@ -1219,6 +1221,33 @@ def parse_game_list(templates_path: Path) -> dict:
     }
 
 
+def write_shared_type_with_common_import(output_file: Path, kind: str, all_objects: dict[str, list[str]]):
+    declarations = []
+    base = "import retro_data_structures.properties."
+
+    used_games = set()
+
+    for object_name, games in sorted(all_objects.items()):
+        if len(games) < 2:
+            continue
+
+        type_name = object_name.split("_")[-1]
+
+        used_games.update(games)
+        declarations.append("{} = typing.Union[\n{}\n]".format(
+            object_name,
+            ",\n".join(f"    _{_game_id_to_file[game]}_{kind}.{type_name}" for game in games)
+        ))
+
+    output_file.write_text("# Generated File\nimport typing\n\n{imports}\n\n{declarations}\n".format(
+        imports="\n".join(
+            f"{base}{_game_id_to_file[game]}.{kind} as _{_game_id_to_file[game]}_{kind}"
+            for game in sorted(used_games)
+        ),
+        declarations="\n".join(declarations),
+    ))
+
+
 def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]):
     imports = []
     declarations = []
@@ -1235,9 +1264,9 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
             imports.append(
                 f"{base}{_game_id_to_file[game]}.{kind}.{import_name} as _{object_name}_{game}"
             )
-        declarations.append("{} = typing.Union[{}]".format(
+        declarations.append("{} = typing.Union[\n{}\n]".format(
             object_name,
-            ", ".join(f"_{object_name}_{game}.{type_name}" for game in games)
+            ",\n".join(f"    _{object_name}_{game}.{type_name}" for game in games)
         ))
 
     output_file.write_text("# Generated File\nimport typing\n\n{imports}\n\n{declarations}\n".format(
@@ -1266,7 +1295,7 @@ def write_shared_types_helpers(all_games: dict):
             all_archetypes[archetype["name"]].append(game_id)
 
     path_to_props = Path(__file__).parent.joinpath("retro_data_structures", "properties")
-    write_shared_type(
+    write_shared_type_with_common_import(
         path_to_props.joinpath("shared_objects.py"),
         "objects",
         all_objects,
