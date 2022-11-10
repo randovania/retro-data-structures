@@ -969,7 +969,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Array":
             inner_prop = get_prop_details(prop["item_archetype"])
 
-            prop_type = f"list[{inner_prop.prop_type}]"
+            prop_type = f"typing.List[{inner_prop.prop_type}]"
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
             meta["default_factory"] = "list"
