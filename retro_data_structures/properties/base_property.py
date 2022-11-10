@@ -45,3 +45,9 @@ class BaseObjectType(BaseProperty, ABC):
     @classmethod
     def modules(cls) -> typing.List[str]:
         return []
+
+    def get_name(self) -> typing.Optional[str]:
+        raise NotImplementedError()
+
+    def set_name(self, name: str) -> None:
+        raise NotImplementedError()

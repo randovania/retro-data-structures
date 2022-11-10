@@ -162,16 +162,13 @@ class ScriptInstanceHelper:
         return self.id.area == id.area and self.id.instance == id.instance
 
     @property
-    def name(self) -> str:
-        try:
-            return self.get_property(("editor_properties", "name"))
-        except Exception as e:
-            return f"Id 0x{self.id:08x}"
+    def name(self) -> typing.Union[str]:
+        return self.get_properties().get_name()
 
     @name.setter
     def name(self, value: str):
         props = self.get_properties()
-        props.editor_properties.name = value
+        props.set_name(value)
         self.set_properties(props)
 
     @property

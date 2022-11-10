@@ -1100,6 +1100,25 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.class_code += f"        return Game.{game_id.upper()}\n"
 
         if is_struct:
+            cls.class_code += "\n    def get_name(self) -> typing.Optional[str]:\n"
+            if game_id == "Prime":
+                if "name" in cls.all_props:
+                    name_field = "self.name"
+                else:
+                    name_field = "None"
+            else:
+                if "editor_properties" in cls.all_props:
+                    name_field = "self.editor_properties.name"
+                else:
+                    name_field = "None"
+            cls.class_code += f"        return {name_field}\n"
+
+            cls.class_code += "\n    def set_name(self, name: str) -> None:\n"
+            if name_field == "None":
+                cls.class_code += '        raise RuntimeException(f"{self.__class__.name} does not have name")\n'
+            else:
+                cls.class_code += f'        {name_field} = name\n'
+
             cls.class_code += "\n    @classmethod\n"
             if game_id == "Prime":
                 cls.class_code += "    def object_type(cls) -> int:\n"
