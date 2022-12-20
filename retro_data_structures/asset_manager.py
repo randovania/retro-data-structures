@@ -31,6 +31,9 @@ class FileProvider:
     def open_binary(self, name: str) -> typing.BinaryIO:
         raise NotImplementedError()
 
+    def get_dol(self) -> bytes:
+        raise NotImplementedError()
+
 
 class PathFileProvider(FileProvider):
     def __init__(self, root: Path):
@@ -50,6 +53,10 @@ class PathFileProvider(FileProvider):
 
     def open_binary(self, name: str) -> typing.BinaryIO:
         return self.root.joinpath(name).open("rb")
+
+    def get_dol(self) -> bytes:
+        with self.open_binary("sys/main.dol") as f:
+            return f.read()
 
 
 class IsoFileProvider(FileProvider):
@@ -79,6 +86,9 @@ class IsoFileProvider(FileProvider):
 
     def open_binary(self, name: str):
         return self.data.read_file(name)
+
+    def get_dol(self) -> bytes:
+        return self.data.get_dol()
 
 
 class AssetManager:
