@@ -17,12 +17,12 @@ FormDescriptorHeader = Struct(
 def FormDescription(data_type: str, version: int, contents: construct.Construct):
     return Struct(
         magic=Const("RFRM", FourCC),
-        size=Int64ul,
+        _size=construct.Rebuild(Int64ul, construct.len_(construct.this.data)),
         unk=Int64ul,
         id=Const(data_type, FourCC),
         version=Const(version, Int32ul),
         other_version=Int32ul,
-        data=construct.FixedSized(construct.this.size, contents),
+        data=construct.FixedSized(construct.this._size, contents),
     )
 
 
@@ -70,38 +70,39 @@ ChunkDescriptor = Struct(
     ),
 )
 
+TOCC = FormDescription(
+    "TOCC", 3, construct.ExprAdapter(
+        construct.GreedyRange(ChunkDescriptor),
+        lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
+        lambda obj, ctx: construct.ListContainer(obj.values()),
+    ),
+)
+
 PakWiiU = FormDescription(
     "PACK", 1, Struct(
-        tocc=FormDescription(
-            "TOCC", 3, construct.ExprAdapter(
-                construct.GreedyRange(ChunkDescriptor),
-                lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
-                lambda obj, ctx: construct.ListContainer(obj.values()),
-            ),
-        ),
+        tocc=TOCC,
         remain=construct.GreedyBytes,
     ),
 )
 
 PakWiiUNoData = Struct(
-    resources=construct.ExprAdapter(
-        PakWiiU,
-        lambda obj, ctx: obj.data.tocc.data.ADIR.data,
-        lambda obj, ctx: None,
-    )
+    header=FormDescriptorHeader,
+    tocc=TOCC,
+    resources=construct.Computed(construct.this.tocc.data.ADIR.data),
 )
 
 
 class ConstructPakWiiU(construct.Construct):
     def _parse(self, stream, context, path):
-        header = PakWiiU._parsereport(stream, context, f"{path} -> header")
+        header = PakWiiUNoData._parsereport(stream, context, f"{path} -> header")
 
         files = []
         for i, resource in enumerate(header.resources):
-            if resource.offset != construct.stream_tell(stream, path):
-                raise construct.ConstructError(
-                    f"Expected resource at {resource.offset}, was at {construct.stream_tell(stream, path)}", path)
+            # if resource.decompressed_size != resource.size:
+            #     raise construct.ConstructError(
+            #         f"Resource {i} ({resource.asset.id} {resource.asset.type}), is compressed", path)
 
+            construct.stream_seek(stream, resource.offset, 0, path)
             data = construct.stream_read(stream, resource.size, path)
             files.append(PakFile(
                 resource.asset.id,
