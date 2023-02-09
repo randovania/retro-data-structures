@@ -5,7 +5,7 @@ from retro_data_structures.common_types import FourCC, AssetId128
 from retro_data_structures.formats.pak_gc import PakFile
 
 FormDescriptorHeader = Struct(
-    magic=Const("RFRM", FourCC),
+    magic=Const(b"RFRM"),
     size=Int64ul,
     unk=Int64ul,
     id=FourCC,
@@ -16,7 +16,7 @@ FormDescriptorHeader = Struct(
 
 def FormDescription(data_type: str, version: int, contents: construct.Construct):
     return Struct(
-        magic=Const("RFRM", FourCC),
+        magic=Const(b"RFRM"),
         _size=construct.Rebuild(Int64ul, construct.len_(construct.this.data)),
         unk=Int64ul,
         id=Const(data_type, FourCC),
@@ -68,7 +68,7 @@ ChunkDescriptor = Struct(
             construct.GreedyBytes,
         )
     ),
-)
+).compile()
 
 TOCC = FormDescription(
     "TOCC", 3, construct.ExprAdapter(
