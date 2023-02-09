@@ -14,7 +14,8 @@ from retro_data_structures.base_resource import (
     resolve_asset_id, AssetType
 )
 from retro_data_structures.exceptions import UnknownAssetId
-from retro_data_structures.formats.pak import PAKNoData, Pak
+from retro_data_structures.formats.pak import Pak
+from retro_data_structures.formats.pak_gc import PAKNoData
 from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
@@ -145,7 +146,7 @@ class AssetManager:
 
         for name in self.all_paks:
             with self.provider.open_binary(name) as f:
-                pak_no_data = PAKNoData.parse_stream(f, target_game=self.target_game)
+                pak_no_data = Pak.header_for_game(self.target_game).parse_stream(f, target_game=self.target_game)
 
             self._ensured_asset_ids[name] = set()
             for entry in pak_no_data.resources:

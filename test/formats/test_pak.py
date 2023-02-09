@@ -2,7 +2,8 @@ import pytest
 
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
-from retro_data_structures.formats.pak import PAK, CompressedPakResource, PAKNoData, Pak, PakBody, PakFile
+from retro_data_structures.formats.pak import PAK_GC, Pak
+from retro_data_structures.formats.pak_gc import PAKNoData, CompressedPakResource, PakFile, PakBody
 from retro_data_structures.game_check import Game
 
 
@@ -184,11 +185,11 @@ def test_compare_header_keep_data(prime2_paks_path):
     raw_header = PAKNoData.parse(raw, target_game=game)
     raw_sizes = [(r.compressed, r.offset, r.size) for r in raw_header.resources]
 
-    decoded = PAK.parse(raw, target_game=game)
+    decoded = PAK_GC.parse(raw, target_game=game)
     # for r in decoded.resources:
     #     r.contents.pop("data")
 
-    encoded = PAK.build(decoded, target_game=game)
+    encoded = PAK_GC.build(decoded, target_game=game)
 
     custom_header = PAKNoData.parse(encoded, target_game=game)
 
@@ -497,8 +498,8 @@ def test_compare_from_build():
         ]
     )
 
-    result = PAK.build(source, target_game=game)
-    decoded: PakBody = PAK.parse(result, target_game=game)
+    result = PAK_GC.build(source, target_game=game)
+    decoded: PakBody = PAK_GC.parse(result, target_game=game)
 
     for source_file in source.files:
         pad = 32 - len(source_file.compressed_data) % 32

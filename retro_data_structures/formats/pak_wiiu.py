@@ -1,7 +1,7 @@
 import construct
 from construct import Struct, Int32ul, Int64ul, PrefixedArray, Array
 
-from retro_data_structures.common_types import FourCC
+from retro_data_structures.common_types import FourCC, AssetId128
 
 RFRMHeader = Struct(
     magic=Int32ul,
@@ -22,8 +22,10 @@ ADIRHeader = Struct(
 )
 
 Resource = Struct(
-    type=FourCC,
-    res_id=Int64ul[2],
+    asset=Struct(
+        type=FourCC,
+        id=AssetId128,
+    ),
     offset=Int64ul,
     size=Int64ul,
     unk1=Int64ul,
@@ -46,7 +48,7 @@ Meta = Struct(
     )
 )
 
-PakFile = Struct(
+ConstructPakWiiU = Struct(
     PAK=RFRMHeader,
     TOCC=RFRMHeader,
     ADIR=ADIRHeader,

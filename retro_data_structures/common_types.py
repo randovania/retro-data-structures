@@ -1,3 +1,4 @@
+import construct
 from construct import Array, PrefixedArray, Struct, Float32b, PaddedString, CString, Int16ub, Int32ub, Int64ub, Hex, Byte
 
 Vector2f = Array(2, Float32b)
@@ -32,6 +33,11 @@ CharAnimTime = Struct(
 
 AssetId32 = Hex(Int32ub)
 AssetId64 = Hex(Int64ub)
+AssetId128 = Hex(construct.ExprAdapter(
+    construct.Int64ul[2],
+    decoder=lambda obj, ctx: obj[0] | obj[1] << 64,
+    encoder=lambda obj, ctx: (obj & (1 << 64 - 1), obj >> 64),
+))
 ObjectTag_32 = Struct(
     type=FourCC,
     id=AssetId32,

@@ -23,7 +23,7 @@ Construct type definitions for Retro Studios game
 ## Example Usage
 
 ```python
-from retro_data_structures.formats.pak import PAK
+from retro_data_structures.formats.pak import PAK_GC
 
 
 def read_file(path):
@@ -31,7 +31,7 @@ def read_file(path):
         return f.read()
 
 
-PAK.build_file({
+PAK_GC.build_file({
     'named_resources': [
         {"asset": {"type": 'TXTR', "id": 201335801}, "name": 'TXTR_ElevatorIcon_1'},
         {"asset": {"type": 'TXTR', "id": 239414538}, "name": 'TXTR_ElevatorIcon'},

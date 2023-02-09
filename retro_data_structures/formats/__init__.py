@@ -15,7 +15,7 @@ from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.mapw import Mapw
 from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
-from retro_data_structures.formats.pak import PAK, Pak
+from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.part import PART, Part
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw
@@ -35,7 +35,6 @@ ALL_FORMATS = {
     "EVNT": EVNT,
     "MLVL": MLVL,
     "MREA": MREA,
-    "PAK": PAK,
     "PART": PART,
     "SAND": SAND,
     "SAVW": SAVW,
