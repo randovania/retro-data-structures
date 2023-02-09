@@ -96,7 +96,7 @@ class PakBody:
     files: typing.List[PakFile]
 
 
-class PAKNew(construct.Construct):
+class ConstructPakGc(construct.Construct):
     def _parse(self, stream, context, path) -> PakBody:
         header = PAKNoData._parsereport(stream, context, f"{path} -> header")
 
@@ -193,7 +193,7 @@ class PAKNew(construct.Construct):
         construct.stream_seek(stream, files_end, 0, path)
 
 
-PAK = PAKNew()
+PAK = ConstructPakGc()
 
 
 class Pak:

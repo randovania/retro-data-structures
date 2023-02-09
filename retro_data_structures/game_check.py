@@ -14,6 +14,7 @@ class Game(Enum):
     PRIME = 1
     ECHOES = 2
     CORRUPTION = 3
+    PRIME_REMASTER = 10
 
     def __ge__(self, other):
         if self.__class__ is other.__class__:
@@ -40,6 +41,10 @@ class Game(Enum):
         return self <= Game.ECHOES
 
     @property
+    def uses_asset_id_64(self):
+        return self == Game.CORRUPTION
+
+    @property
     def uses_lzo(self):
         return self in {Game.ECHOES, Game.CORRUPTION}
 
@@ -47,8 +52,10 @@ class Game(Enum):
     def invalid_asset_id(self) -> int:
         if self.uses_asset_id_32:
             return (1 << 32) - 1
-        else:
+        elif self.uses_asset_id_64:
             return (1 << 64) - 1
+        else:
+            return (1 << 128) - 1
 
     def is_valid_asset_id(self, asset_id: int) -> bool:
         if self == Game.PRIME and asset_id == 0:
