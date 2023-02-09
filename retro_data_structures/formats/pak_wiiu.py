@@ -2,29 +2,9 @@ import construct
 from construct import Struct, Int32ul, Int64ul, PrefixedArray, Hex, Const
 
 from retro_data_structures.common_types import FourCC, AssetId128
+from retro_data_structures.formats.chunk_descriptor import ChunkDescriptor
+from retro_data_structures.formats.form_description import FormDescriptorHeader, FormDescription
 from retro_data_structures.formats.pak_gc import PakFile
-
-FormDescriptorHeader = Struct(
-    magic=Const(b"RFRM"),
-    size=Int64ul,
-    unk=Int64ul,
-    id=FourCC,
-    version=Int32ul,
-    other_version=Int32ul,
-)
-
-
-def FormDescription(data_type: str, version: int, contents: construct.Construct):
-    return Struct(
-        magic=Const(b"RFRM"),
-        _size=construct.Rebuild(Int64ul, construct.len_(construct.this.data)),
-        unk=Int64ul,
-        id=Const(data_type, FourCC),
-        version=Const(version, Int32ul),
-        other_version=Int32ul,
-        data=construct.FixedSized(construct.this._size, contents),
-    )
-
 
 StringTableEntry = Struct(
     asset=Struct(
@@ -51,28 +31,17 @@ AssetDirectoryEntry = Struct(
     size=Hex(Int64ul),
 )
 
-ChunkDescriptor = Struct(
-    id=FourCC,
-    size=Int64ul,
-    unk=Int32ul,
-    skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
-    data=construct.FixedSized(
-        construct.this.size,
-        construct.Switch(
-            construct.this.id,
-            {
-                "ADIR": PrefixedArray(Int32ul, AssetDirectoryEntry),
-                "META": PrefixedArray(Int32ul, MetadataEntry),
-                "STRG": PrefixedArray(Int32ul, StringTableEntry),
-            },
-            construct.GreedyBytes,
-        )
-    ),
+TOCCChunkDescriptor = ChunkDescriptor(
+    {
+        "ADIR": PrefixedArray(Int32ul, AssetDirectoryEntry),
+        "META": PrefixedArray(Int32ul, MetadataEntry),
+        "STRG": PrefixedArray(Int32ul, StringTableEntry),
+    },
 ).compile()
 
 TOCC = FormDescription(
     "TOCC", 3, construct.ExprAdapter(
-        construct.GreedyRange(ChunkDescriptor),
+        construct.GreedyRange(TOCCChunkDescriptor),
         lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
         lambda obj, ctx: construct.ListContainer(obj.values()),
     ),

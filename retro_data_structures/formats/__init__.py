@@ -17,6 +17,7 @@ from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.part import PART, Part
+from retro_data_structures.formats.room import Room
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw
 from retro_data_structures.formats.scan import SCAN, Scan
@@ -58,6 +59,7 @@ ALL_RESOURCE_TYPES = {
     "MREA": Mrea,
     "PAK": Pak,
     "PART": Part,
+    "ROOM": Room,
     "SAND": Sand,
     "SAVW": Savw,
     "SCAN": Scan,
