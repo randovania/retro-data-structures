@@ -10,7 +10,7 @@ from retro_data_structures.game_check import Game
 
 def _pak_for_game(game: Game):
     if game == Game.PRIME_REMASTER:
-        return pak_wiiu.ConstructPakWiiU
+        return pak_wiiu.PAK_WIIU
     else:
         return pak_gc.PAK_GC
 
@@ -26,7 +26,7 @@ class Pak:
     @staticmethod
     def header_for_game(game: Game):
         if game == Game.PRIME_REMASTER:
-            return pak_wiiu.ConstructPakWiiU
+            return pak_wiiu.PakWiiUNoData
         else:
             return pak_gc.PAKNoData
 
