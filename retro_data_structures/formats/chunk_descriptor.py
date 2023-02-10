@@ -11,7 +11,7 @@ def ChunkDescriptor(data_types: typing.Dict[str, construct.Construct]):
     return Struct(
         id=FourCC,
         size=Int64ul,
-        unk=Int32ul,
+        unk=Const(1, Int32ul),
         skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
         data=construct.FixedSized(
             construct.this.size,
@@ -21,4 +21,15 @@ def ChunkDescriptor(data_types: typing.Dict[str, construct.Construct]):
                 ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.id}"),
             )
         ),
+    )
+
+
+def SingleTypeChunkDescriptor(type_name: str, subcon: construct.Construct):
+    return construct.FocusedSeq(
+        "data",
+        id=Const(type_name, FourCC),
+        size=Int64ul,
+        unk=Const(1, Int32ul),
+        skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
+        data=construct.FixedSized(construct.this.size, subcon),
     )

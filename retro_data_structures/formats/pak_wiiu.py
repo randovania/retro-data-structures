@@ -57,7 +57,7 @@ PakWiiU = FormDescription(
 PakWiiUNoData = Struct(
     header=FormDescriptorHeader,
     tocc=TOCC,
-    resources=construct.Computed(construct.this.tocc.data.ADIR.data),
+    resources=construct.Computed(construct.this.tocc.ADIR.data),
 )
 
 
