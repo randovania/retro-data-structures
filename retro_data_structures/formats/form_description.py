@@ -13,7 +13,10 @@ FormDescriptorHeader = Struct(
 )
 
 
-def FormDescription(data_type: str, version: int, contents: construct.Construct):
+def FormDescription(data_type: str, version: int, contents: construct.Construct, *, add_terminated: bool = True):
+    if add_terminated:
+        contents = construct.FocusedSeq("data", data=contents, terminate=construct.Terminated)
+
     return construct.FocusedSeq(
         "data",
         magic=Const(b"RFRM"),
