@@ -109,3 +109,7 @@ def LabeledOptional(label, subcon):
             "subcon" / subcon,
         )
     )
+
+
+def UntilEof(subcon):
+    return construct.RepeatUntil(lambda _, __, ctx: construct.stream_iseof(ctx._io), subcon)
