@@ -1,3 +1,5 @@
+import uuid
+
 import construct
 from construct import Array, PrefixedArray, Struct, Float32b, PaddedString, CString, Int16ub, Int32ub, Int64ub, Hex, Byte
 
@@ -22,6 +24,12 @@ AABox = Struct(
 OBBox = Struct(
     transform=Transform4f,
     extents=Vector3,
+)
+
+GUID = construct.ExprAdapter(
+    construct.BytesInteger(16, swapped=True),
+    lambda obj, ctx: uuid.UUID(int=obj),
+    lambda obj, ctx: obj.int,
 )
 
 FourCC = PaddedString(4, "ascii")

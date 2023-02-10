@@ -4,7 +4,7 @@ import construct
 from construct import Struct, Int32ul, Hex
 
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.common_types import AssetId128
+from retro_data_structures.common_types import AssetId128, GUID
 from retro_data_structures.construct_extensions.misc import UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescription
@@ -12,26 +12,61 @@ from retro_data_structures.game_check import Game
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
-LoadUnit = FormDescription("LUNT", 0, GreedyBytes)
+LoadUnit = FormDescription("LUNT", 0, Struct(
+    header=SingleTypeChunkDescriptor("LUHD", Struct(
+        name=construct.PascalString(Int32ul, "utf8"),
+        guid=GUID,
+        unk1=construct.Int16ul,
+        rest=GreedyBytes,
+    )),
+    load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
+    load_layers=SingleTypeChunkDescriptor("LLYR", construct.PrefixedArray(Int32ul, GUID)),
+))
+
+PerformanceGroups = construct.PrefixedArray(
+    construct.Int16ul,
+    Struct(
+        name=construct.PascalString(Int32ul, "utf8"),
+        controller_id=GUID,
+        unk1=construct.Flag,
+        layer_guids=construct.PrefixedArray(construct.Int16ul, GUID),
+    ),
+)
+
+GeneratedObjectMap = construct.PrefixedArray(
+    construct.Int16ul,
+    Struct(
+        object_id=GUID,
+        layer_id=GUID,
+    )
+)
+
+Docks = construct.PrefixedArray(
+    construct.Int16ul,
+    GreedyBytes,
+)
 
 RoomHeader = FormDescription(
     "HEAD", 0, Struct(
         room_header=SingleTypeChunkDescriptor("RMHD", GreedyBytes),
-        performance_groups=SingleTypeChunkDescriptor("PGRP", GreedyBytes),
-        generated_object_map=SingleTypeChunkDescriptor("LGEN", GreedyBytes),
-        docks=SingleTypeChunkDescriptor("DOCK", GreedyBytes),
+        performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
+        generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
+        docks=SingleTypeChunkDescriptor("DOCK", Docks),
         blit=SingleTypeChunkDescriptor("BLIT", GreedyBytes),
-        luns=SingleTypeChunkDescriptor("LUNS", GreedyBytes),
-        load_units=UntilEof(LoadUnit),
-        _=construct.Terminated,
+        load_units=construct.PrefixedArray(
+            SingleTypeChunkDescriptor("LUNS", construct.Int16ul),
+            LoadUnit,
+        ),
     ),
 )
 
 GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
     component_type=Hex(Int32ul),
-    instance_id=AssetId128,
+    instance_id=GUID,
     a=Hex(Int32ul),
     b=Hex(Int32ul),
+    c=Hex(Int32ul),
+    d=Hex(Int32ul),
     # name=construct.PascalString(Int32ul, "utf8"),
     z=GreedyBytes,
 ))
@@ -39,10 +74,9 @@ GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
 Layer = FormDescription("LAYR", 0, Struct(
     header=SingleTypeChunkDescriptor("LHED", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
-        id=AssetId128,
+        id=GUID,
         unk1=Int32ul,
-        unk2=AssetId128,
-        z=GreedyBytes,
+        rest=GreedyBytes,
     )),
     generated_script_object=FormDescription("GSRP", 0, GreedyBytes),
     # generated_script_object=FormDescription("GSRP", 0, SingleTypeChunkDescriptor(
@@ -51,7 +85,7 @@ Layer = FormDescription("LAYR", 0, Struct(
     #         z=GreedyBytes,
     #     ),
     # )),
-    components=FormDescription("SRIP", 0, GameObjectComponent),
+    components=FormDescription("SRIP", 0, UntilEof(GameObjectComponent)),
     _=construct.Terminated,
 ))
 
@@ -62,7 +96,10 @@ ROOM = construct.FocusedSeq(
             header=RoomHeader,
             strp=SingleTypeChunkDescriptor("STRP", GreedyBytes),
             sdta=FormDescription("SDTA", 0, GreedyBytes),
-            layers=FormDescription("LYRS", 0, UntilEof(Layer)),
+            layers=FormDescription("LYRS", 0, construct.Array(
+                lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
+                Layer,
+            )),
             _=construct.Terminated,
         ),
     ),
