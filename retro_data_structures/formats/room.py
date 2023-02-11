@@ -16,7 +16,9 @@ LoadUnit = FormDescription("LUNT", 0, Struct(
     header=SingleTypeChunkDescriptor("LUHD", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
         guid=GUID,
+        idB=GUID,
         unk1=construct.Int16ul,
+        unk2=Int32ul,
         rest=GreedyBytes,
     )),
     load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
