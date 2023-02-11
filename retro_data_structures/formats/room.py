@@ -4,8 +4,8 @@ import construct
 from construct import Struct, Int32ul, Hex
 
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.common_types import AssetId128, GUID
-from retro_data_structures.construct_extensions.misc import UntilEof
+from retro_data_structures.common_types import GUID
+from retro_data_structures.construct_extensions.misc import UntilEof, ErrorWithMessage, Skip
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescription
 from retro_data_structures.game_check import Game
@@ -46,9 +46,49 @@ Docks = construct.PrefixedArray(
     GreedyBytes,
 )
 
+DataEnumValue = Struct(
+    unk1=Int32ul,
+    idA=GUID,
+    skip=Int32ul,
+    _do_skip=Skip(construct.this.skip, construct.Int8ul),
+    idB=GUID,
+)
+
+GameAreaHeader = Struct(
+    id_a=GUID,
+    unk1=construct.Int16ul,
+    unk2=construct.Int16ul,
+    unk3=construct.Flag,
+    id_b=GUID,
+    id_c=GUID,
+    id_d=GUID,
+    id_e=GUID,
+    id_F=GUID,
+    work_stages=Struct(
+        items=construct.PrefixedArray(construct.Int16ul, Struct(
+            type=Hex(construct.Int32ul),
+            data=construct.Prefixed(construct.Int16ul, construct.Switch(
+                construct.this.type,
+                {
+                    0x7B68B3A0: DataEnumValue,
+                    0xb9187c94: DataEnumValue,
+                    0xec5d9069: DataEnumValue,
+                    0x8333a604: DataEnumValue,
+                    0x5ca42b9d: DataEnumValue,
+
+                    # LdrToEnum_ProductionWorkStageEnu
+                    0x113F9CE1: Hex(Int32ul),
+                },
+                # TODO: should actually be GreedyBytes since the game skips over unknown ids
+                ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.type}"),
+            ))
+        )),
+    ),
+)
+
 RoomHeader = FormDescription(
     "HEAD", 0, Struct(
-        room_header=SingleTypeChunkDescriptor("RMHD", GreedyBytes),
+        game_area_header=SingleTypeChunkDescriptor("RMHD", GameAreaHeader),
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
         generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
         docks=SingleTypeChunkDescriptor("DOCK", Docks),
