@@ -43,7 +43,14 @@ GeneratedObjectMap = construct.PrefixedArray(
 
 Docks = construct.PrefixedArray(
     construct.Int16ul,
-    GreedyBytes,
+    Struct(
+        guid1=GUID,
+        guid2=GUID,
+        guid3=GUID,
+        guid4=GUID,
+        roomType1=construct.Int16ul,
+        roomType2=construct.Int16ul,
+    ),
 )
 
 DataEnumValue = Struct(
@@ -86,7 +93,7 @@ GameAreaHeader = Struct(
     ),
 )
 
-Blit = construct.Struct(
+BakedLightning = construct.Struct(
     "unk1" / Int32ul,  # always either 3 or 0?
     construct.StopIf(lambda ctx: ctx.unk1 == 0),
     construct.Check(lambda ctx: ctx.unk1 == 3),
@@ -108,7 +115,7 @@ RoomHeader = FormDescription(
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
         generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
         docks=SingleTypeChunkDescriptor("DOCK", Docks),
-        blit=SingleTypeChunkDescriptor("BLIT", Blit),
+        baked_lightinng=SingleTypeChunkDescriptor("BLIT", BakedLightning),
         load_units=construct.PrefixedArray(
             SingleTypeChunkDescriptor("LUNS", construct.Int16ul),
             LoadUnit,
