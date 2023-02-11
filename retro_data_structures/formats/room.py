@@ -137,7 +137,8 @@ Layer = FormDescription("LAYR", 0, Struct(
     #         z=GreedyBytes,
     #     ),
     # )),
-    components=FormDescription("SRIP", 0, UntilEof(GameObjectComponent)),
+    # components=FormDescription("SRIP", 0, UntilEof(GameObjectComponent)),
+    components=GreedyBytes,
     _=construct.Terminated,
 ))
 
