@@ -63,10 +63,6 @@ RoomHeader = FormDescription(
 GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
     component_type=Hex(Int32ul),
     instance_id=GUID,
-    a=Hex(Int32ul),
-    b=Hex(Int32ul),
-    c=Hex(Int32ul),
-    d=Hex(Int32ul),
     # name=construct.PascalString(Int32ul, "utf8"),
     z=GreedyBytes,
 ))
@@ -89,21 +85,16 @@ Layer = FormDescription("LAYR", 0, Struct(
     _=construct.Terminated,
 ))
 
-ROOM = construct.FocusedSeq(
-    "form",
-    form=FormDescription(
-        "ROOM", 147, Struct(
-            header=RoomHeader,
-            strp=SingleTypeChunkDescriptor("STRP", GreedyBytes),
-            sdta=FormDescription("SDTA", 0, GreedyBytes),
-            layers=FormDescription("LYRS", 0, construct.Array(
-                lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
-                Layer,
-            )),
-            _=construct.Terminated,
-        ),
+ROOM = FormDescription(
+    "ROOM", 147, Struct(
+        header=RoomHeader,
+        strp=SingleTypeChunkDescriptor("STRP", GreedyBytes),
+        sdta=FormDescription("SDTA", 0, GreedyBytes),
+        layers=FormDescription("LYRS", 0, construct.Array(
+            lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
+            Layer,
+        )),
     ),
-    _=construct.Terminated,
 )
 
 
