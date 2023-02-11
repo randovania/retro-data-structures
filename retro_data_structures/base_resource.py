@@ -1,5 +1,6 @@
 from __future__ import annotations
 import typing
+import uuid
 
 from construct import Construct, Container
 
@@ -10,7 +11,7 @@ if typing.TYPE_CHECKING:
 
 AssetType = str
 AssetId = int
-NameOrAssetId = typing.Union[str, AssetId]
+NameOrAssetId = typing.Union[str, AssetId, uuid.UUID]
 
 
 class Dependency(typing.NamedTuple):
@@ -55,6 +56,8 @@ class BaseResource:
 def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
     if isinstance(value, str):
         return game.hash_asset_id(value)
+    elif isinstance(value, uuid.UUID):
+        return value.int
     return value
 
 

@@ -2,6 +2,7 @@ import fnmatch
 import json
 import logging
 import typing
+import uuid
 from pathlib import Path
 from typing import Optional, Iterator
 
@@ -106,6 +107,7 @@ class AssetManager:
     _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
     _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
     _in_memory_paks: typing.Dict[str, Pak]
+    _custom_asset_ids: dict[str, AssetId]
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider
@@ -117,8 +119,8 @@ class AssetManager:
         self._update_headers()
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
-        if value in self._custom_asset_ids:
-            return self._custom_asset_ids[value]
+        if str(value) in self._custom_asset_ids:
+            return self._custom_asset_ids[str(value)]
         return resolve_asset_id(self.target_game, value)
 
     def _add_pak_name_for_asset_id(self, asset_id: AssetId, pak_name: str):
@@ -261,7 +263,7 @@ class AssetManager:
 
         self._custom_asset_ids[name] = asset_id
 
-    def add_new_asset(self, name: str, new_data: typing.Union[RawResource, BaseResource],
+    def add_new_asset(self, name: typing.Union[str, uuid.UUID], new_data: typing.Union[RawResource, BaseResource],
                       in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
@@ -274,7 +276,7 @@ class AssetManager:
         in_paks = list(in_paks)
         files_set = set()
 
-        self._custom_asset_ids[name] = asset_id
+        self._custom_asset_ids[str(name)] = asset_id
         self._paks_for_asset_id[asset_id] = files_set
         self.replace_asset(name, new_data)
         for pak_name in in_paks:
