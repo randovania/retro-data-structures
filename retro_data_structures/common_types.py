@@ -27,9 +27,9 @@ OBBox = Struct(
 )
 
 GUID = construct.ExprAdapter(
-    construct.BytesInteger(16, swapped=True),
-    lambda obj, ctx: uuid.UUID(int=obj),
-    lambda obj, ctx: obj.int,
+    construct.Bytes(16),
+    lambda obj, ctx: uuid.UUID(bytes_le=obj),
+    lambda obj, ctx: obj.bytes_le,
 )
 
 FourCC = PaddedString(4, "ascii")
