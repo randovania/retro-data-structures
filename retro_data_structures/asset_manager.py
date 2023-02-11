@@ -107,7 +107,7 @@ class AssetManager:
     _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
     _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
     _in_memory_paks: typing.Dict[str, Pak]
-    _custom_asset_ids: dict[str, AssetId]
+    _custom_asset_ids: typing.Dict[str, AssetId]
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider

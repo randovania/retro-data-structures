@@ -2,8 +2,8 @@ import pytest
 
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
-from retro_data_structures.formats.pak import PAK_GC, Pak
-from retro_data_structures.formats.pak_gc import PAKNoData, CompressedPakResource, PakFile, PakBody
+from retro_data_structures.formats.pak import Pak
+from retro_data_structures.formats.pak_gc import PAKNoData, CompressedPakResource, PakFile, PakBody, PAK_GC
 from retro_data_structures.game_check import Game
 
 
