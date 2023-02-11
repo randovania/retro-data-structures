@@ -5,7 +5,7 @@ from construct import Struct, Int32ul, Hex
 
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.common_types import GUID
-from retro_data_structures.construct_extensions.misc import UntilEof, ErrorWithMessage, Skip
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescription
 from retro_data_structures.game_check import Game
@@ -86,13 +86,29 @@ GameAreaHeader = Struct(
     ),
 )
 
+Blit = construct.Struct(
+    "unk1" / Int32ul,  # always either 3 or 0?
+    construct.StopIf(lambda ctx: ctx.unk1 == 0),
+    construct.Check(lambda ctx: ctx.unk1 == 3),
+    "resource1" / GUID,
+    "unk2" / construct.PrefixedArray(Int32ul, GUID),
+    "unk3" / construct.PrefixedArray(Int32ul, Struct(
+        "unk1" / Int32ul,
+        "unk2" / Int32ul,
+        "unk3" / Int32ul,
+        "unk4" / construct.Const(0, Int32ul)
+    )),
+    "resource2" / GUID,
+    construct.Terminated
+)
+
 RoomHeader = FormDescription(
     "HEAD", 0, Struct(
         game_area_header=SingleTypeChunkDescriptor("RMHD", GameAreaHeader),
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
         generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
         docks=SingleTypeChunkDescriptor("DOCK", Docks),
-        blit=SingleTypeChunkDescriptor("BLIT", GreedyBytes),
+        blit=SingleTypeChunkDescriptor("BLIT", Blit),
         load_units=construct.PrefixedArray(
             SingleTypeChunkDescriptor("LUNS", construct.Int16ul),
             LoadUnit,
