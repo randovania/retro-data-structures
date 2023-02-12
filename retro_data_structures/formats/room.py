@@ -125,6 +125,77 @@ RoomHeader = FormDescription(
     ),
 )
 
+STRP = Struct(
+    unk=Int32ul,
+    pools=construct.PrefixedArray(
+        Int32ul,
+        construct.Prefixed(
+            Int32ul,
+            construct.GreedyRange(construct.CString("utf-8")),
+        ),
+    ),
+    z=GreedyBytes,
+)
+
+PooledString = Struct(
+    a=construct.Int32sl,
+    b=construct.IfThenElse(
+        construct.this.a != -1,
+        Int32ul,
+        construct.Prefixed(Int32ul, GreedyBytes),
+    ),
+)
+
+CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32 = Struct(
+    a=construct.Prefixed(construct.Int16ul, GreedyBytes),
+)
+
+
+SizeofAllocationsForEventCriteriaSLdrFromStream = Struct(
+    a=Int32ul,
+    b=construct.If(construct.this.a != 0, Struct(
+        a=CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32,
+        b=construct.Prefixed(Int32ul, GreedyBytes),
+    )),
+)
+SizeofAllocationsForActionPayloadSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
+SizeofAllocationsForLinkDataSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
+
+ScriptData = Struct(
+    sdhr=SingleTypeChunkDescriptor("SDHR", Struct(
+        properties_count=Int32ul,
+        instance_data_count=Int32ul,
+        skip_count=Int32ul,
+        skip=construct.Bytes(construct.this.skip_count * 0x18),
+    )),
+    properties=construct.Array(construct.this.sdhr.properties_count, SingleTypeChunkDescriptor("SDEN", Struct(
+        a=Hex(Int32ul),
+        z=GreedyBytes,
+    ))),
+    instance_data=construct.Array(construct.this.sdhr.instance_data_count, SingleTypeChunkDescriptor("IDTA", Struct(
+        guid=GUID,
+        str=PooledString,
+        connections=construct.PrefixedArray(
+            construct.Int16ul,
+            Struct(
+                skip1=construct.Bytes(0x1a),
+                event_criteria_sldr=SizeofAllocationsForEventCriteriaSLdrFromStream,
+                action_payload_sldr=SizeofAllocationsForActionPayloadSLdrFromStream,
+                skip2=construct.Bytes(0x13),
+            ),
+        ),
+        script_links=construct.PrefixedArray(
+            construct.Int16ul,
+            Struct(
+                skip1=construct.Bytes(0x14),
+                a=SizeofAllocationsForLinkDataSLdrFromStream,
+                skip2=construct.Bytes(0x12),
+            )
+        ),
+        skip_the_rest=GreedyBytes,
+    ))),
+)
+
 GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
     component_type=Hex(Int32ul),
     instance_id=GUID,
@@ -154,8 +225,8 @@ Layer = FormDescription("LAYR", 0, Struct(
 ROOM = FormDescription(
     "ROOM", 147, Struct(
         header=RoomHeader,
-        strp=SingleTypeChunkDescriptor("STRP", GreedyBytes),
-        sdta=FormDescription("SDTA", 0, GreedyBytes),
+        strp=SingleTypeChunkDescriptor("STRP", STRP),
+        script_data=FormDescription("SDTA", 0, ScriptData),
         layers=FormDescription("LYRS", 0, construct.Array(
             lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
             Layer,
