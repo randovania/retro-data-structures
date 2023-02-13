@@ -55,6 +55,11 @@ def test_import_and_create_corruption(path):
     perform_module_checks(path)
 
 
+@pytest.mark.parametrize("path", _parametrize_for_game("prime_remastered"))
+def test_import_and_create_prime_remastered(path):
+    perform_module_checks(path)
+
+
 def test_door():
     data = (b'\xFF\xFF\xFF\xFF\x06\x9a\x00\x16%ZE\x80\x00H\x00\x04INAM\x00\x05Door\x00XFRM\x00$\xc1\xb6'
             b'\xad\xc9\xc3BwZ\xc26\x9e\xcb\x00\x00\x00\x00\x00\x00\x00\x00C4\x00\x00?\x80\x00\x00?\x80\x00'

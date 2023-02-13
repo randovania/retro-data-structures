@@ -1,14 +1,17 @@
+import io
 import typing
 
 import construct
 from construct import Struct, Int32ul, Hex
 
+import retro_data_structures.properties.prime_remastered.objects
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.common_types import GUID
-from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip, UntilEof
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescription
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties import BaseObjectType
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
@@ -150,7 +153,6 @@ CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32 = Struct(
     a=construct.Prefixed(construct.Int16ul, GreedyBytes),
 )
 
-
 SizeofAllocationsForEventCriteriaSLdrFromStream = Struct(
     a=Int32ul,
     b=construct.If(construct.this.a != 0, Struct(
@@ -162,53 +164,30 @@ SizeofAllocationsForActionPayloadSLdrFromStream = SizeofAllocationsForEventCrite
 SizeofAllocationsForLinkDataSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
 
 
-def PropertyType(known_properties: typing.Dict[int, construct.Construct]):
-    return Struct(
-        properties=construct.PrefixedArray(construct.Int16ul, Struct(
-            type_id=Hex(construct.Int32sl),
-            data=construct.Prefixed(construct.Int16ul, construct.Switch(
-                construct.this.type_id, known_properties, GreedyBytes,
-            ))
-        )),
-    )
+class RDSPropertyAdapter(construct.Adapter):
+    def __init__(self, type_id):
+        super().__init__(GreedyBytes)
+        self.type_id = type_id
 
+    def _decode(self, obj: bytes, context, path):
+        type_id = self.type_id(context)
+        try:
+            property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
+        except KeyError:
+            return obj
+        return property_class.from_stream(io.BytesIO(obj))
 
-SLdrVector_MP1Typedef = PropertyType({
-    0x2649E551: construct.Float32l,  # x
-    -0x2D44A43A: construct.Float32l,  # y
-    0x7F9499B2: construct.Float32l,  # z
-})
+    def _encode(self, obj: typing.Union[BaseObjectType, bytes], context, path):
+        if isinstance(obj, BaseObjectType):
+            data = io.BytesIO()
+            obj.to_stream(data)
+            return data
+        return obj
 
-SLdrAnimSet_MP1Typedef = PropertyType({
-    -0x5a76277b: GUID,
-    -0x783fc5ff: PooledString,
-    -0x290F3F10: PooledString,
-})
-
-
-SLdrWorldTeleporterTooMP1 = PropertyType(
-    {
-        -0x2B65AE81: GUID,  # idA
-        -0x65A00494: GUID,  # idB
-        0x6AEAEE72: SLdrAnimSet_MP1Typedef,
-        -0x44c519d6: SLdrVector_MP1Typedef,
-        -0x584CE072: GUID,  # idC
-        0x4FB5E821: SLdrVector_MP1Typedef,
-        -0x3dac9987: SLdrVector_MP1Typedef,
-        0x5407BB23: GUID,  # idE
-    },
-)
 
 Property = Struct(
     type_id=Hex(Int32ul),
-    data=construct.Switch(
-        construct.this.type_id,
-        {
-            # CWorldTeleporterToo
-            0x2fa104ff: SLdrWorldTeleporterTooMP1,
-        },
-        GreedyBytes,
-    ),
+    data=RDSPropertyAdapter(construct.this.type_id),
 )
 
 ScriptData = Struct(
