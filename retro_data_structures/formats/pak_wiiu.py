@@ -44,14 +44,14 @@ TOCC = FormDescription(
         construct.GreedyRange(TOCCChunkDescriptor),
         lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
         lambda obj, ctx: construct.ListContainer(obj.values()),
-    ),
+    ), other_version=3,
 )
 
 PakWiiU = FormDescription(
     "PACK", 1, Struct(
         tocc=TOCC,
         remain=construct.GreedyBytes,
-    ),
+    ), other_version=0,
 )
 
 PakWiiUNoData = Struct(

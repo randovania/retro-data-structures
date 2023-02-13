@@ -26,7 +26,7 @@ LoadUnit = FormDescription("LUNT", 0, Struct(
     )),
     load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
     load_layers=SingleTypeChunkDescriptor("LLYR", construct.PrefixedArray(Int32ul, GUID)),
-))
+), other_version=0)
 
 PerformanceGroups = construct.PrefixedArray(
     construct.Int16ul,
@@ -125,7 +125,7 @@ RoomHeader = FormDescription(
             SingleTypeChunkDescriptor("LUNS", construct.Int16ul),
             LoadUnit,
         ),
-    ),
+    ), other_version=0,
 )
 
 STRP = Struct(
@@ -236,7 +236,7 @@ Layer = FormDescription("LAYR", 0, Struct(
         unk1=Int32ul,
         rest=GreedyBytes,
     )),
-    generated_script_object=FormDescription("GSRP", 0, GreedyBytes),
+    generated_script_object=FormDescription("GSRP", 0, GreedyBytes, other_version=0),
     # generated_script_object=FormDescription("GSRP", 0, SingleTypeChunkDescriptor(
     #     "GGOB", Struct(
     #         generated_game_object_id=AssetId128,
@@ -246,18 +246,18 @@ Layer = FormDescription("LAYR", 0, Struct(
     # components=FormDescription("SRIP", 0, UntilEof(GameObjectComponent)),
     components=GreedyBytes,
     _=construct.Terminated,
-))
+), other_version=0)
 
 ROOM = FormDescription(
     "ROOM", 147, Struct(
         header=RoomHeader,
         strp=SingleTypeChunkDescriptor("STRP", STRP),
-        script_data=FormDescription("SDTA", 0, ScriptData),
+        script_data=FormDescription("SDTA", 0, ScriptData, other_version=0),
         layers=FormDescription("LYRS", 0, construct.Array(
             lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
             Layer,
-        )),
-    ),
+        ), other_version=0),
+    ), other_version=160,
 )
 
 
