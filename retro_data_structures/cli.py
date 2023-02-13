@@ -4,6 +4,7 @@ import itertools
 import json
 import logging
 import typing
+import uuid
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Optional, List
@@ -65,6 +66,13 @@ def get_provider_from_argument(args):
         return IsoFileProvider(args.input_iso)
 
 
+def asset_id_conversion(x: str) -> AssetId:
+    try:
+        return uuid.UUID(x)
+    except ValueError:
+        return int(x, 0)
+
+
 def create_parser():
     parser = argparse.ArgumentParser()
 
@@ -88,7 +96,7 @@ def create_parser():
     decode_from_paks = subparser.add_parser("decode-from-pak")
     add_game_argument(decode_from_paks)
     add_provider_argument(decode_from_paks)
-    decode_from_paks.add_argument("asset_id", type=lambda x: int(x, 0), help="Asset id to print")
+    decode_from_paks.add_argument("asset_id", type=asset_id_conversion, help="Asset id to print")
 
     deps = subparser.add_parser("list-dependencies")
     add_game_argument(deps)
@@ -101,7 +109,7 @@ def create_parser():
     add_game_argument(convert, "--source-game")
     add_game_argument(convert, "--target-game")
     add_provider_argument(convert)
-    convert.add_argument("asset_ids", type=lambda x: int(x, 0), nargs="+", help="Asset id to list dependencies for")
+    convert.add_argument("asset_ids", type=asset_id_conversion, nargs="+", help="Asset id to list dependencies for")
 
     return parser
 

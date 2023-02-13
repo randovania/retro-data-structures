@@ -1,6 +1,8 @@
 """
 For checking which game is being parsed
 """
+import typing
+import uuid
 from enum import Enum
 from typing import Any, Callable
 
@@ -45,19 +47,25 @@ class Game(Enum):
         return self == Game.CORRUPTION
 
     @property
+    def uses_guid_as_asset_id(self):
+        return self == Game.PRIME_REMASTER
+
+    @property
     def uses_lzo(self):
         return self in {Game.ECHOES, Game.CORRUPTION}
 
     @property
-    def invalid_asset_id(self) -> int:
+    def invalid_asset_id(self) -> typing.Union[int, uuid.UUID]:
         if self.uses_asset_id_32:
             return (1 << 32) - 1
         elif self.uses_asset_id_64:
             return (1 << 64) - 1
+        elif self.uses_guid_as_asset_id:
+            return uuid.UUID(int=0)
         else:
-            return (1 << 128) - 1
+            raise NotImplementedError()
 
-    def is_valid_asset_id(self, asset_id: int) -> bool:
+    def is_valid_asset_id(self, asset_id: typing.Union[int, uuid.UUID]) -> bool:
         if self == Game.PRIME and asset_id == 0:
             return False
         return asset_id != self.invalid_asset_id

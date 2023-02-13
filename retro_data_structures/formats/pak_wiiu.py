@@ -1,7 +1,7 @@
 import construct
-from construct import Struct, Int32ul, Int64ul, PrefixedArray, Hex, Const
+from construct import Struct, Int32ul, Int64ul, PrefixedArray, Hex
 
-from retro_data_structures.common_types import FourCC, AssetId128
+from retro_data_structures.common_types import FourCC, GUID
 from retro_data_structures.formats.chunk_descriptor import ChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescriptorHeader, FormDescription
 from retro_data_structures.formats.pak_gc import PakFile
@@ -9,20 +9,20 @@ from retro_data_structures.formats.pak_gc import PakFile
 StringTableEntry = Struct(
     asset=Struct(
         type=FourCC,
-        id=AssetId128,
+        id=GUID,
     ),
     name=construct.PascalString(Int32ul, "utf8"),
 )
 
 MetadataEntry = Struct(
-    id=AssetId128,
+    id=GUID,
     offset=Int32ul,
 )
 
 AssetDirectoryEntry = Struct(
     asset=Struct(
         type=FourCC,
-        id=AssetId128,
+        id=GUID,
     ),
     unk1=Hex(Int32ul),
     unk2=Hex(Int32ul),

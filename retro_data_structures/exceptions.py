@@ -3,9 +3,16 @@ from typing import Optional
 from retro_data_structures.base_resource import AssetId
 
 
+def format_asset_id(asset_id: AssetId) -> str:
+    if isinstance(asset_id, int):
+        return f"0x{asset_id:08X}"
+    else:
+        return str(asset_id)
+
+
 class UnknownAssetId(Exception):
     def __init__(self, asset_id: AssetId, name: Optional[str] = None):
-        msg = f"Unknown asset id 0x{asset_id:08X}"
+        msg = f"Unknown asset id {format_asset_id(asset_id)}"
         if isinstance(name, str):
             msg += f" ({name})"
         super().__init__(msg)
@@ -14,6 +21,6 @@ class UnknownAssetId(Exception):
 
 class InvalidAssetId(Exception):
     def __init__(self, asset_id, reason: str):
-        super().__init__(f"Unable to decode asset id 0x{asset_id:08X}: {reason}")
+        super().__init__(f"Unable to decode asset id {format_asset_id(asset_id)}: {reason}")
         self.asset_id = asset_id
         self.reason = reason

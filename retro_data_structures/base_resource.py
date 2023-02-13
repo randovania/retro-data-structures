@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import typing
 import uuid
 
@@ -10,8 +11,8 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
 
 AssetType = str
-AssetId = int
-NameOrAssetId = typing.Union[str, AssetId, uuid.UUID]
+AssetId = typing.Union[int, uuid.UUID]
+NameOrAssetId = typing.Union[str, AssetId]
 
 
 class Dependency(typing.NamedTuple):
@@ -38,7 +39,8 @@ class BaseResource:
         raise NotImplementedError()
 
     @classmethod
-    def parse(cls, data: bytes, target_game: Game, asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
+    def parse(cls, data: bytes, target_game: Game,
+              asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
                    target_game, asset_manager)
 
@@ -55,9 +57,11 @@ class BaseResource:
 
 def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
     if isinstance(value, str):
-        return game.hash_asset_id(value)
-    elif isinstance(value, uuid.UUID):
-        return value.int
+        value = game.hash_asset_id(value)
+
+    if game.uses_guid_as_asset_id and isinstance(value, int):
+        return uuid.UUID(int=value)
+
     return value
 
 
