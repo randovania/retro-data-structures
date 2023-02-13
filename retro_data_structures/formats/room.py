@@ -161,6 +161,56 @@ SizeofAllocationsForEventCriteriaSLdrFromStream = Struct(
 SizeofAllocationsForActionPayloadSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
 SizeofAllocationsForLinkDataSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
 
+
+def PropertyType(known_properties: typing.Dict[int, construct.Construct]):
+    return Struct(
+        properties=construct.PrefixedArray(construct.Int16ul, Struct(
+            type_id=Hex(construct.Int32sl),
+            data=construct.Prefixed(construct.Int16ul, construct.Switch(
+                construct.this.type_id, known_properties, GreedyBytes,
+            ))
+        )),
+    )
+
+
+SLdrVector_MP1Typedef = PropertyType({
+    0x2649E551: construct.Float32l,  # x
+    -0x2D44A43A: construct.Float32l,  # y
+    0x7F9499B2: construct.Float32l,  # z
+})
+
+SLdrAnimSet_MP1Typedef = PropertyType({
+    -0x5a76277b: GUID,
+    -0x783fc5ff: PooledString,
+    -0x290F3F10: PooledString,
+})
+
+
+SLdrWorldTeleporterTooMP1 = PropertyType(
+    {
+        -0x2B65AE81: GUID,  # idA
+        -0x65A00494: GUID,  # idB
+        0x6AEAEE72: SLdrAnimSet_MP1Typedef,
+        -0x44c519d6: SLdrVector_MP1Typedef,
+        -0x584CE072: GUID,  # idC
+        0x4FB5E821: SLdrVector_MP1Typedef,
+        -0x3dac9987: SLdrVector_MP1Typedef,
+        0x5407BB23: GUID,  # idE
+    },
+)
+
+Property = Struct(
+    type_id=Hex(Int32ul),
+    data=construct.Switch(
+        construct.this.type_id,
+        {
+            # CWorldTeleporterToo
+            0x2fa104ff: SLdrWorldTeleporterTooMP1,
+        },
+        GreedyBytes,
+    ),
+)
+
 ScriptData = Struct(
     sdhr=SingleTypeChunkDescriptor("SDHR", Struct(
         properties_count=Int32ul,
@@ -168,10 +218,7 @@ ScriptData = Struct(
         skip_count=Int32ul,
         skip=construct.Bytes(construct.this.skip_count * 0x18),
     )),
-    properties=construct.Array(construct.this.sdhr.properties_count, SingleTypeChunkDescriptor("SDEN", Struct(
-        a=Hex(Int32ul),
-        z=GreedyBytes,
-    ))),
+    properties=construct.Array(construct.this.sdhr.properties_count, SingleTypeChunkDescriptor("SDEN", Property)),
     instance_data=construct.Array(construct.this.sdhr.instance_data_count, SingleTypeChunkDescriptor("IDTA", Struct(
         guid=GUID,
         str=PooledString,
