@@ -7,15 +7,15 @@ from construct import Struct, Int32ul, Hex
 import retro_data_structures.properties.prime_remastered.objects
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.common_types import GUID
-from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_description import FormDescription
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties import BaseObjectType
+from retro_data_structures.properties import BaseProperty
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
-LoadUnit = FormDescription("LUNT", 0, Struct(
+LoadUnit = FormDescription("LUNT", 0, 0, Struct(
     header=SingleTypeChunkDescriptor("LUHD", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
         guid=GUID,
@@ -26,7 +26,7 @@ LoadUnit = FormDescription("LUNT", 0, Struct(
     )),
     load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
     load_layers=SingleTypeChunkDescriptor("LLYR", construct.PrefixedArray(Int32ul, GUID)),
-), other_version=0)
+))
 
 PerformanceGroups = construct.PrefixedArray(
     construct.Int16ul,
@@ -61,8 +61,7 @@ Docks = construct.PrefixedArray(
 DataEnumValue = Struct(
     unk1=Int32ul,
     idA=GUID,
-    skip=Int32ul,
-    _do_skip=Skip(construct.this.skip, construct.Int8ul),
+    skip=construct.Prefixed(Int32ul, GreedyBytes),
     idB=GUID,
 )
 
@@ -75,7 +74,7 @@ GameAreaHeader = Struct(
     id_c=GUID,
     id_d=GUID,
     id_e=GUID,
-    id_F=GUID,
+    id_f=GUID,
     work_stages=Struct(
         items=construct.PrefixedArray(construct.Int16ul, Struct(
             type=Hex(construct.Int32ul),
@@ -115,7 +114,7 @@ BakedLightning = construct.Struct(
 )
 
 RoomHeader = FormDescription(
-    "HEAD", 0, Struct(
+    "HEAD", 0, 0, Struct(
         game_area_header=SingleTypeChunkDescriptor("RMHD", GameAreaHeader),
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
         generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
@@ -125,7 +124,7 @@ RoomHeader = FormDescription(
             SingleTypeChunkDescriptor("LUNS", construct.Int16ul),
             LoadUnit,
         ),
-    ), other_version=0,
+    ),
 )
 
 STRP = Struct(
@@ -177,11 +176,11 @@ class RDSPropertyAdapter(construct.Adapter):
             return obj
         return property_class.from_stream(io.BytesIO(obj))
 
-    def _encode(self, obj: typing.Union[BaseObjectType, bytes], context, path):
-        if isinstance(obj, BaseObjectType):
+    def _encode(self, obj: typing.Union[BaseProperty, bytes], context, path):
+        if isinstance(obj, BaseProperty):
             data = io.BytesIO()
             obj.to_stream(data)
-            return data
+            return data.getvalue()
         return obj
 
 
@@ -229,14 +228,14 @@ GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
     z=GreedyBytes,
 ))
 
-Layer = FormDescription("LAYR", 0, Struct(
+Layer = FormDescription("LAYR", 0, 0, Struct(
     header=SingleTypeChunkDescriptor("LHED", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
         id=GUID,
         unk1=Int32ul,
         rest=GreedyBytes,
     )),
-    generated_script_object=FormDescription("GSRP", 0, GreedyBytes, other_version=0),
+    generated_script_object=FormDescription("GSRP", 0, 0, GreedyBytes),
     # generated_script_object=FormDescription("GSRP", 0, SingleTypeChunkDescriptor(
     #     "GGOB", Struct(
     #         generated_game_object_id=AssetId128,
@@ -246,18 +245,18 @@ Layer = FormDescription("LAYR", 0, Struct(
     # components=FormDescription("SRIP", 0, UntilEof(GameObjectComponent)),
     components=GreedyBytes,
     _=construct.Terminated,
-), other_version=0)
+))
 
 ROOM = FormDescription(
-    "ROOM", 147, Struct(
+    "ROOM", 147, 160, Struct(
         header=RoomHeader,
         strp=SingleTypeChunkDescriptor("STRP", STRP),
-        script_data=FormDescription("SDTA", 0, ScriptData, other_version=0),
-        layers=FormDescription("LYRS", 0, construct.Array(
+        script_data=FormDescription("SDTA", 0, 0, ScriptData),
+        layers=FormDescription("LYRS", 0, 0, construct.Array(
             lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
             Layer,
-        ), other_version=0),
-    ), other_version=160,
+        )),
+    ),
 )
 
 

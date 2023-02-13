@@ -60,6 +60,7 @@ def _scrub_enum(string: str):
 
 def create_enums_file(game_id: str, enums: typing.List[EnumDefinition]):
     code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\n'
+    endianness = get_endianness(game_id)
 
     for e in enums:
         code += f"\n\nclass {_scrub_enum(e.name)}(enum.{e.enum_base}):\n"
@@ -68,10 +69,10 @@ def create_enums_file(game_id: str, enums: typing.List[EnumDefinition]):
 
         code += '\n    @classmethod\n'
         code += '    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):\n'
-        code += f'        return cls({_CODE_PARSE_UINT32[get_endianness(game_id)]})\n'
+        code += f'        return cls({_CODE_PARSE_UINT32[endianness]})\n'
 
         code += '\n    def to_stream(self, data: typing.BinaryIO):\n'
-        code += '        data.write(struct.pack(">L", self.value))\n'
+        code += '        data.write(struct.pack("' + endianness + 'L", self.value))\n'
 
         code += '\n    @classmethod\n'
         code += '    def from_json(cls, data):\n'
@@ -85,7 +86,7 @@ def create_enums_file(game_id: str, enums: typing.List[EnumDefinition]):
 
 def _prop_default_value(element: Element, game_id: str, path: Path) -> dict:
     default_value_types = {
-        "Int": lambda el: struct.unpack(">l", struct.pack(">L", (int(el.text, 10) & 0xFFFFFFFF)))[0],
+        "Int": lambda el: struct.unpack("l", struct.pack("L", (int(el.text, 10) & 0xFFFFFFFF)))[0],
         "Float": lambda el: float(el.text),
         "Bool": lambda el: el.text == "true",
         "Short": lambda el: int(el.text, 10) & 0xFFFF,
@@ -413,7 +414,7 @@ class ClassDefinition:
             # self.properties_builder is handled in write_to_stream
         else:
             # build
-            prop_id_bytes = struct.pack(">L", prop.id)
+            prop_id_bytes = struct.pack(endianness + "L", prop.id)
             self.properties_builder += "\n"
             build_prop = [
                 f'data.write({repr(prop_id_bytes)})  # {hex(prop.id)}'
@@ -586,7 +587,7 @@ class ClassDefinition:
 
             if self.game_id == "Prime" and self.is_struct:
                 num_props = len(self.all_props)
-                prop_count_repr = repr(struct.pack(">L", num_props))
+                prop_count_repr = repr(struct.pack(endianness + "L", num_props))
                 self.class_code += f"        data.write({prop_count_repr})  # {num_props} properties\n"
 
             for prop_name, prop in self.all_props.items():
@@ -1446,5 +1447,5 @@ def persist_data(parse_result):
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    persist_data(parse(["PrimeRemastered"]))
-    # persist_data(parse(_game_id_to_file.keys()))
+    # persist_data(parse(["PrimeRemastered"]))
+    persist_data(parse(_game_id_to_file.keys()))

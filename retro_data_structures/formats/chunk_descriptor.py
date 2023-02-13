@@ -10,11 +10,13 @@ from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 def ChunkDescriptor(data_types: typing.Dict[str, construct.Construct]):
     return Struct(
         id=FourCC,
-        size=construct.Rebuild(Int64ul, construct.len_(construct.this.data)),
-        unk=Const(1, Int32ul),
-        skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
-        data=construct.FixedSized(
-            construct.this.size,
+        data=construct.Prefixed(
+            construct.FocusedSeq(
+                "size",
+                size=Int64ul,
+                unk=Const(1, Int32ul),
+                skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
+            ),
             construct.Switch(
                 construct.this.id,
                 data_types,
@@ -31,8 +33,13 @@ def SingleTypeChunkDescriptor(type_name: str, contents: construct.Construct, *, 
     return construct.FocusedSeq(
         "data",
         id=Const(type_name, FourCC),
-        size=construct.Rebuild(Int64ul, construct.len_(construct.this.data)),
-        unk=Const(1, Int32ul),
-        skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
-        data=construct.FixedSized(construct.this.size, contents),
+        data=construct.Prefixed(
+            construct.FocusedSeq(
+                "size",
+                size=Int64ul,
+                unk=Const(1, Int32ul),
+                skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
+            ),
+            contents,
+        ),
     )
