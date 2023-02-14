@@ -1,3 +1,5 @@
+import itertools
+
 import construct
 from construct import FocusedSeq, Rebuild, len_, this, stream_tell, Construct, Optional, Const
 
@@ -111,5 +113,23 @@ def LabeledOptional(label, subcon):
     )
 
 
-def UntilEof(subcon):
-    return construct.RepeatUntil(lambda _, __, ctx: construct.stream_iseof(ctx._io), subcon)
+class UntilEof(construct.Subconstruct):
+    def _parse(self, stream, context, path):
+        obj = construct.ListContainer()
+        for i in itertools.count():
+            if construct.stream_iseof(stream):
+                return obj
+            context._index = i
+            e = self.subcon._parsereport(stream, context, path)
+            obj.append(e)
+
+    def _build(self, obj, stream, context, path):
+        retlist = construct.ListContainer()
+        for i, e in enumerate(obj):
+            context._index = i
+            buildret = self.subcon._build(e, stream, context, path)
+            retlist.append(buildret)
+        return retlist
+
+    def _sizeof(self, context, path):
+        raise construct.SizeofError("cannot calculate size, amount depends on actual data", path=path)
