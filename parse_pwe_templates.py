@@ -201,6 +201,7 @@ def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
         "type": "Struct",
         "name": properties.find("Name").text if properties.find("Name") is not None else "",
         "atomic": properties.find("Atomic") is not None,
+        "incomplete": properties.attrib.get("Incomplete") == "true",
         "properties": elements,
     }
 
@@ -369,6 +370,7 @@ class ClassDefinition:
     class_name: str
     class_path: str
     is_struct: bool
+    is_incomplete: bool
 
     class_code: str = ""
     after_class_code: str = ""
@@ -464,7 +466,12 @@ class ClassDefinition:
             self.properties_builder += "\n"
 
     def finalize_props(self):
+        if self.keep_unknown_properties():
+            self.class_code += "    unknown_properties: typing.Dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
         pass
+
+    def keep_unknown_properties(self):
+        return self.is_incomplete
 
     def _can_fast_decode(self) -> bool:
         return all(
@@ -545,7 +552,14 @@ class ClassDefinition:
                 self.after_class_code += f"{fast_decode}\n"
             self.after_class_code += "\n\n"
 
-        self.class_code += f"""        present_fields = default_override or {{}}
+        if self.keep_unknown_properties():
+            read_unknown = 'present_fields["unknown_properties"][property_id] = data.read(property_size)'
+            unknown_fields_declare = '\n        present_fields["unknown_properties"] = {}\n'
+        else:
+            read_unknown = 'raise RuntimeError(f"Unknown property: 0x{property_id:08x}")'
+            unknown_fields_declare = ""
+
+        self.class_code += f"""        present_fields = default_override or {{}}{unknown_fields_declare}
         for _ in range(property_count):
             property_id, property_size = struct.unpack("{endianness}LH", data.read(6))
             start = data.tell()
@@ -553,7 +567,7 @@ class ClassDefinition:
                 property_name, decoder = _property_decoder[property_id]
                 present_fields[property_name] = decoder(data, property_size)
             except KeyError:
-                data.read(property_size)  # skip unknown property
+                {read_unknown} 
             assert data.tell() - start == property_size\n
 """
         if self.is_struct:
@@ -609,19 +623,30 @@ class ClassDefinition:
         elif self.has_custom_cook_pref:
             self.class_code += "        num_properties_offset = data.tell()\n"
 
-        prop_count_repr = repr(struct.pack(endianness + "H", self.property_count))
-        self.class_code += f"        data.write({prop_count_repr})  # {self.property_count} properties\n"
+        if self.keep_unknown_properties():
+            self.class_code += f'        data.write(struct.pack("{endianness}H", {self.property_count} + len(self.unknown_properties)))\n'
+        else:
+            prop_count_repr = repr(struct.pack(endianness + "H", self.property_count))
+            self.class_code += f"        data.write({prop_count_repr})  # {self.property_count} properties\n"
+
         if self.has_custom_cook_pref:
             self.class_code += f"        num_properties_written = {self.property_count}\n"
 
         self.class_code += self.properties_builder
+        if self.keep_unknown_properties():
+            self.class_code += "\n        for property_id, property_data in self.unknown_properties.items():\n"
+            self.class_code += f'            data.write(struct.pack("{endianness}LH", property_id, len(property_data)))\n'
+            self.class_code += f'            data.write(property_data)\n'
+            num_props_variable = "num_properties_written + len(self.unknown_properties)"
+        else:
+            num_props_variable = "num_properties_written"
 
         if has_root_size_offset:
             self.class_code += "\n        struct_end_offset = data.tell()\n"
             self.class_code += "        data.seek(root_size_offset)\n"
             self.class_code += '        data.write(struct.pack("' + endianness + 'H", struct_end_offset - root_size_offset - 2))\n'
             if self.has_custom_cook_pref:
-                self.class_code += '        data.write(struct.pack("' + endianness + 'H", num_properties_written))\n'
+                self.class_code += f'        data.write(struct.pack("{endianness}H", {num_props_variable}))\n'
             self.class_code += "        data.seek(struct_end_offset)\n"
 
         elif self.has_custom_cook_pref:
@@ -629,7 +654,7 @@ class ClassDefinition:
             self.class_code += f"        if num_properties_written != {self.property_count}:\n"
             self.class_code += "            struct_end_offset = data.tell()\n"
             self.class_code += "            data.seek(num_properties_offset)\n"
-            self.class_code += '            data.write(struct.pack("' + endianness + 'H", num_properties_written))\n'
+            self.class_code += f'            data.write(struct.pack("{endianness}H", {num_props_variable}))\n'
             self.class_code += "            data.seek(struct_end_offset)\n"
 
     def write_from_json(self):
@@ -641,6 +666,16 @@ class ClassDefinition:
         space = "            "
         for prop_name, prop in self.all_props.items():
             self.class_code += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+
+        if self.keep_unknown_properties():
+            self.needed_imports["base64"] = True
+            self.class_code += """
+            unknown_properties={
+                int(property_id, 16): base64.b64decode(property_data)
+                for property_id, property_data in data["unknown_properties"].items()
+            },
+"""
+
         self.class_code += "        )\n"
 
     def write_to_json(self):
@@ -651,6 +686,16 @@ class ClassDefinition:
         space = "            "
         for prop_name, prop in self.all_props.items():
             self.class_code += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
+
+        if self.keep_unknown_properties():
+            self.needed_imports["base64"] = True
+            self.class_code += """
+            'unknown_properties': {
+                hex(property_id): base64.b64encode(property_data)
+                for property_id, property_data in self.unknown_properties.items()
+            }
+"""
+
         self.class_code += "        }\n"
 
 
@@ -1032,6 +1077,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             meta["default"] = default_value
 
             if game_id in ["PrimeRemastered"]:
+                needed_imports["uuid"] = True
                 known_size = 16
                 parse_code = f'uuid.UUID(bytes_le=data.read(16))'
                 build_code.append(f'data.write({{obj}}.bytes_le)')
@@ -1178,6 +1224,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             class_name=name.split("_")[-1],
             class_path=name.replace("_", "/"),
             is_struct=is_struct,
+            is_incomplete=this["incomplete"],
         )
         base_class = "BaseObjectType" if is_struct else "BaseProperty"
         cls.class_code = f"@dataclasses.dataclass()\nclass {cls.class_name}({base_class}):\n"
@@ -1242,8 +1289,6 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"
-        if game_id == "PrimeRemastered":
-            code_code += "import uuid\n"
 
         code_code += "\nfrom retro_data_structures.game_check import Game\n"
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
@@ -1252,7 +1297,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             code_code += f"import retro_data_structures.enums.{_game_id_to_file[game_id]} as enums\n"
 
         for import_path, code_import in sorted(cls.needed_imports.items()):
-            code_code += f"from {import_path} import {code_import}\n"
+            if code_import is True:
+                code_code += f"import {import_path}\n"
+            else:
+                code_code += f"from {import_path} import {code_import}\n"
 
         code_code += "\n\n"
         code_code += cls.class_code
