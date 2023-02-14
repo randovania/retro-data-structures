@@ -38,10 +38,7 @@ TOCCChunkDescriptor = ChunkDescriptor(
         "ADIR": PrefixedArray(Int32ul, AssetDirectoryEntry),
         "META": Struct(
             entries=PrefixedArray(Int32ul, MetadataEntry),
-            entry_data=construct.Array(
-                construct.len_(construct.this.entries),
-                construct.Prefixed(Int32ul, construct.GreedyBytes),
-            ),
+            entry_data=construct.GreedyBytes,
         ),
         "STRG": PrefixedArray(Int32ul, StringTableEntry),
     },
@@ -65,6 +62,7 @@ PakWiiU = FormDescription(
 PakWiiUNoData = Struct(
     header=FormDescriptorHeader,
     tocc=TOCC,
+    resources=construct.Computed(lambda ctx: ctx.tocc.ADIR.data),
 )
 
 
@@ -73,6 +71,8 @@ class ConstructPakWiiU(construct.Construct):
         header = PakWiiUNoData._parsereport(stream, context, f"{path} -> header")
 
         files = construct.ListContainer()
+
+        last = construct.stream_tell(stream, path)
 
         for i, resource in enumerate(header.tocc.ADIR.data):
             # if resource.decompressed_size != resource.size:
@@ -88,7 +88,9 @@ class ConstructPakWiiU(construct.Construct):
                 data,
                 None,
             ))
+            last = max(last, construct.stream_tell(stream, path))
 
+        construct.stream_seek(stream, last, 0, path)
         AlignTo(32)._parsereport(stream, context, path)
         construct.Terminated._parsereport(stream, context, path)
 
