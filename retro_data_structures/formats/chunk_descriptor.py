@@ -17,13 +17,16 @@ def ChunkDescriptor(data_types: typing.Dict[str, construct.Construct]):
                 unk=Const(1, Int32ul),
                 skip=Const(0, Int64ul),  # TODO: support skip, but this is unused in remastered?
             ),
-            construct.Switch(
-                construct.this.id,
-                data_types,
-                ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.id}"),
-            )
-        ),
-    )
+            construct.FocusedSeq(
+                "chunk_item",
+                chunk_item=construct.Switch(
+                    construct.this._.id,
+                    data_types,
+                    ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.id}"),
+                ),
+                terminate=construct.Terminated,
+            )),
+        )
 
 
 def SingleTypeChunkDescriptor(type_name: str, contents: construct.Construct, *, add_terminated: bool = True):
