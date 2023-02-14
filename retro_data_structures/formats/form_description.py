@@ -4,9 +4,9 @@ from construct import Struct, Const, Int64ul, Int32ul
 from retro_data_structures.common_types import FourCC
 
 FormDescriptorHeader = Struct(
-    magic=Const(b"RFRM"),
+    _magic=Const(b"RFRM"),
     size=Int64ul,
-    unk=Int64ul,
+    _unk=Const(0, Int64ul),
     id=FourCC,
     version=Int32ul,
     other_version=Int32ul,
