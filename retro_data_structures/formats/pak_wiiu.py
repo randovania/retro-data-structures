@@ -5,7 +5,7 @@ from retro_data_structures.common_types import FourCC, GUID
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.misc import UntilEof
 from retro_data_structures.formats.chunk_descriptor import ChunkDescriptor
-from retro_data_structures.formats.form_description import FormDescriptorHeader, FormDescription
+from retro_data_structures.formats.form_descriptor import FormDescriptorHeader, FormDescriptor
 from retro_data_structures.formats.pak_gc import PakFile
 
 StringTableEntry = Struct(
@@ -44,7 +44,7 @@ TOCCChunkDescriptor = ChunkDescriptor(
     },
 )
 
-TOCC = FormDescription(
+TOCC = FormDescriptor(
     "TOCC", 3, 3, construct.ExprAdapter(
         UntilEof(TOCCChunkDescriptor),
         lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
@@ -52,7 +52,7 @@ TOCC = FormDescription(
     ),
 )
 
-PakWiiU = FormDescription(
+PakWiiU = FormDescriptor(
     "PACK", 1, 0, Struct(
         tocc=TOCC,
         remain=construct.GreedyBytes,

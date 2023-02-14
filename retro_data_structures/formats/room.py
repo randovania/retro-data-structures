@@ -9,13 +9,13 @@ from retro_data_structures.base_resource import BaseResource, AssetType, Depende
 from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
-from retro_data_structures.formats.form_description import FormDescription
+from retro_data_structures.formats.form_descriptor import FormDescriptor
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseProperty
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
-LoadUnit = FormDescription("LUNT", 0, 0, Struct(
+LoadUnit = FormDescriptor("LUNT", 0, 0, Struct(
     header=SingleTypeChunkDescriptor("LUHD", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
         guid=GUID,
@@ -113,7 +113,7 @@ BakedLightning = construct.Struct(
     construct.Terminated
 )
 
-RoomHeader = FormDescription(
+RoomHeader = FormDescriptor(
     "HEAD", 0, 0, Struct(
         game_area_header=SingleTypeChunkDescriptor("RMHD", GameAreaHeader),
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
@@ -228,14 +228,14 @@ GameObjectComponent = SingleTypeChunkDescriptor("COMP", Struct(
     z=GreedyBytes,
 ))
 
-Layer = FormDescription("LAYR", 0, 0, Struct(
+Layer = FormDescriptor("LAYR", 0, 0, Struct(
     header=SingleTypeChunkDescriptor("LHED", Struct(
         name=construct.PascalString(Int32ul, "utf8"),
         id=GUID,
         unk1=Int32ul,
         rest=GreedyBytes,
     )),
-    generated_script_object=FormDescription("GSRP", 0, 0, GreedyBytes),
+    generated_script_object=FormDescriptor("GSRP", 0, 0, GreedyBytes),
     # generated_script_object=FormDescription("GSRP", 0, SingleTypeChunkDescriptor(
     #     "GGOB", Struct(
     #         generated_game_object_id=AssetId128,
@@ -247,12 +247,12 @@ Layer = FormDescription("LAYR", 0, 0, Struct(
     _=construct.Terminated,
 ))
 
-ROOM = FormDescription(
+ROOM = FormDescriptor(
     "ROOM", 147, 160, Struct(
         header=RoomHeader,
         strp=SingleTypeChunkDescriptor("STRP", STRP),
-        script_data=FormDescription("SDTA", 0, 0, ScriptData),
-        layers=FormDescription("LYRS", 0, 0, construct.Array(
+        script_data=FormDescriptor("SDTA", 0, 0, ScriptData),
+        layers=FormDescriptor("LYRS", 0, 0, construct.Array(
             lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
             Layer,
         )),
