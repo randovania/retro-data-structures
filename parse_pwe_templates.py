@@ -799,8 +799,8 @@ from .AssetId import AssetId, default_asset_id
 
 @dataclasses.dataclass()
 class PooledString(BaseProperty):
-    a: int = -1
-    b: typing.Union[int, bytes] = b""
+    index: int = -1
+    size_or_str: typing.Union[int, bytes] = b""
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
@@ -810,21 +810,21 @@ class PooledString(BaseProperty):
         return cls(a, b)
 
     def to_stream(self, data: typing.BinaryIO):
-        a, b = self.a, self.b
+        a, b = self.index, self.size_or_str
         if a == -1:
             b = len(b)
         data.write(struct.pack('{endianness}lL', a, b))
         if a == -1:
-            data.write(self.b)
+            data.write(self.size_or_str)
 
     @classmethod
     def from_json(cls, data: dict):
-        return cls(data["a"], data["b"])
+        return cls(data["index"], data["size_or_str"])
 
     def to_json(self) -> dict:
         return {{
-            "a": self.a,
-            "b": self.b,
+            "index": self.index,
+            "size_or_str": self.size_or_str,
         }}
 """ + game_code)
         return
