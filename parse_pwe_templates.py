@@ -1221,8 +1221,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             game_id=game_id,
             raw_name=name,
             raw_def=this,
-            class_name=name.split("_")[-1] if name != "NotSTD_Dock" else name,
-            class_path=name.replace("_", "/") if name != "NotSTD_Dock" else name,
+            class_name=name.split("_")[-1] if game_id != "PrimeRemastered" else name,
+            class_path=name.replace("_", "/") if game_id != "PrimeRemastered" else name,
             is_struct=is_struct,
             is_incomplete=this["incomplete"],
         )
