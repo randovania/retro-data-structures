@@ -1,14 +1,14 @@
-from dataclasses import dataclass
 import io
 import typing
 import uuid
+from dataclasses import dataclass
 
 import construct
 from construct import Container, PrefixedArray, Struct, Int32ul, Hex, Int16ul
 
 import retro_data_structures.properties.prime_remastered.objects
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.common_types import GUID, FourCC
+from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor
@@ -185,12 +185,15 @@ class RDSPropertyAdapter(construct.Adapter):
             return data.getvalue()
         return obj
 
+
 class ComponentTypeName(int):
     def __str__(self) -> str:
         try:
             return retro_data_structures.properties.prime_remastered.objects.get_object(self).__name__
         except KeyError:
             return f"0x{self:08x}"
+
+
 class ComponentType(Hex):
     def _decode(self, obj, context, path):
         return ComponentTypeName(super()._decode(obj, context, path))
@@ -272,6 +275,8 @@ ROOM = FormDescriptor(
     ),
 )
 
+T = typing.TypeVar("T")
+
 
 @dataclass(frozen=True)
 class Instance:
@@ -290,7 +295,12 @@ class Room(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []
-    
+
+    def properties_of_type(self, t: typing.Type[T]) -> typing.Iterator[T]:
+        for prop in self.raw.script_data.properties:
+            if isinstance(prop.data, t):
+                yield prop.data
+
     def test(self):
         sdhr = self.raw.script_data.sdhr
         weird_count = sdhr.weird_count
@@ -300,8 +310,11 @@ class Room(BaseResource):
         properties = self.raw.script_data.properties
 
         instances: dict[int, Instance] = {}
+
         def _add_inst(inst):
-            instances[inst.instance_idx] = Instance(instance_data[inst.instance_idx].guid, properties[inst.property_idx])
+            instances[inst.instance_idx] = Instance(instance_data[inst.instance_idx].guid,
+                                                    properties[inst.property_idx])
+
         for layer in self.raw.layers:
             for comp in layer.components:
                 _add_inst(comp)
@@ -314,13 +327,14 @@ class Room(BaseResource):
         for i in range(weird_count):
             guid = guids[i]
             unk = weird[i]
-            if type(instances[unk.a].properties.data).__name__ != "EntityProperties" and type(instances[unk.b].properties.data).__name__ != "EntityProperties":
+            if type(instances[unk.a].properties.data).__name__ != "EntityProperties" and type(
+                    instances[unk.b].properties.data).__name__ != "EntityProperties":
                 print(f"i: {i}")
                 print(f"a: {instances[unk.a]}")
                 print(f"b: {instances[unk.b]}")
                 count1 += 1
             else:
                 count2 += 1
-        
+
         print(count1)
         print(count2)
