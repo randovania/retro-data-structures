@@ -176,13 +176,11 @@ class RDSPropertyAdapter(construct.Adapter):
             property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
         except KeyError:
             return obj
-        return property_class.from_stream(io.BytesIO(obj))
+        return property_class.from_bytes(obj)
 
     def _encode(self, obj: typing.Union[BaseProperty, bytes], context, path):
         if isinstance(obj, BaseProperty):
-            data = io.BytesIO()
-            obj.to_stream(data)
-            return data.getvalue()
+            return obj.to_bytes()
         return obj
 
 
