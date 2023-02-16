@@ -295,7 +295,7 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
-            logger.debug("Encoding 0x%08x (%s, %s)", asset_id, original_name, new_data.resource_type())
+            logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
             raw_asset = RawResource(
                 type=new_data.resource_type(),
                 data=new_data.build(),
