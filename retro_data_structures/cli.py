@@ -147,9 +147,30 @@ def do_decode(args):
     if file_format is None:
         file_format = input_path.suffix[1:]
 
-    construct_class = formats.format_for(file_format)
+    construct_class = formats.resource_type_for(file_format)
+
+    import wx
+    from construct_editor.wx_widgets import WxConstructHexEditor
 
     raw = input_path.read_bytes()
+
+    from construct_editor.core.custom import add_custom_transparent_subconstruct
+    from retro_data_structures.construct_extensions.misc import UntilEof
+    add_custom_transparent_subconstruct(UntilEof)
+    from construct_editor.core.entries import construct_entry_mapping
+    from construct_editor.core.entries import EntryArray
+    construct_entry_mapping[UntilEof] = EntryArray
+
+    app = wx.App(False)
+    frame = wx.Frame(None, title="Construct Hex Editor", size=(1000, 200))
+    editor_panel = WxConstructHexEditor(frame, construct=construct_class.construct_class(game),
+                                        binary=raw)
+    editor_panel.construct_editor.expand_all()
+    frame.Show(True)
+    app.MainLoop()
+
+    return
+
     decoded_from_raw = construct_class.parse(raw, target_game=game)
     print(decoded_from_raw)
 
