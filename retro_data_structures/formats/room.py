@@ -272,10 +272,12 @@ ROOM = FormDescriptor(
     ),
 )
 
+
 @dataclass(frozen=True)
 class Instance:
     guid: uuid.UUID
-    properties: BaseProperty | Container
+    properties: typing.Union[BaseProperty, Container]
+
 
 class Room(BaseResource):
     @classmethod
