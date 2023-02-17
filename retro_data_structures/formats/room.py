@@ -1,4 +1,3 @@
-import io
 import typing
 import uuid
 from dataclasses import dataclass
@@ -14,6 +13,7 @@ from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescri
 from retro_data_structures.formats.form_descriptor import FormDescriptor
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseProperty
+from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
@@ -135,13 +135,13 @@ STRP = Struct(
         Int32ul,
         construct.Prefixed(
             Int32ul,
-            construct.GreedyRange(construct.CString("utf-8")),
+            GreedyBytes,
         ),
     ),
     z=GreedyBytes,
 )
 
-PooledString = Struct(
+ConstructPooledString = Struct(
     a=construct.Int32sl,
     b=construct.IfThenElse(
         construct.this.a != -1,
@@ -216,7 +216,7 @@ ScriptData = Struct(
     properties=construct.Array(construct.this.sdhr.properties_count, SingleTypeChunkDescriptor("SDEN", Property)),
     instance_data=construct.Array(construct.this.sdhr.instance_data_count, SingleTypeChunkDescriptor("IDTA", Struct(
         guid=GUID,
-        str=PooledString,
+        str=ConstructPooledString,
         connections=construct.PrefixedArray(
             construct.Int16ul,
             Struct(
@@ -293,6 +293,12 @@ class Room(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []
+
+    def get_pooled_string(self, pooled_string: PooledString) -> bytes:
+        if pooled_string.index == -1:
+            return pooled_string.size_or_str
+        else:
+            return self.raw.strp.pools[0][pooled_string.index:pooled_string.index + pooled_string.size_or_str]
 
     def properties_of_type(self, t: typing.Type[T]) -> typing.Iterator[T]:
         for prop in self.raw.script_data.properties:
