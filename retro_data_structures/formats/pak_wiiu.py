@@ -1,3 +1,5 @@
+import math
+
 import construct
 from construct import Struct, Int32ul, Int64ul, PrefixedArray, Hex
 
@@ -26,8 +28,8 @@ AssetDirectoryEntry = Struct(
         type=FourCC,
         id=GUID,
     ),
-    unk1=Hex(Int32ul),
-    unk2=Hex(Int32ul),
+    version_a=Hex(Int32ul),
+    version_b=Hex(Int32ul),
     offset=Hex(Int64ul),
     decompressed_size=Hex(Int64ul),
     size=Hex(Int64ul),
@@ -87,6 +89,12 @@ class ConstructPakWiiU(construct.Construct):
                 False,
                 data,
                 None,
+                extra=construct.Container(
+                    version_a=resource.version_a,
+                    version_b=resource.version_b,
+                    offset=resource.offset,
+                    decompressed_size=resource.decompressed_size,
+                ),
             ))
             last = max(last, construct.stream_tell(stream, path))
 
@@ -112,21 +120,21 @@ class ConstructPakWiiU(construct.Construct):
                         type=file.asset_type,
                         id=file.asset_id,
                     ),
-                    unk1=147,
-                    unk2=160,
+                    version_a=file.extra.version_a,
+                    version_b=file.extra.version_b,
                     offset=0,
-                    decompressed_size=len(file.get_decompressed(game)),
+                    decompressed_size=file.extra.get("decompressed_size", len(file.get_decompressed(game))),
                     size=len(file.get_decompressed(game)),
                 )
-                for file in files
+                for file in sorted(files, key=lambda it: it.asset_id)
             )
         )
 
         header_start = construct.stream_tell(stream, path)
         PakWiiUNoData._build(obj.header, stream, context, f"{path} -> header")
 
-        for i, file in enumerate(files):
-            tocc.ADIR.data[i].offset = construct.stream_tell(stream, f"{path} -> file[{i}]")
+        for i, (adir, file) in enumerate(sorted(zip(tocc.ADIR.data, files), key=lambda it: it[1].extra.offset or math.inf)):
+            adir.offset = construct.stream_tell(stream, f"{path} -> file[{i}]")
             data = file.get_decompressed(game)
             construct.stream_write(stream, data, len(data), f"{path} -> file[{i}]")
 

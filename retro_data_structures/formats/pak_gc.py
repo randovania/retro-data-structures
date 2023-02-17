@@ -53,6 +53,7 @@ class PakFile:
     should_compress: bool
     uncompressed_data: typing.Optional[bytes]
     compressed_data: typing.Optional[bytes]
+    extra: typing.Optional[construct.Container] = None
 
     def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
