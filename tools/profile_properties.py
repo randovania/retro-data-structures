@@ -7,10 +7,12 @@ from pathlib import Path
 import construct
 
 from retro_data_structures import properties
-from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
-from retro_data_structures.formats import Mrea
+from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
+from retro_data_structures.formats import Mrea, Room
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties import BaseProperty
 from retro_data_structures.properties.prime import objects as prime_objects
+
 
 @dataclasses.dataclass()
 class Object:
@@ -31,7 +33,7 @@ SerializedData = construct.Struct(
 ).compile()
 
 
-def do_dump_properties(game: Game, args):
+def do_dump_properties_mrea(game: Game, args):
     manager = AssetManager(IsoFileProvider(args.iso), target_game=game)
 
     header = []
@@ -75,12 +77,65 @@ def do_dump_properties(game: Game, args):
     )
 
 
+def do_dump_properties_room(game: Game, args):
+    manager = AssetManager(PathFileProvider(args.root), target_game=game)
+
+    header = []
+    data = []
+
+    for asset_id in manager.all_asset_ids():
+        if manager.get_asset_type(asset_id) != Room.resource_type():
+            continue
+
+        try:
+            room = manager.get_parsed_asset(asset_id, type_hint=Room)
+        except construct.ConstructError as e:
+            print(f"Unable to parse {asset_id}: {e}")
+            continue
+
+        for i, instance in enumerate(room.raw.script_data.properties):
+            body = instance.data
+            if isinstance(body, BaseProperty):
+                body = body.to_bytes()
+
+            header.append(dict(
+                identifier=f"{i}-th property of room {asset_id}",
+                instance_id=i,
+                size=len(body),
+            ))
+            data.append(instance.type_id.to_bytes(4, "big"))
+            data.append(body)
+
+        print(f"Wrote properties for {asset_id}")
+
+    data_to_dump = dict(
+        game=game.value,
+        header=header,
+        data=b"".join(data),
+    )
+    path = Path(__file__).parent.joinpath(f"properties_{game.name}.bin")
+    SerializedData.build_file(
+        data_to_dump,
+        path,
+    )
+
+
 def _parse_properties(game: Game, property_data: construct.Container, build: bool, compare: bool):
+    if game == Game.PRIME_REMASTER:
+        def decode(b: bytes):
+            return int.from_bytes(b, "big")
+    else:
+        def decode(b: bytes):
+            return b.decode("ascii")
+
     start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
-        property_type = data.read(4).decode("ascii")
-        property_class = properties.get_game_object(game, property_type)
+        property_type = decode(data.read(4))
+        try:
+            property_class = properties.get_game_object(game, property_type)
+        except KeyError:
+            continue
         type_name = property_class.__name__
 
         before = data.tell()
@@ -127,8 +182,10 @@ def main():
     parser.add_argument("--game", required=True, choices=[g.name for g in Game])
 
     sub_parser = parser.add_subparsers(dest="tool", required=True)
-    dump_properties = sub_parser.add_parser("dump-properties")
+    dump_properties = sub_parser.add_parser("dump-properties-mrea")
     dump_properties.add_argument("iso", type=Path)
+    dump_properties = sub_parser.add_parser("dump-properties-room")
+    dump_properties.add_argument("root", type=Path)
     parse_properties = sub_parser.add_parser("parse-properties")
     parse_properties.add_argument("--repeat", default=1, type=int, help="Perform the decoding this many times")
     parse_properties.add_argument("--build", action="store_true", help="re-build and discard the result")
@@ -137,8 +194,10 @@ def main():
     args = parser.parse_args()
     game: Game = getattr(Game, args.game)
 
-    if args.tool == "dump-properties":
-        do_dump_properties(game, args)
+    if args.tool == "dump-properties-mrea":
+        do_dump_properties_mrea(game, args)
+    elif args.tool == "dump-properties-room":
+        do_dump_properties_room(game, args)
     elif args.tool == "parse-properties":
         do_parse_properties(game, args)
 

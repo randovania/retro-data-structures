@@ -14,5 +14,8 @@ def get_game_object(game: Game, four_cc: typing.Union[str, int]) -> typing.Type[
     elif game == Game.CORRUPTION:
         from .corruption import objects as corruption_objects
         return corruption_objects.get_object(four_cc)
+    elif game == Game.PRIME_REMASTER:
+        from .prime_remastered import objects as prime_remastered_objects
+        return prime_remastered_objects.get_object(four_cc)
     else:
         raise ValueError(f"Unknown Game: {game}")
