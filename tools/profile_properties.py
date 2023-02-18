@@ -1,5 +1,4 @@
 import argparse
-import dataclasses
 import io
 import time
 from pathlib import Path
@@ -12,25 +11,17 @@ from retro_data_structures.formats import Mrea, Room
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseProperty
 from retro_data_structures.properties.prime import objects as prime_objects
-
-
-@dataclasses.dataclass()
-class Object:
-    identifier: str
-    instance_id: int
-    type: str
-    properties: bytes
-
+from retro_data_structures.properties.prime_remastered.objects import HUDMemoMP1
 
 SerializedData = construct.Struct(
     game=construct.VarInt,
     header=construct.PrefixedArray(construct.VarInt, construct.Struct(
         identifier=construct.PascalString(construct.VarInt, "utf-8"),
-        instance_id=construct.Int32ub,
+        instance_id=construct.VarInt,
         size=construct.VarInt,
     )),
     data=construct.GreedyBytes,
-).compile()
+)
 
 
 def do_dump_properties_mrea(game: Game, args):
@@ -94,16 +85,15 @@ def do_dump_properties_room(game: Game, args):
             continue
 
         for i, instance in enumerate(room.raw.script_data.properties):
-            body = instance.data
-            if isinstance(body, BaseProperty):
-                body = body.to_bytes()
+            if not isinstance(instance.data, BaseProperty):
+                continue
 
+            body = instance.data.to_bytes()
             header.append(dict(
-                identifier=f"{i}-th property of room {asset_id}",
-                instance_id=i,
+                identifier=f"{i} property of room {asset_id} ({instance.data.__class__.__name__})",
+                instance_id=instance.type_id,
                 size=len(body),
             ))
-            data.append(instance.type_id.to_bytes(4, "big"))
             data.append(body)
 
         print(f"Wrote properties for {asset_id}")
@@ -121,20 +111,16 @@ def do_dump_properties_room(game: Game, args):
 
 
 def _parse_properties(game: Game, property_data: construct.Container, build: bool, compare: bool):
-    if game == Game.PRIME_REMASTER:
-        def decode(b: bytes):
-            return int.from_bytes(b, "big")
-    else:
-        def decode(b: bytes):
-            return b.decode("ascii")
-
     start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
-        property_type = decode(data.read(4))
         try:
-            property_class = properties.get_game_object(game, property_type)
-        except KeyError:
+            if game == Game.PRIME_REMASTER:
+                property_class = properties.get_game_object(game, instance.instance_id)
+            else:
+                property_class = properties.get_game_object(game, data.read(4).decode("ascii"))
+        except KeyError as e:
+            data.read(instance.size)
             continue
         type_name = property_class.__name__
 
