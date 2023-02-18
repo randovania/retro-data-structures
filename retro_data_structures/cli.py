@@ -10,11 +10,11 @@ from pathlib import Path
 from typing import Optional, List
 
 from retro_data_structures import dependencies, formats
+from retro_data_structures.asset_manager import AssetManager, PathFileProvider, IsoFileProvider
 from retro_data_structures.base_resource import AssetId
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.asset_manager import AssetManager, PathFileProvider, IsoFileProvider
 from retro_data_structures.formats import mlvl
 from retro_data_structures.game_check import Game
 
@@ -98,6 +98,12 @@ def create_parser():
     add_provider_argument(decode_from_paks)
     decode_from_paks.add_argument("asset_id", type=asset_id_conversion, help="Asset id to print")
 
+    extract = subparser.add_parser("extract")
+    add_game_argument(extract)
+    add_provider_argument(extract)
+    extract.add_argument("asset_id", type=asset_id_conversion, help="Asset id to extract")
+    extract.add_argument("destination", type=Path, help="Directory to write to")
+
     deps = subparser.add_parser("list-dependencies")
     add_game_argument(deps)
     add_provider_argument(deps)
@@ -163,8 +169,22 @@ def do_decode_from_pak(args):
     game: Game = args.game
     asset_id: int = args.asset_id
 
-    asset_provider = AssetManager(get_provider_from_argument(args), game)
-    print(asset_provider.get_parsed_asset(asset_id).raw)
+    asset_manager = AssetManager(get_provider_from_argument(args), game)
+    print(asset_manager.get_parsed_asset(asset_id).raw)
+
+
+def do_extract(args):
+    game: Game = args.game
+    asset_id: int = args.asset_id
+    destination: Path = args.destination
+
+    asset_manager = AssetManager(get_provider_from_argument(args), game)
+    target_asset = asset_manager.get_raw_asset(asset_id)
+
+    destination.mkdir(parents=True, exist_ok=True)
+    destination.joinpath(f"{asset_id}.{target_asset.type.lower()}").write_bytes(
+        target_asset.data
+    )
 
 
 def list_dependencies(args):
@@ -320,6 +340,8 @@ def main():
         do_decode(args)
     elif args.command == "decode-from-pak":
         do_decode_from_pak(args)
+    elif args.command == "extract":
+        do_extract(args)
     elif args.command == "list-dependencies":
         list_dependencies(args)
     elif args.command == "convert":
