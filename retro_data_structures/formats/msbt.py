@@ -29,25 +29,31 @@ def TableHeader(magic: str):
 
 
 class SectionBody(construct.Construct):
-    def __init__(self, header_magic: str, entry_header: construct.Construct, get_offset_from_header,
-                 entry: construct.Construct, has_entry_size: bool):
+    def __init__(self, header_magic: str, entry: construct.Construct, has_entry_size: bool):
         super().__init__()
         self.header_magic = header_magic
-        self.entry_header = entry_header
-        self.get_offset_from_header = get_offset_from_header
+        self.entry_header = construct.Int32ul
         self.entry = entry
         self.has_entry_size = has_entry_size
+        self.int_type = typing.cast(construct.Construct, construct.Int32ul)
+
+    def get_offset_from_header(self, item):
+        return item
+
+    def _header_for_entry(self, offset: int, entry):
+        return offset
+
+    def _context_for_entry(self, context, entry_header):
+        return context
 
     def _parse(self, stream, context, path):
-        int_type = typing.cast(construct.Construct, construct.Int32ul)
-
         table_size = TableHeader(self.header_magic)._parsereport(stream, context, path).table_size
         table_start = construct.stream_tell(stream, path)
-        count = int_type._parsereport(stream, context, path)
+        count = self.int_type._parsereport(stream, context, path)
 
         if self.has_entry_size:
             # Read the entry size. It's always 4.
-            construct.Const(4, construct.Int32ul)._parsereport(stream, context, path)
+            construct.Const(4, self.int_type)._parsereport(stream, context, path)
 
         entry_headers = construct.Array(count, self.entry_header)._parsereport(stream, context, path)
 
@@ -64,13 +70,7 @@ class SectionBody(construct.Construct):
             if current_offset != table_start + this_offset:
                 raise construct.CheckError("incorrect offset in data", path=path)
 
-            new_context = construct.Container(
-                _=context, _params=context._params, _root=None, _parsing=context._parsing,
-                _building=context._building, _sizing=context._sizing,
-                _io=stream, _index=context.get("_index", None),
-                entry_header=entry_header,
-            )
-            new_context._root = new_context._.get("_root", context)
+            new_context = self._context_for_entry(context, entry_header)
             entry_data = io.BytesIO(construct.stream_read(stream, next_offset - this_offset, path))
             result.append(self.entry._parsereport(entry_data, new_context, path))
             if not construct.stream_iseof(entry_data):
@@ -79,39 +79,105 @@ class SectionBody(construct.Construct):
         return result
 
     def _build(self, obj, stream, context, path):
-        pass
+        items = []
+        entry_headers = []
+
+        count = len(obj)
+        offset = self.int_type._sizeof(construct.Container(), path)
+        if self.has_entry_size:
+            offset += self.int_type._sizeof(construct.Container(), path)
+        offset += count * self.entry_header._sizeof(context, path)
+
+        for item in obj:
+            new_context = self._context_for_entry(context, item)
+
+            stream2 = io.BytesIO()
+            self.entry._build(item, stream2, new_context, path)
+            items.append(stream2.getvalue())
+            entry_headers.append(self._header_for_entry(
+                offset, item,
+            ))
+            offset += len(items[-1])
+
+        # Build!
+        TableHeader(self.header_magic)._build(
+            construct.Container(
+                table_size=offset,
+            ),
+            stream, context, path,
+        )
+        table_start = construct.stream_tell(stream, path)
+        self.int_type._build(count, stream, context, path)
+
+        if self.has_entry_size:
+            # Read the entry size. It's always 4.
+            construct.Const(4, self.int_type)._build(None, stream, context, path)
+
+        construct.Array(count, self.entry_header)._build(entry_headers, stream, context, path)
+
+        for entry_header, entry in zip(entry_headers, items):
+            this_offset = self.get_offset_from_header(entry_header)
+            current_offset = construct.stream_tell(stream, path)
+            if current_offset != table_start + this_offset:
+                raise construct.CheckError("incorrect offset in data", path=path)
+
+            construct.stream_write(stream, entry, len(entry), path)
 
 
-LabelsSection = construct.Aligned(16, SectionBody(
-    header_magic="LBL1",
-    entry_header=Struct(
-        string_count=construct.Int32ul,
-        string_offset=construct.Int32ul,
-    ),
-    get_offset_from_header=lambda it: it.string_offset,
-    entry=construct.Array(
-        lambda ctx: ctx.entry_header.string_count,
-        Struct(
-            str=construct.PascalString(construct.Int8ul, "ascii"),
-            string_table_index=construct.Int32ul,
-        ),
-    ),
-    has_entry_size=False,
-), b"\xAB")
+class LabelsSectionBody(SectionBody):
+    def __init__(self):
+        super().__init__(
+            "LBL1",
+            entry=construct.Array(
+                lambda ctx: ctx.entry_header.string_count,
+                Struct(
+                    str=construct.PascalString(construct.Int8ul, "ascii"),
+                    string_table_index=construct.Int32ul,
+                ),
+            ),
+            has_entry_size=False,
+        )
+        self.entry_header = Struct(
+            string_count=construct.Int32ul,
+            string_offset=construct.Int32ul,
+        )
+
+    def get_offset_from_header(self, item):
+        return item.string_offset
+
+    def _header_for_entry(self, offset: int, entry):
+        return construct.Container(
+            string_offset=offset,
+            string_count=len(entry),
+        )
+
+    def _context_for_entry(self, context, entry_or_header):
+        new_context = construct.Container(
+            _=context, _params=context._params, _root=None, _parsing=context._parsing,
+            _building=context._building, _sizing=context._sizing,
+            _io=context._io, _index=context.get("_index", None),
+        )
+        new_context._root = new_context._.get("_root", context)
+
+        if context._building:
+            new_context.entry_header = self._header_for_entry(0, entry_or_header)
+        else:
+            new_context.entry_header = entry_or_header
+
+        return new_context
+
+
+LabelsSection = construct.Aligned(16, LabelsSectionBody(), b"\xAB")
 
 AttributesSection = construct.Aligned(16, SectionBody(
     header_magic="ATR1",
-    entry_header=construct.Int32ul,
-    get_offset_from_header=lambda it: it,
     entry=construct.CString("utf-16"),
     has_entry_size=True,
 ), b"\xAB")
 
 TextsSection = construct.Aligned(16, SectionBody(
     header_magic="TXT2",
-    entry_header=construct.Int32ul,
-    get_offset_from_header=lambda it: it,
-    entry=construct.StringEncoded(construct.GreedyBytes, "utf-16"),
+    entry=construct.GreedyBytes,
     has_entry_size=False,
 ), b"\xAB")
 
