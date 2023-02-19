@@ -15,6 +15,7 @@ from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.mapw import Mapw
 from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
+from retro_data_structures.formats.msbt import Msbt
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.part import PART, Part
 from retro_data_structures.formats.room import Room
@@ -57,6 +58,7 @@ ALL_RESOURCE_TYPES = {
     "MAPW": Mapw,
     "MLVL": Mlvl,
     "MREA": Mrea,
+    "MSBT": Msbt,
     "PAK": Pak,
     "PART": Part,
     "ROOM": Room,
