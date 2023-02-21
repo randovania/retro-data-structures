@@ -1018,7 +1018,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif prop['type'] in ['Choice', 'Enum']:
             default_value = prop["default_value"] if prop['has_default'] else 0
-            enum_name = _scrub_enum(prop["archetype"] or property_names.get(prop["id"]) or "")
+            enum_name = _scrub_enum(prop["archetype"] or prop["name"] or property_names.get(prop["id"]) or "")
             format_specifier = "L"
 
             uses_known_enum = enum_name in known_enums and (
