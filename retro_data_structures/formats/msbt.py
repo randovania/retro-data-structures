@@ -171,13 +171,13 @@ LabelsSection = construct.Aligned(16, LabelsSectionBody(), b"\xAB")
 
 AttributesSection = construct.Aligned(16, SectionBody(
     header_magic="ATR1",
-    entry=construct.CString("utf-16"),
+    entry=construct.CString("utf_16_le"),
     has_entry_size=True,
 ), b"\xAB")
 
 TextsSection = construct.Aligned(16, SectionBody(
     header_magic="TXT2",
-    entry=construct.GreedyBytes,
+    entry=construct.StringEncoded(construct.GreedyBytes, "utf_16_le"),
     has_entry_size=False,
 ), b"\xAB")
 
