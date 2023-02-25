@@ -346,6 +346,15 @@ class AreaWrapper:
     def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         return self.mrea.get_instance_by_name(name)
 
+    def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+        source_dock = self._raw.docks[source_dock_number]
+        source_dock.connecting_dock[0].area_index = target_area._index
+        source_dock.connecting_dock[0].dock_index = target_dock_number
+
+        target_dock = target_area._raw.docks[target_dock_number]
+        target_dock.connecting_dock[0].area_index = self._index
+        target_dock.connecting_dock[0].dock_index = source_dock_number
+
 
 class Mlvl(BaseResource):
     _mapw: Mapw = None
