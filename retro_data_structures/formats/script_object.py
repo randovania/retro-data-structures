@@ -180,6 +180,9 @@ class ScriptInstanceHelper:
 
     def get_properties_as(self, type_cls: Type[PropertyType]) -> PropertyType:
         props = self.get_properties()
+        # hack to support using the shared_objects unions
+        if hasattr(type_cls, "__args__"):
+            type_cls = type_cls.__args__
         assert isinstance(props, type_cls)
         return props
 
