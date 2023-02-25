@@ -65,6 +65,7 @@ MLVLMemoryRelay = Struct(
     active=Int8ub,
 )
 
+
 class LayerFlags(Adapter):
     def __init__(self):
         super().__init__(Struct(
@@ -83,6 +84,7 @@ class LayerFlags(Adapter):
             "layer_flags": list(reversed(flags))
         })
 
+
 class LayerNameOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
         return context._.layer_names
@@ -93,6 +95,7 @@ class LayerNameOffsetAdapter(OffsetAdapter):
     def _get_item_size(self, item):
         return len(item.encode('utf-8'))
 
+
 class AreaDependencyOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
         return context._.dependencies_b
@@ -102,6 +105,7 @@ class AreaDependencyOffsetAdapter(OffsetAdapter):
     
     def _get_item_size(self, item):
         return 8
+
 
 def create_area(version: int, asset_id):
     MLVLAreaDependency = Struct(
@@ -346,14 +350,22 @@ class AreaWrapper:
     def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         return self.mrea.get_instance_by_name(name)
 
-    def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+    def _raw_connect_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]
+        assert len(source_dock.connecting_dock) == 1, "Only docks with one connection supported"
         source_dock.connecting_dock[0].area_index = target_area._index
         source_dock.connecting_dock[0].dock_index = target_dock_number
 
-        target_dock = target_area._raw.docks[target_dock_number]
-        target_dock.connecting_dock[0].area_index = self._index
-        target_dock.connecting_dock[0].dock_index = source_dock_number
+        attached_area_index = []
+        for docks in self._raw.docks:
+            for c in docks.connecting_dock:
+                if c.area_index not in attached_area_index:
+                    attached_area_index.append(c.area_index)
+        self._raw.attached_area_index = construct.ListContainer(attached_area_index)
+
+    def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+        self._raw_connect_to(source_dock_number, target_area, target_dock_number)
+        target_area._raw_connect_to(target_dock_number, self, source_dock_number)
 
 
 class Mlvl(BaseResource):
