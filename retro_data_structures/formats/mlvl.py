@@ -343,6 +343,9 @@ class AreaWrapper:
 
         return None
 
+    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+        return self.mrea.get_instance_by_name(name)
+
 
 class Mlvl(BaseResource):
     _mapw: Mapw = None
