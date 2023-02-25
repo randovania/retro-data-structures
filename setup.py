@@ -20,7 +20,7 @@ class GenerateTemplateCommand(egg_info):
     """
 
     def run(self):
-        if Path(__file__).parent.joinpath("PrimeWorldEditor").is_dir():
+        if Path(__file__).parent.joinpath("retro-script-object-templates").is_dir():
             generate_property_templates()
         return egg_info.run(self)
 

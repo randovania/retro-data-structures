@@ -1466,7 +1466,7 @@ def write_shared_types_helpers(all_games: dict):
 
 def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
     base_dir = Path(__file__).parent
-    templates_path = base_dir.joinpath("PrimeWorldEditor/templates")
+    templates_path = base_dir.joinpath("retro-script-object-templates")
     read_property_names(templates_path / "PropertyMap.xml")
 
     game_list = parse_game_list(templates_path)
