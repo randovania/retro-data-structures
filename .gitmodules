@@ -1,6 +1,3 @@
-[submodule "PrimeWorldEditor"]
-	path = PrimeWorldEditor
-	url = https://github.com/AxioDL/PrimeWorldEditor
 [submodule "retro-script-object-templates"]
 	path = retro-script-object-templates
 	url = https://github.com/henriquegemignani/retro-script-object-templates.git
