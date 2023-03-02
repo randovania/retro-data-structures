@@ -218,7 +218,9 @@ class AssetManager:
                 return result
 
         try:
-            for pak_name in self._paks_for_asset_id[asset_id]:
+            paks_to_check = list(self._paks_for_asset_id[asset_id])
+            paks_to_check.sort(key=lambda it: it in self._in_memory_paks, reverse=True)
+            for pak_name in paks_to_check:
                 pak = self.get_pak(pak_name)
                 result = pak.get_asset(asset_id)
                 if result is not None:
