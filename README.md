@@ -6,6 +6,7 @@ Construct type definitions for Retro Studios game
 | PAK    | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | MLVL   | &check;        | &cross;         | &check;        | &cross;         | &check;        | &cross;         |
 | MREA   | &cross;        | &cross;         | &check;        | &cross; [2]     | &cross;        | &cross;         |
+| MAPA   | &check;        | &cross;         | &check;        | &cross;         | &cross;        | &cross;         |
 | CMDL   | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | ANCS   | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
 | ANIM   | &check;        | &check;         | &check;        | &check;         | &cross;        | &cross;         |
@@ -23,7 +24,7 @@ Construct type definitions for Retro Studios game
 ## Example Usage
 
 ```python
-from retro_data_structures.formats.pak import PAK_GC
+from retro_data_structures.formats.pak_gc import PAK_GC
 
 
 def read_file(path):
