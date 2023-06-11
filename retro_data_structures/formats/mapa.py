@@ -1,3 +1,4 @@
+from enum import Enum
 import typing
 
 import construct
@@ -11,10 +12,23 @@ from retro_data_structures.game_check import Game, current_game_at_least_else, g
 def _const(val: int):
     return construct.Const(val, construct.Int32ub)
 
+class AreaVisibilty(Enum):
+    Always = 0
+    VisitOrMapStation = 1
+    VisitOnly = 2
+    Never = 3
+
+class ObjectVisibility(Enum):
+    Always = 0
+    AreaVisitOrMapStation = 1
+    DoorVisit = 2
+    Never = 3
+    AreaVisitOrMapStation2 = 4
+
 
 MappableObject = construct.Struct(
     type=construct.Int32ub,
-    visibility_mode=construct.Int32ub,
+    visibility_mode=construct.Enum(construct.Int32ub, ObjectVisibility),
     editor_id=construct.Int32ub,
     unk1=construct.Int32ub,
     transform=Transform4f,
@@ -43,7 +57,7 @@ MAPA = construct.Aligned(32, construct.Struct(
             default=ErrorWithMessage("Unknown game"),
         ),
         type=construct.Int32ub,  # Light/Dark world for Echoes
-        visibility_mode=construct.Int32ub,
+        visibility_mode=construct.Enum(construct.Int32ub, AreaVisibilty),
         bounding_box=AABox,
         map_adjustment=current_game_at_least_else(Game.ECHOES, Vector3, construct.Pass),
         mappable_object_count=construct.Int32ub,

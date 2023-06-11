@@ -31,3 +31,8 @@ class Mapw(BaseResource):
 
     def get_mapa_id(self, index: int) -> AssetId:
         return self.raw.area_map[index]
+    
+    @property
+    def mapa_ids(self) -> typing.Iterator[AssetId]:
+        for item in self.raw.area_map:
+            yield item
