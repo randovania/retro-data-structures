@@ -186,7 +186,8 @@ class ScriptInstanceHelper:
         # hack to support using the shared_objects unions
         if hasattr(type_cls, "__args__"):
             type_cls = type_cls.__args__
-        assert isinstance(props, type_cls)
+        if not isinstance(props, type_cls):
+            raise TypeError(f"Expected {type_cls}, got {props}")
         return props
 
     def set_properties(self, data: BaseObjectType):

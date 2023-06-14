@@ -272,12 +272,15 @@ class AssetManager:
 
     def register_custom_asset_name(self, name: str, asset_id: AssetId):
         if self.does_asset_exists(asset_id):
-            raise ValueError(f"{asset_id} already exists")
+            raise ValueError(f"{asset_id} ({name}) already exists")
 
         if name in self._custom_asset_ids and self._custom_asset_ids[name] != asset_id:
             raise ValueError(f"{name} already exists")
 
         self._custom_asset_ids[name] = asset_id
+    
+    def get_custom_asset(self, name: str) -> AssetId | None:
+        return self._custom_asset_ids.get(name)
 
     def add_new_asset(self, name: typing.Union[str, uuid.UUID], new_data: typing.Union[RawResource, BaseResource],
                       in_paks: typing.Iterable[str]):
