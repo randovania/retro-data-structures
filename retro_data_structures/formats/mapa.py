@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, IntEnum
 import typing
 
 import construct
@@ -18,6 +18,7 @@ class AreaVisibilty(Enum):
     VisitOnly = 2
     Never = 3
 
+
 class ObjectVisibility(Enum):
     Always = 0
     AreaVisitOrMapStation = 1
@@ -26,8 +27,74 @@ class ObjectVisibility(Enum):
     AreaVisitOrMapStation2 = 4
 
 
+class ObjectTypeMP1(IntEnum):
+    NormalDoor = 0
+    ShieldDoor = 1
+    IceDoor = 2
+    WaveDoor = 3
+    PlasmaDoor = 4
+    BigDoor = 5
+    BigDoor2 = 6
+    IceDoorCeil = 7
+    IceDoorFloor = 8
+    WaveDoorCeil = 9
+    WaveDoorFloor = 10
+    PlasmaDoorCeil = 11
+    PlasmaDoorFloor = 12
+    IceDoorFloor2 = 13
+    WaveDoorFloor2 = 14
+    PlasmaDoorFloor2 = 15
+
+    DownArrowYellow = 27
+    UpArrowYellow = 28
+    DownArrowGreen = 29
+    UpArrowGreen = 30
+    DownArrowRed = 31
+    UpArrowRed = 32
+    
+    Elevator = 33
+    SaveStation = 34
+    MissileStation = 37
+
+    @property
+    def is_door_type(self):
+        return self < ObjectTypeMP1.DownArrowYellow
+
+
+class ObjectTypeMP2(IntEnum):
+    NormalDoor = 0
+    MissileDoor = 1
+    DarkDoor = 2
+    AnnihilatorDoor = 3
+    LightDoor = 4
+    SuperMissileDoor = 5
+    SeekerMissileDoor = 6
+    PowerBombDoor = 7
+
+    Elevator = 16
+    SaveStation = 17
+
+    AmmoStation = 20
+    Portal = 21
+    LightTeleporter = 22
+    TranslatorGate = 23
+    UpArrow = 24
+    DownArrow = 25
+
+    @property
+    def is_door_type(self):
+        return self < ObjectTypeMP2.Elevator
+
+
 MappableObject = construct.Struct(
-    type=construct.Int32ub,
+    type=construct.Switch(
+        get_current_game,
+        {
+            Game.PRIME: construct.Enum(construct.Int32sb, ObjectTypeMP1),
+            Game.ECHOES: construct.Enum(construct.Int32sb, ObjectTypeMP2),
+        },
+        default=construct.Int32sb
+    ),
     visibility_mode=construct.Enum(construct.Int32ub, ObjectVisibility),
     editor_id=construct.Int32ub,
     unk1=construct.Int32ub,
