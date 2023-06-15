@@ -113,9 +113,9 @@ EVNT = Struct(
 )
 
 
-def dependencies_for(obj, target_game):
+def dependencies_for(obj, asset_manager):
     for particle_poi in obj.particle_poi_nodes:
-        yield particle_poi.particle.type, particle_poi.particle.id
+        yield from asset_manager.get_dependencies_for_asset(particle_poi.particle.id)
 
 
 class Evnt(BaseResource):
@@ -128,4 +128,4 @@ class Evnt(BaseResource):
         return EVNT
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+        yield from dependencies_for(self.raw, self.asset_manager)

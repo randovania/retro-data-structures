@@ -18,7 +18,7 @@ from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.msbt import Msbt
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.part import PART, Part
+from retro_data_structures.formats.part import CRSC, DPSC, ELSC, PART, SPSC, SRSC, SWHC, WPSC, Crsc, Dpsc, Elsc, Part, Spsc, Srsc, Swhc, Wpsc
 from retro_data_structures.formats.room import Room
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw
@@ -45,6 +45,13 @@ ALL_FORMATS = {
     "SCAN": SCAN,
     "STRG": STRG,
     "TXTR": TXTR,
+    "DPSC": DPSC,
+    "WPSC": WPSC,
+    "CRSC": CRSC,
+    "SRSC": SRSC,
+    "SPSC": SPSC,
+    "ELSC": ELSC,
+    "SWHC": SWHC,
 }
 
 ALL_RESOURCE_TYPES = {
@@ -70,6 +77,13 @@ ALL_RESOURCE_TYPES = {
     "SCAN": Scan,
     "STRG": Strg,
     "TXTR": Txtr,
+    "DPSC": Dpsc,
+    "WPSC": Wpsc,
+    "CRSC": Crsc,
+    "SRSC": Srsc,
+    "SPSC": Spsc,
+    "ELSC": Elsc,
+    "SWHC": Swhc,
 }
 
 

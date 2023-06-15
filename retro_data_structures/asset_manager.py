@@ -11,7 +11,7 @@ import nod
 
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
-    AssetId, BaseResource, NameOrAssetId, RawResource,
+    AssetId, BaseResource, Dependency, NameOrAssetId, RawResource,
     resolve_asset_id, AssetType
 )
 from retro_data_structures.exceptions import UnknownAssetId
@@ -201,6 +201,47 @@ class AssetManager:
             return self._types_for_asset_id[asset_id]
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
+    
+    def get_dependencies_for_asset(self, asset_id: NameOrAssetId) -> Iterator[Dependency]:
+        if not self.target_game.is_valid_asset_id(asset_id):
+            yield from []
+            return
+        
+        if not self.does_asset_exists(asset_id):
+            # logging.warn(f"Can't resolve asset id {hex(asset_id)}")
+            yield from []
+            return
+
+        yield self.get_asset_type(asset_id), asset_id
+
+        try:
+            if not self.get_asset_format(asset_id).has_dependencies(self.target_game):
+                return
+            asset = self.get_parsed_asset(asset_id)
+        except KeyError:
+            return
+        yield from asset.dependencies_for()
+    
+    def get_mlvl_dependencies_for_asset(self, asset_id: NameOrAssetId, is_player_actor: bool = False) -> Iterator[Dependency]:
+        if not self.target_game.is_valid_asset_id(asset_id):
+            yield from []
+            return
+        
+        if not self.does_asset_exists(asset_id):
+            # logging.warn(f"Can't resolve asset id {hex(asset_id)}")
+            yield from []
+            return
+
+        yield self.get_asset_type(asset_id), asset_id
+
+        try:
+            if not self.get_asset_format(asset_id).has_dependencies(self.target_game):
+                return
+            asset = self.get_parsed_asset(asset_id)
+        except KeyError:
+            # logging.warn(f"May be missing dependencies for {self.get_asset_type(asset_id)}")
+            return
+        yield from asset.mlvl_dependencies_for(is_player_actor)
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
@@ -226,18 +267,20 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
+    def get_asset_format(self, asset_id: NameOrAssetId) -> typing.Type[BaseResource]:
+        raw_asset = self.get_raw_asset(asset_id)
+        return formats.resource_type_for(raw_asset.type)
+
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
         """
-        raw_asset = self.get_raw_asset(asset_id)
-
-        format_class = formats.resource_type_for(raw_asset.type)
+        format_class = self.get_asset_format(asset_id)
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
-        return format_class.parse(raw_asset.data, target_game=self.target_game,
+        return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game,
                                   asset_manager=self)
 
     def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:

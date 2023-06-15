@@ -33,6 +33,7 @@ from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
 from retro_data_structures.formats.script_object import ScriptInstanceHelper
 from retro_data_structures.formats.visi import VISI
+from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect
 from retro_data_structures.game_check import Game
 
@@ -63,6 +64,7 @@ _all_categories = [
 ]
 
 _CATEGORY_ENCODINGS = {
+    "geometry_section": lazy_world_geometry(),
     "script_layers_section": SCLY,
     "generated_script_objects_section": SCGN,
     "area_octree_section": AROT,
@@ -448,6 +450,10 @@ class Mrea(BaseResource):
                 GreedyBytes if lazy_load else _CATEGORY_ENCODINGS[section_name],
                 context, "",
             )
+    
+    def get_section(self, section_name: str, lazy_load: bool = False):
+        self._ensure_decoded_section(section_name, lazy_load)
+        return self._raw.sections[section_name]
 
     def build(self) -> bytes:
         for i, section in (self._script_layer_helpers or {}).items():

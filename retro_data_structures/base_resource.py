@@ -47,8 +47,19 @@ class BaseResource:
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
 
+    @classmethod
+    def has_dependencies(cls, target_game: Game) -> bool:
+        dummy = cls(Container(), target_game, None)
+        try:
+            return len(dummy.dependencies_for()) > 0
+        except Exception:
+            return True
+
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
+    
+    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
+        yield from self.dependencies_for()
 
     @property
     def raw(self) -> Container:

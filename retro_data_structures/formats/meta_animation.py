@@ -65,18 +65,18 @@ by_asset_type = {
 }
 
 
-def dependencies_for(obj, target_game):
+def dependencies_for(obj, asset_manager):
     if obj.type == MetaAnimationType.Play:
-        yield "ANIM", obj.body.asset_id
+        yield from asset_manager.get_dependencies_for_asset(obj.body.asset_id)
 
     elif obj.type in (MetaAnimationType.Blend, MetaAnimationType.PhaseBlend):
-        yield from dependencies_for(obj.body.anim_a, target_game)
-        yield from dependencies_for(obj.body.anim_b, target_game)
+        yield from dependencies_for(obj.body.anim_a, asset_manager)
+        yield from dependencies_for(obj.body.anim_b, asset_manager)
 
     elif obj.type == MetaAnimationType.Random:
         for anim in obj.body:
-            yield from dependencies_for(anim.animation, target_game)
+            yield from dependencies_for(anim.animation, asset_manager)
 
     elif obj.type == MetaAnimationType.Sequence:
         for item in obj.body:
-            yield from dependencies_for(item, target_game)
+            yield from dependencies_for(item, asset_manager)

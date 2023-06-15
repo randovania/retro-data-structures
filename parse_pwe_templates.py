@@ -467,7 +467,7 @@ class ClassDefinition:
 
     def finalize_props(self):
         if self.keep_unknown_properties():
-            self.class_code += "    unknown_properties: typing.Dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
+            self.class_code += "    unknown_properties: dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
         pass
 
     def keep_unknown_properties(self):
@@ -1113,7 +1113,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Array":
             inner_prop = get_prop_details(prop["item_archetype"])
 
-            prop_type = f"typing.List[{inner_prop.prop_type}]"
+            prop_type = f"list[{inner_prop.prop_type}]"
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
             meta["default_factory"] = "list"

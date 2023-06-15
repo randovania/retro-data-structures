@@ -1,8 +1,9 @@
 """
 Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
+from __future__ import annotations
 import typing
-from typing import Optional, List
+from typing import Iterable, Optional, List
 
 import construct
 from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b
@@ -17,6 +18,9 @@ from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
 ConstructAssetId = AssetId32
@@ -145,34 +149,46 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
+def char_dependencies_for(character, asset_manager: AssetManager):
+    def _array(asset_ids: Optional[Iterable[int]]):
+        if asset_ids is not None:
+            for asset_id in asset_ids:
+                yield from asset_manager.get_dependencies_for_asset(asset_id)
+    
+    yield from _array((
+        character.model_id,
+        character.skin_id,
+        character.skeleton_id,
+        character.frozen_model,
+        character.frozen_skin,
+        character.spatial_primitives_id
+    ))
 
-def dependencies_for(obj, target_game: Game):
-    for character in obj.character_set.characters:
-        yield from _yield_dependency_if_valid(character.model_id, "CMDL", target_game)
-        yield from _yield_dependency_if_valid(character.skin_id, "CSKR", target_game)
-        yield from _yield_dependency_if_valid(character.skeleton_id, "CINF", target_game)
-        yield from _yield_dependency_if_valid(character.frozen_model, "CMDL", target_game)
-        yield from _yield_dependency_if_valid(character.frozen_skin, "CSKR", target_game)
-        yield from _yield_dependency_if_valid(character.spatial_primitives_id, "CSPP", target_game)
+    # ParticleResourceData
+    psd = character.particle_resource_data
+    yield from _array(psd.generic_particles)
+    yield from _array(psd.swoosh_particles)
+    yield from _array(psd.electric_particles)
+    yield from _array(psd.spawn_particles)
 
-        # ParticleResourceData
-        psd = character.particle_resource_data
-        _yield_dependency_array(psd.generic_particles, "PART", target_game)
-        _yield_dependency_array(psd.swoosh_particles, "SWHC", target_game)
-        _yield_dependency_array(psd.electric_particles, "ELSC", target_game)
-        _yield_dependency_array(psd.spawn_particles, "SPSC", target_game)
-
+def non_char_dependencies_for(obj, asset_manager: AssetManager):
     for animation in obj.animation_set.animations:
-        yield from meta_animation.dependencies_for(animation.meta, target_game)
+        yield from meta_animation.dependencies_for(animation.meta, asset_manager)
 
     if obj.animation_set.animation_resources is not None:
         for res in obj.animation_set.animation_resources:
-            yield from _yield_dependency_if_valid(res.anim_id, "ANIM", target_game)
-            yield from _yield_dependency_if_valid(res.event_id, "EVNT", target_game)
+            yield from asset_manager.get_dependencies_for_asset(res.anim_id)
+            yield from asset_manager.get_dependencies_for_asset(res.event_id)
 
     event_sets = obj.animation_set.event_sets or []
     for event in event_sets:
-        yield from evnt.dependencies_for(event, target_game)
+        yield from evnt.dependencies_for(event, asset_manager)
+
+def dependencies_for(obj, asset_manager: AssetManager):
+    for character in obj.character_set.characters:
+        yield from char_dependencies_for(character, asset_manager)
+
+    yield from non_char_dependencies_for(obj, asset_manager)
 
 
 class Ancs(BaseResource):
@@ -185,4 +201,13 @@ class Ancs(BaseResource):
         return ANCS
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+        yield from dependencies_for(self.raw, self.asset_manager)
+    
+    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
+        if not is_player_actor:
+            yield from self.dependencies_for()
+            return
+        
+        empty_suit_index = 5 if self.target_game == Game.PRIME else 3
+        yield from char_dependencies_for(self.raw.character_set.characters[empty_suit_index], self.asset_manager)
+        yield from non_char_dependencies_for(self.raw, self.asset_manager)

@@ -28,4 +28,9 @@ class Dgrp(BaseResource):
         return DGRP
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+        for dependency in self.raw:
+            yield from self.asset_manager.get_dependencies_for_asset(dependency.asset_id)
+
+    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
+        for dependency in self.raw:
+            yield from self.asset_manager.get_mlvl_dependencies_for_asset(dependency.asset_id, is_player_actor)

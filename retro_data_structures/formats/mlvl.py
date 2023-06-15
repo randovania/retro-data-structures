@@ -4,6 +4,7 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 from __future__ import annotations
 
 from itertools import count
+import itertools
 from typing import Iterator
 import typing
 import construct
@@ -38,6 +39,7 @@ from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExt
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, NameOrAssetId
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
+from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
@@ -115,10 +117,9 @@ def create_area(version: int, asset_id):
     
     # TODO: better offset stuff
     MLVLAreaDependencies = Struct(
-        # Always empty
-        dependencies_a=PrefixedArray(Int32ub, MLVLAreaDependency),
-        dependencies_b=PrefixedArray(Int32ub, MLVLAreaDependency),
-        dependencies_offset=PrefixedArray(Int32ub, Int32ub),
+        Const(0, Int32ub),
+        "dependencies" / PrefixedArray(Int32ub, MLVLAreaDependency),
+        "offsets" / PrefixedArray(Int32ub, Int32ub),
     )
 
     area_fields = [
@@ -366,6 +367,59 @@ class AreaWrapper:
     def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
         self._raw_connect_to(source_dock_number, target_area, target_dock_number)
         target_area._raw_connect_to(target_dock_number, self, source_dock_number)
+    
+    def build_non_layer_dependencies(self) -> typing.Iterator[Dependency]:
+        geometry_section = self.mrea.get_section("geometry_section")
+        if geometry_section is not None:
+            yield from dependencies_for_material_set(geometry_section[0].materials, self.asset_manager)
+        valid_asset = self.asset_manager.target_game.is_valid_asset_id
+        if valid_asset(portal_area := self.mrea.get_section("portal_area_section")[0]):
+            yield "PTLA", portal_area
+        if valid_asset(static_geometry_map := self.mrea.get_section("static_geometry_map_section")[0]):
+            yield "EGMC", static_geometry_map
+        if valid_asset(path := self.mrea.get_section("path_section")[0]):
+            yield "PATH", path
+    
+    def build_mlvl_dependencies(self):
+        layer_deps = [list(layer.build_mlvl_dependencies(self.asset_manager)) for layer in self.layers]
+        layer_deps.append(list(self.build_non_layer_dependencies()))
+
+        offset = 0
+        offsets = []
+        for layer in layer_deps:
+            offsets.append(offset)
+            offset += len(layer)
+        
+        deps = list(itertools.chain(*layer_deps))
+        deps = [Container(asset_type=typ, asset_id=idx) for typ, idx in deps]
+        self._raw.dependencies.dependencies = deps
+        self._raw.dependencies.offsets = offsets
+
+    @property
+    def layer_dependencies(self):
+        return {
+            layer.name: list(layer.dependencies)
+            for layer in self.layers
+        }
+    
+    @property
+    def all_layer_deps(self):
+        deps = set()
+        for layer_deps in self.layer_dependencies.values():
+            deps.update(dep["asset_id"] for dep in layer_deps)
+        return deps
+    
+    @property
+    def non_layer_dependencies(self):
+        deps = self._raw.dependencies
+        global_deps = deps.dependencies[deps.offsets[len(self._layer_names)]:]
+        yield from [(dep.asset_type, dep.asset_id) for dep in global_deps]
+    
+    @property
+    def dependencies(self):
+        deps = self.layer_dependencies
+        deps["!!non_layer!!"] = list(self.non_layer_dependencies)
+        return deps
 
 
 class Mlvl(BaseResource):

@@ -14,12 +14,14 @@ from construct.core import (
     PrefixedArray, Struct, Union,
 )
 from retro_data_structures import game_check, properties
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
 from retro_data_structures.properties.base_property import BaseProperty, BaseObjectType
 
 if TYPE_CHECKING:
     from retro_data_structures.formats.script_layer import ScriptLayerHelper
+    from retro_data_structures.asset_manager import AssetManager
 
 
 PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
@@ -126,7 +128,7 @@ class ScriptInstanceHelper:
             connections=construct.ListContainer(),
             base_property=property_type().to_bytes(),
         )
-        return cls(raw, target_game)
+        return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
     def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
@@ -136,7 +138,7 @@ class ScriptInstanceHelper:
             connections=construct.ListContainer(),
             base_property=object_properties.to_bytes(),
         )
-        return cls(raw, object_properties.game())
+        return cls(raw, object_properties.game(), on_modify=layer.mark_modified)
 
     @property
     def type(self) -> Type[BaseObjectType]:
@@ -162,7 +164,7 @@ class ScriptInstanceHelper:
         return self.id.area == id.area and self.id.instance == id.instance
 
     @property
-    def name(self) -> typing.Union[str]:
+    def name(self) -> str | None:
         return self.get_properties().get_name()
 
     @name.setter
@@ -221,3 +223,6 @@ class ScriptInstanceHelper:
 
         self.connections = [c for c in self.connections if c.target != target]
         self.on_modify()
+    
+    def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
+        yield from self.get_properties().mlvl_dependencies_for(asset_manager)

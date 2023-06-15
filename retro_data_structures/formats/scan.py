@@ -74,6 +74,9 @@ class Scan(BaseResource):
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)
     
+    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
+        yield from []
+    
     @property
     def scannable_object_info(self) -> ScriptInstanceHelper:
         assert self.target_game != Game.PRIME
