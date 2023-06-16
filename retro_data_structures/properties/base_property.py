@@ -44,41 +44,35 @@ class BaseProperty:
     def to_json(self) -> typing.Any:
         raise NotImplementedError()
     
-    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-        for field in dataclasses.fields(self):
-            if issubclass(field.type, BaseProperty):
-                prop: BaseProperty = getattr(self, field.name)
-                yield from prop.dependencies_for(asset_manager)
-            
-            if issubclass(field.type, AssetId):
-                asset_id: AssetId = getattr(self, field.name)
-                yield from asset_manager.get_dependencies_for_asset(asset_id)
+    def _is_property_mrea_or_mlvl(self, field: dataclasses.Field) -> bool:
+        return (('asset_types' in field.metadata)
+            and (("MLVL" in field.metadata['asset_types'])
+                or ("MREA" in field.metadata['asset_types'])
+            ))
 
-    def mlvl_dependencies_for(self, asset_manager: AssetManager, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
-        # i'm so sorry
-        classname = self.__class__.__name__
-        if classname == "PlayerActor":
-            is_player_actor = True
+    def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        if issubclass(field.type, BaseProperty):
+            if is_mlvl and field.type.__name__ == "AreaAttributes":
+                    return # ignore the skybox
+            prop: BaseProperty = getattr(self, field.name)
+            yield from prop.dependencies_for(asset_manager, is_mlvl)
+        
+        elif issubclass(field.type, int) and "sound" in field.metadata:
+                sound_id: int = getattr(self, field.name)
+                yield from asset_manager.get_audio_group_dependency(sound_id, is_mlvl)
 
+        elif issubclass(field.type, int) and (field.default == 0xFFFFFFFF or 'asset_types' in field.metadata):
+            if self._is_property_mrea_or_mlvl(field):
+                    return
+            asset_id: AssetId = getattr(self, field.name)
+            yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl)
+
+    def dependencies_for(self, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         for field in dataclasses.fields(self):
             try:
-                if issubclass(field.type, BaseProperty):
-                    if field.type.__name__ == "AreaAttributes":
-                        continue # ignore the skybox
-                    prop: BaseProperty = getattr(self, field.name)
-                    yield from prop.mlvl_dependencies_for(asset_manager, is_player_actor)
-                elif issubclass(field.type, int) and (field.default == 0xFFFFFFFF or 'asset_types' in field.metadata):
-                    if (
-                        ('asset_types' in field.metadata)
-                        and (("MLVL" in field.metadata['asset_types'])
-                             or ("MREA" in field.metadata['asset_types'])
-                        )
-                    ):
-                        continue
-                    asset_id: AssetId = getattr(self, field.name)
-                    yield from asset_manager.get_mlvl_dependencies_for_asset(asset_id, is_player_actor)
+                yield from self._dependencies_for_field(field, asset_manager, is_mlvl)
             except Exception as e:
-                raise Exception(f"Error finding dependencies for {classname}.{field.name} ({field.type}): {e}")
+                raise Exception(f"Error finding dependencies for {self.__class__.__name__}.{field.name} ({field.type}): {e}")
 
 
 class BaseObjectType(BaseProperty, ABC):

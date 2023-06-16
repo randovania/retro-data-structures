@@ -5,6 +5,7 @@ from construct import Construct
 from retro_data_structures.formats.ancs import ANCS, Ancs
 from retro_data_structures.formats.anim import ANIM, Anim
 from retro_data_structures.base_resource import BaseResource, AssetType
+from retro_data_structures.formats.audio_group import AGSC, ATBL, Agsc, Atbl
 from retro_data_structures.formats.char import CHAR, Char
 from retro_data_structures.formats.cinf import CINF, Cinf
 from retro_data_structures.formats.cmdl import CMDL, Cmdl
@@ -52,6 +53,8 @@ ALL_FORMATS = {
     "SPSC": SPSC,
     "ELSC": ELSC,
     "SWHC": SWHC,
+    "AGSC": AGSC,
+    "ATBL": ATBL,
 }
 
 ALL_RESOURCE_TYPES = {
@@ -84,6 +87,8 @@ ALL_RESOURCE_TYPES = {
     "SPSC": Spsc,
     "ELSC": Elsc,
     "SWHC": Swhc,
+    "AGSC": Agsc,
+    "ATBL": Atbl,
 }
 
 

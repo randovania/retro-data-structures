@@ -1,6 +1,7 @@
 """
 https://wiki.axiodl.com/w/STRG_(File_Format)
 """
+import re
 import typing
 
 from construct import (
@@ -186,6 +187,8 @@ STRG = Struct(
     "junk" / GreedyRange(Byte),
 )
 
+image_regex = re.compile(r"&image=(?:\S+?,)+?((?:[a-fA-F0-9]+,?)+);")
+font_regex = re.compile(r"&font=([a-fA-F0-9]+?);")
 
 class Strg(BaseResource):
     @classmethod
@@ -196,8 +199,26 @@ class Strg(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return STRG
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from []
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        def _str_to_deps(id_str: str):
+            yield from self.asset_manager.get_dependencies_for_asset(int(id_str, 16), is_mlvl)
+        for lang in self.languages:
+            for string in self.get_strings(lang):
+                for match in image_regex.finditer(string):
+                    ids = match.group(1).split(",")
+                    for asset_id in ids:
+                        yield from _str_to_deps(asset_id)
+                for match in font_regex.finditer(string):
+                    yield from _str_to_deps(match.group(1))
+
+
+    @property
+    def languages(self) -> typing.Iterator[str]:
+        if self._raw.prime3:
+            yield from self._raw.languageids
+        else:
+            for lang in self._raw.language_table:
+                yield lang.lang
     
     def get_strings(self, language: str) -> typing.Iterator[str]:
         found = False

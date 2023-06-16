@@ -149,11 +149,11 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
-def char_dependencies_for(character, asset_manager: AssetManager):
+def char_dependencies_for(character, asset_manager: AssetManager, is_mlvl: bool = False):
     def _array(asset_ids: Optional[Iterable[int]]):
         if asset_ids is not None:
             for asset_id in asset_ids:
-                yield from asset_manager.get_dependencies_for_asset(asset_id)
+                yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl)
     
     yield from _array((
         character.model_id,
@@ -171,24 +171,24 @@ def char_dependencies_for(character, asset_manager: AssetManager):
     yield from _array(psd.electric_particles)
     yield from _array(psd.spawn_particles)
 
-def non_char_dependencies_for(obj, asset_manager: AssetManager):
+def non_char_dependencies_for(obj, asset_manager: AssetManager, is_mlvl: bool = False, char_id: int = -1):
     for animation in obj.animation_set.animations:
-        yield from meta_animation.dependencies_for(animation.meta, asset_manager)
+        yield from meta_animation.dependencies_for(animation.meta, asset_manager, is_mlvl)
 
     if obj.animation_set.animation_resources is not None:
         for res in obj.animation_set.animation_resources:
-            yield from asset_manager.get_dependencies_for_asset(res.anim_id)
-            yield from asset_manager.get_dependencies_for_asset(res.event_id)
+            yield from asset_manager.get_dependencies_for_asset(res.anim_id, is_mlvl)
+            yield from asset_manager.get_dependencies_for_asset(res.event_id, is_mlvl)
 
     event_sets = obj.animation_set.event_sets or []
     for event in event_sets:
-        yield from evnt.dependencies_for(event, asset_manager)
+        yield from evnt.dependencies_for(event, asset_manager, is_mlvl, char_id)
 
-def dependencies_for(obj, asset_manager: AssetManager):
+def dependencies_for(obj, asset_manager: AssetManager, is_mlvl: bool = False):
     for character in obj.character_set.characters:
-        yield from char_dependencies_for(character, asset_manager)
+        yield from char_dependencies_for(character, asset_manager, is_mlvl)
 
-    yield from non_char_dependencies_for(obj, asset_manager)
+    yield from non_char_dependencies_for(obj, asset_manager, is_mlvl)
 
 
 class Ancs(BaseResource):
@@ -200,14 +200,13 @@ class Ancs(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return ANCS
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.asset_manager)
-    
-    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
-        if not is_player_actor:
-            yield from self.dependencies_for()
-            return
+    def dependencies_for(self, is_mlvl: bool = False, char_index: int | None = None) -> typing.Iterator[Dependency]:
+        if is_mlvl and char_index is not None:
+            chars = [self.raw.character_set.characters[char_index]]
+        else:
+            chars = self.raw.character_set.characters
         
-        empty_suit_index = 5 if self.target_game == Game.PRIME else 3
-        yield from char_dependencies_for(self.raw.character_set.characters[empty_suit_index], self.asset_manager)
-        yield from non_char_dependencies_for(self.raw, self.asset_manager)
+        for char in chars:
+            yield from char_dependencies_for(char, self.asset_manager, is_mlvl)
+        
+        yield from non_char_dependencies_for(self.raw, self.asset_manager, is_mlvl, char_index)

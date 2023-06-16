@@ -322,6 +322,10 @@ class AreaWrapper:
         for layer in self.mrea.script_layers:
             yield layer.with_parent(self)
     
+    @property
+    def generated_objects_layer(self) -> ScriptLayerHelper:
+        return self.mrea.generated_objects_layer
+    
     def get_layer(self, name: str) -> ScriptLayerHelper:
         return next(layer for layer in self.layers if layer.name == name)
     
@@ -371,7 +375,7 @@ class AreaWrapper:
     def build_non_layer_dependencies(self) -> typing.Iterator[Dependency]:
         geometry_section = self.mrea.get_section("geometry_section")
         if geometry_section is not None:
-            yield from dependencies_for_material_set(geometry_section[0].materials, self.asset_manager)
+            yield from dependencies_for_material_set(geometry_section[0].materials, self.asset_manager, True)
         valid_asset = self.asset_manager.target_game.is_valid_asset_id
         if valid_asset(portal_area := self.mrea.get_section("portal_area_section")[0]):
             yield "PTLA", portal_area
@@ -380,8 +384,18 @@ class AreaWrapper:
         if valid_asset(path := self.mrea.get_section("path_section")[0]):
             yield "PATH", path
     
+    def build_scgn_dependencies(self, layer_deps: list[list[Dependency]]):
+        layer_deps = list(layer_deps)
+
+        for instance in self.generated_objects_layer.instances:
+            inst_layer = instance.id.layer
+            layer_deps[inst_layer].extend(instance.mlvl_dependencies_for(self.asset_manager))
+        
+        return [list(dict.fromkeys(deps)) for deps in layer_deps]
+
     def build_mlvl_dependencies(self):
         layer_deps = [list(layer.build_mlvl_dependencies(self.asset_manager)) for layer in self.layers]
+        layer_deps = self.build_scgn_dependencies(layer_deps)
         layer_deps.append(list(self.build_non_layer_dependencies()))
 
         offset = 0
@@ -433,7 +447,7 @@ class Mlvl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MLVL
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     def __repr__(self) -> str:

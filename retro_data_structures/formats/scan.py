@@ -52,16 +52,6 @@ Prime23SCAN = Struct(
 SCAN = IfThenElse(game_check.is_prime1, Prime1SCAN, Prime23SCAN)
 
 
-def dependencies_for(obj, target_game: Game):
-    if target_game == Game.PRIME:
-        yield "FRME", obj.frame_id
-        yield "STRG", obj.text_id
-        for image in obj.scan_images:
-            yield "TXTR", image.texture
-    else:
-        yield from dgrp.dependencies_for(obj.dependencies, target_game)
-
-
 class Scan(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -71,11 +61,18 @@ class Scan(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SCAN
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
-    
-    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
-        yield from []
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        if is_mlvl:
+            return
+        
+        if self.target_game == Game.PRIME:
+            yield "FRME", self.raw.frame_id
+            yield "STRG", self.raw.text_id
+            for image in self.raw.scan_images:
+                yield "TXTR", image.texture
+        else:
+            for dep in self.raw.dependencies:
+                yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)
     
     @property
     def scannable_object_info(self) -> ScriptInstanceHelper:

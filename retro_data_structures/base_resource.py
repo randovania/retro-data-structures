@@ -55,11 +55,8 @@ class BaseResource:
         except Exception:
             return True
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
-    
-    def mlvl_dependencies_for(self, is_player_actor: bool = False) -> typing.Iterator[Dependency]:
-        yield from self.dependencies_for()
 
     @property
     def raw(self) -> Container:

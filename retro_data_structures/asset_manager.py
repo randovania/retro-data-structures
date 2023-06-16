@@ -15,6 +15,8 @@ from retro_data_structures.base_resource import (
     resolve_asset_id, AssetType
 )
 from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.formats import dependency_cheating
+from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.pak_gc import PAKNoData
 from retro_data_structures.game_check import Game
@@ -118,6 +120,8 @@ class AssetManager:
 
         self._update_headers()
 
+        self.build_audio_group_dependency_table()
+
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if str(value) in self._custom_asset_ids:
             return self._custom_asset_ids[str(value)]
@@ -202,46 +206,35 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
     
-    def get_dependencies_for_asset(self, asset_id: NameOrAssetId) -> Iterator[Dependency]:
+    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, is_mlvl: bool = False, not_exist_ok: bool = False) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
-            yield from []
             return
         
         if not self.does_asset_exists(asset_id):
-            # logging.warn(f"Can't resolve asset id {hex(asset_id)}")
-            yield from []
+            if not not_exist_ok:
+                pass
+                # logging.warning(f"Can't resolve asset id {hex(asset_id)}")
             return
 
-        yield self.get_asset_type(asset_id), asset_id
+        asset_type = self.get_asset_type(asset_id)
+
+        yield asset_type, asset_id
+
+        if dependency_cheating.should_cheat_asset(asset_type):
+            yield from dependency_cheating.get_cheated_dependencies(
+                self.get_raw_asset(asset_id),
+                self, is_mlvl
+            )
+            return
 
         try:
             if not self.get_asset_format(asset_id).has_dependencies(self.target_game):
                 return
             asset = self.get_parsed_asset(asset_id)
         except KeyError:
+            # logging.warning(f"May be missing dependencies for {self.get_asset_type(asset_id)}")
             return
-        yield from asset.dependencies_for()
-    
-    def get_mlvl_dependencies_for_asset(self, asset_id: NameOrAssetId, is_player_actor: bool = False) -> Iterator[Dependency]:
-        if not self.target_game.is_valid_asset_id(asset_id):
-            yield from []
-            return
-        
-        if not self.does_asset_exists(asset_id):
-            # logging.warn(f"Can't resolve asset id {hex(asset_id)}")
-            yield from []
-            return
-
-        yield self.get_asset_type(asset_id), asset_id
-
-        try:
-            if not self.get_asset_format(asset_id).has_dependencies(self.target_game):
-                return
-            asset = self.get_parsed_asset(asset_id)
-        except KeyError:
-            # logging.warn(f"May be missing dependencies for {self.get_asset_type(asset_id)}")
-            return
-        yield from asset.mlvl_dependencies_for(is_player_actor)
+        yield from asset.dependencies_for(is_mlvl)
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
@@ -394,6 +387,55 @@ class AssetManager:
             self._in_memory_paks[pak_name] = Pak.parse(data, target_game=self.target_game)
 
         return self._in_memory_paks[pak_name]
+
+    _sound_id_to_agsc: dict[int, AssetId] = {}
+    def build_audio_group_dependency_table(self):
+        atbl: Atbl | None = None
+        agsc_ids: list[AssetId] = []
+        for asset_id in self.all_asset_ids():
+            asset_type = self.get_asset_type(asset_id)
+            if asset_type == "ATBL":
+                if atbl is not None:
+                    logging.warning("Two ATBL files found!")
+                atbl = self.get_parsed_asset(asset_id)
+            elif asset_type == "AGSC":
+                agsc_ids.append(asset_id)
+        
+        define_id_to_agsc: dict[int, AssetId] = {0xFFFF: None, -1: None}
+        for agsc_id in agsc_ids:
+            try:
+                agsc = self.get_parsed_asset(agsc_id, type_hint=Agsc)
+                for define_id in agsc.define_ids:
+                    define_id_to_agsc[define_id] = agsc_id
+            except Exception as e:
+                raise Exception(f"Error parsing AGSC {hex(agsc_id)}: {e}")
+        
+        error_keys = set()
+
+        self._sound_id_to_agsc = {-1: None}
+        for sound_id, define_id in enumerate(atbl.raw):
+            try:
+                self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
+            except:
+                error_keys.add(define_id)
+        
+        # if error_keys:
+        #     raise Exception(error_keys)
+        
+    def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
+        agsc = self._sound_id_to_agsc[sound_id]
+        if agsc is None:
+            return
+        
+        dep = ("AGSC", agsc)
+
+        if is_mlvl:
+            to_ignore = self.get_file(0x31CB5ADB) # audio_groups_single_player_DGRP
+            if dep in to_ignore.direct_dependencies:
+                return
+
+        yield dep
+            
 
     def save_modifications(self, output_path: Path):
         modified_paks = set()

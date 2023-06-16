@@ -65,18 +65,18 @@ by_asset_type = {
 }
 
 
-def dependencies_for(obj, asset_manager):
+def dependencies_for(obj, asset_manager, is_mlvl: bool = False):
     if obj.type == MetaAnimationType.Play:
-        yield from asset_manager.get_dependencies_for_asset(obj.body.asset_id)
+        yield from asset_manager.get_dependencies_for_asset(obj.body.asset_id, is_mlvl)
 
     elif obj.type in (MetaAnimationType.Blend, MetaAnimationType.PhaseBlend):
-        yield from dependencies_for(obj.body.anim_a, asset_manager)
-        yield from dependencies_for(obj.body.anim_b, asset_manager)
+        yield from dependencies_for(obj.body.anim_a, asset_manager, is_mlvl)
+        yield from dependencies_for(obj.body.anim_b, asset_manager, is_mlvl)
 
     elif obj.type == MetaAnimationType.Random:
         for anim in obj.body:
-            yield from dependencies_for(anim.animation, asset_manager)
+            yield from dependencies_for(anim.animation, asset_manager, is_mlvl)
 
     elif obj.type == MetaAnimationType.Sequence:
         for item in obj.body:
-            yield from dependencies_for(item, asset_manager)
+            yield from dependencies_for(item, asset_manager, is_mlvl)

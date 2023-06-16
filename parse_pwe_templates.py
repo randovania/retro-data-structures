@@ -869,6 +869,15 @@ class AnimationParameters(BaseProperty):
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
         }}
+    
+    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+        if self.ancs == default_asset_id:
+            return
+        
+        yield "ANCS", self.ancs
+
+        ancs = asset_manager.get_parsed_asset(self.ancs)
+        yield from ancs.dependencies_for(is_mlvl, char_index=self.character_index)
 """ + game_code)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses
@@ -984,6 +993,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         needed_imports = {}
         format_specifier = None
 
+        if raw_type == "Sound":
+            raw_type = "Int"
+            meta["default"] = 65535
+            meta["metadata"] = {"sound": True}
+        
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
             prop_type = archetype_path.split(".")[-1]
@@ -1066,7 +1080,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
-        elif raw_type in ["Asset", "Sound"]:
+        elif raw_type == "Asset":
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
             if raw_type == "Asset":

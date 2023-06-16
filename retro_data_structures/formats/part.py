@@ -1320,21 +1320,21 @@ class BaseEffect(BaseResource):
     def spawn_system_keys(cls) -> typing.Iterable[AssetType]:
         return []
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         for element in self.raw.elements:
             if element.type in self.texture_keys():
                 if element.body.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id)
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl)
             
             elif element.type in self.spawn_system_keys():
                 if element.body.magic != "NONE":
                     for spawn in element.body.value.spawns:
                         for t in spawn.v2:
-                            yield from self.asset_manager.get_dependencies_for_asset(t.id)
+                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl)
 
             elif element.type in self.asset_id_keys():
-                if element.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body)
+                if element.body is not None and element.body.body is not None:
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl)
 
 
 class Part(BaseEffect):

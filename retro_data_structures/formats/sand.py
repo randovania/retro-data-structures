@@ -91,5 +91,5 @@ class Sand(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SAND
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         yield from dependencies_for(self.raw, self.target_game)

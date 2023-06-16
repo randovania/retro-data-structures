@@ -332,16 +332,16 @@ CMDL = Struct(
     ),
 )
 
-def dependencies_for_material_set(mat, asset_manager: AssetManager):
+def dependencies_for_material_set(mat, asset_manager: AssetManager, is_mlvl):
     if asset_manager.target_game <= Game.ECHOES:
         for file_id in mat.texture_file_ids:
-            yield from asset_manager.get_dependencies_for_asset(file_id)
+            yield from asset_manager.get_dependencies_for_asset(file_id, is_mlvl)
 
     if Game.CORRUPTION <= asset_manager.target_game:
         for material in mat.materials:
             for element in material.element:
                 if element.type == "PASS":
-                    yield from asset_manager.get_dependencies_for_asset(element.body.id)
+                    yield from asset_manager.get_dependencies_for_asset(element.body.id, is_mlvl)
 
 class Cmdl(BaseResource):
     @classmethod
@@ -352,6 +352,6 @@ class Cmdl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CMDL
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         for material in self.raw.material_sets:
-            yield from dependencies_for_material_set(material, self.asset_manager)
+            yield from dependencies_for_material_set(material, self.asset_manager, is_mlvl)

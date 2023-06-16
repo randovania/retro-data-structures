@@ -225,4 +225,4 @@ class ScriptInstanceHelper:
         self.on_modify()
     
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
-        yield from self.get_properties().mlvl_dependencies_for(asset_manager)
+        yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)

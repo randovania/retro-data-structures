@@ -434,7 +434,7 @@ class Mrea(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MREA
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
@@ -484,6 +484,18 @@ class Mrea(BaseResource):
                     )
 
             yield from self._script_layer_helpers.values()
+    
+    _generated_objects_layer: ScriptLayerHelper | None = None
+    @property
+    def generated_objects_layer(self) -> ScriptLayerHelper:
+        assert self.target_game >= Game.ECHOES
+        if self._generated_objects_layer is None:
+            self._generated_objects_layer = ScriptLayerHelper(
+                self.get_section("generated_script_objects_section")[0],
+                None,
+                self.target_game
+            )
+        return self._generated_objects_layer
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for layer in self.script_layers:
