@@ -117,6 +117,11 @@ EVNT = Struct(
 )
 
 
+def legacy_dependencies(obj, target_game):
+    for particle_poi in obj.particle_poi_nodes:
+        yield particle_poi.particle.type, particle_poi.particle.id
+
+
 def dependencies_for(obj, asset_manager, is_mlvl: bool = False, char_id: int | None = None):
     def is_for_character(poi, generic_ok):
         # return True

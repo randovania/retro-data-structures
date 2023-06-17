@@ -1297,6 +1297,43 @@ def effect_script(magic: str, effect_types: dict):
         )
     )
 
+def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
+    if asset_id is not None and game.is_valid_asset_id(asset_id):
+        yield asset_type, asset_id
+
+def legacy_dependencies(obj, target_game: Game):
+    for element in obj.elements:
+        if element.type in ("TEXR", "TIND"):
+            if element.body.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body.id, "TXTR", target_game)
+
+        if element.type == "KSSM":
+            if element.body.magic != "NONE":
+                for spawn in element.body.value.spawns:
+                    for t in spawn.v2:
+                        yield from _yield_dependency_if_valid(
+                            t.id,
+                            t.type if target_game >= Game.ECHOES else "PART",
+                            target_game,
+                        )
+
+        if element.type == "SSWH":
+            if element.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body, "SWHC", target_game)
+
+        if element.type == "PMDL":
+            if element.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body, "CMDL", target_game)
+
+        if element.type == "SELC":
+            if element.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body, "ELSC", target_game)
+
+        if element.type in ("IDTS", "ICTS", "IITS"):
+            if element.body is not None:
+                yield from _yield_dependency_if_valid(element.body.body, "PART", target_game)
+
+
 PART = effect_script("GPSM", PARTICLE_TYPES)
 DPSC = effect_script("DPSM", DECAL_TYPES)
 WPSC = effect_script("WPSM", WEAPON_TYPES)

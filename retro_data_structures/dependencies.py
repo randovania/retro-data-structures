@@ -28,12 +28,12 @@ def _no_dependencies(_obj, _target_game):
 _formats_without_dependencies = {"txtr", "cskr", "cinf", "anim", "cspp", "strg"}
 
 _dependency_functions = {
-    "cmdl": cmdl.dependencies_for,
-    "ancs": ancs.dependencies_for,
-    "evnt": evnt.dependencies_for,
-    "part": part.dependencies_for,
-    "scan": scan.dependencies_for,
-    "dgrp": dgrp.dependencies_for,
+    "cmdl": cmdl.legacy_dependencies,
+    "ancs": ancs.legacy_dependencies,
+    "evnt": evnt.legacy_dependencies,
+    "part": part.legacy_dependencies,
+    "scan": scan.legacy_dependencies,
+    "dgrp": dgrp.legacy_dependencies,
 }
 
 

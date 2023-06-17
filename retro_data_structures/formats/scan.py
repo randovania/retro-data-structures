@@ -52,6 +52,16 @@ Prime23SCAN = Struct(
 SCAN = IfThenElse(game_check.is_prime1, Prime1SCAN, Prime23SCAN)
 
 
+def legacy_dependencies(obj, target_game: Game):
+    if target_game == Game.PRIME:
+        yield "FRME", obj.frame_id
+        yield "STRG", obj.text_id
+        for image in obj.scan_images:
+            yield "TXTR", image.texture
+    else:
+        yield from dgrp.legacy_dependencies(obj.dependencies, target_game)
+
+
 class Scan(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -66,10 +76,10 @@ class Scan(BaseResource):
             return
         
         if self.target_game == Game.PRIME:
-            yield "FRME", self.raw.frame_id
-            yield "STRG", self.raw.text_id
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.text_id)
             for image in self.raw.scan_images:
-                yield "TXTR", image.texture
+                yield from self.asset_manager.get_dependencies_for_asset(image.texture)
         else:
             for dep in self.raw.dependencies:
                 yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)

@@ -343,6 +343,19 @@ def dependencies_for_material_set(mat, asset_manager: AssetManager, is_mlvl):
                 if element.type == "PASS":
                     yield from asset_manager.get_dependencies_for_asset(element.body.id, is_mlvl)
 
+def legacy_dependencies(obj, target_game: Game):
+    if target_game <= Game.ECHOES:
+        for material_set in obj.material_sets:
+            for file_id in material_set.texture_file_ids:
+                yield "TXTR", file_id
+
+    if Game.CORRUPTION <= target_game:
+        for material_set in obj.material_sets:
+            for material in material_set.materials:
+                for element in material.element:
+                    if element.type == "PASS":
+                        yield "TXTR", element.body.id
+
 class Cmdl(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:

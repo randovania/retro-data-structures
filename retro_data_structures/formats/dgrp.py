@@ -13,7 +13,7 @@ ConstructDependency = Struct("asset_type" / FourCC, "asset_id" / AssetIdCorrect)
 DGRP = PrefixedArray(Int32ub, ConstructDependency)
 
 
-def dependencies_for(obj, target_game: Game):
+def legacy_dependencies(obj, target_game: Game):
     for dependency in obj:
         yield dependency.asset_type, dependency.asset_id
 
