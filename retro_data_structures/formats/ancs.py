@@ -13,6 +13,7 @@ from retro_data_structures.common_types import AABox, String, ObjectTag_32, Asse
 from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
 from retro_data_structures.formats import meta_animation, evnt
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.formats import meta_transition
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
@@ -171,18 +172,9 @@ def char_dependencies_for(character, asset_manager: AssetManager, is_mlvl: bool 
     yield from _array(psd.electric_particles)
     yield from _array(psd.spawn_particles)
 
-def non_char_dependencies_for(obj, asset_manager: AssetManager, is_mlvl: bool = False, char_id: int = -1):
+def non_char_dependencies_for(obj, asset_manager: AssetManager, is_mlvl: bool = False, char_id: int | None = None):
     for animation in obj.animation_set.animations:
         yield from meta_animation.dependencies_for(animation.meta, asset_manager, is_mlvl)
-
-    if obj.animation_set.animation_resources is not None:
-        for res in obj.animation_set.animation_resources:
-            yield from asset_manager.get_dependencies_for_asset(res.anim_id, is_mlvl)
-            yield from asset_manager.get_dependencies_for_asset(res.event_id, is_mlvl)
-
-    event_sets = obj.animation_set.event_sets or []
-    for event in event_sets:
-        yield from evnt.dependencies_for(event, asset_manager, is_mlvl, char_id)
 
 def dependencies_for(obj, asset_manager: AssetManager, is_mlvl: bool = False):
     for character in obj.character_set.characters:
@@ -201,12 +193,33 @@ class Ancs(BaseResource):
         return ANCS
 
     def dependencies_for(self, is_mlvl: bool = False, char_index: int | None = None) -> typing.Iterator[Dependency]:
-        if is_mlvl and char_index is not None:
+        def char_deps(char):
+            yield from char_dependencies_for(char, self.asset_manager, is_mlvl)
+            
+            for anim_name in char.animation_names:
+                anim_index, anim = next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
+                yield from meta_animation.dependencies_for(anim.meta, self.asset_manager, is_mlvl)
+                
+                if self.raw.animation_set.animation_resources is not None:
+                    res = self.raw.animation_set.animation_resources[anim_index]
+                    yield from self.asset_manager.get_dependencies_for_asset(res.anim_id, is_mlvl)
+                    
+                    if not self.asset_manager.target_game.is_valid_asset_id(res.event_id):
+                        continue
+                    yield "EVNT", res.event_id
+                    evnt_file = self.asset_manager.get_parsed_asset(res.event_id)
+                    yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, is_mlvl, char_index)
+                
+                elif self.raw.animation_set.event_sets is not None:
+                    yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager, is_mlvl, char_index)
+
+        if char_index is not None:
             chars = [self.raw.character_set.characters[char_index]]
         else:
             chars = self.raw.character_set.characters
         
         for char in chars:
-            yield from char_dependencies_for(char, self.asset_manager, is_mlvl)
+            yield from char_deps(char)
         
-        yield from non_char_dependencies_for(self.raw, self.asset_manager, is_mlvl, char_index)
+        for transition in self.raw.animation_set.transitions:
+            yield from meta_transition.dependencies_for(transition.transition, self.asset_manager, is_mlvl)

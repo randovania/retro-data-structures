@@ -263,6 +263,95 @@ MLVL = FocusedSeq(
 )
 
 
+_hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
+    0xD7C3B839: {
+        # Sanctum
+        "Default": [("TXTR", 0xd5b9e5d1)],
+        "Emperor Ing Stage 1": [("TXTR", 0x52c7d438)],
+        "Emperor Ing Stage 3": [("TXTR", 0xd5b9e5d1)],
+        "Emperor Ing Stage 1 Intro Cine": [("TXTR", 0x52c7d438)],
+        "Emperor Ing Stage 3 Death Cine": [("TXTR", 0xd5b9e5d1)],
+    },
+    0xA92F00B3: {
+        # Hive Temple
+        "CliffsideBoss": [
+            ("TXTR", 0x24149e16),
+            ("TXTR", 0xbdb8a88a),
+            ("FSM2", 0x3d31822b),
+        ]
+    },
+    0xC0113CE8: {
+        # Dynamo Works
+        "3rd Pass": [("RULE", 0x393ca543)]
+    },
+    0x5571E89E: {
+        # Hall of Combat Mastery
+        "2nd Pass Enemies": [("RULE", 0x393ca543)]
+    },
+    0x7B94B06B: {
+        # Hive Portal Chamber
+        "1st Pass": [("RULE", 0x393ca543)],
+        "2nd Pass": [("RULE", 0x393ca543)]
+    },
+    0xF8DBC03D: {
+        # Hive Reactor
+        "2nd Pass": [("RULE", 0x393ca543)]
+    },
+    0xB666B655: {
+        # Reactor Access
+        "2nd Pass": [("RULE", 0x393ca543)]
+    },
+    0xE79AAFAE: {
+        # Transport A Access
+        "2nd Pass": [("RULE", 0x393ca543)]
+    },
+    0xFEB7BD27: {
+        # Transport B Access
+        "Default": [("RULE", 0x393ca543)]
+    },
+    0x89D246FD: {
+        # Portal Access
+        "Default": [("RULE", 0x393ca543)]
+    },
+    0x0253782D: {
+        # Dark Forgotten Bridge
+        "Default": [("RULE", 0x393ca543)]
+    },
+    0x09DECF21: {
+        # Forgotten Bridge
+        "Default": [("RULE", 0x393ca543)]
+    },
+    0x629790F4: {
+        # Sacrificial Chamber
+        "1st Pass": [("RULE", 0x393ca543)]
+    },
+    0xBBE4B3AE: {
+        # Dungeon
+        "Default": [("TXTR", 0xe252e7f6)]
+    },
+    0x2BCD44A7: {
+        # Portal Terminal
+        "Default": [("TXTR", 0xb6fa5023)]
+    },
+    0xC68B5B51: {
+        # Transport to Sanctuary Fortress
+        "!!non_layer!!": [("TXTR", 0x75a219a8)]
+    },
+    0x625A2692: {
+        # Temple Transport Access
+        "!!non_layer!!": [("TXTR", 0x581c56ea)]
+    },
+    0x96F4CA1E: {
+        # Minigyro Chamber
+        "Default": [("TXTR", 0xac080dfb)]
+    },
+    0x5BBF334F: {
+        # Staging Area
+        "!!non_layer!!": [("TXTR", 0x738feb19)]
+    }
+}
+
+
 class AreaWrapper:
     _flags: Container
     _layer_names: ListContainer
@@ -384,19 +473,48 @@ class AreaWrapper:
         if valid_asset(path := self.mrea.get_section("path_section")[0]):
             yield "PATH", path
     
-    def build_scgn_dependencies(self, layer_deps: list[list[Dependency]]):
+    def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
         layer_deps = list(layer_deps)
 
+        layers = list(self.layers)
         for instance in self.generated_objects_layer.instances:
             inst_layer = instance.id.layer
-            layer_deps[inst_layer].extend(instance.mlvl_dependencies_for(self.asset_manager))
+            if not only_modified or layers[inst_layer].is_modified:
+                layer_deps[inst_layer].extend(instance.mlvl_dependencies_for(self.asset_manager))
         
         return [list(dict.fromkeys(deps)) for deps in layer_deps]
 
-    def build_mlvl_dependencies(self):
-        layer_deps = [list(layer.build_mlvl_dependencies(self.asset_manager)) for layer in self.layers]
-        layer_deps = self.build_scgn_dependencies(layer_deps)
-        layer_deps.append(list(self.build_non_layer_dependencies()))
+    def build_mlvl_dependencies(self, only_modified: bool = False):
+        layer_deps = [
+            list(
+                layer.build_mlvl_dependencies(self.asset_manager)
+                if (not only_modified) or layer.modified else
+                layer.dependencies
+            ) for layer in self.layers
+        ]
+
+        if only_modified:
+            # assume we never modify these
+            layer_deps.append(list(self.non_layer_dependencies()))
+        else:
+            non_layer_deps = list(self.build_non_layer_dependencies())
+            if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
+                non_layer_deps.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
+            layer_deps.append(non_layer_deps)
+
+        
+        layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
+        
+        if self.mrea_asset_id in _hardcoded_dependencies:
+            for layer_name, missing in _hardcoded_dependencies[self.mrea_asset_id].items():
+                if layer_name == "!!non_layer!!":
+                    continue
+
+                layer = self.get_layer(layer_name)
+                if only_modified and not layer.is_modified:
+                    continue
+
+                layer_deps[layer.index].extend(missing)
 
         offset = 0
         offsets = []

@@ -1,10 +1,17 @@
 import json
 import logging
+import os
 import pathlib
-from retro_data_structures.asset_manager import AssetManager
+
+import construct
+from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
+from retro_data_structures.formats.ancs import Ancs
 from retro_data_structures.formats.mlvl import Mlvl
 import pytest
 import warnings
+import nod
+from retro_data_structures.game_check import Game
+
 
 
 area_names = [
@@ -17,23 +24,79 @@ areas = {'Temple Grounds': {'Landing Site': (1006255871, 1655756413), 'Service A
 (1039999561, 2921206585), 'Path of Roots': (1039999561, 1950913308), 'Save Station A': (1039999561, 3681435765), 'Forgotten Bridge': (1039999561, 165596961), 'Great Bridge': (1039999561, 3822429534), 'Cache A': (1039999561, 212528838), 'Plaza Access': (1039999561, 3250751238), 'Abandoned Worksite': (1039999561, 1423634263), 'Dark Forgotten Bridge': (1039999561, 39024685), 'Grove Access': (1039999561, 1180978245), 'Poisoned Bog': (1039999561, 350405542), 'Venomous Pond': (1039999561, 2240736467), 'Temple Access': (1039999561, 121681107), 'Torvus Map Station': (1039999561, 673929343), 'Torvus Plaza': (1039999561, 1978751231), 'Dark Arena Tunnel': (1039999561, 957217977), 'Putrid Alcove': (1039999561, 3418828153), 'Brooding Ground': (1039999561, 3706669497), 'Dark Falls': (1039999561, 774215801), 'Torvus Grove': (1039999561, 3896048152), 'Dark Torvus Temple Access': (1039999561, 3851937017), 'Save Station 1': (1039999561, 2591519810), 'Torvus Temple': (1039999561, 3863006870), 'Dark Torvus Arena': (1039999561, 2761578287), 'Polluted Mire': (1039999561, 2208154870), 'Underground Tunnel': (1039999561, 2162589584), 'Meditation Vista': (1039999561, 1576678107), 'Dark Torvus Temple': (1039999561, 912503189), 'Transport to Agon Wastes': (1039999561, 3479543630), 'Underground Transport': (1039999561, 2455297154), 'Controller Access': (1039999561, 720788297), 'Gloom Vista': (1039999561, 2504558791), 'Ammo Station': (1039999561, 2258105898), 'Cache B': (1039999561, 7688697), 'Dark Controller Access': (1039999561, 298078827), 'Hydrodynamo Station': (1039999561, 
 3585454182), 'Torvus Energy Controller': (1039999561, 322696632), 'Undertemple Shaft': (1039999561, 3000230508), 'Dark Torvus Energy Controller': (1039999561, 1591201049), 'Gathering Access': (1039999561, 1393426305), 'Training Access': (1039999561, 2007998417), 'Catacombs Access': (1039999561, 2999623881), 'Save Station B': (1039999561, 3407240152), 'Hydrodynamo Shaft': (1039999561, 813912549), 'Main Energy Controller': (1039999561, 2793419525), 'Crypt Tunnel': (1039999561, 1304699309), 'Sacrificial Chamber Tunnel': (1039999561, 1709535693), 'Save Station 2': (1039999561, 321212102), 'Undertemple Access': (1039999561, 700027128), 'Gathering Hall': (1039999561, 889276218), 'Training Chamber': (1039999561, 1270197856), 'Catacombs': (1039999561, 4217540043), 'Main Hydrochamber': (1039999561, 3468345533), 'Crypt': (1039999561, 3366472600), 'Sacrificial Chamber': (1039999561, 1654100212), 'Undertemple': (1039999561, 2242084895), 'Transit Tunnel South': (1039999561, 3072694950), 'Transit Tunnel West': (1039999561, 3780180813), 'Transit Tunnel East': (1039999561, 1727410190), 'Fortress Transport Access': (1039999561, 1662585441), 'Dungeon': (1039999561, 3152327598), 'Hydrochamber Storage': (1039999561, 2527519102), 'Undertransit One': (1039999561, 1557447417), 'Undertransit Two': (1039999561, 1274848825), 'Transport to Sanctuary Fortress': (1039999561, 3205424168)}, 'Sanctuary Fortress': {'Transport to Temple Grounds': (464164546, 3528156989), 'Temple Transport Access': (464164546, 1650075282), 'Sanctuary Entrance': (464164546, 1193696267), 'Power Junction': (464164546, 834698518), 'Reactor Access': (464164546, 3060184661), 'Reactor Core': (464164546, 1248653973), 'Save Station A': (464164546, 1706557902), 'Minigyro Chamber': (464164546, 2532624926), 'Transit Station': (464164546, 4148317891), 'Sanctuary Map Station': (464164546, 1388284403), 'Hall of Combat Mastery': (464164546, 1433528478), 'Main Research': (464164546, 2437878657), 'Hive Portal Chamber': (464164546, 2073342059), 'Agon Transport Access': (464164546, 1963704303), 'Central Area Transport East': (464164546, 290586973), 'Culling Chamber': (464164546, 1762359402), 'Central Area Transport West': (464164546, 1894024576), 'Torvus Transport Access': (464164546, 4071453868), 'Staging Area': (464164546, 1539257167), 'Transport to Agon Wastes': (464164546, 900285955), 'Dynamo Works': (464164546, 3222355176), 'Hazing Cliff': (464164546, 931221290), 'Central Hive East Transport': (464164546, 3268908651), 'Unseen Way': (464164546, 3590320811), 'Watch Station': (464164546, 2722128775), 'Transport to Torvus Bog': (464164546, 3145160350), 'Central Hive West Transport': (464164546, 1824314539), 'Dynamo Access': (464164546, 1120426713), 'Workers Path': (464164546, 65839695), 'Dynamo Storage': (464164546, 527902968), 'Hive Dynamo Works': (464164546, 4065261236), 'Hive Reactor': (464164546, 4175151165), "Sentinel's Path": (464164546, 2765624647), 'Watch Station Access': (464164546, 1349974475), 'Grand Abyss': (464164546, 595516932), 'Aerial Training Site': (464164546, 1089946750), 'Main Gyro Chamber': (464164546, 1932798548), 'Sanctuary Temple': (464164546, 1815493844), 'Hive Cache 3': (464164546, 120573884), 'Hive Dynamo Access': (464164546, 4222565163), 'Hive Save Station 1': (464164546, 3143049775), 'Hive Reactor Access': (464164546, 2955332843), 'Hive Cache 1': (464164546, 1598256765), 'Judgment Drop': (464164546, 1438939627), 'Vault': (464164546, 1378173793), 'Temple Security Access': (464164546, 1122770219), 'Temple Access': (464164546, 3312357786), 'Checkpoint Station': (464164546, 2219469068), 'Save Station B': (464164546, 3811341152), 'Controller Access': (464164546, 3902528658), 'Hive Gyro Chamber': (464164546, 2741330578), 'Entrance Defense Hall': (464164546, 2802755627), 'Vault Attack Portal': (464164546, 502346057), 'Hive Temple': (464164546, 2838429875), 'Aerie Transport Station': (464164546, 3136899603), 'Sanctuary Energy Controller': (464164546, 218311274), 'Hive Temple Access': (464164546, 3968294891), 'Hive Gyro Access': (464164546, 657793899), 'Hive Save Station 2': (464164546, 582304814), 'Hive Entrance': (464164546, 4093264161), 'Hive Controller Access': (464164546, 648838942), 'Aerie Access': (464164546, 3741790551), 'Main Energy Controller': (464164546, 1460882882), 'Hive Ammo Station': (464164546, 4057954524), 'Hive Energy Controller': (464164546, 770491160), 'Aerie': (464164546, 1564082177), 'Hive Summit': (464164546, 2642430293)}}
 
-# # @pytest.mark.parametrize("mlvl_id", mlvl_ids)
-# def test_mlvl(prime2_asset_manager: AssetManager):
-#     area_names = []
 
-#     worlds = {}
-#     for mlvl_id in mlvl_ids:
-#         areas = {}
-#         mlvl = prime2_asset_manager.get_parsed_asset(mlvl_id, type_hint=Mlvl)
-#         for area in mlvl.areas:
-#             area_names.append((mlvl.world_name, area.name))
-#             areas[area.name] = (mlvl_id, area.mrea_asset_id)
-#         worlds[mlvl.world_name] = areas
-    
-#     print(area_names)
-#     print(worlds)
+missing = [
+    ("Great Temple", "Transport A Access"),
+    ("Great Temple", "Transport B Access"),
+    ("Agon Wastes", "Portal Access"),
+    ("Torvus Bog", "Dark Forgotten Bridge"),
+    ("Torvus Bog", "Forgotten Bridge"),
+    ("Torvus Bog", "Sacrificial Chamber"),
+    ("Sanctuary Fortress", "Dynamo Works"),
+    ("Sanctuary Fortress", "Hall of Combat Mastery"),
+    ("Sanctuary Fortress", "Hive Portal Chamber"),
+    ("Sanctuary Fortress", "Hive Reactor"),
+    ("Sanctuary Fortress", "Reactor Access"),
+    ("Agon Wastes", "Portal Terminal"),
+    ("Agon Wastes", "Transport to Sanctuary Fortress"),
+    ("Sanctuary Fortress", "Temple Transport Access"),
+    ("Sanctuary Fortress", "Minigyro Chamber"),
+    ("Sanctuary Fortress", "Staging Area"),
+    ("Torvus Bog", "Dungeon"),
+    ("Sanctuary Fortress", "Hive Temple"),
+    ("Great Temple", "Sanctum")
+]
+def patch_missing_dependencies():
+    iso = pathlib.Path("C:/Users/dunca/Downloads/echoes/Metroid Prime 2 - Echoes (USA).iso")
+    prime2_asset_manager: AssetManager = AssetManager(IsoFileProvider(iso),
+                        target_game=Game.ECHOES)
+
+    callback1 = lambda name, prog: print(f"{prog*100}%: {name}")
+    callback2 = lambda prog, name, _: print(f"{prog*100}%: {name}")
+    files = pathlib.Path("C:/Users/dunca/Documents/Patched Echoes/Files")
+
+    disc, _ = nod.open_disc_from_image(iso)
+    data_partition = disc.get_data_partition()
+    context = nod.ExtractionContext()
+    context.set_progress_callback(callback1)
+    data_partition.extract_to_directory(os.fspath(files), context)
+
+    for world_name, area_name in missing:
+        print(area_name)
+        mlvl_id, mrea_id = areas[world_name][area_name]
+        mlvl = prime2_asset_manager.get_file(mlvl_id, Mlvl)
+        area = mlvl.get_area(mrea_id)
+        area.build_mlvl_dependencies()
+        prime2_asset_manager.replace_asset(mlvl_id, mlvl)
+
+    prime2_asset_manager.save_modifications(files)
+    disc_builder = nod.DiscBuilderGCN(
+        files.parent.joinpath("echoes.iso"),
+        callback2
+    )
+    disc_builder.build_from_directory(files)
+
+
+def test_ancs_deps(prime2_asset_manager: AssetManager):
+    mlvl_id, mrea_id, ancs_id = 0x3BFA3EFF, 0x64E640D6, 0x7587F0CD
+
+    mlvl = prime2_asset_manager.get_file(mlvl_id, Mlvl)
+    area = mlvl.get_area(mrea_id)
+    ancs = prime2_asset_manager.get_file(ancs_id, Ancs)
+
+    area_deps = set(area.get_layer("Default").dependencies)
+    ancs_deps = set(ancs.dependencies_for(True, 0))
+
+    construct.lib.setGlobalPrintFullStrings(True)
+    print(ancs.raw)
+    construct.lib.setGlobalPrintFullStrings(False)
+
+    orphans = {(typ, hex(idx)) for typ, idx in ancs_deps.difference(area_deps)}
+    assert orphans == set()
+
 
 @pytest.mark.parametrize(["world_name", "area_name"], area_names)
+# @pytest.mark.skip
 def test_mlvl_dependencies(prime2_asset_manager: AssetManager, world_name, area_name):
     mlvl_id, mrea_id = areas[world_name][area_name]
 
@@ -87,5 +150,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager, world_name, area_
         f.unlink(missing_ok=True)
 
     if len(extra):
-        logging.warn(f"Extra dependencies leftover in {area_identifier}!")
+        logging.warning(f"Extra dependencies leftover in {area_identifier}!")
     assert not len(missing)
+    if len(extra):
+        pytest.skip()

@@ -64,5 +64,10 @@ def create(version: int):
     return meta
 
 
+def dependencies_for(obj, asset_manager, is_mlvl: bool = False):
+    if obj.type == MetaTransitionType.Animation:
+        yield from meta_animation.dependencies_for(obj.body, asset_manager, is_mlvl)
+
+
 MetaTransition_v1 = create(1)
 MetaTransition_v2 = create(2)

@@ -210,6 +210,11 @@ class AssetManager:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
         
+        if is_mlvl and self.target_game == Game.ECHOES and asset_id in (
+            0x7b2ea5b1,
+        ):
+            return
+        
         if not self.does_asset_exists(asset_id):
             if not not_exist_ok:
                 pass

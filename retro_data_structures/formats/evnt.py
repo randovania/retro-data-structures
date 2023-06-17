@@ -118,13 +118,18 @@ EVNT = Struct(
 
 
 def dependencies_for(obj, asset_manager, is_mlvl: bool = False, char_id: int | None = None):
+    def is_for_character(poi, generic_ok):
+        # return True
+        ids = (-1, char_id) if generic_ok else (char_id,)
+        return char_id is None or poi.base.character_index in ids
+
     for particle_poi in obj.particle_poi_nodes:
-        if char_id is None or particle_poi.base.character_index in (-1, char_id):
+        if is_for_character(particle_poi, False):
             yield from asset_manager.get_dependencies_for_asset(particle_poi.particle.id, is_mlvl)
     
     if obj.sound_poi_nodes:
         for sound_poi in obj.sound_poi_nodes:
-            if char_id is not None and sound_poi.base.character_index not in (-1, char_id):
+            if not is_for_character(sound_poi, True):
                 continue
             if asset_manager.target_game >= Game.CORRUPTION:
                 yield from asset_manager.get_dependencies_for_asset(sound_poi.sound_id, is_mlvl)

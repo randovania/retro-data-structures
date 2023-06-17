@@ -876,6 +876,14 @@ class AnimationParameters(BaseProperty):
         
         yield "ANCS", self.ancs
 
+        if self.ancs == 0xC043D342:
+            # every gun animation needs these i guess
+            yield "TXTR", 0x9e6f9531
+            yield "TXTR", 0xcea098fe
+            yield "TXTR", 0x607638ea
+            yield "TXTR", 0x578e51b8
+            yield "TXTR", 0x1e7b6c64
+
         ancs = asset_manager.get_parsed_asset(self.ancs)
         yield from ancs.dependencies_for(is_mlvl, char_index=self.character_index)
 """ + game_code)
