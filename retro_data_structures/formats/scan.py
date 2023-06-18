@@ -93,7 +93,7 @@ class Scan(BaseResource):
         return self._scannable_object_info
 
     def rebuild_dependencies(self):
-        logging.warning("rebuilding deps for a SCAN!")
+        logging.debug("rebuilding deps for a SCAN!")
         if self.target_game == Game.PRIME:
             return
         scan_info = self.scannable_object_info.get_properties()
