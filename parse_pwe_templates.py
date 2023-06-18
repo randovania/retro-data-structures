@@ -871,21 +871,7 @@ class AnimationParameters(BaseProperty):
         }}
     
     def dependencies_for(self, asset_manager, is_mlvl: bool = False):
-        if self.ancs == default_asset_id:
-            return
-        
-        yield "ANCS", self.ancs
-
-        if self.ancs == 0xC043D342:
-            # every gun animation needs these i guess
-            yield "TXTR", 0x9e6f9531
-            yield "TXTR", 0xcea098fe
-            yield "TXTR", 0x607638ea
-            yield "TXTR", 0x578e51b8
-            yield "TXTR", 0x1e7b6c64
-
-        ancs = asset_manager.get_parsed_asset(self.ancs)
-        yield from ancs.dependencies_for(is_mlvl, char_index=self.character_index)
+        yield from asset_manager.get_dependencies_for_ancs(self.ancs, is_mlvl, self.character_index)
 """ + game_code)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses

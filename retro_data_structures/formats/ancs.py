@@ -227,7 +227,7 @@ class Ancs(BaseResource):
                     
                     if not self.asset_manager.target_game.is_valid_asset_id(res.event_id):
                         continue
-                    yield "EVNT", res.event_id
+                    yield Dependency("EVNT", res.event_id)
                     evnt_file = self.asset_manager.get_parsed_asset(res.event_id)
                     yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, is_mlvl, char_index)
                 

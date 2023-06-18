@@ -3,6 +3,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
 from __future__ import annotations
+import logging
 
 import typing
 from typing import TYPE_CHECKING, Iterator, Type
@@ -225,4 +226,5 @@ class ScriptInstanceHelper:
         self.on_modify()
     
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
+        logging.debug(f"            {self.name}")
         yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)

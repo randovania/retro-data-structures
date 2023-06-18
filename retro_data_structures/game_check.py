@@ -11,6 +11,7 @@ import construct
 from construct.core import IfThenElse
 
 from retro_data_structures import common_types
+from retro_data_structures.base_resource import Dependency
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.base_resource import AssetId
@@ -79,6 +80,15 @@ class Game(Enum):
         if self == Game.ECHOES:
             return (0x7b2ea5b1,)
         return ()
+    
+    def special_ancs_dependencies(self, ancs: AssetId):
+        if self == Game.ECHOES and ancs == 0xC043D342:
+            # every gun animation needs these i guess
+            yield Dependency("TXTR", 0x9e6f9531)
+            yield Dependency("TXTR", 0xcea098fe)
+            yield Dependency("TXTR", 0x607638ea)
+            yield Dependency("TXTR", 0x578e51b8)
+            yield Dependency("TXTR", 0x1e7b6c64)
 
 
 def get_current_game(ctx):

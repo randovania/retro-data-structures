@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 import typing
 from typing import Optional, Union
@@ -214,6 +215,8 @@ class ScriptLayerHelper:
         self._modified = True
     
     def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+        logging.debug(f"        Layer: {self.name}")
+        
         deps: list[Dependency] = []
         for instance in self.instances:
             deps.extend(instance.mlvl_dependencies_for(asset_manager))
