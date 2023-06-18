@@ -1,6 +1,9 @@
-from construct import Struct, Const, Int32ub, PrefixedArray, GreedyRange, Byte
+import typing
+from construct import Construct, Struct, Const, Int32ub, PrefixedArray, GreedyRange, Byte
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 
 from retro_data_structures.common_types import AssetId32, String
+from retro_data_structures.game_check import Game
 
 HIER = Struct(
     magic=Const(b"HIER"),
@@ -15,3 +18,17 @@ HIER = Struct(
     ),
     junk=GreedyRange(Byte),
 )
+
+
+class Hier(BaseResource):
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return HIER
+
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "DUMB"
+    
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        for entry in self.raw.entries:
+            yield from self.asset_manager.get_dependencies_for_asset(entry.string_table_id)

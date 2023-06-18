@@ -169,11 +169,17 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         name = name_element.text if name_element is not None and name_element.text is not None else ""
 
     cook = element.find("CookPreference")
+    
     parsed.update({
         "type": element.attrib["Type"],
         "name": name,
         "cook_preference": cook.text if cook is not None and cook.text is not None else "Always"
     })
+
+    ignore_dependencies_mlvl = element.attrib.get("IgnoreDependenciesMlvl", "False")
+    ignore_dependencies_mlvl = ignore_dependencies_mlvl.lower() != "false"
+    if ignore_dependencies_mlvl:
+        parsed["ignore_dependencies_mlvl"] = True
 
     property_type_extras = {
         "Struct": _prop_struct,
@@ -467,7 +473,7 @@ class ClassDefinition:
 
     def finalize_props(self):
         if self.keep_unknown_properties():
-            self.class_code += "    unknown_properties: typing.Dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
+            self.class_code += "    unknown_properties: dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
         pass
 
     def keep_unknown_properties(self):
@@ -869,6 +875,9 @@ class AnimationParameters(BaseProperty):
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
         }}
+    
+    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+        yield from asset_manager.get_dependencies_for_ancs(self.ancs, is_mlvl, self.character_index)
 """ + game_code)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses
@@ -984,6 +993,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         needed_imports = {}
         format_specifier = None
 
+        if raw_type == "Sound":
+            raw_type = "Int"
+            meta["default"] = 65535
+            meta["metadata"] = {"sound": True}
+        
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
             prop_type = archetype_path.split(".")[-1]
@@ -1066,11 +1080,14 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
-        elif raw_type in ["Asset", "Sound"]:
+        elif raw_type == "Asset":
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
             if raw_type == "Asset":
-                meta["metadata"] = repr({"asset_types": prop["type_filter"]})
+                field_meta = {"asset_types": prop["type_filter"]}
+                if "ignore_dependencies_mlvl" in prop:
+                    field_meta["ignore_dependencies_mlvl"] = True
+                meta["metadata"] = repr(field_meta)
                 default_value = "default_asset_id"
             else:
                 default_value = hex(prop["default_value"] if prop['has_default'] else 0)
@@ -1113,7 +1130,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Array":
             inner_prop = get_prop_details(prop["item_archetype"])
 
-            prop_type = f"typing.List[{inner_prop.prop_type}]"
+            prop_type = f"list[{inner_prop.prop_type}]"
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
             meta["default_factory"] = "list"

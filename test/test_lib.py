@@ -68,6 +68,11 @@ def purge_hidden(data: Container) -> Container:
     return {k: purge_hidden(v) if isinstance(v, Container) else v for k, v in data.items()}
 
 
+def parse_and_build_compare_auto_manager(asset_manager: AssetManager, asset_id: AssetId, print_data=False):
+    resource_type = asset_manager.get_asset_format(asset_id)
+    return parse_and_build_compare_from_manager(asset_manager, asset_id, resource_type, print_data)
+
+
 def parse_and_build_compare_from_manager(
         asset_manager: AssetManager, asset_id: AssetId, resource_class: Type[BaseResource],
         print_data=False) -> Tuple[RawResource, BaseResource, bytes]:

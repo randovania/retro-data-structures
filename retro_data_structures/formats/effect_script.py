@@ -1,9 +1,10 @@
 import typing
-from typing import Optional
+from typing import Iterable, Optional
 
 import construct
 from construct import (
     Const,
+    Construct,
     RepeatUntil,
     Switch,
     Flag,
@@ -26,7 +27,7 @@ from retro_data_structures.base_resource import BaseResource, AssetType, Depende
 from retro_data_structures.game_check import AssetIdCorrect
 from retro_data_structures.game_check import Game
 
-UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
+UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"], lookahead=80), ErrorWithMessage("Unknown type"))
 
 
 def FourCCSwitch(element_types):
@@ -106,10 +107,16 @@ GetTextureElement = FourCCSwitch(TEXTURE_ELEMENT_TYPES)
 GetEmitterElement = FourCCSwitch(EMITTER_ELEMENT_TYPES)
 GetColorElement = FourCCSwitch(COLOR_ELEMENT_TYPES)
 GetModVectorElement = FourCCSwitch(MOD_VECTOR_ELEMENT_TYPES)
-GetChildGeneratorDesc = Struct(type=FourCC, body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect))
-GetModel = Struct(type=FourCC, body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect))
-GetSwooshGeneratorDesc = Struct(type=FourCC, body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect))
-GetElectricGeneratorDesc = Struct(type=FourCC, body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect))
+
+GetAssetId = Struct(type=FourCC, body=IfThenElse(lambda this: this.type == "NONE", Pass, AssetIdCorrect))
+GetChildGeneratorDesc = GetAssetId
+GetModel = GetAssetId
+GetSwooshGeneratorDesc = GetAssetId
+GetElectricGeneratorDesc = GetAssetId
+GetParticleGeneratorDesc = GetAssetId
+GetCollisionResponseGeneratorDesc = GetAssetId
+GetDecalGeneratorDesc = GetAssetId
+GetAudioTable = GetAssetId
 
 GetBitFlag = Struct(
     magic1=FourCC,
@@ -489,6 +496,7 @@ VECTOR_ELEMENT_TYPES.update(
         "PAP4": StartingAtVersion(Game.ECHOES, Pass),
         "NORM": StartingAtVersion(Game.ECHOES, GetVectorElement),
         "PILV": StartingAtVersion(Game.ECHOES, Pass),
+        "PIVL": StartingAtVersion(Game.ECHOES, Pass),
         "PINV": StartingAtVersion(Game.ECHOES, Pass),
         "PEVL": StartingAtVersion(Game.ECHOES, Pass),
         "PNCV": StartingAtVersion(Game.ECHOES, Pass),
@@ -884,21 +892,416 @@ PARTICLE_TYPES = {
     "_END": Pass,
 }
 
-PART = Struct(
-    magic=Const("GPSM", FourCC),
-    elements=RepeatUntil(
-        lambda x, lst, ctx: x.type == "_END",
-        FourCCSwitch(PARTICLE_TYPES),
-    ),
-)
+DECAL_TYPES = dict(PARTICLE_TYPES)
+DECAL_TYPES.update({
+    "DMOO": GetBool,
+    "DMAB": GetBool,
+    "DMDL": GetModel,
+    "DMCL": GetColorElement,
+    "DMOP": GetVectorElement,
+    "DMRT": GetVectorElement,
+    "DMSC": GetVectorElement,
+    "DLFT": GetIntElement,
+    "1ADD": GetBool,
+    "1TEX": GetTextureElement,
+    "1CLR": GetColorElement,
+    "1OFF": GetVectorElement,
+    "1ROT": GetRealElement,
+    "1SZE": GetRealElement,
+    "1LFT": GetRealElement,
+    "2ADD": GetBool,
+    "2TEX": GetTextureElement,
+    "2CLR": GetColorElement,
+    "2OFF": GetVectorElement,
+    "2ROT": GetRealElement,
+    "2SZE": GetRealElement,
+    "2LFT": GetRealElement,
+    # End
+    "_END": Pass,
+})
 
+WEAPON_TYPES = dict(PARTICLE_TYPES)
+WEAPON_TYPES.update({
+    "LWTR": GetBool,
+    "EWTR": GetBool,
+    "SWTR": GetBool,
+    "PJFX": GetAudioTable,
+    "TRAT": GetRealElement,
+    "HOMG": GetBool,
+    "OFST": GetVectorElement,
+    "COLR": GetCollisionResponseGeneratorDesc,
+    "PCOL": GetColorElement,
+    "POFS": GetVectorElement,
+    "PSCL": GetVectorElement,
+    "PSLT": GetIntElement,
+    "OHEF": GetModel,
+    "APSM": GetParticleGeneratorDesc,
+    "APSO": GetBool,
+    "APS1": GetParticleGeneratorDesc,
+    "AP11": GetBool,
+    "APS2": GetParticleGeneratorDesc,
+    "AP21": GetBool,
+    "ASW1": GetSwooshGeneratorDesc,
+    "AS11": GetBool,
+    "ASW2": GetSwooshGeneratorDesc,
+    "AS12": GetBool,
+    "ASW3": GetSwooshGeneratorDesc,
+    "AS13": GetBool,
+    "PSOV": GetVectorElement,
+    "IORN": GetVectorElement,
+    "VMD2": GetBool,
+    "PSVM": GetModVectorElement,
+    "IVEC": GetVectorElement,
+    "RNGE": GetRealElement,
+    "FC60": GetBool,
+    "SPS1": GetBool,
+    "SPS2": GetBool,
+    # Echoes?
+    "EELT": GetBool,
+    "DP2C": GetBool,
+    "DP1C": GetBool,
+    "RTLA": GetBool,
+    "RB1A": GetBool,
+    "RB2A": GetBool,
+    "RWPE": GetBool,
+    "TECL": GetColorElement,
+    "FOFF": GetRealElement,
+    "TSCL": GetColorElement,
+    "B2CL": GetColorElement,
+    "B1CL": GetColorElement,
+    "TLEN": GetRealElement,
+    "TSZE": GetRealElement,
+    "B2SE": GetRealElement,
+    "B1SE": GetRealElement,
+    "B2TX": GetTextureElement,
+    "B1TX": GetTextureElement,
+    "TLPO": GetVectorElement,
+    "TTEX": GetTextureElement,
+    "B2PO": GetVectorElement,
+    "B1PO": GetVectorElement,
+    "B2RT": GetRealElement,
+    "B1RT": GetRealElement,
+    # End
+    "_END": Pass,
+})
+
+COLLISION_RESPONSE_TYPES = dict(PARTICLE_TYPES)
+COLLISION_RESPONSE_TYPES.update({
+    "DCHR": GetParticleGeneratorDesc,
+    "DEFS": GetParticleGeneratorDesc,
+    "TALP": GetParticleGeneratorDesc,
+    "DESH": GetParticleGeneratorDesc,
+    "DENM": GetParticleGeneratorDesc,
+    "DDCL": GetDecalGeneratorDesc,
+    "ENDL": GetDecalGeneratorDesc,
+    "CHDL": GetDecalGeneratorDesc,
+    "WTDL": GetDecalGeneratorDesc,
+    "GODL": GetDecalGeneratorDesc,
+    "ICDL": GetDecalGeneratorDesc,
+    "GRDL": GetDecalGeneratorDesc,
+    "MEDL": GetDecalGeneratorDesc,
+    "CODL": GetDecalGeneratorDesc,
+    "WODL": GetDecalGeneratorDesc,
+    "FOFF": GetRealElement,
+    "RNGE": GetRealElement,
+    "MSFX": GetIntElement,
+    "DSHX": GetIntElement,
+    "DSFX": GetIntElement,
+    "GOFX": GetIntElement,
+    "GOOO": GetIntElement,
+    "ICFX": GetIntElement,
+    "ICEE": GetIntElement,
+    "GRFX": GetIntElement,
+    "GRAS": GetIntElement,
+    "WTFX": GetIntElement,
+    "WATR": GetIntElement,
+    "CHFX": GetIntElement,
+    "CHSH": GetIntElement,
+    "CHSP": GetIntElement,
+    "CZFX": GetIntElement,
+    "CHOZ": GetIntElement,
+    "IBHX": GetIntElement,
+    "IBSH": GetIntElement,
+    "IBSX": GetIntElement,
+    "IBSP": GetIntElement,
+    "IBFX": GetIntElement,
+    "IBOS": GetIntElement,
+    "PBHX": GetIntElement,
+    "PBSH": GetIntElement,
+    "PBSX": GetIntElement,
+    "PBSP": GetIntElement,
+    "PBFX": GetIntElement,
+    "PBOS": GetIntElement,
+    "HBFX": GetIntElement,
+    "BFSH": GetIntElement,
+    "SBFX": GetIntElement,
+    "BFSP": GetIntElement,
+    "BFFX": GetIntElement,
+    "BFLR": GetIntElement,
+    "MHFX": GetIntElement,
+    "BMSH": GetIntElement,
+    "BMSP": GetIntElement,
+    "BMFX": GetIntElement,
+    "BMON": GetIntElement,
+    "PHFX": GetIntElement,
+    "PSSH": GetIntElement,
+    "PSFX": GetIntElement,
+    "PSSP": GetIntElement,
+    "PAFX": GetIntElement,
+    "PARA": GetIntElement,
+    "HFFX": GetIntElement,
+    "FFSH": GetIntElement,
+    "SFFX": GetIntElement,
+    "FFSP": GetIntElement,
+    "FFFX": GetIntElement,
+    "FFLE": GetIntElement,
+    "FHFX": GetIntElement,
+    "FPSH": GetIntElement,
+    "FSFX": GetIntElement,
+    "FPSP": GetIntElement,
+    "FPFX": GetIntElement,
+    "FPIR": GetIntElement,
+    "SPSH": GetIntElement,
+    "SSFX": GetIntElement,
+    "SPSP": GetIntElement,
+    "SPFX": GetIntElement,
+    "SPIR": GetIntElement,
+    "GHFX": GetIntElement,
+    "TGSH": GetIntElement,
+    "GSFX": GetIntElement,
+    "TGSP": GetIntElement,
+    "GTFX": GetIntElement,
+    "PTGM": GetIntElement,
+    "THFX": GetIntElement,
+    "TASH": GetIntElement,
+    "TSFX": GetIntElement,
+    "TASP": GetIntElement,
+    "TAFX": GetIntElement,
+    "WHFX": GetIntElement,
+    "WWSH": GetIntElement,
+    "WWSP": GetIntElement,
+    "WWFX": GetIntElement,
+    "WASP": GetIntElement,
+    "BHFX": GetIntElement,
+    "BTSH": GetIntElement,
+    "BSFX": GetIntElement,
+    "BTSP": GetIntElement,
+    "BEFX": GetIntElement,
+    "BTLE": GetIntElement,
+    "SHFX": GetIntElement,
+    "ESFX": GetIntElement,
+    "DESP": GetIntElement,
+    "DEFX": GetIntElement,
+    "DCHS": GetIntElement,
+    "DCFX": GetIntElement,
+    "CSFX": GetIntElement,
+    "CRTS": GetIntElement,
+    "MTLS": GetIntElement,
+    "WSFX": GetIntElement,
+    "WODS": GetIntElement,
+    "6ISE": GetIntElement,
+    "5ISE": GetIntElement,
+    "4ISE": GetIntElement,
+    "3ISE": GetIntElement,
+    "2ISE": GetIntElement,
+    "1ISE": GetIntElement,
+    "JZHS": GetIntElement,
+    "JZSH": GetIntElement,
+    "JZPS": GetIntElement,
+    "JZSP": GetIntElement,
+    "JZAS": GetIntElement,
+    "JZAP": GetIntElement,
+    "6MRE": GetIntElement,
+    "5MRE": GetIntElement,
+    "4MRE": GetIntElement,
+    "3MRE": GetIntElement,
+    "2MRE": GetIntElement,
+    "1MRE": GetIntElement,
+    "6DRN": GetIntElement,
+    "5DRN": GetIntElement,
+    "4DRN": GetIntElement,
+    "3DRN": GetIntElement,
+    "2DRN": GetIntElement,
+    "1DRN": GetIntElement,
+    "6FLB": GetIntElement,
+    "5FLB": GetIntElement,
+    "4FLB": GetIntElement,
+    "3FLB": GetIntElement,
+    "2FLB": GetIntElement,
+    "1FLB": GetIntElement,
+    "6PDS": GetIntElement,
+    "5PDS": GetIntElement,
+    "4PDS": GetIntElement,
+    "3PDS": GetIntElement,
+    "2PDS": GetIntElement,
+    "1PDS": GetIntElement,
+    "6MTR": GetIntElement,
+    "5MTR": GetIntElement,
+    "4MTR": GetIntElement,
+    "3MTR": GetIntElement,
+    "2MTR": GetIntElement,
+    "1MTR": GetIntElement,
+    "6RPR": GetIntElement,
+    "5RPR": GetIntElement,
+    "4RPR": GetIntElement,
+    "3RPR": GetIntElement,
+    "2RPR": GetIntElement,
+    "1RPR": GetIntElement,
+    "6SVA": GetIntElement,
+    "5SVA": GetIntElement,
+    "4SVA": GetIntElement,
+    "3SVA": GetIntElement,
+    "2SVA": GetIntElement,
+    "1SVA": GetIntElement,
+    "6ATA": GetIntElement,
+    "5ATA": GetIntElement,
+    "4ATA": GetIntElement,
+    "3ATA": GetIntElement,
+    "2ATA": GetIntElement,
+    "1ATA": GetIntElement,
+    "6ATB": GetIntElement,
+    "5ATB": GetIntElement,
+    "4ATB": GetIntElement,
+    "3ATB": GetIntElement,
+    "2ATB": GetIntElement,
+    "1ATB": GetIntElement,
+    "6BSE": GetIntElement,
+    "5BSE": GetIntElement,
+    "4BSE": GetIntElement,
+    "3BSE": GetIntElement,
+    "2BSE": GetIntElement,
+    "1BSE": GetIntElement,
+    "6SAN": GetIntElement,
+    "5SAN": GetIntElement,
+    "4SAN": GetIntElement,
+    "3SAN": GetIntElement,
+    "2SAN": GetIntElement,
+    "1SAN": GetIntElement,
+    "6MUD": GetIntElement,
+    "5MUD": GetIntElement,
+    "4MUD": GetIntElement,
+    "3MUD": GetIntElement,
+    "2MUD": GetIntElement,
+    "1MUD": GetIntElement,
+    "6GRN": GetIntElement,
+    "5GRN": GetIntElement,
+    "4GRN": GetIntElement,
+    "3GRN": GetIntElement,
+    "2GRN": GetIntElement,
+    "1GRN": GetIntElement,
+    "6LAV": GetDecalGeneratorDesc,
+    "5LAV": GetDecalGeneratorDesc,
+    "4LAV": GetDecalGeneratorDesc,
+    "3LAV": GetDecalGeneratorDesc,
+    "2LAV": GetDecalGeneratorDesc,
+    "1LAV": GetDecalGeneratorDesc,
+    "DCSH": GetIntElement,
+    # End
+    "_END": Pass,
+})
+
+ELECTRIC_TYPES = dict(PARTICLE_TYPES)
+ELECTRIC_TYPES.update({
+    "LIFE": GetIntElement,
+    "SLIF": GetIntElement,
+    "GRAT": GetRealElement,
+    "SCNT": GetIntElement,
+    "SSEG": GetIntElement,
+    "COLR": GetColorElement,
+    "IEMT": GetEmitterElement,
+    "FEMT": GetEmitterElement,
+    "AMPL": GetRealElement,
+    "AMPD": GetRealElement,
+    "LWD1": GetRealElement,
+    "LWD2": GetRealElement,
+    "LWD3": GetRealElement,
+    "LCL1": GetColorElement,
+    "LCL2": GetColorElement,
+    "LCL3": GetColorElement,
+    "SSWH": GetSwooshGeneratorDesc,
+    "GPSM": GetParticleGeneratorDesc,
+    "EPSM": GetParticleGeneratorDesc,
+    "ZERY": GetBool,
+    "TEXR": GetTextureElement,
+    # End
+    "_END": Pass
+})
+
+SWOOSH_TYPES = dict(PARTICLE_TYPES)
+SWOOSH_TYPES.update({
+    "PSLT": GetIntElement,
+    "TIME": GetRealElement,
+    "LRAD": GetRealElement,
+    "RRAD": GetRealElement,
+    "LEND": GetIntElement,
+    "COLR": GetColorElement,
+    "SIDE": GetIntElement,
+    "IROT": GetRealElement,
+    "ROTM": GetRealElement,
+    "POFS": GetVectorElement,
+    "IVEL": GetVectorElement,
+    "NPOS": GetVectorElement,
+    "VELM": GetModVectorElement,
+    "VLM2": GetModVectorElement,
+    "SPLN": GetIntElement,
+    "TEXR": GetTextureElement,
+    "TSPN": GetIntElement,
+    "LLRD": GetBool,
+    "CROS": GetBool,
+    "VLS1": GetBool,
+    "VLS2": GetBool,
+    "SROT": GetBool,
+    "WIRE": GetBool,
+    "TEXW": GetBool,
+    "AALP": GetBool,
+    "ZBUF": GetBool,
+    "ORNT": GetBool,
+    "CRND": GetBool,
+    "CLTX": GetBool,
+    "LENG": GetRealElement,
+    # End
+    "_END": Pass,
+})
+
+SPAWN_TYPES = dict(PARTICLE_TYPES)
+SPAWN_TYPES.update({
+    "FRCO": GetBool,
+    "FROV": GetVectorElement,
+    "SPWN": SpawnSystemKeyframeData,
+    "VMD2": GetBool,
+    "VMD1": GetBool,
+    "IGLT": GetBool,
+    "IGGT": GetBool,
+    "GIVL": GetIntElement,
+    "DEOL": GetBool,
+    "PSLT": GetIntElement,
+    "GORN": GetVectorElement,
+    "TRNL": GetVectorElement,
+    "ORNT": GetVectorElement,
+    "LSCL": GetVectorElement,
+    "SCLE": GetVectorElement,
+    "VLM1": GetModVectorElement,
+    "VLM2": GetModVectorElement,
+    "PCOL": GetColorElement,
+    # End
+    "_END": Pass,
+})
+
+
+def effect_script(magic: str, effect_types: dict):
+    return Struct(
+        magic=Const(magic, FourCC),
+        elements=RepeatUntil(
+            lambda x, lst, ctx: x.type == "_END",
+            FourCCSwitch(effect_types)
+        )
+    )
 
 def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
-
-def dependencies_for(obj, target_game: Game):
+def legacy_dependencies(obj, target_game: Game):
     for element in obj.elements:
         if element.type in ("TEXR", "TIND"):
             if element.body.body is not None:
@@ -931,7 +1334,47 @@ def dependencies_for(obj, target_game: Game):
                 yield from _yield_dependency_if_valid(element.body.body, "PART", target_game)
 
 
-class Part(BaseResource):
+PART = effect_script("GPSM", PARTICLE_TYPES)
+DPSC = effect_script("DPSM", DECAL_TYPES)
+WPSC = effect_script("WPSM", WEAPON_TYPES)
+CRSC = effect_script("CRSM", COLLISION_RESPONSE_TYPES)
+SRSC = effect_script("SRSM", SPAWN_TYPES)
+SPSC = effect_script("SPSM", SPAWN_TYPES)
+ELSC = effect_script("ELSM", ELECTRIC_TYPES)
+SWHC = effect_script("SWSH", SWOOSH_TYPES)
+
+
+class BaseEffect(BaseResource):
+    @classmethod
+    def asset_id_keys(cls) -> typing.Iterable[AssetType]:
+        return []
+    
+    @classmethod
+    def texture_keys(cls) -> typing.Iterable[AssetType]:
+        return []
+    
+    @classmethod
+    def spawn_system_keys(cls) -> typing.Iterable[AssetType]:
+        return []
+
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        for element in self.raw.elements:
+            if element.type in self.texture_keys():
+                if element.body.body is not None:
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl, not_exist_ok=True)
+            
+            elif element.type in self.spawn_system_keys():
+                if element.body.magic != "NONE":
+                    for spawn in element.body.value.spawns:
+                        for t in spawn.v2:
+                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl, not_exist_ok=True)
+
+            elif element.type in self.asset_id_keys():
+                if element.body is not None and element.body.body is not None:
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl, not_exist_ok=True)
+
+
+class Part(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "PART"
@@ -939,6 +1382,125 @@ class Part(BaseResource):
     @classmethod
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return PART
+    
+    @classmethod
+    def asset_id_keys(cls) -> Iterable[AssetType]:
+        return ("SSWH", "PMDL", "SELC", "IDTS", "ICTS", "IITS")
+    
+    @classmethod
+    def spawn_system_keys(cls) -> Iterable[AssetType]:
+        return ("KSSM", )
+    
+    @classmethod
+    def texture_keys(cls) -> Iterable[AssetType]:
+        return ("TEXR", "TIND")
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+
+class Dpsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "DPSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return DPSC
+
+    @classmethod
+    def asset_id_keys(cls) -> typing.Iterable[AssetType]:
+        return ("DMDL", )
+    
+    @classmethod
+    def texture_keys(cls) -> Iterable[AssetType]:
+        return ("1TEX", "2TEX")
+
+
+class Wpsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "WPSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return WPSC
+    
+    @classmethod
+    def asset_id_keys(cls) -> typing.Iterable[AssetType]:
+        return ("PJFX", "COLR", "OHEF", "APSM", "APS1", "APS2", "ASW1", "ASW2", "ASW3")
+
+    @classmethod
+    def texture_keys(cls) -> Iterable[AssetType]:
+        return ("B1TX", "B2TX", "TTEX")
+
+
+class Crsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "CRSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return CRSC
+    
+    @classmethod
+    def asset_id_keys(cls) -> typing.Iterable[AssetType]:
+        return ("DCHR", "DEFS", "TALP", "DESH", "DENM", "DDCL", "ENDL", "CHDL", "WTDL", "GODL", "ICDL", "GRDL", "MEDL", "CODL", "WODL", "6LAV", "5LAV", "4LAV", "3LAV", "2LAV", "1LAV")
+
+
+class Spsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "SPSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return SPSC
+    
+    @classmethod
+    def spawn_system_keys(cls) -> Iterable[AssetType]:
+        return ("SPWN", )
+
+
+class Srsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "SRSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return SRSC
+
+    @classmethod
+    def spawn_system_keys(cls) -> Iterable[AssetType]:
+        return ("SPWN", )
+
+
+class Elsc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "ELSC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return ELSC
+
+    @classmethod
+    def asset_id_keys(cls) -> Iterable[AssetType]:
+        return ("SSWH", "GPSM", "EPSM")
+    
+    @classmethod
+    def texture_keys(cls) -> Iterable[AssetType]:
+        return ("TEXR", )
+
+
+class Swhc(BaseEffect):
+    @classmethod
+    def resource_type(cls) -> AssetType:
+        return "SWHC"
+    
+    @classmethod
+    def construct_class(cls, target_game: Game) -> Construct:
+        return SWHC
+
+    @classmethod
+    def texture_keys(cls) -> Iterable[AssetType]:
+        return ("TEXR", )

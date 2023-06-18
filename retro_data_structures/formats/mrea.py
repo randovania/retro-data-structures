@@ -31,8 +31,9 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
-from retro_data_structures.formats.script_object import ScriptInstanceHelper
+from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
 from retro_data_structures.formats.visi import VISI
+from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect
 from retro_data_structures.game_check import Game
 
@@ -63,6 +64,7 @@ _all_categories = [
 ]
 
 _CATEGORY_ENCODINGS = {
+    "geometry_section": lazy_world_geometry(),
     "script_layers_section": SCLY,
     "generated_script_objects_section": SCGN,
     "area_octree_section": AROT,
@@ -432,7 +434,7 @@ class Mrea(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MREA
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
@@ -448,6 +450,10 @@ class Mrea(BaseResource):
                 GreedyBytes if lazy_load else _CATEGORY_ENCODINGS[section_name],
                 context, "",
             )
+    
+    def get_section(self, section_name: str, lazy_load: bool = False):
+        self._ensure_decoded_section(section_name, lazy_load)
+        return self._raw.sections[section_name]
 
     def build(self) -> bytes:
         for i, section in (self._script_layer_helpers or {}).items():
@@ -478,6 +484,23 @@ class Mrea(BaseResource):
                     )
 
             yield from self._script_layer_helpers.values()
+    
+    _generated_objects_layer: ScriptLayerHelper | None = None
+    @property
+    def generated_objects_layer(self) -> ScriptLayerHelper:
+        assert self.target_game >= Game.ECHOES
+        if self._generated_objects_layer is None:
+            self._generated_objects_layer = ScriptLayerHelper(
+                self.get_section("generated_script_objects_section")[0],
+                None,
+                self.target_game
+            )
+        return self._generated_objects_layer
+
+    @property
+    def all_instances(self) -> Iterator[ScriptInstanceHelper]:
+        for layer in self.script_layers:
+            yield from layer.instances
 
     def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
         for layer in self.script_layers:
@@ -489,3 +512,14 @@ class Mrea(BaseResource):
             if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
                 return instance
         raise KeyError(name)
+    
+    def remove_instance(self, instance: int | InstanceId | str | ScriptInstanceHelper):
+        if isinstance(instance, str):
+            instance = self.get_instance(instance)
+        elif isinstance(instance, int):
+            instance = InstanceId(instance)
+        if isinstance(instance, ScriptInstanceHelper):
+            instance = instance.id
+        
+        layers = list(self.script_layers)
+        layers[instance.layer].remove_instance(instance)

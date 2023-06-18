@@ -1,3 +1,4 @@
+from enum import IntEnum
 import typing
 
 import construct
@@ -11,10 +12,90 @@ from retro_data_structures.game_check import Game, current_game_at_least_else, g
 def _const(val: int):
     return construct.Const(val, construct.Int32ub)
 
+class AreaVisibilty(IntEnum):
+    Always = 0
+    VisitOrMapStation = 1
+    VisitOnly = 2
+    Never = 3
+
+
+class ObjectVisibility(IntEnum):
+    Always = 0
+    AreaVisitOrMapStation = 1
+    DoorVisit = 2
+    Never = 3
+    AreaVisitOrMapStation2 = 4
+
+
+class ObjectTypeMP1(IntEnum):
+    NormalDoor = 0
+    ShieldDoor = 1
+    IceDoor = 2
+    WaveDoor = 3
+    PlasmaDoor = 4
+    BigDoor = 5
+    BigDoor2 = 6
+    IceDoorCeil = 7
+    IceDoorFloor = 8
+    WaveDoorCeil = 9
+    WaveDoorFloor = 10
+    PlasmaDoorCeil = 11
+    PlasmaDoorFloor = 12
+    IceDoorFloor2 = 13
+    WaveDoorFloor2 = 14
+    PlasmaDoorFloor2 = 15
+
+    DownArrowYellow = 27
+    UpArrowYellow = 28
+    DownArrowGreen = 29
+    UpArrowGreen = 30
+    DownArrowRed = 31
+    UpArrowRed = 32
+    
+    Elevator = 33
+    SaveStation = 34
+    MissileStation = 37
+
+    @property
+    def is_door_type(self):
+        return self < ObjectTypeMP1.DownArrowYellow
+
+
+class ObjectTypeMP2(IntEnum):
+    NormalDoor = 0
+    MissileDoor = 1
+    DarkDoor = 2
+    AnnihilatorDoor = 3
+    LightDoor = 4
+    SuperMissileDoor = 5
+    SeekerMissileDoor = 6
+    PowerBombDoor = 7
+
+    Elevator = 16
+    SaveStation = 17
+
+    AmmoStation = 20
+    Portal = 21
+    LightTeleporter = 22
+    TranslatorGate = 23
+    UpArrow = 24
+    DownArrow = 25
+
+    @property
+    def is_door_type(self):
+        return self < ObjectTypeMP2.Elevator
+
 
 MappableObject = construct.Struct(
-    type=construct.Int32ub,
-    visibility_mode=construct.Int32ub,
+    type=construct.Switch(
+        get_current_game,
+        {
+            Game.PRIME: construct.Enum(construct.Int32sb, ObjectTypeMP1),
+            Game.ECHOES: construct.Enum(construct.Int32sb, ObjectTypeMP2),
+        },
+        default=construct.Int32sb
+    ),
+    visibility_mode=construct.Enum(construct.Int32ub, ObjectVisibility),
     editor_id=construct.Int32ub,
     unk1=construct.Int32ub,
     transform=Transform4f,
@@ -43,7 +124,7 @@ MAPA = construct.Aligned(32, construct.Struct(
             default=ErrorWithMessage("Unknown game"),
         ),
         type=construct.Int32ub,  # Light/Dark world for Echoes
-        visibility_mode=construct.Int32ub,
+        visibility_mode=construct.Enum(construct.Int32ub, AreaVisibilty),
         bounding_box=AABox,
         map_adjustment=current_game_at_least_else(Game.ECHOES, Vector3, construct.Pass),
         mappable_object_count=construct.Int32ub,
@@ -80,5 +161,5 @@ class Mapa(BaseResource):
     def resource_type(cls) -> AssetType:
         return "MAPA"
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         yield from []

@@ -5,14 +5,13 @@ import uuid
 
 from construct import Construct, Container
 
-from retro_data_structures.game_check import Game
-
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.game_check import Game
 
 AssetType = str
-AssetId = typing.Union[int, uuid.UUID]
-NameOrAssetId = typing.Union[str, AssetId]
+AssetId = int | uuid.UUID
+NameOrAssetId = str | AssetId
 
 
 class Dependency(typing.NamedTuple):
@@ -47,7 +46,15 @@ class BaseResource:
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    @classmethod
+    def has_dependencies(cls, target_game: Game) -> bool:
+        dummy = cls(Container(), target_game, None)
+        try:
+            return len(dummy.dependencies_for()) > 0
+        except Exception:
+            return True
+
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     @property
@@ -68,3 +75,5 @@ def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
 class RawResource(typing.NamedTuple):
     type: AssetType
     data: bytes
+
+Resource = RawResource | BaseResource

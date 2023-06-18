@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 
 import construct
@@ -12,6 +13,9 @@ from retro_data_structures.common_types import String, CharAnimTime, MayaSpline
 from retro_data_structures.construct_extensions.version import WithVersion
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 BasePOINode = Struct(
     unk_1=Int16ub,
@@ -113,9 +117,31 @@ EVNT = Struct(
 )
 
 
-def dependencies_for(obj, target_game):
+def legacy_dependencies(obj, target_game):
     for particle_poi in obj.particle_poi_nodes:
         yield particle_poi.particle.type, particle_poi.particle.id
+
+
+def dependencies_for(obj, asset_manager, is_mlvl: bool = False, char_id: int | None = None):
+    def is_for_character(poi, generic_ok):
+        # return True
+        ids = (-1, char_id) if generic_ok else (char_id,)
+        return char_id is None or poi.base.character_index in ids
+
+    for particle_poi in obj.particle_poi_nodes:
+        if is_for_character(particle_poi, False):
+            yield from asset_manager.get_dependencies_for_asset(particle_poi.particle.id, is_mlvl)
+    
+    if obj.sound_poi_nodes:
+        for sound_poi in obj.sound_poi_nodes:
+            if not is_for_character(sound_poi, True):
+                continue
+            if asset_manager.target_game >= Game.CORRUPTION:
+                yield from asset_manager.get_dependencies_for_asset(sound_poi.sound_id, is_mlvl)
+            else:
+                sound_id = sound_poi.sound_id & 0xFFFF
+                yield from asset_manager.get_audio_group_dependency(sound_id, is_mlvl)
+
 
 
 class Evnt(BaseResource):
@@ -127,5 +153,5 @@ class Evnt(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return EVNT
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        yield from dependencies_for(self.raw, self.asset_manager, is_mlvl)

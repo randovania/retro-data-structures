@@ -2,10 +2,11 @@
 https://wiki.axiodl.com/w/SCAN_(File_Format)
 """
 
+import logging
 import typing
 
 import construct
-from construct import Struct, Int32ub
+from construct import Aligned, Struct, Int32ub
 from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRange, Hex, IfThenElse
 
 from retro_data_structures import game_check
@@ -39,27 +40,26 @@ Prime1SCAN = Struct(
     "junk" / GreedyRange(Byte),
 )
 
-Prime23SCAN = Struct(
+Prime23SCAN = Aligned(32, Struct(
     "magic" / Const("SCAN", FourCC),
     "unknown1" / Const(2, Int32ub),
     "unknown2" / Byte,
     "instance_count" / Const(1, Int32ub),
     "scannable_object_info" / ScriptInstance,
     "dependencies" / DGRP,
-    "junk" / GreedyRange(Byte),
-)
+), b"\xff")
 
 SCAN = IfThenElse(game_check.is_prime1, Prime1SCAN, Prime23SCAN)
 
 
-def dependencies_for(obj, target_game: Game):
+def legacy_dependencies(obj, target_game: Game):
     if target_game == Game.PRIME:
         yield "FRME", obj.frame_id
         yield "STRG", obj.text_id
         for image in obj.scan_images:
             yield "TXTR", image.texture
     else:
-        yield from dgrp.dependencies_for(obj.dependencies, target_game)
+        yield from dgrp.legacy_dependencies(obj.dependencies, target_game)
 
 
 class Scan(BaseResource):
@@ -71,10 +71,34 @@ class Scan(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SCAN
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        if is_mlvl:
+            return
+        
+        if self.target_game == Game.PRIME:
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.text_id)
+            for image in self.raw.scan_images:
+                yield from self.asset_manager.get_dependencies_for_asset(image.texture)
+        else:
+            for dep in self.raw.dependencies:
+                yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)
     
+    _scannable_object_info: ScriptInstanceHelper | None = None
     @property
     def scannable_object_info(self) -> ScriptInstanceHelper:
         assert self.target_game != Game.PRIME
-        return ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game)
+        if self._scannable_object_info is None:
+            self._scannable_object_info = ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game, on_modify=self.rebuild_dependencies)
+        return self._scannable_object_info
+
+    def rebuild_dependencies(self):
+        logging.debug("rebuilding deps for a SCAN!")
+        if self.target_game == Game.PRIME:
+            return
+        scan_info = self.scannable_object_info.get_properties()
+        self._raw.dependencies = [
+            {"asset_type": dep.type, "asset_id": dep.id}
+            for dep in scan_info.dependencies_for(self.asset_manager)
+        ]
+

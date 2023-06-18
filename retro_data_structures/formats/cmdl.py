@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 
 import construct
@@ -33,6 +34,9 @@ from retro_data_structures.construct_extensions.misc import Skip, ErrorWithMessa
 from retro_data_structures.data_section import DataSectionSizes, DataSection
 from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
 
@@ -328,8 +332,18 @@ CMDL = Struct(
     ),
 )
 
+def dependencies_for_material_set(mat, asset_manager: AssetManager, is_mlvl):
+    if asset_manager.target_game <= Game.ECHOES:
+        for file_id in mat.texture_file_ids:
+            yield from asset_manager.get_dependencies_for_asset(file_id, is_mlvl)
 
-def dependencies_for(obj, target_game: Game):
+    if Game.CORRUPTION <= asset_manager.target_game:
+        for material in mat.materials:
+            for element in material.element:
+                if element.type == "PASS":
+                    yield from asset_manager.get_dependencies_for_asset(element.body.id, is_mlvl)
+
+def legacy_dependencies(obj, target_game: Game):
     if target_game <= Game.ECHOES:
         for material_set in obj.material_sets:
             for file_id in material_set.texture_file_ids:
@@ -342,7 +356,6 @@ def dependencies_for(obj, target_game: Game):
                     if element.type == "PASS":
                         yield "TXTR", element.body.id
 
-
 class Cmdl(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -352,5 +365,6 @@ class Cmdl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return CMDL
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from dependencies_for(self.raw, self.target_game)
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        for material in self.raw.material_sets:
+            yield from dependencies_for_material_set(material, self.asset_manager, is_mlvl)

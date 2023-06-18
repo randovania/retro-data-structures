@@ -5,6 +5,7 @@ from construct import Construct
 from retro_data_structures.formats.ancs import ANCS, Ancs
 from retro_data_structures.formats.anim import ANIM, Anim
 from retro_data_structures.base_resource import BaseResource, AssetType
+from retro_data_structures.formats.audio_group import AGSC, ATBL, Agsc, Atbl
 from retro_data_structures.formats.char import CHAR, Char
 from retro_data_structures.formats.cinf import CINF, Cinf
 from retro_data_structures.formats.cmdl import CMDL, Cmdl
@@ -18,7 +19,7 @@ from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.msbt import Msbt
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.part import PART, Part
+from retro_data_structures.formats.effect_script import CRSC, DPSC, ELSC, PART, SPSC, SRSC, SWHC, WPSC, Crsc, Dpsc, Elsc, Part, Spsc, Srsc, Swhc, Wpsc
 from retro_data_structures.formats.room import Room
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw
@@ -45,6 +46,15 @@ ALL_FORMATS = {
     "SCAN": SCAN,
     "STRG": STRG,
     "TXTR": TXTR,
+    "DPSC": DPSC,
+    "WPSC": WPSC,
+    "CRSC": CRSC,
+    "SRSC": SRSC,
+    "SPSC": SPSC,
+    "ELSC": ELSC,
+    "SWHC": SWHC,
+    "AGSC": AGSC,
+    "ATBL": ATBL,
 }
 
 ALL_RESOURCE_TYPES = {
@@ -70,6 +80,15 @@ ALL_RESOURCE_TYPES = {
     "SCAN": Scan,
     "STRG": Strg,
     "TXTR": Txtr,
+    "DPSC": Dpsc,
+    "WPSC": Wpsc,
+    "CRSC": Crsc,
+    "SRSC": Srsc,
+    "SPSC": Spsc,
+    "ELSC": Elsc,
+    "SWHC": Swhc,
+    "AGSC": Agsc,
+    "ATBL": Atbl,
 }
 
 
@@ -81,7 +100,16 @@ def resource_type_for(type_name: AssetType) -> typing.Type[BaseResource]:
     return ALL_RESOURCE_TYPES[type_name.upper()]
 
 
+def has_format(type_name: AssetType) -> bool:
+    return type_name in ALL_FORMATS
+
+
+def has_resource_type(type_name: AssetType) -> bool:
+    return type_name in ALL_RESOURCE_TYPES
+
 __all__ = [
     "format_for",
     "resource_type_for",
+    "has_format",
+    "has_resource_type"
 ]

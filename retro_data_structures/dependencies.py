@@ -6,7 +6,7 @@ from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
+from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, effect_script
 from retro_data_structures.game_check import Game
 
 
@@ -28,12 +28,12 @@ def _no_dependencies(_obj, _target_game):
 _formats_without_dependencies = {"txtr", "cskr", "cinf", "anim", "cspp", "strg"}
 
 _dependency_functions = {
-    "cmdl": cmdl.dependencies_for,
-    "ancs": ancs.dependencies_for,
-    "evnt": evnt.dependencies_for,
-    "part": part.dependencies_for,
-    "scan": scan.dependencies_for,
-    "dgrp": dgrp.dependencies_for,
+    "cmdl": cmdl.legacy_dependencies,
+    "ancs": ancs.legacy_dependencies,
+    "evnt": evnt.legacy_dependencies,
+    "part": effect_script.legacy_dependencies,
+    "scan": scan.legacy_dependencies,
+    "dgrp": dgrp.legacy_dependencies,
 }
 
 

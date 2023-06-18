@@ -1,6 +1,7 @@
 """
 For checking which game is being parsed
 """
+from __future__ import annotations
 import typing
 import uuid
 from enum import Enum
@@ -10,6 +11,10 @@ import construct
 from construct.core import IfThenElse
 
 from retro_data_structures import common_types
+from retro_data_structures.base_resource import Dependency
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 class Game(Enum):
@@ -66,9 +71,25 @@ class Game(Enum):
             raise NotImplementedError()
 
     def is_valid_asset_id(self, asset_id: typing.Union[int, uuid.UUID]) -> bool:
-        if self == Game.PRIME and asset_id == 0:
+        if self <= Game.ECHOES and asset_id == 0:
             return False
         return asset_id != self.invalid_asset_id
+    
+    @property
+    def mlvl_dependencies_to_ignore(self) -> tuple[AssetId]:
+        if self == Game.ECHOES:
+            # Textures/Misc/VisorSteamQtr.TXTR
+            return (0x7b2ea5b1,)
+        return ()
+    
+    def special_ancs_dependencies(self, ancs: AssetId):
+        if self == Game.ECHOES and ancs == 0xC043D342:
+            # every gun animation needs these i guess
+            yield Dependency("TXTR", 0x9e6f9531)
+            yield Dependency("TXTR", 0xcea098fe)
+            yield Dependency("TXTR", 0x607638ea)
+            yield Dependency("TXTR", 0x578e51b8)
+            yield Dependency("TXTR", 0x1e7b6c64)
 
 
 def get_current_game(ctx):

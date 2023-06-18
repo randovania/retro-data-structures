@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 import typing
 from typing import Optional, Union
@@ -22,6 +23,7 @@ from construct.core import (
 from construct.lib.containers import Container
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
@@ -30,6 +32,7 @@ from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import AreaWrapper
+    from retro_data_structures.asset_manager import AssetManager
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -210,3 +213,27 @@ class ScriptLayerHelper:
 
     def mark_modified(self):
         self._modified = True
+    
+    def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+        logging.debug(f"        Layer: {self.name}")
+        
+        deps: list[Dependency] = []
+        for instance in self.instances:
+            deps.extend(instance.mlvl_dependencies_for(asset_manager))
+        
+        unique_deps: set[Dependency] = set()
+        for dep in deps:
+            if dep in unique_deps:
+                continue
+            # specifically keep the order of the *first* appearance of the dependency
+            unique_deps.add(dep)
+            yield dep
+
+    @property
+    def dependencies(self):
+        self.assert_parent()
+        deps = self._parent_area._raw.dependencies
+        offsets = deps.offsets
+        raw_deps = deps.dependencies[offsets[self._index]:offsets[self._index+1]]
+        yield from ((dep.asset_type, dep.asset_id) for dep in raw_deps)
+        

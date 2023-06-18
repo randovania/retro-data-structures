@@ -1,27 +1,29 @@
+from collections import defaultdict
 import fnmatch
 import json
 import logging
 import typing
 import uuid
 from pathlib import Path
-from typing import Optional, Iterator
+from typing import Iterator
 
 import construct
 import nod
 
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
-    AssetId, BaseResource, NameOrAssetId, RawResource,
-    resolve_asset_id, AssetType
+    AssetId, BaseResource, Dependency, NameOrAssetId, RawResource,
+    resolve_asset_id, AssetType, Resource
 )
 from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.formats import dependency_cheating
+from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.pak_gc import PAKNoData
 from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
 logger = logging.getLogger(__name__)
-
 
 class FileProvider:
     def is_file(self, name: str) -> bool:
@@ -101,13 +103,18 @@ class AssetManager:
     _ensured_asset_ids: mapping of pak name to assets we'll copy into it when saving
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
-    headers: typing.Dict[str, construct.Container]
-    _paks_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
-    _types_for_asset_id: typing.Dict[AssetId, AssetType]
-    _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
-    _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
-    _in_memory_paks: typing.Dict[str, Pak]
-    _custom_asset_ids: typing.Dict[str, AssetId]
+    headers: dict[str, construct.Container]
+    _paks_for_asset_id: dict[AssetId, set[str]]
+    _types_for_asset_id: dict[AssetId, AssetType]
+    _ensured_asset_ids: dict[str, set[AssetId]]
+    _modified_resources: dict[AssetId, RawResource | None]
+    _in_memory_paks: dict[str, Pak]
+    _custom_asset_ids: dict[str, AssetId]
+
+    _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
+    _cached_mlvl_dependencies: dict[AssetId, tuple[Dependency, ...]]
+    _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
+
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider
@@ -117,6 +124,13 @@ class AssetManager:
         self._next_generated_id = 0xFFFF0000
 
         self._update_headers()
+
+        self._cached_dependencies = {}
+        self._cached_mlvl_dependencies = {}
+        self._cached_ancs_per_char_dependencies = defaultdict(dict)
+
+        self._sound_id_to_agsc: dict[int, AssetId | None] = {}
+        self.build_audio_group_dependency_table()
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if str(value) in self._custom_asset_ids:
@@ -226,18 +240,20 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
+    def get_asset_format(self, asset_id: NameOrAssetId) -> typing.Type[BaseResource]:
+        asset_type = self.get_asset_type(asset_id)
+        return formats.resource_type_for(asset_type)
+
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
         """
-        raw_asset = self.get_raw_asset(asset_id)
-
-        format_class = formats.resource_type_for(raw_asset.type)
+        format_class = self.get_asset_format(asset_id)
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
-        return format_class.parse(raw_asset.data, target_game=self.target_game,
+        return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game,
                                   asset_manager=self)
 
     def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:
@@ -256,14 +272,17 @@ class AssetManager:
 
     def register_custom_asset_name(self, name: str, asset_id: AssetId):
         if self.does_asset_exists(asset_id):
-            raise ValueError(f"{asset_id} already exists")
+            raise ValueError(f"{asset_id} ({name}) already exists")
 
         if name in self._custom_asset_ids and self._custom_asset_ids[name] != asset_id:
             raise ValueError(f"{name} already exists")
 
         self._custom_asset_ids[name] = asset_id
+    
+    def get_custom_asset(self, name: str) -> AssetId | None:
+        return self._custom_asset_ids.get(name)
 
-    def add_new_asset(self, name: typing.Union[str, uuid.UUID], new_data: typing.Union[RawResource, BaseResource],
+    def add_new_asset(self, name: str | uuid.UUID, new_data: Resource,
                       in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
@@ -282,7 +301,7 @@ class AssetManager:
         for pak_name in in_paks:
             self.ensure_present(pak_name, asset_id)
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: typing.Union[RawResource, BaseResource]):
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource):
         """
         Replaces an existing asset.
         See `add_new_asset` for new assets.
@@ -305,6 +324,8 @@ class AssetManager:
             raw_asset = new_data
 
         self._modified_resources[asset_id] = raw_asset
+
+        return asset_id
 
     def delete_asset(self, asset_id: NameOrAssetId):
         original_name = asset_id
@@ -338,6 +359,12 @@ class AssetManager:
         # If the pak already has the given asset, do nothing
         if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
+        
+        # Ensure the asset's dependencies are present as well
+        for dep in self.get_dependencies_for_asset(asset_id):
+            if dep.id == asset_id:
+                continue
+            self.ensure_present(pak_name, dep.id)
 
     def get_pak(self, pak_name: str) -> Pak:
         if pak_name not in self._ensured_asset_ids:
@@ -351,6 +378,111 @@ class AssetManager:
             self._in_memory_paks[pak_name] = Pak.parse(data, target_game=self.target_game)
 
         return self._in_memory_paks[pak_name]
+
+    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, is_mlvl: bool = False, not_exist_ok: bool = False) -> Iterator[Dependency]:
+        if not self.target_game.is_valid_asset_id(asset_id):
+            return
+        
+        if is_mlvl and asset_id in self.target_game.mlvl_dependencies_to_ignore:
+            return
+        
+        if not self.does_asset_exists(asset_id):
+            if not not_exist_ok:
+                raise UnknownAssetId(asset_id)
+            return
+
+        asset_type = self.get_asset_type(asset_id)
+        
+        dep_cache = self._cached_mlvl_dependencies if is_mlvl else self._cached_dependencies
+        deps: tuple[Dependency, ...] = ()
+
+        if asset_id in dep_cache:
+            logger.debug(f"Fetching cached asset {asset_id:#8x}...")
+            deps = dep_cache[asset_id]
+        else:
+            if dependency_cheating.should_cheat_asset(asset_type):
+                deps = dependency_cheating.get_cheated_dependencies(
+                    self.get_raw_asset(asset_id),
+                    self, is_mlvl
+                )
+            
+            elif formats.has_resource_type(asset_type):
+                if self.get_asset_format(asset_id).has_dependencies(self.target_game):
+                    deps = self.get_parsed_asset(asset_id).dependencies_for(is_mlvl)
+            
+            logger.debug(f"Adding {asset_id:#8x} deps to cache...")
+            deps = tuple(deps)
+            dep_cache[asset_id] = deps   
+        
+        yield from deps
+        yield Dependency(asset_type, asset_id)
+    
+    def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, is_mlvl: bool = False, char_index: int | None = None):
+        if not self.target_game.is_valid_asset_id(asset_id):
+            return
+        
+        if (asset_type := self.get_asset_type(asset_id)) != "ANCS":
+            raise ValueError(f"{hex(asset_id)} ({asset_type}) is not an ANCS!")
+        
+        if char_index is None:
+            yield from self.get_dependencies_for_asset(asset_id, is_mlvl)
+            return
+        
+        if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
+            logger.debug(f"Fetching cached asset {asset_id:#8x}...")
+            deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
+        else:
+            deps = list(self.target_game.special_ancs_dependencies(asset_id))
+            ancs = self.get_parsed_asset(asset_id)
+            deps.extend(ancs.dependencies_for(is_mlvl, char_index=char_index))
+            deps = tuple(deps)
+            self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
+        
+        yield from deps
+        yield Dependency("ANCS", asset_id)
+
+
+    def build_audio_group_dependency_table(self):
+        atbl: Atbl | None = None
+        agsc_ids: list[AssetId] = []
+        for asset_id in self.all_asset_ids():
+            asset_type = self.get_asset_type(asset_id)
+            if asset_type == "ATBL":
+                if atbl is not None:
+                    logger.warning("Two ATBL files found!")
+                atbl = self.get_parsed_asset(asset_id)
+            elif asset_type == "AGSC":
+                agsc_ids.append(asset_id)
+        
+        define_id_to_agsc: dict[int, AssetId] = {0xFFFF: None, -1: None}
+        for agsc_id in agsc_ids:
+            try:
+                agsc = self.get_parsed_asset(agsc_id, type_hint=Agsc)
+                for define_id in agsc.define_ids:
+                    define_id_to_agsc[define_id] = agsc_id
+            except Exception as e:
+                raise Exception(f"Error parsing AGSC {hex(agsc_id)}: {e}")
+
+        self._sound_id_to_agsc = {-1: None}
+        for sound_id, define_id in enumerate(atbl.raw):
+            if define_id in define_id_to_agsc:
+                self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
+
+        
+    def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
+        agsc = self._sound_id_to_agsc[sound_id]
+        if agsc is None:
+            return
+        
+        dep = ("AGSC", agsc)
+
+        if is_mlvl:
+            to_ignore = self.get_file(0x31CB5ADB) # audio_groups_single_player_DGRP
+            if dep in to_ignore.direct_dependencies:
+                return
+
+        yield dep
+            
 
     def save_modifications(self, output_path: Path):
         modified_paks = set()
