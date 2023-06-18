@@ -100,7 +100,16 @@ def resource_type_for(type_name: AssetType) -> typing.Type[BaseResource]:
     return ALL_RESOURCE_TYPES[type_name.upper()]
 
 
+def has_format(type_name: AssetType) -> bool:
+    return type_name in ALL_FORMATS
+
+
+def has_resource_type(type_name: AssetType) -> bool:
+    return type_name in ALL_RESOURCE_TYPES
+
 __all__ = [
     "format_for",
     "resource_type_for",
+    "has_format",
+    "has_resource_type"
 ]

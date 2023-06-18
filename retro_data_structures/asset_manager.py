@@ -210,36 +210,27 @@ class AssetManager:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
         
-        if is_mlvl and self.target_game == Game.ECHOES and asset_id in (
-            0x7b2ea5b1,
-        ):
+        if is_mlvl and asset_id in self.target_game.mlvl_dependencies_to_ignore:
             return
         
         if not self.does_asset_exists(asset_id):
             if not not_exist_ok:
-                pass
-                # logging.warning(f"Can't resolve asset id {hex(asset_id)}")
+                raise UnknownAssetId(asset_id)
             return
 
         asset_type = self.get_asset_type(asset_id)
-
-        yield asset_type, asset_id
 
         if dependency_cheating.should_cheat_asset(asset_type):
             yield from dependency_cheating.get_cheated_dependencies(
                 self.get_raw_asset(asset_id),
                 self, is_mlvl
             )
-            return
+        
+        elif formats.has_resource_type(asset_type):
+            if self.get_asset_format(asset_id).has_dependencies(self.target_game):
+                yield from self.get_parsed_asset(asset_id).dependencies_for(is_mlvl)
 
-        try:
-            if not self.get_asset_format(asset_id).has_dependencies(self.target_game):
-                return
-            asset = self.get_parsed_asset(asset_id)
-        except KeyError:
-            # logging.warning(f"May be missing dependencies for {self.get_asset_type(asset_id)}")
-            return
-        yield from asset.dependencies_for(is_mlvl)
+        yield asset_type, asset_id
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
@@ -266,8 +257,8 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name) from None
 
     def get_asset_format(self, asset_id: NameOrAssetId) -> typing.Type[BaseResource]:
-        raw_asset = self.get_raw_asset(asset_id)
-        return formats.resource_type_for(raw_asset.type)
+        asset_type = self.get_asset_type(asset_id)
+        return formats.resource_type_for(asset_type)
 
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
                          type_hint: typing.Type[T] = BaseResource) -> T:
@@ -393,7 +384,7 @@ class AssetManager:
 
         return self._in_memory_paks[pak_name]
 
-    _sound_id_to_agsc: dict[int, AssetId] = {}
+    _sound_id_to_agsc: dict[int, AssetId | None] | None = None
     def build_audio_group_dependency_table(self):
         atbl: Atbl | None = None
         agsc_ids: list[AssetId] = []
@@ -414,18 +405,12 @@ class AssetManager:
                     define_id_to_agsc[define_id] = agsc_id
             except Exception as e:
                 raise Exception(f"Error parsing AGSC {hex(agsc_id)}: {e}")
-        
-        error_keys = set()
 
         self._sound_id_to_agsc = {-1: None}
         for sound_id, define_id in enumerate(atbl.raw):
-            try:
+            if define_id in define_id_to_agsc:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
-            except:
-                error_keys.add(define_id)
-        
-        # if error_keys:
-        #     raise Exception(error_keys)
+
         
     def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
         agsc = self._sound_id_to_agsc[sound_id]

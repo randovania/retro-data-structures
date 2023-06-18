@@ -218,8 +218,13 @@ class ScriptLayerHelper:
         for instance in self.instances:
             deps.extend(instance.mlvl_dependencies_for(asset_manager))
         
-        # only unique dependencies
-        yield from list(dict.fromkeys(deps))
+        unique_deps: set[Dependency] = set()
+        for dep in deps:
+            if dep in unique_deps:
+                continue
+            # specifically keep the order of the *first* appearance of the dependency
+            unique_deps.add(dep)
+            yield dep
 
     @property
     def dependencies(self):

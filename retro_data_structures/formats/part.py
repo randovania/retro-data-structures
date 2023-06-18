@@ -1361,17 +1361,17 @@ class BaseEffect(BaseResource):
         for element in self.raw.elements:
             if element.type in self.texture_keys():
                 if element.body.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl)
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl, not_exist_ok=True)
             
             elif element.type in self.spawn_system_keys():
                 if element.body.magic != "NONE":
                     for spawn in element.body.value.spawns:
                         for t in spawn.v2:
-                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl)
+                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl, not_exist_ok=True)
 
             elif element.type in self.asset_id_keys():
                 if element.body is not None and element.body.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl)
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl, not_exist_ok=True)
 
 
 class Part(BaseEffect):

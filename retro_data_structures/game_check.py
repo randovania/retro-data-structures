@@ -1,6 +1,7 @@
 """
 For checking which game is being parsed
 """
+from __future__ import annotations
 import typing
 import uuid
 from enum import Enum
@@ -10,6 +11,9 @@ import construct
 from construct.core import IfThenElse
 
 from retro_data_structures import common_types
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 class Game(Enum):
@@ -66,9 +70,15 @@ class Game(Enum):
             raise NotImplementedError()
 
     def is_valid_asset_id(self, asset_id: typing.Union[int, uuid.UUID]) -> bool:
-        if self == Game.PRIME and asset_id == 0:
+        if self <= Game.ECHOES and asset_id == 0:
             return False
         return asset_id != self.invalid_asset_id
+    
+    @property
+    def mlvl_dependencies_to_ignore(self) -> tuple[AssetId]:
+        if self == Game.ECHOES:
+            return (0x7b2ea5b1,)
+        return ()
 
 
 def get_current_game(ctx):
