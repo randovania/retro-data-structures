@@ -3,6 +3,7 @@ from enum import IntEnum
 
 import construct
 
+from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AABox, Transform4f, Vector3
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
@@ -11,6 +12,7 @@ from retro_data_structures.game_check import Game, current_game_at_least_else, g
 
 def _const(val: int):
     return construct.Const(val, construct.Int32ub)
+
 
 class AreaVisibilty(IntEnum):
     Always = 0
@@ -86,6 +88,19 @@ class ObjectTypeMP2(IntEnum):
         return self < ObjectTypeMP2.Elevator
 
 
+class GXPrimitive(IntEnum):
+    GX_QUADS = 0x80
+    GX_TRIANGLES = 0x90
+    GX_TRIANGLESTRIP = 0x98
+    GX_TRIANGLEFAN = 0xA0
+    GX_LINES = 0xA8
+    GX_LINESTRIP = 0xB0
+    GX_POINTS = 0xB8
+
+    def __str__(self):
+        return self.name
+
+
 MappableObject = construct.Struct(
     type=construct.Switch(
         get_current_game,
@@ -103,7 +118,7 @@ MappableObject = construct.Struct(
 )
 
 Primitive = construct.Aligned(4, construct.Struct(
-    type=construct.Int32ub,
+    type=EnumAdapter(GXPrimitive),
     indices=construct.PrefixedArray(construct.Int32ub, construct.Int8ub),
 ))
 
