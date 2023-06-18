@@ -488,14 +488,14 @@ class AreaWrapper:
         layer_deps = [
             list(
                 layer.build_mlvl_dependencies(self.asset_manager)
-                if (not only_modified) or layer.modified else
+                if (not only_modified) or layer.is_modified() else
                 layer.dependencies
             ) for layer in self.layers
         ]
 
         if only_modified:
             # assume we never modify these
-            layer_deps.append(list(self.non_layer_dependencies()))
+            layer_deps.append(list(self.non_layer_dependencies))
         else:
             non_layer_deps = list(self.build_non_layer_dependencies())
             if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
