@@ -5,7 +5,7 @@ import logging
 import typing
 import uuid
 from pathlib import Path
-from typing import Optional, Iterator
+from typing import Iterator
 
 import construct
 import nod
@@ -13,7 +13,7 @@ import nod
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
     AssetId, BaseResource, Dependency, NameOrAssetId, RawResource,
-    resolve_asset_id, AssetType
+    resolve_asset_id, AssetType, Resource
 )
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import dependency_cheating
@@ -103,13 +103,13 @@ class AssetManager:
     _ensured_asset_ids: mapping of pak name to assets we'll copy into it when saving
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
-    headers: typing.Dict[str, construct.Container]
-    _paks_for_asset_id: typing.Dict[AssetId, typing.Set[str]]
-    _types_for_asset_id: typing.Dict[AssetId, AssetType]
-    _ensured_asset_ids: typing.Dict[str, typing.Set[AssetId]]
-    _modified_resources: typing.Dict[AssetId, Optional[RawResource]]
-    _in_memory_paks: typing.Dict[str, Pak]
-    _custom_asset_ids: typing.Dict[str, AssetId]
+    headers: dict[str, construct.Container]
+    _paks_for_asset_id: dict[AssetId, set[str]]
+    _types_for_asset_id: dict[AssetId, AssetType]
+    _ensured_asset_ids: dict[str, set[AssetId]]
+    _modified_resources: dict[AssetId, RawResource | None]
+    _in_memory_paks: dict[str, Pak]
+    _custom_asset_ids: dict[str, AssetId]
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_mlvl_dependencies: dict[AssetId, tuple[Dependency, ...]]
@@ -282,7 +282,7 @@ class AssetManager:
     def get_custom_asset(self, name: str) -> AssetId | None:
         return self._custom_asset_ids.get(name)
 
-    def add_new_asset(self, name: typing.Union[str, uuid.UUID], new_data: typing.Union[RawResource, BaseResource],
+    def add_new_asset(self, name: str | uuid.UUID, new_data: Resource,
                       in_paks: typing.Iterable[str]):
         """
         Adds an asset that doesn't already exist.
@@ -301,7 +301,7 @@ class AssetManager:
         for pak_name in in_paks:
             self.ensure_present(pak_name, asset_id)
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: typing.Union[RawResource, BaseResource]):
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource):
         """
         Replaces an existing asset.
         See `add_new_asset` for new assets.
@@ -324,6 +324,8 @@ class AssetManager:
             raw_asset = new_data
 
         self._modified_resources[asset_id] = raw_asset
+
+        return asset_id
 
     def delete_asset(self, asset_id: NameOrAssetId):
         original_name = asset_id
@@ -357,6 +359,12 @@ class AssetManager:
         # If the pak already has the given asset, do nothing
         if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
+        
+        # Ensure the asset's dependencies are present as well
+        for dep in self.get_dependencies_for_asset(asset_id):
+            if dep.id == asset_id:
+                continue
+            self.ensure_present(pak_name, dep.id)
 
     def get_pak(self, pak_name: str) -> Pak:
         if pak_name not in self._ensured_asset_ids:

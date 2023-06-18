@@ -169,11 +169,17 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         name = name_element.text if name_element is not None and name_element.text is not None else ""
 
     cook = element.find("CookPreference")
+    
     parsed.update({
         "type": element.attrib["Type"],
         "name": name,
         "cook_preference": cook.text if cook is not None and cook.text is not None else "Always"
     })
+
+    ignore_dependencies_mlvl = element.attrib.get("IgnoreDependenciesMlvl", "False")
+    ignore_dependencies_mlvl = ignore_dependencies_mlvl.lower() != "false"
+    if ignore_dependencies_mlvl:
+        parsed["ignore_dependencies_mlvl"] = True
 
     property_type_extras = {
         "Struct": _prop_struct,
@@ -1078,7 +1084,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
             if raw_type == "Asset":
-                meta["metadata"] = repr({"asset_types": prop["type_filter"]})
+                field_meta = {"asset_types": prop["type_filter"]}
+                if "ignore_dependencies_mlvl" in prop:
+                    field_meta["ignore_dependencies_mlvl"] = True
+                meta["metadata"] = repr(field_meta)
                 default_value = "default_asset_id"
             else:
                 default_value = hex(prop["default_value"] if prop['has_default'] else 0)

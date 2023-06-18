@@ -1,4 +1,4 @@
-from enum import Enum, IntEnum
+from enum import IntEnum
 import typing
 
 import construct
@@ -12,14 +12,14 @@ from retro_data_structures.game_check import Game, current_game_at_least_else, g
 def _const(val: int):
     return construct.Const(val, construct.Int32ub)
 
-class AreaVisibilty(Enum):
+class AreaVisibilty(IntEnum):
     Always = 0
     VisitOrMapStation = 1
     VisitOnly = 2
     Never = 3
 
 
-class ObjectVisibility(Enum):
+class ObjectVisibility(IntEnum):
     Always = 0
     AreaVisitOrMapStation = 1
     DoorVisit = 2

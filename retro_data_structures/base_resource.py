@@ -10,8 +10,8 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.game_check import Game
 
 AssetType = str
-AssetId = typing.Union[int, uuid.UUID]
-NameOrAssetId = typing.Union[str, AssetId]
+AssetId = int | uuid.UUID
+NameOrAssetId = str | AssetId
 
 
 class Dependency(typing.NamedTuple):
@@ -75,3 +75,5 @@ def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
 class RawResource(typing.NamedTuple):
     type: AssetType
     data: bytes
+
+Resource = RawResource | BaseResource

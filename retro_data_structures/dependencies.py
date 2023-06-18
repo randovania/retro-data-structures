@@ -6,7 +6,7 @@ from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, part
+from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, effect_script
 from retro_data_structures.game_check import Game
 
 
@@ -31,7 +31,7 @@ _dependency_functions = {
     "cmdl": cmdl.legacy_dependencies,
     "ancs": ancs.legacy_dependencies,
     "evnt": evnt.legacy_dependencies,
-    "part": part.legacy_dependencies,
+    "part": effect_script.legacy_dependencies,
     "scan": scan.legacy_dependencies,
     "dgrp": dgrp.legacy_dependencies,
 }

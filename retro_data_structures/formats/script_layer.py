@@ -235,5 +235,5 @@ class ScriptLayerHelper:
         deps = self._parent_area._raw.dependencies
         offsets = deps.offsets
         raw_deps = deps.dependencies[offsets[self._index]:offsets[self._index+1]]
-        yield from [(dep.asset_type, dep.asset_id) for dep in raw_deps]
+        yield from ((dep.asset_type, dep.asset_id) for dep in raw_deps)
         

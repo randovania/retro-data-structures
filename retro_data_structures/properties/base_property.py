@@ -45,15 +45,13 @@ class BaseProperty:
         raise NotImplementedError()
     
     def _is_property_mrea_or_mlvl(self, field: dataclasses.Field) -> bool:
-        return (('asset_types' in field.metadata)
-            and (("MLVL" in field.metadata['asset_types'])
-                or ("MREA" in field.metadata['asset_types'])
-            ))
+        asset_types = field.metadata.get("asset_types", [])
+        return any((typ in asset_types) for typ in ("MLVL", "MREA"))
 
     def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         if issubclass(field.type, BaseProperty):
-            if is_mlvl and field.type.__name__ == "AreaAttributes":
-                return # ignore the skybox
+            if is_mlvl and field.metadata.get("ignore_dependencies_mlvl", False):
+                return
             prop: BaseProperty = getattr(self, field.name)
             yield from prop.dependencies_for(asset_manager, is_mlvl)
         

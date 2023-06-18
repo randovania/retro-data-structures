@@ -19,7 +19,7 @@ from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.msbt import Msbt
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.part import CRSC, DPSC, ELSC, PART, SPSC, SRSC, SWHC, WPSC, Crsc, Dpsc, Elsc, Part, Spsc, Srsc, Swhc, Wpsc
+from retro_data_structures.formats.effect_script import CRSC, DPSC, ELSC, PART, SPSC, SRSC, SWHC, WPSC, Crsc, Dpsc, Elsc, Part, Spsc, Srsc, Swhc, Wpsc
 from retro_data_structures.formats.room import Room
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw
