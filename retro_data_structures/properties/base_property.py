@@ -53,17 +53,17 @@ class BaseProperty:
     def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         if issubclass(field.type, BaseProperty):
             if is_mlvl and field.type.__name__ == "AreaAttributes":
-                    return # ignore the skybox
+                return # ignore the skybox
             prop: BaseProperty = getattr(self, field.name)
             yield from prop.dependencies_for(asset_manager, is_mlvl)
         
         elif issubclass(field.type, int) and "sound" in field.metadata:
-                sound_id: int = getattr(self, field.name)
-                yield from asset_manager.get_audio_group_dependency(sound_id, is_mlvl)
+            sound_id: int = getattr(self, field.name)
+            yield from asset_manager.get_audio_group_dependency(sound_id, is_mlvl)
 
         elif issubclass(field.type, int) and (field.default == 0xFFFFFFFF or 'asset_types' in field.metadata):
             if self._is_property_mrea_or_mlvl(field):
-                    return
+                return
             asset_id: AssetId = getattr(self, field.name)
             yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl)
 

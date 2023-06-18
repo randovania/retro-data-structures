@@ -78,6 +78,7 @@ class Game(Enum):
     @property
     def mlvl_dependencies_to_ignore(self) -> tuple[AssetId]:
         if self == Game.ECHOES:
+            # Textures/Misc/VisorSteamQtr.TXTR
             return (0x7b2ea5b1,)
         return ()
     
