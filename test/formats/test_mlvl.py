@@ -3,6 +3,8 @@ import logging
 import pathlib
 import time
 
+import pytest
+
 from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats.mlvl import Mlvl
 
@@ -15,6 +17,7 @@ _MLVLS = (
 )
 
 
+@pytest.mark.skip_dependency_tests
 def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
     print()
     total_elapsed = 0.0

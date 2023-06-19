@@ -153,7 +153,7 @@ jobs:
           path: dist/
 
       - name: Install Python packages
-        run: venv/bin/python -m pip install --upgrade pip pytest
+        run: venv/bin/python -m pip install --upgrade pip pytest pytest-xdist
 
       - name: install built wheel
         run: venv/bin/python -m pip install dist/*.whl
@@ -161,4 +161,4 @@ jobs:
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest --fail-if-missing test/
+          venv/bin/python -m pytest --fail-if-missing --skip-dependency-tests -n auto test

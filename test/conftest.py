@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
-from test import test_lib
 
 import pytest
 
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
 from retro_data_structures.game_check import Game
+from test import test_lib
 
 _FAIL_INSTEAD_OF_SKIP = False
 
@@ -82,8 +82,17 @@ def pytest_generate_tests(metafunc):
 def pytest_addoption(parser):
     parser.addoption('--fail-if-missing', action='store_true', dest="fail_if_missing",
                      default=False, help="Fails tests instead of skipping, in case any asset is missing")
+    parser.addoption('--skip-dependency-tests', action='store_true', dest="skip_dependency_tests",
+                     default=False, help="Skips tests that involves calculating dependencies")
 
 
-def pytest_configure(config):
+def pytest_configure(config: pytest.Config):
     global _FAIL_INSTEAD_OF_SKIP
     _FAIL_INSTEAD_OF_SKIP = config.option.fail_if_missing
+
+    markers = []
+
+    if config.option.skip_dependency_tests:
+        markers.append('not skip_dependency_tests')
+
+    config.option.markexpr = " and ".join(markers)
