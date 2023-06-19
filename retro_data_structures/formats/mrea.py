@@ -506,11 +506,15 @@ class Mrea(BaseResource):
         for layer in self.script_layers:
             if (instance := layer.get_instance(instance_id)) is not None:
                 return instance
+        if (instance := self.generated_objects_layer.get_instance(instance_id)) is not None:
+            return instance
 
     def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         for layer in self.script_layers:
             if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
                 return instance
+        if (instance := self.generated_objects_layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
+            return instance
         raise KeyError(name)
     
     def remove_instance(self, instance: int | InstanceId | str | ScriptInstanceHelper):

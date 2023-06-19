@@ -139,6 +139,12 @@ class ScriptLayerHelper:
     def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_from_properties(object_properties, self)
         return self._internal_add_instance(instance)
+    
+    def add_memory_relay(self, name: str | None = None) -> ScriptInstanceHelper:
+        relay = self.add_instance("MRLY", name)
+        savw = self._parent_area._parent_mlvl.savw
+        savw.raw.memory_relays.append({"instance_id": relay.id})
+        return relay
 
     def add_existing_instance(self, instance: ScriptInstanceHelper) -> ScriptInstanceHelper:
         if instance.id.area != self._parent_area.id:

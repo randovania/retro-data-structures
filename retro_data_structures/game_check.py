@@ -13,6 +13,8 @@ from construct.core import IfThenElse
 from retro_data_structures import common_types
 from retro_data_structures.base_resource import Dependency
 
+from retro_data_structures.crc import crc32, crc64
+
 if typing.TYPE_CHECKING:
     from retro_data_structures.base_resource import AssetId
 
@@ -69,6 +71,14 @@ class Game(Enum):
             return uuid.UUID(int=0)
         else:
             raise NotImplementedError()
+    
+    def hash_asset_id(self, asset_name: str) -> AssetId:
+        if self.uses_guid_as_asset_id:
+            raise NotImplementedError()
+        if self.uses_asset_id_64:
+            return crc64(asset_name)
+        if self.uses_asset_id_32:
+            return crc32(asset_name)
 
     def is_valid_asset_id(self, asset_id: typing.Union[int, uuid.UUID]) -> bool:
         if self <= Game.ECHOES and asset_id == 0:
