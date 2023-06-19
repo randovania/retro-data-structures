@@ -4,6 +4,7 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import enum
 import io
@@ -278,6 +279,12 @@ class ScriptInstanceHelper:
         for name in chain:
             prop = getattr(prop, name)
         return prop
+
+    @contextlib.contextmanager
+    def edit_properties(self, type_cls: Type[PropertyType]):
+        props = self.get_properties_as(type_cls)
+        yield props
+        self.set_properties(props)
 
     @property
     def connections(self) -> tuple[Connection, ...]:
