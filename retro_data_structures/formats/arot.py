@@ -1,6 +1,6 @@
 import math
 
-from construct import Aligned, Array, Const, Int32ub, Struct, this, FlagsEnum, Int16ub
+from construct import Aligned, Array, Const, FlagsEnum, Int16ub, Int32ub, Struct, this
 from construct.core import Computed, If
 
 from retro_data_structures.common_types import AABox, FourCC

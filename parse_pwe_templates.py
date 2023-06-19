@@ -11,6 +11,9 @@ from xml.etree.ElementTree import Element
 
 import inflection
 
+# ruff: noqa: E501
+# ruff: noqa: C901
+
 _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
@@ -169,7 +172,7 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         name = name_element.text if name_element is not None and name_element.text is not None else ""
 
     cook = element.find("CookPreference")
-    
+
     parsed.update({
         "type": element.attrib["Type"],
         "name": name,
@@ -433,17 +436,17 @@ class ClassDefinition:
                 build_prop.append(f"data.write({placeholder})  # size")
             else:
                 placeholder = repr(b'\x00\x00')
-                build_prop.append(f"before = data.tell()")
+                build_prop.append("before = data.tell()")
                 build_prop.append(f"data.write({placeholder})  # size placeholder")
 
             for build in prop.build_code:
                 build_prop.append(build.replace("{obj}", f'self.{prop_name}'))
 
             if prop.known_size is None:
-                build_prop.append(f"after = data.tell()")
-                build_prop.append(f"data.seek(before)")
+                build_prop.append("after = data.tell()")
+                build_prop.append("data.seek(before)")
                 build_prop.append(f'data.write(struct.pack("{endianness}H", after - before - 2))')
-                build_prop.append(f'data.seek(after)')
+                build_prop.append('data.seek(after)')
 
             if not prop.custom_cook_pref:
                 build_prop = [f"        {text}" for text in build_prop]
@@ -462,7 +465,7 @@ class ClassDefinition:
 
                 elif prop.raw['cook_preference'] == "OnlyIfModified":
                     self.properties_builder += f"        if self.{prop_name} != default_override.get({repr(prop_name)}, {default_value}):\n"
-                    self.properties_builder += f"            num_properties_written += 1\n"
+                    self.properties_builder += "            num_properties_written += 1\n"
                     build_prop = [f"            {text}" for text in build_prop]
 
                 else:
@@ -492,7 +495,7 @@ class ClassDefinition:
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
         assert len(big_format) == 1 + 3 * num_props
-        yield f"_FAST_FORMAT = None"
+        yield "_FAST_FORMAT = None"
         yield f"_FAST_IDS = ({', '.join(ids)})"
         yield ""
         yield ""
@@ -528,7 +531,7 @@ class ClassDefinition:
         game_id = self.game_id
         endianness = get_endianness(game_id)
 
-        self.class_code += f"""
+        self.class_code += """
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None, default_override: typing.Optional[dict] = None):
 """
@@ -573,7 +576,7 @@ class ClassDefinition:
                 property_name, decoder = _property_decoder[property_id]
                 present_fields[property_name] = decoder(data, property_size)
             except KeyError:
-                {read_unknown} 
+                {read_unknown}
             assert data.tell() - start == property_size\n
 """
         if self.is_struct:
@@ -581,7 +584,7 @@ class ClassDefinition:
 
         self.class_code += "        return cls(**present_fields)\n"
 
-        signature = f"data: typing.BinaryIO, property_size: int"
+        signature = "data: typing.BinaryIO, property_size: int"
         for prop_name, prop in self.all_props.items():
             self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
             self.after_class_code += f"    return {prop.parse_code}\n\n\n"
@@ -642,7 +645,7 @@ class ClassDefinition:
         if self.keep_unknown_properties():
             self.class_code += "\n        for property_id, property_data in self.unknown_properties.items():\n"
             self.class_code += f'            data.write(struct.pack("{endianness}LH", property_id, len(property_data)))\n'
-            self.class_code += f'            data.write(property_data)\n'
+            self.class_code += '            data.write(property_data)\n'
             num_props_variable = "num_properties_written + len(self.unknown_properties)"
         else:
             num_props_variable = "num_properties_written"
@@ -875,7 +878,7 @@ class AnimationParameters(BaseProperty):
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
         }}
-    
+
     def dependencies_for(self, asset_manager, is_mlvl: bool = False):
         yield from asset_manager.get_dependencies_for_ancs(self.ancs, is_mlvl, self.character_index)
 """ + game_code)
@@ -997,7 +1000,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             raw_type = "Int"
             meta["default"] = 65535
             meta["metadata"] = {"sound": True}
-        
+
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
             prop_type = archetype_path.split(".")[-1]
@@ -1096,8 +1099,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             if game_id in ["PrimeRemastered"]:
                 needed_imports["uuid"] = True
                 known_size = 16
-                parse_code = f'uuid.UUID(bytes_le=data.read(16))'
-                build_code.append(f'data.write({{obj}}.bytes_le)')
+                parse_code = 'uuid.UUID(bytes_le=data.read(16))'
+                build_code.append('data.write({obj}.bytes_le)')
                 from_json_code = "uuid.UUID({obj})"
                 to_json_code = "str({obj})"
 
@@ -1338,7 +1341,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     _ensure_is_generated_dir(path)
 
     if game_id in ['Prime', 'PrimeRemastered']:
-        four_cc_wrap = lambda it: it
+        def four_cc_wrap(it):
+            return it
         four_cc_type = "int"
     else:
         four_cc_wrap = repr

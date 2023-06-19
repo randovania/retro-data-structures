@@ -1,7 +1,7 @@
 from typing import Any
 
 from construct import EnumIntegerString
-from construct.lib import ListContainer, Container
+from construct.lib import Container, ListContainer
 
 
 def convert_to_raw_python(value) -> Any:

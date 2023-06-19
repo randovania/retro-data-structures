@@ -1,21 +1,33 @@
 from __future__ import annotations
+
 import typing
 
 import construct
 from construct import (
-    Int16ub, Byte, Float32b, Int32sb, Hex,
-    Int64ub, Array, Int8ub, IfThenElse, Switch,
-    Struct, PrefixedArray, Int32ub, If,
+    Array,
+    Byte,
+    Float32b,
+    Hex,
+    If,
+    IfThenElse,
+    Int8ub,
+    Int16ub,
+    Int32sb,
+    Int32ub,
+    Int64ub,
+    PrefixedArray,
+    Struct,
+    Switch,
 )
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import String, CharAnimTime, MayaSpline
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import CharAnimTime, MayaSpline, String
 from retro_data_structures.construct_extensions.version import WithVersion
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
-    from retro_data_structures.asset_manager import AssetManager
+    pass
 
 BasePOINode = Struct(
     unk_1=Int16ub,
@@ -131,7 +143,7 @@ def dependencies_for(obj, asset_manager, is_mlvl: bool = False, char_id: int | N
     for particle_poi in obj.particle_poi_nodes:
         if is_for_character(particle_poi, False):
             yield from asset_manager.get_dependencies_for_asset(particle_poi.particle.id, is_mlvl)
-    
+
     if obj.sound_poi_nodes:
         for sound_poi in obj.sound_poi_nodes:
             if not is_for_character(sound_poi, True):

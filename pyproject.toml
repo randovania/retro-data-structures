@@ -12,3 +12,12 @@ build-backend = "setuptools.build_meta"
 local_scheme = "no-local-version"
 write_to = "retro_data_structures/version.py"
 git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
+
+[tool.ruff]
+line-length = 120
+select = ["E", "F", "W", "C90", "I"]
+
+[tool.ruff.mccabe]
+# Flag errors (`C901`) whenever the complexity level exceeds 25.
+# Defaults to 10, but we're being very flexible right now
+max-complexity = 25

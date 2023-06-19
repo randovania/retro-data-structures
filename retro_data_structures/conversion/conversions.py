@@ -1,5 +1,5 @@
-from retro_data_structures.conversion import anim, ancs, cinf, cmdl, cskr, evnt, part, txtr
-from retro_data_structures.conversion.asset_converter import ResourceConverter, AssetDetails
+from retro_data_structures.conversion import ancs, anim, cinf, cmdl, cskr, evnt, part, txtr
+from retro_data_structures.conversion.asset_converter import AssetDetails, ResourceConverter
 
 ALL_FORMATS = {
     "ANCS": ancs.CONVERTERS,

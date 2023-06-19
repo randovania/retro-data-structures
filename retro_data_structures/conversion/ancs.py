@@ -1,10 +1,9 @@
-from construct.lib import ListContainer, Container
+from construct.lib import Container, ListContainer
 
 from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
-from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
+from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.formats.meta_animation import MetaAnimationType
 from retro_data_structures.game_check import Game
-
 
 # ANCS Conversion
 # For MP2->MP1 AnimID needs parsed and passed in here, EvntId needs to be created new/unique and passed in as well.

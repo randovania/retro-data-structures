@@ -1,26 +1,26 @@
 from construct.core import (
-    BitStruct,
+    Array,
     BitsInteger,
     BitsSwapped,
-    If,
-    Int16ub,
-    Int24ub,
-    Int8ub,
-    Switch,
-    this,
-    Array,
+    BitStruct,
     Const,
     Enum,
     FixedSized,
     Flag,
     GreedyBytes,
     GreedyRange,
+    If,
+    Int8ub,
+    Int16ub,
+    Int24ub,
     Int32ub,
     Prefixed,
     Struct,
+    Switch,
+    this,
 )
 
-from retro_data_structures.common_types import FourCC, AABox
+from retro_data_structures.common_types import AABox, FourCC
 
 OctreeNode = Struct(
     "header"

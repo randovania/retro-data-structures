@@ -3,7 +3,7 @@ import math
 
 import construct
 import lzokay
-from construct import GreedyRange, Adapter
+from construct import Adapter, GreedyRange
 
 
 class CompressedLZO(construct.Tunnel):

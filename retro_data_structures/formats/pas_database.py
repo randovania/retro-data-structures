@@ -4,7 +4,7 @@ Wiki: https://wiki.axiodl.com/w/PAS_Database
 import enum
 
 import construct
-from construct import Struct, Const, Int32ub, Array, Float32b, Switch, Int8ub
+from construct import Array, Const, Float32b, Int8ub, Int32ub, Struct, Switch
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 

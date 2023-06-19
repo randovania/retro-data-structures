@@ -7,10 +7,10 @@ import typing
 import uuid
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
 from retro_data_structures import dependencies, formats
-from retro_data_structures.asset_manager import AssetManager, PathFileProvider, IsoFileProvider
+from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
 from retro_data_structures.base_resource import AssetId
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions

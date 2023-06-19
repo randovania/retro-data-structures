@@ -3,9 +3,10 @@ import logging
 import pathlib
 import time
 
+import pytest
+
 from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats.mlvl import Mlvl
-
 
 _MLVLS = (
     0x3BFA3EFF, # Temple Grounds
@@ -16,23 +17,24 @@ _MLVLS = (
 )
 
 
+@pytest.mark.skip_dependency_tests
 def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
     print()
     total_elapsed = 0.0
-    
+
     for mlvl_id in _MLVLS:
         mlvl = prime2_asset_manager.get_file(mlvl_id, Mlvl)
         logging.info(mlvl.world_name)
-        
+
         for area in mlvl.areas:
             old = area.dependencies
             old = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in old.items()}
-            
+
             start = time.time()
             area.build_mlvl_dependencies()
             elapsed = time.time()-start
             total_elapsed += elapsed
-            
+
             new = area.dependencies
             new = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in new.items()}
 
@@ -48,7 +50,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             }
             missing = {n: list(miss) for n, miss in missing.items() if miss}
             extra = {n: list(ext) for n, ext in extra.items() if ext}
-            
+
             f = pathlib.Path(f"area_deps/{mlvl.world_name}/{area.name}.json")
             msg = f"    {area.name} ({elapsed:.3f}s)"
             if missing or extra:
@@ -63,5 +65,5 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             else:
                 logging.info(msg)
                 f.unlink(missing_ok=True)
-    
+
     logging.info(f"Total elapsed time: {total_elapsed}")

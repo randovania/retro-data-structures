@@ -1,6 +1,6 @@
 from __future__ import annotations
-import logging
 
+import logging
 import typing
 from typing import Optional, Union
 
@@ -26,13 +26,13 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper, InstanceId
+from retro_data_structures.formats.script_object import InstanceId, ScriptInstance, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
-    from retro_data_structures.formats.mlvl import AreaWrapper
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.formats.mlvl import AreaWrapper
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -139,7 +139,7 @@ class ScriptLayerHelper:
     def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstanceHelper:
         instance = ScriptInstanceHelper.new_from_properties(object_properties, self)
         return self._internal_add_instance(instance)
-    
+
     def add_memory_relay(self, name: str | None = None) -> ScriptInstanceHelper:
         relay = self.add_instance("MRLY", name)
         savw = self._parent_area._parent_mlvl.savw
@@ -219,14 +219,14 @@ class ScriptLayerHelper:
 
     def mark_modified(self):
         self._modified = True
-    
+
     def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         logging.debug(f"        Layer: {self.name}")
-        
+
         deps: list[Dependency] = []
         for instance in self.instances:
             deps.extend(instance.mlvl_dependencies_for(asset_manager))
-        
+
         unique_deps: set[Dependency] = set()
         for dep in deps:
             if dep in unique_deps:
@@ -242,4 +242,3 @@ class ScriptLayerHelper:
         offsets = deps.offsets
         raw_deps = deps.dependencies[offsets[self._index]:offsets[self._index+1]]
         yield from ((dep.asset_type, dep.asset_id) for dep in raw_deps)
-        

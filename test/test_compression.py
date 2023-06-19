@@ -1,5 +1,5 @@
 import construct
-from construct import Bytes, Struct, Prefixed, VarInt, GreedyBytes
+from construct import GreedyBytes, Prefixed, Struct, VarInt
 
 from retro_data_structures import compression
 

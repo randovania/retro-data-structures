@@ -2,19 +2,21 @@ import typing
 
 import construct
 from construct import (
-    Float32b,
-    Prefixed,
-    GreedyBytes,
-    Int16ub,
-    IfThenElse,
     Array,
-    If,
     Const,
+    Float32b,
+    GreedyBytes,
+    If,
+    IfThenElse,
+    Int16ub,
+    Int32ub,
+    Prefixed,
+    PrefixedArray,
+    Struct,
 )
-from construct import Struct, PrefixedArray, Int32ub
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.game_check import Game
 
 Weight = Struct(

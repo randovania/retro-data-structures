@@ -1,7 +1,7 @@
 import itertools
 
 import construct
-from construct import FocusedSeq, Rebuild, len_, this, stream_tell, Construct, Optional, Const
+from construct import Const, Construct, FocusedSeq, Optional, Rebuild, len_, stream_tell, this
 
 
 def PrefixedArrayWithExtra(countfield, extrafield, subcon):

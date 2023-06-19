@@ -3,8 +3,8 @@ from __future__ import annotations
 import typing
 
 from retro_data_structures.base_resource import AssetId, RawResource
-from retro_data_structures.formats import pak_wiiu, pak_gc
-from retro_data_structures.formats.pak_gc import PakFile, PakBody
+from retro_data_structures.formats import pak_gc, pak_wiiu
+from retro_data_structures.formats.pak_gc import PakBody, PakFile
 from retro_data_structures.game_check import Game
 
 

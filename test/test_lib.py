@@ -1,9 +1,9 @@
 import dataclasses
 import json
 from pathlib import Path
-from typing import Tuple, Type, List
-import construct
+from typing import List, Tuple, Type
 
+import construct
 from construct.lib.containers import Container
 
 from retro_data_structures.asset_manager import AssetManager
@@ -41,26 +41,11 @@ def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fal
     encoded = module.build(data, target_game=game)
 
     if save_file:
-        file_path.with_stem(file_path.stem+"_COPY").write_bytes(encoded)
-        file_path.with_suffix(file_path.suffix+".construct").write_text(str(data))
-        
+        file_path.with_stem(file_path.stem + "_COPY").write_bytes(encoded)
+        file_path.with_suffix(file_path.suffix + ".construct").write_text(str(data))
+
     construct.lib.setGlobalPrintFullStrings(False)
     return (raw, encoded, data)
-
-
-def parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=None):
-    raw, encoded, _ = _parse_and_build_compare(module, game, file_path, print_data, save_file)
-    assert encoded == raw
-
-
-def parse_and_build_compare_parsed(module, game: Game, file_path: Path, print_data=False, save_file=None):
-    _, encoded, data = _parse_and_build_compare(module, game, file_path, print_data, save_file)
-
-    data2 = module.parse(encoded, target_game=game)
-    if print_data:
-        print(data2)
-
-    assert purge_hidden(data) == purge_hidden(data2)
 
 
 def purge_hidden(data: Container) -> Container:
@@ -70,10 +55,10 @@ def purge_hidden(data: Container) -> Container:
 
 def parse_and_build_compare_auto_manager(asset_manager: AssetManager, asset_id: AssetId, print_data=False):
     resource_type = asset_manager.get_asset_format(asset_id)
-    return parse_and_build_compare_from_manager(asset_manager, asset_id, resource_type, print_data)
+    return parse_and_build_compare(asset_manager, asset_id, resource_type, print_data)
 
 
-def parse_and_build_compare_from_manager(
+def parse_and_build_compare(
         asset_manager: AssetManager, asset_id: AssetId, resource_class: Type[BaseResource],
         print_data=False) -> Tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
@@ -87,5 +72,22 @@ def parse_and_build_compare_from_manager(
     decoded2 = resource_class.parse(encoded, target_game=asset_manager.target_game)
 
     assert purge_hidden(decoded2.raw) == purge_hidden(decoded.raw)
+
+    return resource, decoded, encoded
+
+
+def parse_and_build_compare_construct(
+        asset_manager: AssetManager, asset_id: AssetId, con: construct.Construct,
+        print_data=False) -> Tuple[RawResource, BaseResource, bytes]:
+    resource = asset_manager.get_raw_asset(asset_id)
+
+    decoded = con.parse(resource.data, target_game=asset_manager.target_game)
+    if print_data:
+        print(decoded)
+
+    encoded = con.build(decoded, target_game=asset_manager.target_game)
+    decoded2 = con.parse(encoded, target_game=asset_manager.target_game)
+
+    assert purge_hidden(decoded2) == purge_hidden(decoded)
 
     return resource, decoded, encoded

@@ -1,7 +1,7 @@
 import enum
 
 import construct
-from construct import Struct, Int32ub, Switch, Float32b, Byte, Int16ub, Int64ub
+from construct import Byte, Float32b, Int16ub, Int32ub, Int64ub, Struct, Switch
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.formats import meta_animation

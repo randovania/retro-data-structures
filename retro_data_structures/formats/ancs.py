@@ -2,18 +2,18 @@
 Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 """
 from __future__ import annotations
+
 import typing
-from typing import Iterable, Optional, List
+from typing import Iterable, List, Optional
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, If, Int8ub, Float32b
+from construct import Const, Float32b, If, Int8ub, Int16ub, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import AABox, String, ObjectTag_32, AssetId32
-from retro_data_structures.construct_extensions.version import WithVersion, BeforeVersion
-from retro_data_structures.formats import meta_animation, evnt
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.formats import meta_transition
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import AABox, AssetId32, ObjectTag_32, String
+from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
+from retro_data_structures.formats import evnt, meta_animation, meta_transition
 from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
@@ -155,7 +155,7 @@ def char_dependencies_for(character, asset_manager: AssetManager, is_mlvl: bool 
         if asset_ids is not None:
             for asset_id in asset_ids:
                 yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl)
-    
+
     yield from _array((
         character.model_id,
         character.skin_id,
@@ -216,31 +216,33 @@ class Ancs(BaseResource):
     def dependencies_for(self, is_mlvl: bool = False, char_index: int | None = None) -> typing.Iterator[Dependency]:
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager, is_mlvl)
-            
+
             for anim_name in char.animation_names:
-                anim_index, anim = next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
+                anim_index, anim = next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
+                                        if a.name == anim_name.name)
                 yield from meta_animation.dependencies_for(anim.meta, self.asset_manager, is_mlvl)
-                
+
                 if self.raw.animation_set.animation_resources is not None:
                     res = self.raw.animation_set.animation_resources[anim_index]
                     yield from self.asset_manager.get_dependencies_for_asset(res.anim_id, is_mlvl)
-                    
+
                     if not self.asset_manager.target_game.is_valid_asset_id(res.event_id):
                         continue
                     yield Dependency("EVNT", res.event_id)
                     evnt_file = self.asset_manager.get_parsed_asset(res.event_id)
                     yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, is_mlvl, char_index)
-                
+
                 elif self.raw.animation_set.event_sets is not None:
-                    yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager, is_mlvl, char_index)
+                    yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager,
+                                                     is_mlvl, char_index)
 
         if char_index is not None:
             chars = [self.raw.character_set.characters[char_index]]
         else:
             chars = self.raw.character_set.characters
-        
+
         for char in chars:
             yield from char_deps(char)
-        
+
         for transition in self.raw.animation_set.transitions:
             yield from meta_transition.dependencies_for(transition.transition, self.asset_manager, is_mlvl)

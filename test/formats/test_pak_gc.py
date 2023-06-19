@@ -1,11 +1,11 @@
 import pytest
 
 from retro_data_structures.base_resource import Dependency
-from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_gc import PAKNoData, CompressedPakResource, PakFile, PakBody, PAK_GC
+from retro_data_structures.formats.pak_gc import PAK_GC, CompressedPakResource, PakBody, PakFile, PAKNoData
 from retro_data_structures.game_check import Game
 
+# ruff: noqa: E501
 
 @pytest.fixture(name="compressed_resource")
 def _compressed_resource():
@@ -166,22 +166,22 @@ def test_echoes_resource_encode_decode(compressed_resource):
     assert raw == encoded
 
 
-def test_identical_when_keep_data(prime2_paks_path):
-    input_path = prime2_paks_path.joinpath("GGuiSys.pak")
+def test_identical_when_keep_data(prime2_iso_provider):
     game = Game.ECHOES
+    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
+        raw = f.read()
 
-    raw = input_path.read_bytes()
     decoded = Pak.parse(raw, target_game=game)
     encoded = decoded.build()
 
     assert raw == encoded
 
 
-def test_compare_header_keep_data(prime2_paks_path):
-    input_path = prime2_paks_path.joinpath("GGuiSys.pak")
+def test_compare_header_keep_data(prime2_iso_provider):
     game = Game.ECHOES
+    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
+        raw = f.read()
 
-    raw = input_path.read_bytes()
     raw_header = PAKNoData.parse(raw, target_game=game)
     raw_sizes = [(r.compressed, r.offset, r.size) for r in raw_header.resources]
 

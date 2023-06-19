@@ -2,8 +2,8 @@ import typing
 
 import construct
 
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, AssetId
-from retro_data_structures.game_check import Game, AssetIdCorrect
+from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 MAPW = construct.Struct(
     _magic=construct.Const(0xDEADF00D, construct.Int32ub),
@@ -32,7 +32,7 @@ class Mapw(BaseResource):
 
     def get_mapa_id(self, index: int) -> AssetId:
         return self.raw.area_map[index]
-    
+
     @property
     def mapa_ids(self) -> typing.Iterator[AssetId]:
         for item in self.raw.area_map:

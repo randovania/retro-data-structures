@@ -5,11 +5,10 @@ import enum
 import typing
 
 import construct
-from construct import Int16ub, GreedyBytes
-from construct import Struct, Int32ub
+from construct import GreedyBytes, Int16ub, Int32ub, Struct
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.game_check import Game
 
 

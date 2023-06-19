@@ -1,7 +1,7 @@
 import typing
 
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty, BaseObjectType
+from retro_data_structures.properties.base_property import BaseObjectType
 
 
 def get_game_object(game: Game, four_cc: typing.Union[str, int]) -> typing.Type[BaseObjectType]:

@@ -29,7 +29,8 @@ def lazy_world_geometry():
         "data" / GreedyBytes
     ))
 
-# WorldModelHeader = Struct("visor_flags" / Int32ub, "transform" / Transform4f, "bounding_box" / AABox)  # TODO: FlagEnum
+# # TODO: FlagEnum
+# WorldModelHeader = Struct("visor_flags" / Int32ub, "transform" / Transform4f, "bounding_box" / AABox)
 
 # SurfaceGroupBounds = Struct(
 #     "bounding_box" / AABox,

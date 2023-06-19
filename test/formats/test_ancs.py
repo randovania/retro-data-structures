@@ -1,29 +1,20 @@
-from retro_data_structures.construct_extensions.json import convert_to_raw_python
-from retro_data_structures.formats.ancs import ANCS
-from retro_data_structures.game_check import Game
+from test import test_lib
+
+from retro_data_structures.formats.ancs import Ancs
 
 
-def test_compare_p1(prime1_pwe_project):
-    input_path = prime1_pwe_project.joinpath("Resources/Uncategorized/alpha_metaree.ANCS")
-    game = Game.PRIME
-    raw = input_path.read_bytes()
-
-    data = ANCS.parse(raw, target_game=game)
-    encoded = ANCS.build(data, target_game=game)
-
-    assert encoded == raw
+def test_compare_p1(prime1_asset_manager):
+    # Resources/Uncategorized/alpha_metaree.ANCS
+    test_lib.parse_and_build_compare(
+        prime1_asset_manager, 0xBBEE2818, Ancs,
+    )
 
 
-def test_compare_p2(prime2_pwe_project):
-    input_path = prime2_pwe_project.joinpath("Resources/Uncategorized/annihilatorBeam.ANCS")
-    game = Game.ECHOES
-    raw = input_path.read_bytes()
-
-    data = ANCS.parse(raw, target_game=game)
-    data_as_dict = convert_to_raw_python(data)
-    encoded = ANCS.build(data_as_dict, target_game=game)
-
-    assert encoded == raw
+def test_compare_p2(prime2_asset_manager):
+    # Resources/Uncategorized/annihilatorBeam.ANCS
+    test_lib.parse_and_build_compare(
+        prime2_asset_manager, 0x4C4B3D9D, Ancs,
+    )
 
 
 """

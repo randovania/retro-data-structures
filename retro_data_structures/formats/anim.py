@@ -2,31 +2,31 @@ import typing
 
 import construct
 from construct import (
-    Struct,
+    Aligned,
     Array,
-    PrefixedArray,
+    Bit,
+    BitsInteger,
     Const,
+    ExprAdapter,
+    Float32b,
+    GreedyRange,
+    If,
+    IfThenElse,
     Int8ub,
     Int16ub,
     Int32ub,
-    Float32b,
-    If,
-    IfThenElse,
-    BitsInteger,
-    ExprAdapter,
-    Bit,
-    Aligned,
-    Terminated,
-    Rebuild,
-    GreedyRange,
-    Tell,
     Pointer,
+    PrefixedArray,
+    Rebuild,
+    Struct,
+    Tell,
+    Terminated,
 )
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import CharAnimTime
 from retro_data_structures.construct_extensions.misc import BitwiseWith32Blocks
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.game_check import Game
 
 UncompressedAnimation = Struct(

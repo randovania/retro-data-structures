@@ -1,8 +1,8 @@
 import construct
 
-from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.common_types import AABox
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
+from retro_data_structures.formats.cmdl import CMDL
 from retro_data_structures.game_check import Game
 
 CMDLHeader = construct.Struct(
@@ -22,10 +22,10 @@ def chunks(lst, n):
         yield lst[i : i + n]
 
 
-def test_compare(prime2_pwe_project):
-    input_path = prime2_pwe_project.joinpath("Resources/Uncategorized/annihilatorBeam.CMDL")
+def test_compare(prime2_asset_manager):
+    # Resources/Uncategorized/annihilatorBeam.CMDL
+    raw = prime2_asset_manager.get_raw_asset(0x6FE2E8A0).data
     game = Game.ECHOES
-    raw = input_path.read_bytes()
 
     data = CMDL.parse(raw, target_game=game)
     data_as_dict = convert_to_raw_python(data)

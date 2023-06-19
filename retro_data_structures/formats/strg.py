@@ -4,24 +4,25 @@ https://wiki.axiodl.com/w/STRG_(File_Format)
 import re
 import typing
 
+import construct
 from construct import (
     Array,
     Byte,
     Computed,
     Const,
     CString,
-    Construct,
     Enum,
     GreedyRange,
+    If,
+    Int32ub,
     Pointer,
     Rebuild,
     Seek,
+    Struct,
     Tell,
     len_,
     this,
 )
-from construct import Struct, Int32ub, If
-import construct
 
 from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
@@ -159,7 +160,7 @@ CorruptionString = Struct(
     "string" / String,
     "_size_end" / Tell,
     "size" / Pointer(this._start, Rebuild(Int32ub, this._size_end - this._size_start)),
-)     
+)
 
 STRG = Struct(
     "magic" / Const(0x87654321, Int32ub),
@@ -219,7 +220,7 @@ class Strg(BaseResource):
         else:
             for lang in self._raw.language_table:
                 yield lang.lang
-    
+
     def get_strings(self, language: str) -> typing.Iterator[str]:
         found = False
 
@@ -231,7 +232,7 @@ class Strg(BaseResource):
                     yield self._raw.string_table[offset].string
                 found = True
                 break
-        
+
         else:
             for i, lang in enumerate(self._raw.language_table):
                 if lang.lang != language:
@@ -240,10 +241,10 @@ class Strg(BaseResource):
                     yield string.string
                 found = True
                 break
-        
+
         if not found:
             raise ValueError(f"No language {language} found in STRG")
-    
+
     def set_strings(self, language: str, strings: typing.List[str]):
         found = False
 
@@ -255,7 +256,7 @@ class Strg(BaseResource):
                     self._raw.string_table[offset].string = strings[j]
                 found = True
                 break
-        
+
         else:
             for i, lang in enumerate(self._raw.language_table):
                 if lang.lang != language:
@@ -264,18 +265,18 @@ class Strg(BaseResource):
                     string.string = strings[j]
                 found = True
                 break
-        
+
         if not found:
             raise ValueError(f"No language {language} found in STRG")
-            
+
     @property
     def strings(self) -> typing.List[str]:
         return list(self.get_strings("ENGL"))
-    
+
     @strings.setter
     def strings(self, value: typing.List[str]):
         self.set_strings("ENGL", value)
-    
+
     def set_string(self, index: int, value: str, *, language: str = "ENGL"):
         strings = list(self.get_strings(language))
         strings[index] = value

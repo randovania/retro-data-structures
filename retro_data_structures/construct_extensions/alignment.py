@@ -1,7 +1,7 @@
 import io
 
 import construct
-from construct import Construct, stream_tell, Subconstruct, GreedyBytes
+from construct import Construct, GreedyBytes, Subconstruct, stream_tell
 
 
 class AlignTo(Construct):

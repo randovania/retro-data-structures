@@ -3,26 +3,34 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 """
 
 from __future__ import annotations
-import logging
 
+import logging
 import typing
 from typing import TYPE_CHECKING, Iterator, Type
 
 import construct
 from construct import Container
 from construct.core import (
-    GreedyBytes, Hex, Int8ub, Int16ub, Int32ub, Prefixed,
-    PrefixedArray, Struct, Union,
+    GreedyBytes,
+    Hex,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    Prefixed,
+    PrefixedArray,
+    Struct,
+    Union,
 )
+
 from retro_data_structures import game_check, properties
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.game_check import Game, current_game_at_least_else
-from retro_data_structures.properties.base_property import BaseProperty, BaseObjectType
+from retro_data_structures.properties.base_property import BaseObjectType
 
 if TYPE_CHECKING:
-    from retro_data_structures.formats.script_layer import ScriptLayerHelper
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.formats.script_layer import ScriptLayerHelper
 
 
 PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
@@ -225,7 +233,7 @@ class ScriptInstanceHelper:
 
         self.connections = [c for c in self.connections if c.target != target]
         self.on_modify()
-    
+
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         logging.debug(f"            {self.name}")
         yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)

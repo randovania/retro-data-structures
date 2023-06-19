@@ -1,5 +1,5 @@
 import construct
-from construct import Struct, Const, Int64ul, Int32ul
+from construct import Const, Int32ul, Int64ul, Struct
 
 from retro_data_structures.common_types import FourCC
 

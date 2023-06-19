@@ -1,7 +1,7 @@
 import enum
 from functools import partial
 
-from construct import EnumIntegerString, IfThenElse, If
+from construct import EnumIntegerString, If, IfThenElse
 
 
 def get_version(this, enum_type):

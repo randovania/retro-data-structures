@@ -1,4 +1,4 @@
-from construct import Adapter, Struct, VarInt, PrefixedArray
+from construct import Adapter, PrefixedArray, Struct, VarInt
 
 from retro_data_structures.common_types import String
 
