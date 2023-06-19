@@ -59,7 +59,7 @@ class InstanceId(int):
         assert 0 <= instance < 65536
         return InstanceId((layer << 26) + (area << 16) + instance)
 
-    def __str__(self):
+    def __repr__(self):
         return f"0x{self:08x}"
 
     @property
@@ -127,13 +127,20 @@ class _ConstructScriptInstance(construct.Construct):
 
         base_property = construct.stream_read_entire(sub_stream, f"{path} -> base_property")
 
+        inst_id = InstanceId(obj_id)
+
+        cons = []
+        for con in connections:
+            try:
+                cons.append(Connection.from_construct(game, con))
+            except ValueError:
+                con.target = InstanceId(con.target) # for prettier printing
+                logging.warning(f"Removing corrupted connection from instance {inst_id} ({obj_type}): {con=}")
+
         return ScriptInstanceRaw(
             type=obj_type,
-            id=InstanceId(obj_id),
-            connections=tuple(
-                Connection.from_construct(game, con)
-                for con in connections
-            ),
+            id=inst_id,
+            connections=tuple(cons),
             base_property=base_property,
         )
 
