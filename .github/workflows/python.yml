@@ -106,3 +106,55 @@ jobs:
         uses: pypa/gh-action-pypi-publish@master
         with:
           password: ${{ secrets.pypi_password }}
+
+  ruff:
+    runs-on: 'ubuntu-latest'
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.9"
+
+    - name: Install Python packages
+      run: python -m pip install ruff==0.0.272
+
+    - name: Run ruff
+      run: ruff check --format=github .
+
+  full_test:
+    runs-on: self-hosted
+    needs:
+      - build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      - name: Create venv
+        run: python -m venv venv
+
+      - name: Download all the dists
+        uses: actions/download-artifact@v3
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Install Python packages
+        run: venv/bin/python -m pip install --upgrade pip pytest
+
+      - name: install built wheel
+        run: venv/bin/python -m pip install dist/*.whl
+        shell: bash
+
+      - name: Run Tests
+        run:
+          venv/bin/python -m pytest test/
