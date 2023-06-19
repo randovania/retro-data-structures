@@ -42,6 +42,7 @@ from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
+from retro_data_structures.formats.savw import Savw
 from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
 from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
 from retro_data_structures.formats.strg import Strg
@@ -360,12 +361,14 @@ class AreaWrapper:
     _mrea: Mrea = None
     _strg: Strg = None
 
-    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int):
+    # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
+    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int, parent_mlvl: Mlvl):
         self._raw = raw
         self.asset_manager = asset_manager
         self._flags = flags
         self._layer_names = names
         self._index = index
+        self._parent_mlvl = parent_mlvl
     
     @property
     def id(self) -> int:
@@ -556,6 +559,7 @@ class AreaWrapper:
 
 class Mlvl(BaseResource):
     _mapw: Mapw = None
+    _savw: Savw = None
 
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -582,7 +586,7 @@ class Mlvl(BaseResource):
         names = self._raw.layer_names
         for i, area in enumerate(self._raw.areas):
             area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
-            yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i)
+            yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
     
     def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
@@ -625,3 +629,9 @@ class Mlvl(BaseResource):
         if self._mapw is None:
             self._mapw = self.asset_manager.get_file(self.raw.world_map_id, type_hint=Mapw)
         return self._mapw
+
+    @property
+    def savw(self) -> Savw:
+        if self._savw is None:
+            self._savw = self.asset_manager.get_file(self.raw.world_save_info_id, type_hint=Savw)
+        return self._savw
