@@ -142,6 +142,10 @@ jobs:
       - name: Create venv
         run: python -m venv venv
 
+      - name: remove code outside of wheel
+        run: rm -rf retro_data_structures
+        shell: bash
+
       - name: Download all the dists
         uses: actions/download-artifact@v3
         with:
@@ -157,4 +161,4 @@ jobs:
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest test/
+          venv/bin/python -m pytest --fail-if-missing test/

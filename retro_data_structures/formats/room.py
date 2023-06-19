@@ -12,7 +12,7 @@ from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Un
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties import BaseProperty
+from retro_data_structures.properties.base_property import BaseProperty
 from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
