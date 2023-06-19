@@ -361,6 +361,7 @@ class AreaWrapper:
     _mrea: Mrea = None
     _strg: Strg = None
 
+    # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
     def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int, parent_mlvl: Mlvl):
         self._raw = raw
         self.asset_manager = asset_manager
