@@ -14,7 +14,7 @@ from retro_data_structures.base_resource import AssetType, BaseResource, Depende
 from retro_data_structures.common_types import AssetId32, FourCC
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
-from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ConstructScriptInstance, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 
 ScanImage = Struct(
@@ -45,7 +45,7 @@ Prime23SCAN = Aligned(32, Struct(
     "unknown1" / Const(2, Int32ub),
     "unknown2" / Byte,
     "instance_count" / Const(1, Int32ub),
-    "scannable_object_info" / ScriptInstance,
+    "scannable_object_info" / ConstructScriptInstance,
     "dependencies" / DGRP,
 ), b"\xff")
 

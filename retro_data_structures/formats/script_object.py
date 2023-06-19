@@ -4,19 +4,19 @@ https://wiki.axiodl.com/w/Scriptable_Layers_(File_Format)
 
 from __future__ import annotations
 
+import dataclasses
+import enum
+import io
 import logging
 import typing
 from typing import TYPE_CHECKING, Iterator, Type
 
 import construct
-from construct import Container
 from construct.core import (
-    GreedyBytes,
     Hex,
     Int8ub,
     Int16ub,
     Int32ub,
-    Prefixed,
     PrefixedArray,
     Struct,
     Union,
@@ -25,18 +25,19 @@ from construct.core import (
 from retro_data_structures import game_check, properties
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
-from retro_data_structures.game_check import Game, current_game_at_least_else
-from retro_data_structures.properties.base_property import BaseObjectType
+from retro_data_structures.enums import helper as enum_helper
+from retro_data_structures.enums.shared_enums import Message, State
+from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.formats.script_layer import ScriptLayerHelper
+    from retro_data_structures.properties.base_property import BaseObjectType
+
+    PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
 
 
-PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
-
-
-def Connection(subcon):
+def ConstructConnection(subcon):
     return Struct(
         state=subcon,
         message=subcon,
@@ -51,7 +52,7 @@ class InstanceId(int):
     # last 16 for instance
 
     @classmethod
-    def new(cls, layer: int, area: int, instance: int) -> "InstanceId":
+    def new(cls, layer: int, area: int, instance: int) -> InstanceId:
         assert 0 <= layer < 64
         assert 0 <= area < 1024
         assert 0 <= instance < 65536
@@ -73,50 +74,117 @@ class InstanceId(int):
         return self & 0xffff
 
 
-InstanceIdInternal = construct.ExprAdapter(
-    Hex(Int32ub),
-    decoder=lambda obj, ctx: InstanceId(obj),
-    encoder=lambda obj, ctx: int(obj),
-)
+@dataclasses.dataclass()
+class Connection:
+    state: State
+    message: Message
+    target: InstanceId
 
-_prefix = current_game_at_least_else(Game.ECHOES, Int16ub, Int32ub)
-
-ScriptInstanceInternal = Struct(
-    type=game_check.current_game_at_least_else(Game.ECHOES, FourCC, Int8ub),
-    instance=Prefixed(
-        _prefix,
-        Struct(
-            id=InstanceIdInternal,
-            connections=PrefixedArray(_prefix, Connection(current_game_at_least_else(Game.ECHOES, FourCC, Int32ub))),
-            base_property=GreedyBytes,
-        ),
-    ),
-).compile()
-
-ScriptInstance = construct.ExprAdapter(
-    ScriptInstanceInternal,
-    decoder=lambda obj, ctx: Container(
-        type=obj.type,
-        id=obj.instance.id,
-        connections=obj.instance.connections,
-        base_property=obj.instance.base_property,
-    ),
-    encoder=lambda obj, ctx: Container(
-        type=obj.type,
-        instance=Container(
-            id=obj.id,
-            connections=obj.connections,
-            base_property=obj.base_property,
+    @classmethod
+    def from_construct(cls, game: Game, obj: dict) -> Connection:
+        return cls(
+            state=enum_helper.STATE_PER_GAME[game](obj["state"]),
+            message=enum_helper.MESSAGE_PER_GAME[game](obj["message"]),
+            target=InstanceId(obj["target"]),
         )
-    )
-)
+
+    def as_construct(self) -> construct.Container:
+        return construct.Container(
+            state=self.state.value,
+            message=self.message.value,
+            target=self.target,
+        )
+
+
+@dataclasses.dataclass()
+class ScriptInstanceRaw:
+    type: int | str
+    id: InstanceId
+    connections: tuple[Connection, ...]
+    base_property: bytes
+
+
+class _ConstructScriptInstance(construct.Construct):
+    def _parse(self, stream, context, path) -> ScriptInstanceRaw:
+        game = game_check.get_current_game(context)
+
+        if game >= Game.ECHOES:
+            obj_type_con = FourCC
+            obj_len_con = Int16ub
+        else:
+            obj_type_con = Int8ub
+            obj_len_con = Int32ub
+
+        obj_type: str | int = obj_type_con._parsereport(stream, context, f"{path} -> type")
+        obj_len: int = obj_len_con._parsereport(stream, context, f"{path} -> object_length")
+        sub_stream = io.BytesIO(construct.stream_read(stream, obj_len, f"{path} -> object_raw_data"))
+
+        obj_id: int = Int32ub._parsereport(sub_stream, context, f"{path} -> instance_id")
+
+        connections = PrefixedArray(obj_len_con, ConstructConnection(obj_type_con))._parsereport(
+            sub_stream, context, f"{path} -> connections")
+
+        base_property = construct.stream_read_entire(sub_stream, f"{path} -> base_property")
+
+        return ScriptInstanceRaw(
+            type=obj_type,
+            id=InstanceId(obj_id),
+            connections=tuple(
+                Connection.from_construct(game, con)
+                for con in connections
+            ),
+            base_property=base_property,
+        )
+
+    def _build(self, obj: ScriptInstanceRaw, stream, context, path):
+        game = game_check.get_current_game(context)
+
+        if game >= Game.ECHOES:
+            obj_type_con = FourCC
+            obj_len_con = Int16ub
+        else:
+            obj_type_con = Int8ub
+            obj_len_con = Int32ub
+
+        sub_stream = io.BytesIO()
+        Int32ub._build(obj.id, sub_stream, context, f"{path} -> instance_id")
+        PrefixedArray(obj_len_con, ConstructConnection(obj_type_con))._build(
+            [conn.as_construct() for conn in obj.connections],
+            sub_stream,
+            context, f"{path} -> connections"
+        )
+        construct.stream_write(sub_stream, obj.base_property, len(obj.base_property), f"{path} -> base_property")
+
+        obj_data = sub_stream.getvalue()
+
+        obj_type_con._build(obj.type, stream, context, f"{path} -> type")
+        obj_len_con._build(len(obj_data), stream, context, f"{path} -> object_length")
+        construct.stream_write(stream, obj_data, len(obj_data), f"{path} -> object_raw_data")
+
+
+ConstructScriptInstance = _ConstructScriptInstance()
+
+E = typing.TypeVar("E", bound=enum.Enum)
+
+
+def _resolve_to_enum(correct_type: type[E], value: str | enum.Enum) -> E:
+    # It's already the enum we want, just use it
+    if isinstance(value, correct_type):
+        return value
+
+    # If passing a string, assume it's a raw FourCC value
+    if isinstance(value, str):
+        return correct_type(value)
+
+    # Otherwise, assume it's a proper enum but for the wrong game, so switch around
+    return correct_type[value.name]
 
 
 class ScriptInstanceHelper:
-    _raw: Container
+    _raw: ScriptInstanceRaw
     target_game: Game
 
-    def __init__(self, raw: Container, target_game: Game, on_modify: typing.Callable[[], None] = lambda: None):
+    def __init__(self, raw: ScriptInstanceRaw, target_game: Game, on_modify: typing.Callable[[], None] = lambda: None):
         self._raw = raw
         self.target_game = target_game
         self.on_modify = on_modify
@@ -131,20 +199,20 @@ class ScriptInstanceHelper:
     def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
         property_type = properties.get_game_object(target_game, instance_type)
 
-        raw = Container(
+        raw = ScriptInstanceRaw(
             type=instance_type,
             id=layer.new_instance_id(),
-            connections=construct.ListContainer(),
+            connections=(),
             base_property=property_type().to_bytes(),
         )
         return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
     def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
-        raw = Container(
+        raw = ScriptInstanceRaw(
             type=object_properties.object_type(),
             id=layer.new_instance_id(),
-            connections=construct.ListContainer(),
+            connections=(),
             base_property=object_properties.to_bytes(),
         )
         return cls(raw, object_properties.game(), on_modify=layer.mark_modified)
@@ -212,27 +280,32 @@ class ScriptInstanceHelper:
         return prop
 
     @property
-    def connections(self):
-        return self._raw.connections
+    def connections(self) -> tuple[Connection, ...]:
+        return tuple(self._raw.connections)
 
     @connections.setter
-    def connections(self, value):
-        self._raw.connections = value
-
-    def add_connection(self, state, message, target: ScriptInstanceHelper):
-        self.connections.append(Container(
-            state=state,
-            message=message,
-            target=target.id
-        ))
+    def connections(self, value: typing.Iterable[Connection]):
+        self._raw.connections = tuple(value)
         self.on_modify()
+
+    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstanceHelper):
+        correct_state = enum_helper.STATE_PER_GAME[self.target_game]
+        correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
+
+        self.connections = self.connections + (Connection(
+            state=_resolve_to_enum(correct_state, state),
+            message=_resolve_to_enum(correct_message, message),
+            target=target.id
+        ),)
+
+    def remove_connection(self, connection: Connection):
+        self.connections = [c for c in self.connections if c is not connection]
 
     def remove_connections(self, target: Union[int, ScriptInstanceHelper]):
         if isinstance(target, ScriptInstanceHelper):
             target = target.id
 
         self.connections = [c for c in self.connections if c.target != target]
-        self.on_modify()
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         logging.debug(f"            {self.name}")

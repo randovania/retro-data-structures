@@ -26,7 +26,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstance, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -48,7 +48,7 @@ ScriptLayerPrime = Struct(
             Pointer(lambda this: this._._layer_size_address + this._index * Int32ub.sizeof(), Int32ub),
             Struct(
                 "unk" / Hex(Int8ub),
-                "script_instances" / PrefixedArray(Int32ub, ScriptInstance),
+                "script_instances" / PrefixedArray(Int32ub, ConstructScriptInstance),
             ),
         ),
     ),
@@ -61,7 +61,7 @@ def ScriptLayer(identifier):
         "unknown" / Int8ub,
         "layer_index" / If(identifier == "SCLY", Int32ub),
         "version" / Const(1, Int8ub),
-        "script_instances" / PrefixedArray(Int32ub, ScriptInstance),
+        "script_instances" / PrefixedArray(Int32ub, ConstructScriptInstance),
     )
 
 
