@@ -1,8 +1,11 @@
-from test.test_lib import parse_and_build_compare
+from test import test_lib
 
-from retro_data_structures.formats.hier import HIER
-from retro_data_structures.game_check import Game
+from retro_data_structures.formats.hier import Hier
 
 
-def test_compare(prime2_pwe_project):
-    parse_and_build_compare(HIER, Game.ECHOES, prime2_pwe_project.joinpath("Resources/NoARAM/DUMB_ScanHierarchy.DUMB"))
+def test_compare_p2(prime2_asset_manager):
+    # Resources/NoARAM/DUMB_ScanHierarchy.DUMB
+
+    test_lib.parse_and_build_compare(
+        prime2_asset_manager, 0xDD79DC2A, Hier,
+    )

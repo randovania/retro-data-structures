@@ -120,7 +120,6 @@ class AssetManager:
     _cached_mlvl_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
 
-
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider
         self.target_game = target_game
@@ -135,7 +134,8 @@ class AssetManager:
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
 
         self._sound_id_to_agsc: dict[int, AssetId | None] = {}
-        self.build_audio_group_dependency_table()
+        if target_game == Game.ECHOES:
+            self.build_audio_group_dependency_table()
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if str(value) in self._custom_asset_ids:

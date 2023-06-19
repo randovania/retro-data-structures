@@ -1,40 +1,20 @@
-from pathlib import Path
+from test import test_lib
 
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
-from retro_data_structures.formats.anim import ANIM
-from retro_data_structures.game_check import Game
+from retro_data_structures.formats.anim import Anim
 
 
-def do_file(path: Path):
-    raw = path.read_bytes()
-    try:
-        data = ANIM.parse(raw, target_game=2)
-        encoded = ANIM.build(data, target_game=2)
-        return path, raw, encoded, None
-    except Exception as e:
-        return path, None, None, e
+def test_compare_p2(prime2_asset_manager):
+    # Resources/Uncategorized/01_gate_open.ANIM
+    test_lib.parse_and_build_compare(
+        prime2_asset_manager, 0x101367C6, Anim,
+    )
 
 
-def test_compare(prime2_pwe_project):
-    input_path = prime2_pwe_project.joinpath("Resources/Uncategorized/01_gate_open.ANIM")
-    game = Game.ECHOES
-    raw = input_path.read_bytes()
-
-    data = ANIM.parse(raw, target_game=game)
-    encoded = ANIM.build(data, target_game=game)
-    data2 = ANIM.parse(encoded, target_game=game)
-
-    assert data2 == data
-
-    assert encoded == raw
-
-
-def test_missile_launcher(prime1_pwe_project, prime2_pwe_project):
-    prime1_path = prime1_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
-    prime2_path = prime2_pwe_project.joinpath("Resources/Uncategorized/Missile_Launcher_ready.ANIM")
-
-    p1_data = ANIM.parse_file(prime1_path, target_game=Game.PRIME)
-    p2_data = ANIM.parse_file(prime2_path, target_game=Game.ECHOES)
+def test_missile_launcher(prime1_asset_manager, prime2_asset_manager):
+    # Resources/Uncategorized/Missile_Launcher_ready.ANIM
+    p1_data = prime1_asset_manager.get_parsed_asset(0x5E2F550E, type_hint=Anim).raw
+    p2_data = prime2_asset_manager.get_parsed_asset(0x5E2F550E, type_hint=Anim).raw
 
     p1_aux = convert_to_raw_python(p1_data)
     p2_aux = convert_to_raw_python(p2_data)

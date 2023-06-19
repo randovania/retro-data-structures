@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
+from test import test_lib
 
 import pytest
 
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
 from retro_data_structures.game_check import Game
-from test import test_lib
 
 _FAIL_INSTEAD_OF_SKIP = False
 
@@ -17,21 +17,6 @@ def get_env_or_skip(env_name):
         else:
             pytest.skip(f"Skipped due to missing environment variable {env_name}")
     return os.environ[env_name]
-
-
-@pytest.fixture()
-def prime1_pwe_project():
-    return Path(get_env_or_skip("PRIME1_PWE_PROJECT"))
-
-
-@pytest.fixture()
-def prime2_pwe_project():
-    return Path(get_env_or_skip("PRIME2_PWE_PROJECT"))
-
-
-@pytest.fixture()
-def prime3_pwe_project():
-    return Path(get_env_or_skip("PRIME3_PWE_PROJECT"))
 
 
 @pytest.fixture(scope="module")
@@ -65,14 +50,29 @@ def prime3_asset_manager(prime3_iso_provider):
 
 
 def pytest_generate_tests(metafunc):
-    if any("_asset_manager" in fixture for fixture in metafunc.fixturenames):
-        for fixture_name in metafunc.fixturenames:
-            assert isinstance(fixture_name, str)
-            if fixture_name.endswith("_asset_id"):
+    fixture_names: list[str] = list(metafunc.fixturenames)
+    asset_manager_fixtures = [fixture for fixture in metafunc.fixturenames
+                              if fixture.endswith("_asset_manager")]
+    if asset_manager_fixtures:
+        asset_id_fixtures = [fixture_name for fixture_name in fixture_names
+                             if fixture_name.endswith("_asset_id")]
+        if asset_id_fixtures:
+            if len(asset_manager_fixtures) > 1:
+                raise ValueError("Test has more than one asset_manager")
+
+            game_name = asset_manager_fixtures[0].split("_asset_manager")[0]
+            if game_name == "prime1":
+                asset_ids = test_lib.PRIME_ASSET_IDS
+            elif game_name == "prime2":
+                asset_ids = test_lib.ECHOES_ASSET_IDS
+            else:
+                raise RuntimeError(f"Unsupported {game_name} for id list")
+
+            for fixture_name in asset_id_fixtures:
                 asset_type = fixture_name[:-len("_asset_id")]
                 asset_ids = [
                     pytest.param(asset.id, id=f"0x{asset.id:08x}")
-                    for asset in test_lib.ECHOES_ASSET_IDS
+                    for asset in asset_ids
                     if asset.type.lower() == asset_type
                 ]
                 if asset_ids:
