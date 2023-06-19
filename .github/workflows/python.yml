@@ -143,14 +143,14 @@ jobs:
         run: python -m venv venv
 
       - name: Install Python packages
-        run: venv/bin/python -m pip install --upgrade pip pytest pytest-xdist pytest-cov
+        run: venv/bin/python -m pip install --upgrade pip pytest pytest-cov
 
       - name: install built wheel
         run: venv/bin/python -m pip install -e .
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest --fail-if-missing --skip-dependency-tests -n auto --cov retro_data_structures test
+          venv/bin/python -m pytest --fail-if-missing --skip-dependency-tests --cov retro_data_structures test
 
       - name: codecov
         uses: codecov/codecov-action@v3
