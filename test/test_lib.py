@@ -1,9 +1,9 @@
 import dataclasses
 import json
 from pathlib import Path
-from typing import Tuple, Type, List
-import construct
+from typing import List, Tuple, Type
 
+import construct
 from construct.lib.containers import Container
 
 from retro_data_structures.asset_manager import AssetManager
@@ -43,7 +43,7 @@ def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fal
     if save_file:
         file_path.with_stem(file_path.stem+"_COPY").write_bytes(encoded)
         file_path.with_suffix(file_path.suffix+".construct").write_text(str(data))
-        
+
     construct.lib.setGlobalPrintFullStrings(False)
     return (raw, encoded, data)
 

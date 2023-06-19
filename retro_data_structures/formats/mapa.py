@@ -1,10 +1,10 @@
-from enum import IntEnum
 import typing
+from enum import IntEnum
 
 import construct
 
-from retro_data_structures.base_resource import BaseResource, Dependency, AssetType
-from retro_data_structures.common_types import AABox, Vector3, Transform4f
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import AABox, Transform4f, Vector3
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 from retro_data_structures.game_check import Game, current_game_at_least_else, get_current_game
 
@@ -51,7 +51,7 @@ class ObjectTypeMP1(IntEnum):
     UpArrowGreen = 30
     DownArrowRed = 31
     UpArrowRed = 32
-    
+
     Elevator = 33
     SaveStation = 34
     MissileStation = 37

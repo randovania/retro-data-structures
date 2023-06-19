@@ -1,12 +1,11 @@
 import typing
 
 import construct
-from construct import Struct, PrefixedArray, Int32ub
+from construct import Int32ub, PrefixedArray, Struct
 
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC
-from retro_data_structures.game_check import AssetIdCorrect
-from retro_data_structures.game_check import Game
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 ConstructDependency = Struct("asset_type" / FourCC, "asset_id" / AssetIdCorrect)
 
@@ -26,7 +25,7 @@ class Dgrp(BaseResource):
     @classmethod
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return DGRP
-    
+
     @property
     def direct_dependencies(self) -> typing.Iterator[Dependency]:
         for dep in self.raw:

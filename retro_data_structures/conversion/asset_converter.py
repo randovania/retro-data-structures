@@ -1,11 +1,11 @@
 import copy
 import dataclasses
 import logging
-from typing import Callable, Dict, Tuple, Any, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 
-from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
-from retro_data_structures.base_resource import AssetType, AssetId, BaseResource
 from retro_data_structures.asset_manager import AssetManager
+from retro_data_structures.base_resource import AssetId, AssetType, BaseResource
+from retro_data_structures.exceptions import InvalidAssetId, UnknownAssetId
 from retro_data_structures.game_check import Game
 
 

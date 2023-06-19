@@ -1,12 +1,12 @@
 import logging
-from typing import Iterator, Dict, Set, List, Callable, Any
+from typing import Any, Callable, Dict, Iterator, List, Set
 
 from retro_data_structures import formats
 from retro_data_structures.asset_manager import AssetManager
-from retro_data_structures.exceptions import UnknownAssetId, InvalidAssetId
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import scan, dgrp, ancs, cmdl, evnt, effect_script
+from retro_data_structures.exceptions import InvalidAssetId, UnknownAssetId
+from retro_data_structures.formats import ancs, cmdl, dgrp, effect_script, evnt, scan
 from retro_data_structures.game_check import Game
 
 
@@ -135,7 +135,7 @@ def recursive_dependencies_for_editor(editor: AssetManager,
                 _recursive(new_asset_id)
             except UnknownAssetId:
                 logging.warning(
-                    f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) " f"that doesn't exist."
+                    f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) that doesn't exist."
                 )
             except InvalidAssetId:
                 raise InvalidDependency(asset_id, new_asset_id, new_type)

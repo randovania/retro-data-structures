@@ -8,7 +8,7 @@ from enum import IntEnum
 from typing import Iterator, Optional
 
 import construct
-from construct import Struct, PrefixedArray, Int32ub, If, Aligned
+from construct import Aligned, If, Int32ub, PrefixedArray, Struct
 from construct.core import (
     Array,
     Computed,
@@ -21,7 +21,7 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
@@ -34,8 +34,7 @@ from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHe
 from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
-from retro_data_structures.game_check import AssetIdCorrect
-from retro_data_structures.game_check import Game
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 
 class MREAVersion(IntEnum):
@@ -450,7 +449,7 @@ class Mrea(BaseResource):
                 GreedyBytes if lazy_load else _CATEGORY_ENCODINGS[section_name],
                 context, "",
             )
-    
+
     def get_section(self, section_name: str, lazy_load: bool = False):
         self._ensure_decoded_section(section_name, lazy_load)
         return self._raw.sections[section_name]
@@ -484,7 +483,7 @@ class Mrea(BaseResource):
                     )
 
             yield from self._script_layer_helpers.values()
-    
+
     _generated_objects_layer: ScriptLayerHelper | None = None
     @property
     def generated_objects_layer(self) -> ScriptLayerHelper:
@@ -516,7 +515,7 @@ class Mrea(BaseResource):
         if (instance := self.generated_objects_layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
             return instance
         raise KeyError(name)
-    
+
     def remove_instance(self, instance: int | InstanceId | str | ScriptInstanceHelper):
         if isinstance(instance, str):
             instance = self.get_instance(instance)
@@ -524,6 +523,6 @@ class Mrea(BaseResource):
             instance = InstanceId(instance)
         if isinstance(instance, ScriptInstanceHelper):
             instance = instance.id
-        
+
         layers = list(self.script_layers)
         layers[instance.layer].remove_instance(instance)

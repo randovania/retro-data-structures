@@ -3,10 +3,10 @@ import uuid
 from dataclasses import dataclass
 
 import construct
-from construct import Container, PrefixedArray, Struct, Int32ul, Hex, Int16ul
+from construct import Container, Hex, Int16ul, Int32ul, PrefixedArray, Struct
 
 import retro_data_structures.properties.prime_remastered.objects
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
@@ -329,7 +329,7 @@ class Room(BaseResource):
         count1 = 0
         count2 = 0
         for i in range(weird_count):
-            guid = guids[i]
+            guids[i]
             unk = weird[i]
             if type(instances[unk.a].properties.data).__name__ != "EntityProperties" and type(
                     instances[unk.b].properties.data).__name__ != "EntityProperties":

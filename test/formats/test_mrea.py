@@ -1,4 +1,5 @@
 from pathlib import Path
+from test import test_lib
 
 import pytest
 
@@ -6,7 +7,6 @@ from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats import Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.game_check import Game
-from test import test_lib
 
 _mrea_path_p1 = "Resources/Worlds/EndCinema/!EndCinema_Master/01_endcinema.MREA"
 _mrea_path_p2 = "Resources/Worlds/SandWorld/!SandWorld_Master/00_pickup_sand_d_dark.MREA"
@@ -46,8 +46,8 @@ def test_compare_all_p2(prime2_asset_manager, mrea_asset_id: AssetId):
 
 
 def test_add_instance(prime2_asset_manager):
-    from retro_data_structures.properties.echoes.objects.SpecialFunction import SpecialFunction
     from retro_data_structures.enums import echoes
+    from retro_data_structures.properties.echoes.objects.SpecialFunction import SpecialFunction
 
     mlvl = prime2_asset_manager.get_parsed_asset(0x42b935e4, type_hint=Mlvl)
     area = mlvl.get_area(0x5DFA984F)

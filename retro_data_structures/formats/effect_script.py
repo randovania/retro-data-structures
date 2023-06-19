@@ -3,29 +3,30 @@ from typing import Iterable, Optional
 
 import construct
 from construct import (
+    Array,
+    Byte,
     Const,
     Construct,
-    RepeatUntil,
-    Switch,
     Flag,
-    Int32sb,
     Float32b,
-    Sequence,
-    Probe,
-    Pass,
+    If,
     IfThenElse,
-    Byte,
-    Array,
+    Int32sb,
+    Int32ub,
+    Pass,
+    PrefixedArray,
+    Probe,
+    RepeatUntil,
+    Sequence,
+    Struct,
+    Switch,
 )
-from construct import Struct, PrefixedArray, Int32ub, If
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import FourCC, Color4f
-from retro_data_structures.common_types import Vector3
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import Color4f, FourCC, Vector3
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.game_check import AssetIdCorrect
-from retro_data_structures.game_check import Game
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"], lookahead=80), ErrorWithMessage("Unknown type"))
 
@@ -1348,11 +1349,11 @@ class BaseEffect(BaseResource):
     @classmethod
     def asset_id_keys(cls) -> typing.Iterable[AssetType]:
         return []
-    
+
     @classmethod
     def texture_keys(cls) -> typing.Iterable[AssetType]:
         return []
-    
+
     @classmethod
     def spawn_system_keys(cls) -> typing.Iterable[AssetType]:
         return []
@@ -1361,17 +1362,20 @@ class BaseEffect(BaseResource):
         for element in self.raw.elements:
             if element.type in self.texture_keys():
                 if element.body.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl, not_exist_ok=True)
-            
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body.id, is_mlvl,
+                                                                             not_exist_ok=True)
+
             elif element.type in self.spawn_system_keys():
                 if element.body.magic != "NONE":
                     for spawn in element.body.value.spawns:
                         for t in spawn.v2:
-                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl, not_exist_ok=True)
+                            yield from self.asset_manager.get_dependencies_for_asset(t.id, is_mlvl,
+                                                                                     not_exist_ok=True)
 
             elif element.type in self.asset_id_keys():
                 if element.body is not None and element.body.body is not None:
-                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl, not_exist_ok=True)
+                    yield from self.asset_manager.get_dependencies_for_asset(element.body.body, is_mlvl,
+                                                                             not_exist_ok=True)
 
 
 class Part(BaseEffect):
@@ -1382,15 +1386,15 @@ class Part(BaseEffect):
     @classmethod
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return PART
-    
+
     @classmethod
     def asset_id_keys(cls) -> Iterable[AssetType]:
         return ("SSWH", "PMDL", "SELC", "IDTS", "ICTS", "IITS")
-    
+
     @classmethod
     def spawn_system_keys(cls) -> Iterable[AssetType]:
         return ("KSSM", )
-    
+
     @classmethod
     def texture_keys(cls) -> Iterable[AssetType]:
         return ("TEXR", "TIND")
@@ -1400,7 +1404,7 @@ class Dpsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "DPSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return DPSC
@@ -1408,7 +1412,7 @@ class Dpsc(BaseEffect):
     @classmethod
     def asset_id_keys(cls) -> typing.Iterable[AssetType]:
         return ("DMDL", )
-    
+
     @classmethod
     def texture_keys(cls) -> Iterable[AssetType]:
         return ("1TEX", "2TEX")
@@ -1418,11 +1422,11 @@ class Wpsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "WPSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return WPSC
-    
+
     @classmethod
     def asset_id_keys(cls) -> typing.Iterable[AssetType]:
         return ("PJFX", "COLR", "OHEF", "APSM", "APS1", "APS2", "ASW1", "ASW2", "ASW3")
@@ -1436,25 +1440,26 @@ class Crsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "CRSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return CRSC
-    
+
     @classmethod
     def asset_id_keys(cls) -> typing.Iterable[AssetType]:
-        return ("DCHR", "DEFS", "TALP", "DESH", "DENM", "DDCL", "ENDL", "CHDL", "WTDL", "GODL", "ICDL", "GRDL", "MEDL", "CODL", "WODL", "6LAV", "5LAV", "4LAV", "3LAV", "2LAV", "1LAV")
+        return ("DCHR", "DEFS", "TALP", "DESH", "DENM", "DDCL", "ENDL", "CHDL", "WTDL", "GODL",
+                "ICDL", "GRDL", "MEDL", "CODL", "WODL", "6LAV", "5LAV", "4LAV", "3LAV", "2LAV", "1LAV")
 
 
 class Spsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "SPSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return SPSC
-    
+
     @classmethod
     def spawn_system_keys(cls) -> Iterable[AssetType]:
         return ("SPWN", )
@@ -1464,7 +1469,7 @@ class Srsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "SRSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return SRSC
@@ -1478,7 +1483,7 @@ class Elsc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "ELSC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return ELSC
@@ -1486,7 +1491,7 @@ class Elsc(BaseEffect):
     @classmethod
     def asset_id_keys(cls) -> Iterable[AssetType]:
         return ("SSWH", "GPSM", "EPSM")
-    
+
     @classmethod
     def texture_keys(cls) -> Iterable[AssetType]:
         return ("TEXR", )
@@ -1496,7 +1501,7 @@ class Swhc(BaseEffect):
     @classmethod
     def resource_type(cls) -> AssetType:
         return "SWHC"
-    
+
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return SWHC

@@ -2,9 +2,9 @@ import io
 import typing
 
 import construct
-from construct import Struct, Const
+from construct import Const, Struct
 
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.formats.form_descriptor import FormDescriptor
 from retro_data_structures.game_check import Game

@@ -11,7 +11,6 @@ from retro_data_structures.formats import Mrea, Room
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseProperty
 from retro_data_structures.properties.prime import objects as prime_objects
-from retro_data_structures.properties.prime_remastered.objects import HUDMemoMP1
 
 SerializedData = construct.Struct(
     game=construct.VarInt,
@@ -119,7 +118,7 @@ def _parse_properties(game: Game, property_data: construct.Container, build: boo
                 property_class = properties.get_game_object(game, instance.instance_id)
             else:
                 property_class = properties.get_game_object(game, data.read(4).decode("ascii"))
-        except KeyError as e:
+        except KeyError:
             data.read(instance.size)
             continue
         type_name = property_class.__name__

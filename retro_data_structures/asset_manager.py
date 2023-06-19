@@ -1,9 +1,9 @@
-from collections import defaultdict
 import fnmatch
 import json
 import logging
 import typing
 import uuid
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 
@@ -12,14 +12,19 @@ import nod
 
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
-    AssetId, BaseResource, Dependency, NameOrAssetId, RawResource,
-    resolve_asset_id, AssetType, Resource
+    AssetId,
+    AssetType,
+    BaseResource,
+    Dependency,
+    NameOrAssetId,
+    RawResource,
+    Resource,
+    resolve_asset_id,
 )
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_gc import PAKNoData
 from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
@@ -278,7 +283,7 @@ class AssetManager:
             raise ValueError(f"{name} already exists")
 
         self._custom_asset_ids[name] = asset_id
-    
+
     def get_custom_asset(self, name: str) -> AssetId | None:
         return self._custom_asset_ids.get(name)
 
@@ -359,7 +364,7 @@ class AssetManager:
         # If the pak already has the given asset, do nothing
         if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
-        
+
         # Ensure the asset's dependencies are present as well
         for dep in self.get_dependencies_for_asset(asset_id):
             if dep.id == asset_id:
@@ -379,20 +384,21 @@ class AssetManager:
 
         return self._in_memory_paks[pak_name]
 
-    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, is_mlvl: bool = False, not_exist_ok: bool = False) -> Iterator[Dependency]:
+    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, is_mlvl: bool = False, not_exist_ok: bool = False,
+                                   ) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
-        
+
         if is_mlvl and asset_id in self.target_game.mlvl_dependencies_to_ignore:
             return
-        
+
         if not self.does_asset_exists(asset_id):
             if not not_exist_ok:
                 raise UnknownAssetId(asset_id)
             return
 
         asset_type = self.get_asset_type(asset_id)
-        
+
         dep_cache = self._cached_mlvl_dependencies if is_mlvl else self._cached_dependencies
         deps: tuple[Dependency, ...] = ()
 
@@ -405,29 +411,29 @@ class AssetManager:
                     self.get_raw_asset(asset_id),
                     self, is_mlvl
                 )
-            
+
             elif formats.has_resource_type(asset_type):
                 if self.get_asset_format(asset_id).has_dependencies(self.target_game):
                     deps = self.get_parsed_asset(asset_id).dependencies_for(is_mlvl)
-            
+
             logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             deps = tuple(deps)
-            dep_cache[asset_id] = deps   
-        
+            dep_cache[asset_id] = deps
+
         yield from deps
         yield Dependency(asset_type, asset_id)
-    
+
     def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, is_mlvl: bool = False, char_index: int | None = None):
         if not self.target_game.is_valid_asset_id(asset_id):
             return
-        
+
         if (asset_type := self.get_asset_type(asset_id)) != "ANCS":
             raise ValueError(f"{hex(asset_id)} ({asset_type}) is not an ANCS!")
-        
+
         if char_index is None:
             yield from self.get_dependencies_for_asset(asset_id, is_mlvl)
             return
-        
+
         if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
             logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
@@ -437,7 +443,7 @@ class AssetManager:
             deps.extend(ancs.dependencies_for(is_mlvl, char_index=char_index))
             deps = tuple(deps)
             self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
-        
+
         yield from deps
         yield Dependency("ANCS", asset_id)
 
@@ -453,7 +459,7 @@ class AssetManager:
                 atbl = self.get_parsed_asset(asset_id)
             elif asset_type == "AGSC":
                 agsc_ids.append(asset_id)
-        
+
         define_id_to_agsc: dict[int, AssetId] = {0xFFFF: None, -1: None}
         for agsc_id in agsc_ids:
             try:
@@ -468,12 +474,12 @@ class AssetManager:
             if define_id in define_id_to_agsc:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
 
-        
+
     def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
         agsc = self._sound_id_to_agsc[sound_id]
         if agsc is None:
             return
-        
+
         dep = ("AGSC", agsc)
 
         if is_mlvl:
@@ -482,7 +488,18 @@ class AssetManager:
                 return
 
         yield dep
-            
+
+    def _write_custom_names(self, output_path: Path):
+        custom_names = output_path.joinpath("custom_names.json")
+        with custom_names.open("w") as f:
+            json.dump(
+                {
+                    name: asset_id
+                    for name, asset_id in self._custom_asset_ids.items()
+                },
+                f,
+                indent=4,
+            )
 
     def save_modifications(self, output_path: Path):
         modified_paks = set()
@@ -524,16 +541,6 @@ class AssetManager:
             with out_pak_path.open("w+b") as f:
                 pak.build_stream(f)
 
-        custom_names = output_path.joinpath("custom_names.json")
-        with custom_names.open("w") as f:
-            json.dump(
-                {
-                    name: asset_id
-                    for name, asset_id in self._custom_asset_ids.items()
-                },
-                f,
-                indent=4,
-            )
-
+        self._write_custom_names(output_path)
         self._modified_resources = {}
         self._update_headers()

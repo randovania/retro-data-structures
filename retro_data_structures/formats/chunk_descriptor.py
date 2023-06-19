@@ -1,7 +1,7 @@
 import typing
 
 import construct
-from construct import Struct, Int32ul, Int64ul, Const
+from construct import Const, Int32ul, Int64ul, Struct
 
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage

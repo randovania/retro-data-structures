@@ -1,11 +1,11 @@
 import typing
 
 import construct
-from construct import Struct, PrefixedArray, Int32ub, If, Aligned
+from construct import Aligned, If, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import String, Vector3, Quaternion
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import Quaternion, String, Vector3
 from retro_data_structures.game_check import Game
 
 Bone = Struct(

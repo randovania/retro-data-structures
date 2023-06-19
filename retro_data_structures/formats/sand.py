@@ -2,14 +2,14 @@
 Wiki: https://wiki.axiodl.com/w/SAND_(File_Format)
 """
 import typing
-from typing import Optional, List
+from typing import List, Optional
 
 import construct
-from construct import Int16ub, Const, Struct, PrefixedArray, Int32ub, Int8ub, Float32b
+from construct import Const, Float32b, Int8ub, Int16ub, Int32ub, PrefixedArray, Struct
 
-from retro_data_structures.base_resource import BaseResource, Dependency, AssetType
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AssetId64
-from retro_data_structures.formats.evnt import SoundPOINode, Int32POINode, ParticlePOINode
+from retro_data_structures.formats.evnt import Int32POINode, ParticlePOINode, SoundPOINode
 from retro_data_structures.formats.meta_transition import MetaTransition_v2
 from retro_data_structures.game_check import Game
 

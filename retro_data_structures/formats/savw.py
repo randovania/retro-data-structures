@@ -3,8 +3,8 @@ import typing
 import construct
 from construct import Const, Int32ub, PrefixedArray
 
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
-from retro_data_structures.game_check import Game, AssetIdCorrect
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.game_check import AssetIdCorrect, Game
 
 SavedStateDescriptor = construct.Struct(
     # TODO: guid for mp3+

@@ -1,5 +1,5 @@
-from retro_data_structures.conversion.asset_converter import AssetConverter, Resource, AssetDetails
-from retro_data_structures.conversion.errors import UnsupportedTargetGame, UnsupportedSourceGame
+from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
+from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.game_check import Game
 
 _BONE_NAME_MAPPING = {

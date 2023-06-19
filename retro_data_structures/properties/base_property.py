@@ -1,12 +1,11 @@
 from __future__ import annotations
+
 import dataclasses
 import io
 import typing
 from abc import ABC
 
 from retro_data_structures.base_resource import AssetId, Dependency
-from retro_data_structures.formats.ancs import Ancs
-
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
@@ -43,18 +42,19 @@ class BaseProperty:
 
     def to_json(self) -> typing.Any:
         raise NotImplementedError()
-    
+
     def _is_property_mrea_or_mlvl(self, field: dataclasses.Field) -> bool:
         asset_types = field.metadata.get("asset_types", [])
         return any((typ in asset_types) for typ in ("MLVL", "MREA"))
 
-    def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False
+                                ) -> typing.Iterator[Dependency]:
         if issubclass(field.type, BaseProperty):
             if is_mlvl and field.metadata.get("ignore_dependencies_mlvl", False):
                 return
             prop: BaseProperty = getattr(self, field.name)
             yield from prop.dependencies_for(asset_manager, is_mlvl)
-        
+
         elif issubclass(field.type, int) and "sound" in field.metadata:
             sound_id: int = getattr(self, field.name)
             yield from asset_manager.get_audio_group_dependency(sound_id, is_mlvl)
@@ -70,7 +70,9 @@ class BaseProperty:
             try:
                 yield from self._dependencies_for_field(field, asset_manager, is_mlvl)
             except Exception as e:
-                raise Exception(f"Error finding dependencies for {self.__class__.__name__}.{field.name} ({field.type}): {e}")
+                raise Exception(
+                    f"Error finding dependencies for {self.__class__.__name__}.{field.name} ({field.type}): {e}"
+                )
 
 
 class BaseObjectType(BaseProperty, ABC):

@@ -1,7 +1,30 @@
 import typing
-from construct import Check, Construct, Enum, FocusedSeq, GreedyBytes, If, Optional, Padded, Peek, Rebuild, RepeatUntil, Seek, StopIf, Struct, Const, Int32ub, Int16ub, Tell, Prefixed, Pointer, PrefixedArray, Int8ub, Int8sb
-from retro_data_structures import game_check
 
+from construct import (
+    Const,
+    Construct,
+    Enum,
+    FocusedSeq,
+    GreedyBytes,
+    If,
+    Int8sb,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    Padded,
+    Peek,
+    Pointer,
+    Prefixed,
+    PrefixedArray,
+    Rebuild,
+    RepeatUntil,
+    Seek,
+    StopIf,
+    Struct,
+    Tell,
+)
+
+from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import String
 from retro_data_structures.game_check import Game
@@ -113,7 +136,7 @@ class Atbl(BaseResource):
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return ATBL
-    
+
     @classmethod
     def resource_type(cls) -> AssetType:
         return "ATBL"
@@ -123,20 +146,20 @@ class Agsc(BaseResource):
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
         return AGSC
-    
+
     @classmethod
     def resource_type(cls) -> AssetType:
         return "AGSC"
-    
+
     def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         yield from []
-    
+
     @property
     def define_ids(self) -> typing.Iterator[int]:
         project = self.raw.project
 
         if "sfx_table" not in project:
             return
-        
+
         for sfx in project.sfx_table:
             yield sfx.define_id

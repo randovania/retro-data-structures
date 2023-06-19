@@ -1,13 +1,13 @@
 import math
 
 import construct
-from construct import Struct, Int32ul, Int64ul, PrefixedArray, Hex
+from construct import Hex, Int32ul, Int64ul, PrefixedArray, Struct
 
-from retro_data_structures.common_types import FourCC, GUID
+from retro_data_structures.common_types import GUID, FourCC
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.misc import UntilEof
 from retro_data_structures.formats.chunk_descriptor import ChunkDescriptor
-from retro_data_structures.formats.form_descriptor import FormDescriptorHeader, FormDescriptor
+from retro_data_structures.formats.form_descriptor import FormDescriptor, FormDescriptorHeader
 from retro_data_structures.formats.pak_gc import PakFile
 
 StringTableEntry = Struct(
@@ -133,7 +133,8 @@ class ConstructPakWiiU(construct.Construct):
         header_start = construct.stream_tell(stream, path)
         PakWiiUNoData._build(obj.header, stream, context, f"{path} -> header")
 
-        for i, (adir, file) in enumerate(sorted(zip(tocc.ADIR.data, files), key=lambda it: it[1].extra.offset or math.inf)):
+        for i, (adir, file) in enumerate(sorted(zip(tocc.ADIR.data, files),
+                                                key=lambda it: it[1].extra.offset or math.inf)):
             adir.offset = construct.stream_tell(stream, f"{path} -> file[{i}]")
             data = file.get_decompressed(game)
             construct.stream_write(stream, data, len(data), f"{path} -> file[{i}]")

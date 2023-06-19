@@ -2,6 +2,7 @@
 For checking which game is being parsed
 """
 from __future__ import annotations
+
 import typing
 import uuid
 from enum import Enum
@@ -12,7 +13,6 @@ from construct.core import IfThenElse
 
 from retro_data_structures import common_types
 from retro_data_structures.base_resource import Dependency
-
 from retro_data_structures.crc import crc32, crc64
 
 if typing.TYPE_CHECKING:
@@ -71,7 +71,7 @@ class Game(Enum):
             return uuid.UUID(int=0)
         else:
             raise NotImplementedError()
-    
+
     def hash_asset_id(self, asset_name: str) -> AssetId:
         if self.uses_guid_as_asset_id:
             raise NotImplementedError()
@@ -84,14 +84,14 @@ class Game(Enum):
         if self <= Game.ECHOES and asset_id == 0:
             return False
         return asset_id != self.invalid_asset_id
-    
+
     @property
     def mlvl_dependencies_to_ignore(self) -> tuple[AssetId]:
         if self == Game.ECHOES:
             # Textures/Misc/VisorSteamQtr.TXTR
             return (0x7b2ea5b1,)
         return ()
-    
+
     def special_ancs_dependencies(self, ancs: AssetId):
         if self == Game.ECHOES and ancs == 0xC043D342:
             # every gun animation needs these i guess
@@ -151,7 +151,9 @@ class CurrentGameCheck(IfThenElse):
 
     def _emitbuild(self, code: construct.CodeGen):
         code.append("from retro_data_structures import game_check")
-        return f"(({self.thensubcon._compilebuild(code)}) if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name}) else ({self.elsesubcon._compilebuild(code)}))"
+        return (f"(({self.thensubcon._compilebuild(code)})"
+                f" if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name})"
+                f" else ({self.elsesubcon._compilebuild(code)}))")
 
 
 def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:

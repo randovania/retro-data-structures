@@ -1,4 +1,4 @@
-from construct import Adapter, Int32ub, Enum
+from construct import Adapter, Enum, Int32ub
 
 
 class EnumAdapter(Adapter):

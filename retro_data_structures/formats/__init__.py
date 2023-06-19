@@ -2,9 +2,9 @@ import typing
 
 from construct import Construct
 
+from retro_data_structures.base_resource import AssetType, BaseResource
 from retro_data_structures.formats.ancs import ANCS, Ancs
 from retro_data_structures.formats.anim import ANIM, Anim
-from retro_data_structures.base_resource import BaseResource, AssetType
 from retro_data_structures.formats.audio_group import AGSC, ATBL, Agsc, Atbl
 from retro_data_structures.formats.char import CHAR, Char
 from retro_data_structures.formats.cinf import CINF, Cinf
@@ -12,6 +12,24 @@ from retro_data_structures.formats.cmdl import CMDL, Cmdl
 from retro_data_structures.formats.cskr import CSKR, Cskr
 from retro_data_structures.formats.cspp import CSPP, Cspp
 from retro_data_structures.formats.dgrp import DGRP, Dgrp
+from retro_data_structures.formats.effect_script import (
+    CRSC,
+    DPSC,
+    ELSC,
+    PART,
+    SPSC,
+    SRSC,
+    SWHC,
+    WPSC,
+    Crsc,
+    Dpsc,
+    Elsc,
+    Part,
+    Spsc,
+    Srsc,
+    Swhc,
+    Wpsc,
+)
 from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.mapa import MAPA, Mapa
 from retro_data_structures.formats.mapw import Mapw
@@ -19,7 +37,6 @@ from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.msbt import Msbt
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.effect_script import CRSC, DPSC, ELSC, PART, SPSC, SRSC, SWHC, WPSC, Crsc, Dpsc, Elsc, Part, Spsc, Srsc, Swhc, Wpsc
 from retro_data_structures.formats.room import Room
 from retro_data_structures.formats.sand import SAND, Sand
 from retro_data_structures.formats.savw import SAVW, Savw

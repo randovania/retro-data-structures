@@ -6,12 +6,12 @@ import logging
 import typing
 
 import construct
-from construct import Aligned, Struct, Int32ub
+from construct import Aligned, Int32ub, Struct
 from construct.core import Array, Byte, Check, Const, Enum, Float32b, GreedyRange, Hex, IfThenElse
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AssetId32, FourCC
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
 from retro_data_structures.formats.script_object import ScriptInstance, ScriptInstanceHelper
@@ -74,7 +74,7 @@ class Scan(BaseResource):
     def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         if is_mlvl:
             return
-        
+
         if self.target_game == Game.PRIME:
             yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
             yield from self.asset_manager.get_dependencies_for_asset(self.raw.text_id)
@@ -83,13 +83,14 @@ class Scan(BaseResource):
         else:
             for dep in self.raw.dependencies:
                 yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)
-    
+
     _scannable_object_info: ScriptInstanceHelper | None = None
     @property
     def scannable_object_info(self) -> ScriptInstanceHelper:
         assert self.target_game != Game.PRIME
         if self._scannable_object_info is None:
-            self._scannable_object_info = ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game, on_modify=self.rebuild_dependencies)
+            self._scannable_object_info = ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game,
+                                                               on_modify=self.rebuild_dependencies)
         return self._scannable_object_info
 
     def rebuild_dependencies(self):

@@ -1,7 +1,19 @@
 import uuid
 
 import construct
-from construct import Array, PrefixedArray, Struct, Float32b, PaddedString, CString, Int16ub, Int32ub, Int64ub, Hex, Byte
+from construct import (
+    Array,
+    Byte,
+    CString,
+    Float32b,
+    Hex,
+    Int16ub,
+    Int32ub,
+    Int64ub,
+    PaddedString,
+    PrefixedArray,
+    Struct,
+)
 
 Vector2f = Array(2, Float32b)
 Vector3 = Array(3, Float32b)

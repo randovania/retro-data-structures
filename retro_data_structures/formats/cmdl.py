@@ -1,38 +1,43 @@
 from __future__ import annotations
+
 import typing
 
 import construct
 from construct import (
-    Struct, PrefixedArray, Int32ub, If, Aligned,
-    Const,
+    Aligned,
     Array,
-    Int16ub,
     Byte,
-    Float32b,
-    GreedyRange,
-    IfThenElse,
-    Float16b,
     Bytes,
-    Switch,
-    Int8ub,
-    Rebuild,
-    Pointer,
-    Pass,
-    Tell,
-    Seek,
-    FocusedSeq,
+    Const,
     ExprAdapter,
-    RepeatUntil,
-    Sequence,
+    Float16b,
+    Float32b,
+    FocusedSeq,
+    GreedyRange,
+    If,
+    IfThenElse,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    Pass,
+    Pointer,
+    PrefixedArray,
     Probe,
+    Rebuild,
+    RepeatUntil,
+    Seek,
+    Sequence,
+    Struct,
+    Switch,
+    Tell,
 )
 
 from retro_data_structures import game_check
-from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Vector3, Color4f, Vector2f, FourCC
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Color4f, FourCC, Vector2f, Vector3
 from retro_data_structures.construct_extensions.alignment import AlignTo
-from retro_data_structures.construct_extensions.misc import Skip, ErrorWithMessage
-from retro_data_structures.data_section import DataSectionSizes, DataSection
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
+from retro_data_structures.data_section import DataSection, DataSectionSizes
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
@@ -53,7 +58,8 @@ GetPass = Struct(
     uv_source=Int32ub,
     uv_animation=PrefixedArray(Int32ub,Byte),
     _end=Tell,
-    _update_pass_size=Pointer(construct.this._start - Int32ub.length, Rebuild(Int32ub, construct.this._end - construct.this._start)),
+    _update_pass_size=Pointer(construct.this._start - Int32ub.length,
+                              Rebuild(Int32ub, construct.this._end - construct.this._start)),
 )
 
 GetClr = Struct(subtype=FourCC, value=Int32ub)
@@ -164,7 +170,8 @@ MaterialSet = Struct(
     texture_file_ids=If(game_check.current_game_at_most(Game.ECHOES),PrefixedArray(Int32ub, AssetId32)),
     _material_count=Rebuild(Int32ub, construct.len_(construct.this.materials)),
     _material_end_offsets_address=Tell,
-    _material_end_offsets=If(game_check.current_game_at_most(Game.ECHOES),Seek(construct.this["_material_count"] * Int32ub.length, 1)),
+    _material_end_offsets=If(game_check.current_game_at_most(Game.ECHOES),
+                             Seek(construct.this["_material_count"] * Int32ub.length, 1)),
     _materials_start=Tell,
     materials=Array(
         construct.this["_material_count"],

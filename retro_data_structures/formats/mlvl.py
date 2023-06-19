@@ -3,40 +3,39 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
 
-from itertools import count
 import itertools
-from typing import Iterator
 import typing
+from itertools import count
+from typing import Iterator
+
 import construct
 from construct import (
     Adapter,
     Array,
     Bitwise,
-    Container,
-    Error,
-    ListContainer,
-    Struct,
-    Int32ub,
-    PrefixedArray,
-    Int64ub,
-    Float32b,
-    Int16ub,
-    CString,
     Const,
-    Int8ub,
-    Switch,
-    Peek,
-    Sequence,
-    FocusedSeq,
+    Container,
+    CString,
+    Error,
     Flag,
-    len_
+    Float32b,
+    FocusedSeq,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    ListContainer,
+    Peek,
+    PrefixedArray,
+    Sequence,
+    Struct,
+    Switch,
+    len_,
 )
+
 from retro_data_structures.adapters.offset import OffsetAdapter
-
-
-from retro_data_structures.common_types import Vector3, AssetId32, AssetId64, FourCC
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, NameOrAssetId
+from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, Vector3
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency, NameOrAssetId
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
@@ -75,10 +74,10 @@ class LayerFlags(Adapter):
             layer_count=Int32ub,
             layer_flags=Bitwise(Array(64, Flag)),
         ))
-    
+
     def _decode(self, obj, context, path):
         return ListContainer(reversed(obj.layer_flags))[:obj.layer_count]
-    
+
     def _encode(self, obj, context, path):
         flags = [True for i in range(64)]
         flags[:len(obj)] = obj
@@ -91,7 +90,7 @@ class LayerFlags(Adapter):
 class LayerNameOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
         return context._.layer_names
-    
+
     def _get_table_length(self, context):
         return len(self._get_table(context))
 
@@ -102,10 +101,10 @@ class LayerNameOffsetAdapter(OffsetAdapter):
 class AreaDependencyOffsetAdapter(OffsetAdapter):
     def _get_table(self, context):
         return context._.dependencies_b
-    
+
     def _get_table_length(self, context):
         return len_(self._get_table(context))
-    
+
     def _get_item_size(self, item):
         return 8
 
@@ -115,7 +114,7 @@ def create_area(version: int, asset_id):
         asset_id=asset_id,
         asset_type=FourCC,
     )
-    
+
     # TODO: better offset stuff
     MLVLAreaDependencies = Struct(
         Const(0, Int32ub),
@@ -362,14 +361,15 @@ class AreaWrapper:
     _strg: Strg = None
 
     # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
-    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container, index: int, parent_mlvl: Mlvl):
+    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container,
+                 index: int, parent_mlvl: Mlvl):
         self._raw = raw
         self.asset_manager = asset_manager
         self._flags = flags
         self._layer_names = names
         self._index = index
         self._parent_mlvl = parent_mlvl
-    
+
     @property
     def id(self) -> int:
         return self._raw.internal_area_id
@@ -377,14 +377,14 @@ class AreaWrapper:
     @property
     def index(self) -> int:
         return self._index
-    
+
     @property
     def name(self) -> str:
         try:
             return self.strg.strings[0]
-        except UnknownAssetId as e:
+        except UnknownAssetId:
             return "!!" + self.internal_name
-    
+
     @name.setter
     def name(self, value):
         self.strg.set_string(0, value)
@@ -404,7 +404,7 @@ class AreaWrapper:
         if self._mrea is None:
             self._mrea = self.asset_manager.get_file(self.mrea_asset_id, type_hint=Mrea)
         return self._mrea
-    
+
     @property
     def mrea_asset_id(self) -> int:
         return self._raw.area_mrea_id
@@ -413,14 +413,14 @@ class AreaWrapper:
     def layers(self) -> Iterator[ScriptLayerHelper]:
         for layer in self.mrea.script_layers:
             yield layer.with_parent(self)
-    
+
     @property
     def generated_objects_layer(self) -> ScriptLayerHelper:
         return self.mrea.generated_objects_layer
-    
+
     def get_layer(self, name: str) -> ScriptLayerHelper:
         return next(layer for layer in self.layers if layer.name == name)
-    
+
     def add_layer(self, name: str, active: bool = True) -> ScriptLayerHelper:
         index = len(self._layer_names)
         self._layer_names.append(name)
@@ -428,7 +428,7 @@ class AreaWrapper:
         raw = new_layer(index, self.asset_manager.target_game)
         self.mrea._raw.sections.script_layer_section.append(raw)
         return self.get_layer(name)
-    
+
     @property
     def next_instance_id(self) -> int:
         ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
@@ -463,7 +463,7 @@ class AreaWrapper:
     def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
         self._raw_connect_to(source_dock_number, target_area, target_dock_number)
         target_area._raw_connect_to(target_dock_number, self, source_dock_number)
-    
+
     def build_non_layer_dependencies(self) -> typing.Iterator[Dependency]:
         geometry_section = self.mrea.get_section("geometry_section")
         if geometry_section is not None:
@@ -475,7 +475,7 @@ class AreaWrapper:
             yield "EGMC", static_geometry_map
         if valid_asset(path := self.mrea.get_section("path_section")[0]):
             yield "PATH", path
-    
+
     def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
         layer_deps = list(layer_deps)
 
@@ -484,7 +484,7 @@ class AreaWrapper:
             inst_layer = instance.id.layer
             if not only_modified or layers[inst_layer].is_modified:
                 layer_deps[inst_layer].extend(instance.mlvl_dependencies_for(self.asset_manager))
-        
+
         return [list(dict.fromkeys(deps)) for deps in layer_deps]
 
     def build_mlvl_dependencies(self, only_modified: bool = False):
@@ -505,9 +505,9 @@ class AreaWrapper:
                 non_layer_deps.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
             layer_deps.append(non_layer_deps)
 
-        
+
         layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
-        
+
         if self.mrea_asset_id in _hardcoded_dependencies:
             for layer_name, missing in _hardcoded_dependencies[self.mrea_asset_id].items():
                 if layer_name == "!!non_layer!!":
@@ -524,7 +524,7 @@ class AreaWrapper:
         for layer in layer_deps:
             offsets.append(offset)
             offset += len(layer)
-        
+
         deps = list(itertools.chain(*layer_deps))
         deps = [Container(asset_type=typ, asset_id=idx) for typ, idx in deps]
         self._raw.dependencies.dependencies = deps
@@ -536,20 +536,20 @@ class AreaWrapper:
             layer.name: list(layer.dependencies)
             for layer in self.layers
         }
-    
+
     @property
     def all_layer_deps(self):
         deps = set()
         for layer_deps in self.layer_dependencies.values():
             deps.update(dep["asset_id"] for dep in layer_deps)
         return deps
-    
+
     @property
     def non_layer_dependencies(self):
         deps = self._raw.dependencies
         global_deps = deps.dependencies[deps.offsets[len(self._layer_names)]:]
         yield from [(dep.asset_type, dep.asset_id) for dep in global_deps]
-    
+
     @property
     def dependencies(self):
         deps = self.layer_dependencies
@@ -579,7 +579,7 @@ class Mlvl(BaseResource):
             return self.world_name
         except UnknownAssetId:
             return super().__repr__()
-    
+
     @property
     def areas(self) -> Iterator[AreaWrapper]:
         offsets = self._raw.area_layer_name_offset
@@ -587,7 +587,7 @@ class Mlvl(BaseResource):
         for i, area in enumerate(self._raw.areas):
             area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
             yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
-    
+
     def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
 
@@ -599,7 +599,7 @@ class Mlvl(BaseResource):
         if self._name_strg_cached is None:
             self._name_strg_cached = self.asset_manager.get_file(self._raw.world_name_id, type_hint=Strg)
         return self._name_strg_cached
-    
+
     @property
     def _dark_strg(self) -> Strg:
         if self.asset_manager.target_game != Game.ECHOES:
@@ -611,15 +611,15 @@ class Mlvl(BaseResource):
     @property
     def world_name(self) -> str:
         return self._name_strg.strings[0]
-    
+
     @world_name.setter
     def world_name(self, value: str):
         self._name_strg.set_string(0, value)
-    
+
     @property
     def dark_world_name(self) -> str:
         return self._dark_strg.strings[0]
-    
+
     @dark_world_name.setter
     def dark_world_name(self, value: str):
         self._dark_strg.set_string(0, value)

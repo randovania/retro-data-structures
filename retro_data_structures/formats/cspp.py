@@ -1,12 +1,10 @@
 import typing
 
 import construct
-from construct import Float32b
-from construct import Struct, PrefixedArray, Int32ub
+from construct import Float32b, Int32ub, PrefixedArray, Struct
 
-from retro_data_structures.common_types import OBBox
-from retro_data_structures.common_types import Vector3
-from retro_data_structures.base_resource import BaseResource, AssetType, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.common_types import OBBox, Vector3
 from retro_data_structures.game_check import Game
 
 SegId = Int32ub

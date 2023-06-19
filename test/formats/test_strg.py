@@ -1,6 +1,7 @@
-from retro_data_structures.game_check import Game
-from retro_data_structures.formats.strg import STRG
 from test.test_lib import parse_and_build_compare
+
+from retro_data_structures.formats.strg import STRG
+from retro_data_structures.game_check import Game
 
 
 def test_compare_p1(prime1_pwe_project):

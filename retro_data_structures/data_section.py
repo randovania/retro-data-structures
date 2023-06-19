@@ -1,4 +1,4 @@
-from construct import Tell, Pointer, Int32ub, Struct, Array, Rebuild, If
+from construct import Array, If, Int32ub, Pointer, Rebuild, Struct, Tell
 
 from retro_data_structures.construct_extensions.alignment import AlignedPrefixed
 from retro_data_structures.construct_extensions.misc import Skip

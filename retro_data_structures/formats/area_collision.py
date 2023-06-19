@@ -1,29 +1,29 @@
 import enum
 
 from construct.core import (
-    Pointer,
-    Rebuild,
-    this,
+    Adapter,
     Aligned,
+    Array,
     BitsInteger,
     Bitwise,
-    Struct,
-    Int32ub,
     Const,
-    Int16ub,
     Enum,
-    Tell,
-    Prefixed,
-    Adapter,
-    Array,
     FlagsEnum,
     If,
-    Int64ub,
     Int8ub,
+    Int16ub,
+    Int32ub,
+    Int64ub,
     LazyBound,
     Pass,
+    Pointer,
+    Prefixed,
     PrefixedArray,
+    Rebuild,
+    Struct,
     Switch,
+    Tell,
+    this,
 )
 
 from retro_data_structures.common_types import AABox, Vector3
@@ -176,7 +176,8 @@ CollisionIndex = Struct(
     "triangle_indices" / PrefixedArray(Int32ub, Int8ub),
     "edges" / PrefixedArray(Int32ub, Struct(vertexA=Int16ub, vertexB=Int16ub)),
     "triangles" / TriangleAdapter(PrefixedArray(Int32ub, Int16ub)),
-    "unknowns" / If(lambda this: AreaCollisionVersion[this._.version] > AreaCollisionVersion.prime1, PrefixedArray(Int32ub, Int16ub)),
+    "unknowns" / If(lambda this: AreaCollisionVersion[this._.version] > AreaCollisionVersion.prime1,
+                    PrefixedArray(Int32ub, Int16ub)),
     "vertices" / PrefixedArray(Int32ub, Vector3),
 )
 

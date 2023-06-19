@@ -1,11 +1,11 @@
 import pytest
 
 from retro_data_structures.base_resource import Dependency
-from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_gc import PAKNoData, CompressedPakResource, PakFile, PakBody, PAK_GC
+from retro_data_structures.formats.pak_gc import PAK_GC, CompressedPakResource, PakBody, PakFile, PAKNoData
 from retro_data_structures.game_check import Game
 
+# ruff: noqa: E501
 
 @pytest.fixture(name="compressed_resource")
 def _compressed_resource():

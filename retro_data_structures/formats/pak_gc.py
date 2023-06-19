@@ -4,7 +4,7 @@ import dataclasses
 import typing
 
 import construct
-from construct import Struct, Const, Int16ub, Int32ub, PrefixedArray, PascalString, FocusedSeq, Rebuild, IfThenElse
+from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalString, PrefixedArray, Rebuild, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
