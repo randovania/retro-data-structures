@@ -102,7 +102,7 @@ class Game(Enum):
             yield Dependency("TXTR", 0x1e7b6c64)
 
 
-def get_current_game(ctx):
+def get_current_game(ctx) -> Game:
     result = ctx["_params"]["target_game"]
     if not isinstance(result, Game):
         raise ValueError(f"build/parse didn't set a valid target_game. Expected `Game`, got {result}")

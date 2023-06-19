@@ -235,7 +235,7 @@ def _parse_choice(properties: Element, game_id: str, path: Path) -> dict:
                 "choices": choices,
             }
 
-        _enums_by_game[game_id].append(EnumDefinition(name, choices))
+        _enums_by_game[game_id].append(EnumDefinition(name, choices, enum_base="IntEnum"))
 
     return {
         "type": _type,
@@ -925,22 +925,35 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     states = get_key_map(root.find("States"))
     messages = get_key_map(root.find("Messages"))
 
-    _enums_by_game[game_id] = [
-        EnumDefinition(
-            "States",
+    game_enums = []
+    _enums_by_game[game_id] = game_enums
+
+    if game_id == "Prime":
+        enum_value_repr = str
+        enum_base = "IntEnum"
+    else:
+        enum_value_repr = repr
+        enum_base = "Enum"
+
+    if states:
+        game_enums.append(EnumDefinition(
+            "State",
             {
-                value: repr(key)
+                value: enum_value_repr(key)
                 for key, value in states.items()
-            }
-        ),
-        EnumDefinition(
-            "Messages",
+            },
+            enum_base=enum_base,
+        ))
+
+    if messages:
+        game_enums.append(EnumDefinition(
+            "Message",
             {
-                value: repr(key)
+                value: enum_value_repr(key)
                 for key, value in messages.items()
-            }
-        ),
-    ]
+            },
+            enum_base=enum_base,
+        ))
 
     script_objects_paths = {
         four_cc: path
@@ -1378,7 +1391,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     return {
         "script_objects": script_objects,
-        "property_archetypes": property_archetypes
+        "property_archetypes": property_archetypes,
+        "enums": game_enums,
     }
 
 
@@ -1391,9 +1405,10 @@ def parse_game_list(templates_path: Path) -> dict:
     }
 
 
-def write_shared_type_with_common_import(output_file: Path, kind: str, all_objects: dict[str, list[str]]):
+def write_shared_type_with_common_import(output_file: Path, kind: str, import_path: str,
+                                         all_objects: dict[str, list[str]]):
     declarations = []
-    base = "import retro_data_structures.properties."
+    base = f"import retro_data_structures.{import_path}."
 
     used_games = set()
 
@@ -1409,9 +1424,14 @@ def write_shared_type_with_common_import(output_file: Path, kind: str, all_objec
             ",\n".join(f"    _{_game_id_to_file[game]}_{kind}.{type_name}" for game in games)
         ))
 
+    if kind == "enums":
+        left_kind = ""
+    else:
+        left_kind = f".{kind}"
+
     output_file.write_text("# Generated File\nimport typing\n\n{imports}\n\n{declarations}\n".format(
         imports="\n".join(
-            f"{base}{_game_id_to_file[game]}.{kind} as _{_game_id_to_file[game]}_{kind}"
+            f"{base}{_game_id_to_file[game]}{left_kind} as _{_game_id_to_file[game]}_{kind}"
             for game in sorted(used_games)
         ),
         declarations="\n".join(declarations),
@@ -1446,8 +1466,9 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
 
 
 def write_shared_types_helpers(all_games: dict):
-    all_objects = collections.defaultdict(list)
     all_archetypes = collections.defaultdict(list)
+    all_objects = collections.defaultdict(list)
+    all_enums = collections.defaultdict(list)
 
     for game_id, game_data in all_games.items():
         for script_object in game_data["script_objects"].values():
@@ -1464,10 +1485,23 @@ def write_shared_types_helpers(all_games: dict):
                 continue
             all_archetypes[archetype["name"]].append(game_id)
 
-    path_to_props = Path(__file__).parent.joinpath("retro_data_structures", "properties")
+        for enum_def in game_data["enums"]:
+            assert isinstance(enum_def, EnumDefinition)
+            if "Unknown" not in enum_def.name:
+                all_enums[_scrub_enum(enum_def.name)].append(game_id)
+
+    root = Path(__file__).parent.joinpath("retro_data_structures")
+    write_shared_type_with_common_import(
+        root.joinpath("enums", "shared_enums.py"),
+        "enums",
+        "enums",
+        all_enums,
+    )
+    path_to_props = root.joinpath("properties")
     write_shared_type_with_common_import(
         path_to_props.joinpath("shared_objects.py"),
         "objects",
+        "properties",
         all_objects,
     )
     write_shared_type(
