@@ -1,7 +1,7 @@
-from test import test_lib
-
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.formats.anim import Anim
+from test import test_lib
 
 
 def test_compare_p2(prime2_asset_manager):
@@ -50,3 +50,10 @@ def test_missile_launcher(prime1_asset_manager, prime2_asset_manager):
     p1_aux["anim"]["scratch_size"] = 405
 
     assert p1_aux == p2_aux
+
+
+def test_no_dependencies(prime2_asset_manager):
+    result = list(prime2_asset_manager.get_dependencies_for_asset(0x5E2F550E))
+    assert result == [
+        Dependency(type='ANIM', id=0x5E2F550E)
+    ]

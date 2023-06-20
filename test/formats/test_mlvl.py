@@ -9,11 +9,11 @@ from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats.mlvl import Mlvl
 
 _MLVLS = (
-    0x3BFA3EFF, # Temple Grounds
-    0x863FCD72, # Great Temple
-    0x42B935E4, # Agon Wastes
-    0x3DFD2249, # Torvus Bog
-    0x1BAA96C2, # Sanctuary Fortress
+    0x3BFA3EFF,  # Temple Grounds
+    0x863FCD72,  # Great Temple
+    0x42B935E4,  # Agon Wastes
+    0x3DFD2249,  # Torvus Bog
+    0x1BAA96C2,  # Sanctuary Fortress
 )
 
 
@@ -32,7 +32,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
             start = time.time()
             area.build_mlvl_dependencies()
-            elapsed = time.time()-start
+            elapsed = time.time() - start
             total_elapsed += elapsed
 
             new = area.dependencies
