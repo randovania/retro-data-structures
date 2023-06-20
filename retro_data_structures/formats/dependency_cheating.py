@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import itertools
+import re
 import struct
 import typing
 
@@ -10,6 +12,7 @@ from retro_data_structures.common_types import String, AssetId32
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.formats import Part, effect_script
 from retro_data_structures.formats.hier import Hier
 from retro_data_structures.game_check import Game
 
@@ -199,6 +202,51 @@ def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: 
             yield from asset_manager.get_dependencies_for_asset(txtr_id, is_mlvl)
 
 
+ALL_EFFECTS = [Part]
+
+
+def _make_re(types: typing.Iterable[AssetType]):
+    return re.compile(b"|".join(key.encode("ascii") for key in types))
+
+
+def effect_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
+                        ) -> typing.Iterator[Dependency]:
+    try:
+        effect_type = next(c for c in ALL_EFFECTS if c.resource_type() == asset.type)
+
+        for match in _make_re(effect_type.texture_keys()).finditer(asset.data):
+            k = asset.data[match.end():match.end() + 4]
+            element = effect_script.TEXTURE_ELEMENT_TYPES[k.decode()].parse(
+                asset.data[match.end() + 4:],
+                target_game=asset_manager.target_game,
+            )
+            if element is not None:
+                yield from asset_manager.get_dependencies_for_asset(element.id, is_mlvl,
+                                                                    not_exist_ok=True)
+
+        for match in _make_re(effect_type.spawn_system_keys()).finditer(asset.data):
+            element = effect_script.SpawnSystemKeyframeData.parse(
+                asset.data[match.end():],
+                target_game=asset_manager.target_game,
+            )
+            if element.magic != "NONE":
+                for spawn in element.value.spawns:
+                    for t in spawn.v2:
+                        yield from asset_manager.get_dependencies_for_asset(t.id, is_mlvl,
+                                                                            not_exist_ok=True)
+
+        for match in _make_re(effect_type.asset_id_keys()).finditer(asset.data):
+            element = effect_script.GetAssetId.parse(
+                asset.data[match.end():],
+                target_game=asset_manager.target_game,
+            )
+            if element is not None and element.body is not None:
+                yield from asset_manager.get_dependencies_for_asset(element.body, is_mlvl,
+                                                                    not_exist_ok=True)
+    except Exception:
+        raise UnableToCheatError()
+
+
 _FORMATS_TO_CHEAT = {
     "CSNG": csng_dependencies,
     "DUMB": dumb_dependencies,
@@ -208,6 +256,7 @@ _FORMATS_TO_CHEAT = {
     "RULE": rule_dependencies,
     "FONT": font_dependencies,
     "CMDL": cmdl_dependencies,
+    "PART": effect_dependencies,
 }
 
 
