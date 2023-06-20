@@ -1,5 +1,6 @@
-from retro_data_structures.asset_manager import AssetManager
 from test import test_lib
+
+from retro_data_structures.asset_manager import AssetManager
 
 
 def test_particles_elsc(prime2_asset_manager: AssetManager, elsc_asset_id):

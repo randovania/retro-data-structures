@@ -784,7 +784,7 @@ class Vector(BaseProperty):
             "y": self.y,
             "z": self.z,
         }}
-        
+
     def dependencies_for(self, asset_manager, is_mlvl: bool = False):
         yield from []
 """ + game_code)

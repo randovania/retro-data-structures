@@ -21,7 +21,7 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, AssetId
+from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore

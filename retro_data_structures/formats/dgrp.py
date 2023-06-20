@@ -5,7 +5,7 @@ from construct import Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import common_types
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
-from retro_data_structures.game_check import Game, CurrentGameCheck
+from retro_data_structures.game_check import CurrentGameCheck, Game
 
 
 def construct_dep(asset_id_format):
