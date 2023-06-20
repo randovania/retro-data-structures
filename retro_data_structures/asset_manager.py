@@ -22,7 +22,7 @@ from retro_data_structures.base_resource import (
     resolve_asset_id,
 )
 from retro_data_structures.exceptions import UnknownAssetId
-from retro_data_structures.formats import dependency_cheating, Dgrp
+from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.game_check import Game
