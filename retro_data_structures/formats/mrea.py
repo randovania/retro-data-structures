@@ -21,7 +21,7 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, AssetId
 from retro_data_structures.common_types import FourCC, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
@@ -453,6 +453,21 @@ class Mrea(BaseResource):
     def get_section(self, section_name: str, lazy_load: bool = False):
         self._ensure_decoded_section(section_name, lazy_load)
         return self._raw.sections[section_name]
+
+    def get_raw_section(self, section_name: str) -> list[bytes]:
+        return list(self._raw.raw_sections[section_name])
+
+    def get_geometry(self):
+        return self.get_section("geometry_section")
+
+    def get_portal_area(self) -> AssetId:
+        return self.get_section("portal_area_section")[0]
+
+    def get_static_geometry_map(self) -> AssetId:
+        return self.get_section("static_geometry_map_section")[0]
+
+    def get_path(self) -> AssetId:
+        return self.get_section("path_section")[0]
 
     def build(self) -> bytes:
         for i, section in (self._script_layer_helpers or {}).items():

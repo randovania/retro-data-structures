@@ -465,15 +465,22 @@ class AreaWrapper:
         target_area._raw_connect_to(target_dock_number, self, source_dock_number)
 
     def build_non_layer_dependencies(self) -> typing.Iterator[Dependency]:
-        geometry_section = self.mrea.get_section("geometry_section")
-        if geometry_section is not None:
-            yield from dependencies_for_material_set(geometry_section[0].materials, self.asset_manager, True)
+        if self.asset_manager.target_game <= Game.ECHOES:
+            geometry_section = self.mrea.get_raw_section("geometry_section")
+            if geometry_section:
+                for asset_id in PrefixedArray(Int32ub, AssetId32).parse(geometry_section[0]):
+                    yield from self.asset_manager.get_dependencies_for_asset(asset_id, True)
+        else:
+            geometry = self.mrea.get_geometry()
+            if geometry is not None:
+                yield from dependencies_for_material_set(geometry[0].materials, self.asset_manager, True)
+
         valid_asset = self.asset_manager.target_game.is_valid_asset_id
-        if valid_asset(portal_area := self.mrea.get_section("portal_area_section")[0]):
+        if valid_asset(portal_area := self.mrea.get_portal_area()):
             yield "PTLA", portal_area
-        if valid_asset(static_geometry_map := self.mrea.get_section("static_geometry_map_section")[0]):
+        if valid_asset(static_geometry_map := self.mrea.get_static_geometry_map()):
             yield "EGMC", static_geometry_map
-        if valid_asset(path := self.mrea.get_section("path_section")[0]):
+        if valid_asset(path := self.mrea.get_path()):
             yield "PATH", path
 
     def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
