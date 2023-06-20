@@ -353,6 +353,7 @@ class PropDetails:
     meta: dict
     needed_imports: dict[str, str]
     format_specifier: typing.Optional[str]
+    dependency_code: str | None
 
     @property
     def id(self):
@@ -707,6 +708,50 @@ class ClassDefinition:
 
         self.class_code += "        }\n"
 
+    def write_dependencies(self):
+        if self.keep_unknown_properties() or self.game_id not in {"Prime", "Echoes"}:
+            return
+
+        has_dep = False
+
+        for prop_name, prop in self.all_props.items():
+            if prop.dependency_code is None:
+                continue
+
+            has_dep = True
+            prop_code = prop.dependency_code.format(obj=f'self.{prop_name}')
+            if prop.raw.get("ignore_dependencies_mlvl"):
+                prop_code = "if not is_mlvl:\n            " + prop_code
+
+            self.class_code += f"""
+    def _dependencies_for_{prop_name}(self, asset_manager, is_mlvl: bool):
+        {prop_code}
+"""
+
+        if has_dep:
+            method_list = "\n".join(
+                f'            (self._dependencies_for_{prop_name}, "{prop_name}", "{prop.prop_type}"),'
+                for prop_name, prop in self.all_props.items()
+                if prop.dependency_code is not None
+            )
+            self.class_code += f"""
+    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+        for method, field_name, field_type in [
+{method_list}
+        ]:
+            try:
+                yield from method(asset_manager, is_mlvl)
+            except Exception as e:
+                raise Exception(
+                    f"Error finding dependencies for AreaAttributes.{{field_name}} ({{field_type}}): {{e}}"
+                )
+"""
+        else:
+            self.class_code += f"""
+    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+        yield from []
+"""
+
 
 def _add_default_types(core_path: Path, game_id: str):
     game_code = f"""
@@ -1011,11 +1056,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         meta = {}
         needed_imports = {}
         format_specifier = None
+        dependency_code = None
 
         if raw_type == "Sound":
             raw_type = "Int"
             meta["default"] = 65535
             meta["metadata"] = {"sound": True}
+            dependency_code = "yield from asset_manager.get_audio_group_dependency({obj}, is_mlvl)"
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -1024,6 +1071,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             meta["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
+            dependency_code = "yield from {obj}.dependencies_for(asset_manager, is_mlvl)"
 
             default_override = {}
             for inner_prop in prop["properties"]:
@@ -1102,14 +1150,16 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Asset":
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
-            if raw_type == "Asset":
-                field_meta = {"asset_types": prop["type_filter"]}
-                if "ignore_dependencies_mlvl" in prop:
-                    field_meta["ignore_dependencies_mlvl"] = True
-                meta["metadata"] = repr(field_meta)
-                default_value = "default_asset_id"
-            else:
-                default_value = hex(prop["default_value"] if prop['has_default'] else 0)
+            field_meta = {"asset_types": prop["type_filter"]}
+            if not any(asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")):
+                dependency_code = "yield from asset_manager.get_dependencies_for_asset({obj}, is_mlvl)"
+
+            if "ignore_dependencies_mlvl" in prop:
+                field_meta["ignore_dependencies_mlvl"] = True
+
+            meta["metadata"] = repr(field_meta)
+            default_value = "default_asset_id"
+
             meta["default"] = default_value
 
             if game_id in ["PrimeRemastered"]:
@@ -1137,6 +1187,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type in ["AnimationSet", "Spline", "PooledString"]:
             if raw_type == "AnimationSet":
                 prop_type = "AnimationParameters"
+                dependency_code = "yield from {obj}.dependencies_for(asset_manager, is_mlvl)"
             else:
                 prop_type = raw_type
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
@@ -1240,7 +1291,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         return PropDetails(prop, prop_type, need_enums, comment, parse_code, build_code, from_json_code, to_json_code,
                            custom_cook_pref=prop['cook_preference'] != "Always", known_size=known_size,
-                           meta=meta, needed_imports=needed_imports, format_specifier=format_specifier)
+                           meta=meta, needed_imports=needed_imports, format_specifier=format_specifier,
+                           dependency_code=dependency_code)
 
     def parse_struct(name: str, this, output_path: Path, struct_fourcc: typing.Optional[str] = None):
         is_struct = struct_fourcc is not None and game_id != "PrimeRemastered"
@@ -1322,6 +1374,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         # json stuff
         cls.write_from_json()
         cls.write_to_json()
+
+        cls.write_dependencies()
 
         code_code = "# Generated File\n"
         code_code += "import dataclasses\nimport struct\nimport typing\n"

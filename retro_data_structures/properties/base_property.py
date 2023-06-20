@@ -49,9 +49,10 @@ class BaseProperty:
 
     def _dependencies_for_field(self, field: dataclasses.Field, asset_manager: AssetManager, is_mlvl: bool = False
                                 ) -> typing.Iterator[Dependency]:
+        if is_mlvl and field.metadata.get("ignore_dependencies_mlvl", False):
+            return
+
         if issubclass(field.type, BaseProperty):
-            if is_mlvl and field.metadata.get("ignore_dependencies_mlvl", False):
-                return
             prop: BaseProperty = getattr(self, field.name)
             yield from prop.dependencies_for(asset_manager, is_mlvl)
 
