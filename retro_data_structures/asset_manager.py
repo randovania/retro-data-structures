@@ -22,13 +22,14 @@ from retro_data_structures.base_resource import (
     resolve_asset_id,
 )
 from retro_data_structures.exceptions import UnknownAssetId
-from retro_data_structures.formats import dependency_cheating
+from retro_data_structures.formats import dependency_cheating, Dgrp
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
 logger = logging.getLogger(__name__)
+
 
 class FileProvider:
     def is_file(self, name: str) -> bool:
@@ -115,6 +116,7 @@ class AssetManager:
     _modified_resources: dict[AssetId, RawResource | None]
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
+    _audio_group_dependency: Dgrp | None = None
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_mlvl_dependencies: dict[AssetId, tuple[Dependency, ...]]
@@ -446,7 +448,6 @@ class AssetManager:
         yield from deps
         yield Dependency("ANCS", asset_id)
 
-
     def build_audio_group_dependency_table(self):
         atbl: Atbl | None = None
         agsc_ids: list[AssetId] = []
@@ -473,7 +474,6 @@ class AssetManager:
             if define_id in define_id_to_agsc:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
 
-
     def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
         agsc = self._sound_id_to_agsc[sound_id]
         if agsc is None:
@@ -482,8 +482,11 @@ class AssetManager:
         dep = ("AGSC", agsc)
 
         if is_mlvl:
-            to_ignore = self.get_file(0x31CB5ADB) # audio_groups_single_player_DGRP
-            if dep in to_ignore.direct_dependencies:
+            if self._audio_group_dependency is None:
+                # audio_groups_single_player_DGRP
+                self._audio_group_dependency = self.get_file(0x31CB5ADB)
+
+            if dep in self._audio_group_dependency.direct_dependencies:
                 return
 
         yield dep
