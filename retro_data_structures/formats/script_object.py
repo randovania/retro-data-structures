@@ -9,6 +9,7 @@ import dataclasses
 import enum
 import io
 import logging
+import struct
 import typing
 from typing import TYPE_CHECKING, Iterator, Type
 
@@ -134,7 +135,7 @@ class _ConstructScriptInstance(construct.Construct):
             try:
                 cons.append(Connection.from_construct(game, con))
             except ValueError:
-                con.target = InstanceId(con.target) # for prettier printing
+                con.target = InstanceId(con.target)  # for prettier printing
                 logging.warning(f"Removing corrupted connection from instance {inst_id} ({obj_type}): {con=}")
 
         return ScriptInstanceRaw(
@@ -186,6 +187,23 @@ def _resolve_to_enum(correct_type: type[E], value: str | enum.Enum) -> E:
 
     # Otherwise, assume it's a proper enum but for the wrong game, so switch around
     return correct_type[value.name]
+
+
+def _try_quick_get_name(data: bytes) -> str | None:
+    try:
+        # Is first property EditorProperties?
+        if data[8:12] != b'%ZE\x80':
+            return None
+        # 12:14  (first prop size)
+        # 14:16  (EditorProperties, prop count)
+        if data[16:20] != b'INAM':
+            return None
+
+        string_size = struct.unpack_from(">H", data, 20)[0]
+        return data[22:22 + string_size - 1].decode("ascii")
+
+    except IndexError:
+        return None
 
 
 class ScriptInstanceHelper:
@@ -250,6 +268,10 @@ class ScriptInstanceHelper:
 
     @property
     def name(self) -> str | None:
+        if self.target_game == Game.ECHOES:
+            name = _try_quick_get_name(self._raw.base_property)
+            if name is not None:
+                return name
         return self.get_properties().get_name()
 
     @name.setter
