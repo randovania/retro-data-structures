@@ -58,10 +58,11 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
                     logging.error(msg)
                 elif extra:
                     logging.warning(msg)
-                f.parent.parent.mkdir(exist_ok=True)
-                f.parent.mkdir(exist_ok=True)
+                f.parent.mkdir(exist_ok=True, parents=True)
                 f.touch()
-                json.dump({"missing": missing, "extra": extra}, f.open("w"), indent=4)
+
+                with f.open("w") as of:
+                    json.dump({"missing": missing, "extra": extra}, of, indent=4)
             else:
                 logging.info(msg)
                 f.unlink(missing_ok=True)

@@ -6,12 +6,19 @@ import typing
 import construct
 
 from retro_data_structures.base_resource import AssetType, Dependency, RawResource
-from retro_data_structures.common_types import String
+from retro_data_structures.common_types import String, AssetId32
+from retro_data_structures.construct_extensions.alignment import AlignTo
+from retro_data_structures.data_section import DataSection
+from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats.hier import Hier
+from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
 
+
+class UnableToCheatError(Exception):
+    pass
 
 
 def _cheat(stream: bytes, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
@@ -25,11 +32,13 @@ def _cheat(stream: bytes, asset_manager: AssetManager, is_mlvl: bool = False) ->
 
 
 _csng = construct.FocusedSeq(
-        "agsc_id",
-        construct.Const(2, construct.Int32ub),
-        construct.Seek(0xC),
-        "agsc_id" / construct.Int32ub
-    )
+    "agsc_id",
+    construct.Const(2, construct.Int32ub),
+    construct.Seek(0xC),
+    "agsc_id" / construct.Int32ub
+)
+
+
 def csng_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
                       ) -> typing.Iterator[Dependency]:
     yield from asset_manager.get_dependencies_for_asset(_csng.parse(asset), is_mlvl)
@@ -49,10 +58,15 @@ _frme = construct.FocusedSeq(
         construct.Int32ub
     )
 )
+
+
 def frme_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
                       ) -> typing.Iterator[Dependency]:
     for dep in _frme.parse(asset.data):
-        yield from asset_manager.get_dependencies_for_asset(dep, is_mlvl)
+        try:
+            yield from asset_manager.get_dependencies_for_asset(dep, is_mlvl)
+        except UnknownAssetId:
+            raise UnableToCheatError()
 
 
 _fsm2 = construct.Struct(
@@ -94,6 +108,8 @@ _fsm2 = construct.Struct(
         "dep" / construct.Int32ub,
     ))
 )
+
+
 def fsm2_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
                       ) -> typing.Iterator[Dependency]:
     fsm2 = _fsm2.parse(asset.data)
@@ -118,6 +134,8 @@ _hint = construct.Struct(
         ))
     ))
 )
+
+
 def hint_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
                       ) -> typing.Iterator[Dependency]:
     hint = _hint.parse(asset.data)
@@ -133,6 +151,8 @@ def hint_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: 
 
 
 _rule = construct.Pointer(0x5, construct.Int32ub)
+
+
 def rule_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
                       ) -> typing.Iterator[Dependency]:
     yield from asset_manager.get_dependencies_for_asset(_rule.parse(asset.data), is_mlvl)
@@ -144,9 +164,39 @@ _font = construct.FocusedSeq(
     String,
     "txtr" / construct.Int32ub
 )
+
+
 def font_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
                       ) -> typing.Iterator[Dependency]:
     yield from asset_manager.get_dependencies_for_asset(_font.parse(asset.data), is_mlvl)
+
+
+_cmdl = construct.Struct(
+    _skip=construct.Bytes(
+        # Magic (4), Version (4), Flags (4), AABox (24)
+        36,
+    ),
+    data_section_count=construct.Int32ub,
+    material_set_count=construct.Int32ub,
+    data_section_sizes=construct.Array(construct.this.data_section_count, construct.Int32ub),
+    _=AlignTo(32),
+    material_sets=construct.Array(construct.this.material_set_count, DataSection(
+        # Assumes Prime 1/2
+        construct.PrefixedArray(construct.Int32ub, AssetId32),
+        size=lambda: construct.Computed(lambda ctx: ctx.data_section_sizes[ctx._index])
+    )),
+)
+
+
+def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
+                      ) -> typing.Iterator[Dependency]:
+    if asset_manager.target_game >= Game.CORRUPTION:
+        raise UnableToCheatError()
+
+    decoded = _cmdl.parse(asset.data)
+    for material_set in decoded.material_sets:
+        for txtr_id in material_set:
+            yield from asset_manager.get_dependencies_for_asset(txtr_id, is_mlvl)
 
 
 _FORMATS_TO_CHEAT = {
@@ -157,14 +207,21 @@ _FORMATS_TO_CHEAT = {
     "HINT": hint_dependencies,
     "RULE": rule_dependencies,
     "FONT": font_dependencies,
+    "CMDL": cmdl_dependencies,
 }
+
 
 def should_cheat_asset(asset_type: AssetType) -> bool:
     return asset_type in _FORMATS_TO_CHEAT
 
+
 def get_cheated_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
                              ) -> typing.Iterator[Dependency]:
-    try:
-        yield from _FORMATS_TO_CHEAT[asset.type](asset, asset_manager, is_mlvl)
-    except Exception:
-        yield from _cheat(asset.data, asset_manager, is_mlvl)
+    if asset.type in _FORMATS_TO_CHEAT:
+        try:
+            yield from _FORMATS_TO_CHEAT[asset.type](asset, asset_manager, is_mlvl)
+            return
+        except UnableToCheatError:
+            pass
+
+    yield from _cheat(asset.data, asset_manager, is_mlvl)

@@ -407,17 +407,16 @@ class AssetManager:
             deps = dep_cache[asset_id]
         else:
             if dependency_cheating.should_cheat_asset(asset_type):
-                deps = dependency_cheating.get_cheated_dependencies(
+                deps = tuple(dependency_cheating.get_cheated_dependencies(
                     self.get_raw_asset(asset_id),
                     self, is_mlvl
-                )
+                ))
 
             elif formats.has_resource_type(asset_type):
                 if self.get_asset_format(asset_id).has_dependencies(self.target_game):
-                    deps = self.get_parsed_asset(asset_id).dependencies_for(is_mlvl)
+                    deps = tuple(self.get_parsed_asset(asset_id).dependencies_for(is_mlvl))
 
             logger.debug(f"Adding {asset_id:#8x} deps to cache...")
-            deps = tuple(deps)
             dep_cache[asset_id] = deps
 
         yield from deps
