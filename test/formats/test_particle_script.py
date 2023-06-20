@@ -1,6 +1,6 @@
-import pytest
-
 from test import test_lib
+
+import pytest
 
 from retro_data_structures.asset_manager import AssetManager
 
