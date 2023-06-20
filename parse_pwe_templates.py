@@ -743,7 +743,7 @@ class ClassDefinition:
                 yield from method(asset_manager, is_mlvl)
             except Exception as e:
                 raise Exception(
-                    f"Error finding dependencies for AreaAttributes.{{field_name}} ({{field_type}}): {{e}}"
+                    f"Error finding dependencies for {self.class_name}.{{field_name}} ({{field_type}}): {{e}}"
                 )
 """
         else:
