@@ -9,7 +9,7 @@ from retro_data_structures.game_check import AssetIdCorrect, Game
 
 ConstructDependency = Struct("asset_type" / FourCC, "asset_id" / AssetIdCorrect)
 
-DGRP = PrefixedArray(Int32ub, ConstructDependency)
+DGRP = PrefixedArray(Int32ub, ConstructDependency).compile()
 
 
 def legacy_dependencies(obj, target_game: Game):
