@@ -747,7 +747,7 @@ class ClassDefinition:
                 )
 """
         else:
-            self.class_code += f"""
+            self.class_code += """
     def dependencies_for(self, asset_manager, is_mlvl: bool = False):
         yield from []
 """
