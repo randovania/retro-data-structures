@@ -3,13 +3,20 @@ import typing
 import construct
 from construct import Int32ub, PrefixedArray, Struct
 
+from retro_data_structures import common_types
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
-from retro_data_structures.common_types import FourCC
-from retro_data_structures.game_check import AssetIdCorrect, Game
+from retro_data_structures.game_check import CurrentGameCheck, Game
 
-ConstructDependency = Struct("asset_type" / FourCC, "asset_id" / AssetIdCorrect)
 
-DGRP = PrefixedArray(Int32ub, ConstructDependency)
+def construct_dep(asset_id_format):
+    return Struct("asset_type" / common_types.FourCC, "asset_id" / asset_id_format)
+
+
+DGRP = CurrentGameCheck(
+    Game.CORRUPTION,
+    PrefixedArray(Int32ub, construct_dep(common_types.AssetId64)),
+    PrefixedArray(Int32ub, construct_dep(common_types.AssetId32))
+).compile()
 
 
 def legacy_dependencies(obj, target_game: Game):

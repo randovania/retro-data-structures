@@ -339,6 +339,7 @@ CMDL = Struct(
     ),
 )
 
+
 def dependencies_for_material_set(mat, asset_manager: AssetManager, is_mlvl):
     if asset_manager.target_game <= Game.ECHOES:
         for file_id in mat.texture_file_ids:
@@ -349,6 +350,7 @@ def dependencies_for_material_set(mat, asset_manager: AssetManager, is_mlvl):
             for element in material.element:
                 if element.type == "PASS":
                     yield from asset_manager.get_dependencies_for_asset(element.body.id, is_mlvl)
+
 
 def legacy_dependencies(obj, target_game: Game):
     if target_game <= Game.ECHOES:

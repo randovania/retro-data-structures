@@ -168,5 +168,5 @@ def uses_lzo(ctx):
     return get_current_game(ctx).uses_lzo
 
 
-AssetIdCorrect = IfThenElse(uses_asset_id_32, common_types.AssetId32, common_types.AssetId64)
-ObjectTagCorrect = IfThenElse(uses_asset_id_32, common_types.ObjectTag_32, common_types.ObjectTag_64)
+AssetIdCorrect = CurrentGameCheck(Game.CORRUPTION, common_types.AssetId64, common_types.AssetId32)
+ObjectTagCorrect = CurrentGameCheck(Game.CORRUPTION, common_types.ObjectTag_64, common_types.ObjectTag_32)

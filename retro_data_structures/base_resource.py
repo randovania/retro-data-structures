@@ -50,8 +50,11 @@ class BaseResource:
     def has_dependencies(cls, target_game: Game) -> bool:
         dummy = cls(Container(), target_game, None)
         try:
-            return len(dummy.dependencies_for()) > 0
-        except Exception:
+            for _ in dummy.dependencies_for():
+                return True
+            return False
+
+        except (KeyError, AttributeError):
             return True
 
     def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:

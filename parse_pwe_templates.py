@@ -784,6 +784,9 @@ class Vector(BaseProperty):
             "y": self.y,
             "z": self.z,
         }}
+
+    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+        yield from []
 """ + game_code)
     if game_id == "PrimeRemastered":
         asset_code = "import uuid\n\nAssetId = uuid.UUID\ndefault_asset_id = uuid.UUID(int=0)\n"
