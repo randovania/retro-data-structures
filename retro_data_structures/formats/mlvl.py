@@ -23,7 +23,7 @@ from retro_data_structures.construct_extensions.misc import \
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
-from retro_data_structures.formats.mrea import AreaWrapper
+from retro_data_structures.formats.mrea import Area
 from retro_data_structures.formats.savw import Savw
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
@@ -270,11 +270,11 @@ class Mlvl(BaseResource):
             return super().__repr__()
 
     @property
-    def areas(self) -> Iterator[AreaWrapper]:
+    def areas(self) -> Iterator[Area]:
         for i, area in enumerate(self._raw.areas):
-            yield AreaWrapper(area, i, self)
+            yield Area(area, i, self)
 
-    def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
+    def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
 
     def layer_names_for_area_index(self, index: int) -> list[str]:

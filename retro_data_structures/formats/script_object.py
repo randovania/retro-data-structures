@@ -267,9 +267,8 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, id: typing.Union[int, InstanceId]) -> bool:
-        if not isinstance(id, InstanceId):
-            id = InstanceId(id)
+    def id_matches(self, id: InstanceRef) -> bool:
+        id = resolve_instance_ref(id)
 
         return self.id.area == id.area and self.id.instance == id.instance
 

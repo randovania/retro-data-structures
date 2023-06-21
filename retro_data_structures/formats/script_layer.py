@@ -32,7 +32,7 @@ from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.mlvl import AreaWrapper
+    from retro_data_structures.formats.mlvl import Area
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -82,7 +82,7 @@ SCGN = ConstructScriptLayer("SCGN")
 
 
 class ScriptLayer:
-    _parent_area: Optional[AreaWrapper] = None
+    _parent_area: Optional[Area] = None
     _index: int
     _modified: bool = False
 
@@ -96,7 +96,7 @@ class ScriptLayer:
             return f"{self.name} ({'Active' if self.active else 'Inactive'})"
         return super().__repr__()
 
-    def with_parent(self, parent: AreaWrapper) -> ScriptLayer:
+    def with_parent(self, parent: Area) -> ScriptLayer:
         self._parent_area = parent
         return self
 
@@ -135,7 +135,7 @@ class ScriptLayer:
         raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstance):
-        if self.get_instance(instance.id) is not None:
+        if self.has_instance(instance.id):
             raise RuntimeError(f"Instance with id {instance.id} already exists.")
 
         self._modified = True

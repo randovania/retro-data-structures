@@ -609,7 +609,7 @@ _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
 }
 
 
-class AreaWrapper:
+class Area:
     _mrea: Mrea = None
     _strg: Strg = None
 
@@ -682,7 +682,7 @@ class AreaWrapper:
 
     @property
     def next_instance_id(self) -> int:
-        ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
+        ids = [instance.id.instance for instance in self.all_instances]
         return next(i for i in itertools.count() if i not in ids)
 
     @property
@@ -719,7 +719,7 @@ class AreaWrapper:
     def remove_instance(self, instance: InstanceRef):
         self.get_layer_for_instance(instance).remove_instance(instance)
 
-    def _raw_connect_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+    def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]
         assert len(source_dock.connecting_dock) == 1, "Only docks with one connection supported"
         source_dock.connecting_dock[0].area_index = target_area._index
@@ -732,7 +732,7 @@ class AreaWrapper:
                     attached_area_index.append(c.area_index)
         self._raw.attached_area_index = construct.ListContainer(attached_area_index)
 
-    def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+    def connect_dock_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         self._raw_connect_to(source_dock_number, target_area, target_dock_number)
         target_area._raw_connect_to(target_dock_number, self, source_dock_number)
 
