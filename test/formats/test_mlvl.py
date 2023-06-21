@@ -92,7 +92,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
         for area in mlvl.areas:
             old = area.dependencies
-            old = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in old.items()}
+            old = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in old.items()}
 
             start = time.time()
             area.build_mlvl_dependencies()
@@ -100,7 +100,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             total_elapsed += elapsed
 
             new = area.dependencies
-            new = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in new.items()}
+            new = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in new.items()}
 
             missing = {
                 layer_name: old_layer.difference(new_layer)

@@ -17,6 +17,7 @@ NameOrAssetId = str | AssetId
 class Dependency(typing.NamedTuple):
     type: AssetType
     id: AssetId
+    exclude_for_mlvl: bool = False
 
 
 class BaseResource:

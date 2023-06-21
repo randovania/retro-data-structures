@@ -71,10 +71,7 @@ class Scan(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return SCAN
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
-        if is_mlvl:
-            return
-
+    def _internal_dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         if self.target_game == Game.PRIME:
             yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
             yield from self.asset_manager.get_dependencies_for_asset(self.raw.text_id)
@@ -83,6 +80,10 @@ class Scan(BaseResource):
         else:
             for dep in self.raw.dependencies:
                 yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)
+
+    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+        for it in self._internal_dependencies_for(is_mlvl):
+            yield Dependency(it.type, it.id, True)
 
     _scannable_object_info: ScriptInstance | None = None
     @property

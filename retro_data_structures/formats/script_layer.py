@@ -255,16 +255,17 @@ class ScriptLayer:
 
         unique_deps: set[Dependency] = set()
         for dep in deps:
-            if dep in unique_deps:
+            if dep in unique_deps or dep.exclude_for_mlvl:
                 continue
             # specifically keep the order of the *first* appearance of the dependency
             unique_deps.add(dep)
             yield dep
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> typing.Iterator[Dependency]:
         self.assert_parent()
         deps = self._parent_area._raw.dependencies
         offsets = deps.offsets
         raw_deps = deps.dependencies[offsets[self._index]:offsets[self._index+1]]
-        yield from ((dep.asset_type, dep.asset_id) for dep in raw_deps)
+        yield from (Dependency(dep.asset_type, dep.asset_id, False)
+                    for dep in raw_deps)

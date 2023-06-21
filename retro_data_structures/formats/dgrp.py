@@ -36,7 +36,7 @@ class Dgrp(BaseResource):
     @property
     def direct_dependencies(self) -> typing.Iterator[Dependency]:
         for dep in self.raw:
-            yield dep.asset_type, dep.asset_id
+            yield Dependency(dep.asset_type, dep.asset_id, False)
 
     def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
         for dependency in self.raw:

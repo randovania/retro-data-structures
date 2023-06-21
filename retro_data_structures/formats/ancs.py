@@ -150,11 +150,13 @@ def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, gam
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
+
 def char_dependencies_for(character, asset_manager: AssetManager, is_mlvl: bool = False):
     def _array(asset_ids: Optional[Iterable[int]]):
         if asset_ids is not None:
             for asset_id in asset_ids:
-                yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl)
+                yield from asset_manager.get_dependencies_for_asset(asset_id, is_mlvl,
+                                                                    not_exist_ok=True)
 
     yield from _array((
         character.model_id,

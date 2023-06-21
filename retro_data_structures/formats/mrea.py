@@ -533,88 +533,88 @@ class Mrea(BaseResource):
 _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
     0xD7C3B839: {
         # Sanctum
-        "Default": [("TXTR", 0xd5b9e5d1)],
-        "Emperor Ing Stage 1": [("TXTR", 0x52c7d438)],
-        "Emperor Ing Stage 3": [("TXTR", 0xd5b9e5d1)],
-        "Emperor Ing Stage 1 Intro Cine": [("TXTR", 0x52c7d438)],
-        "Emperor Ing Stage 3 Death Cine": [("TXTR", 0xd5b9e5d1)],
+        "Default": [Dependency("TXTR", 0xd5b9e5d1)],
+        "Emperor Ing Stage 1": [Dependency("TXTR", 0x52c7d438)],
+        "Emperor Ing Stage 3": [Dependency("TXTR", 0xd5b9e5d1)],
+        "Emperor Ing Stage 1 Intro Cine": [Dependency("TXTR", 0x52c7d438)],
+        "Emperor Ing Stage 3 Death Cine": [Dependency("TXTR", 0xd5b9e5d1)],
     },
     0xA92F00B3: {
         # Hive Temple
         "CliffsideBoss": [
-            ("TXTR", 0x24149e16),
-            ("TXTR", 0xbdb8a88a),
-            ("FSM2", 0x3d31822b),
+            Dependency("TXTR", 0x24149e16),
+            Dependency("TXTR", 0xbdb8a88a),
+            Dependency("FSM2", 0x3d31822b),
         ]
     },
     0xC0113CE8: {
         # Dynamo Works
-        "3rd Pass": [("RULE", 0x393ca543)]
+        "3rd Pass": [Dependency("RULE", 0x393ca543)]
     },
     0x5571E89E: {
         # Hall of Combat Mastery
-        "2nd Pass Enemies": [("RULE", 0x393ca543)]
+        "2nd Pass Enemies": [Dependency("RULE", 0x393ca543)]
     },
     0x7B94B06B: {
         # Hive Portal Chamber
-        "1st Pass": [("RULE", 0x393ca543)],
-        "2nd Pass": [("RULE", 0x393ca543)]
+        "1st Pass": [Dependency("RULE", 0x393ca543)],
+        "2nd Pass": [Dependency("RULE", 0x393ca543)]
     },
     0xF8DBC03D: {
         # Hive Reactor
-        "2nd Pass": [("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393ca543)]
     },
     0xB666B655: {
         # Reactor Access
-        "2nd Pass": [("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393ca543)]
     },
     0xE79AAFAE: {
         # Transport A Access
-        "2nd Pass": [("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393ca543)]
     },
     0xFEB7BD27: {
         # Transport B Access
-        "Default": [("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393ca543)]
     },
     0x89D246FD: {
         # Portal Access
-        "Default": [("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393ca543)]
     },
     0x0253782D: {
         # Dark Forgotten Bridge
-        "Default": [("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393ca543)]
     },
     0x09DECF21: {
         # Forgotten Bridge
-        "Default": [("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393ca543)]
     },
     0x629790F4: {
         # Sacrificial Chamber
-        "1st Pass": [("RULE", 0x393ca543)]
+        "1st Pass": [Dependency("RULE", 0x393ca543)]
     },
     0xBBE4B3AE: {
         # Dungeon
-        "Default": [("TXTR", 0xe252e7f6)]
+        "Default": [Dependency("TXTR", 0xe252e7f6)]
     },
     0x2BCD44A7: {
         # Portal Terminal
-        "Default": [("TXTR", 0xb6fa5023)]
+        "Default": [Dependency("TXTR", 0xb6fa5023)]
     },
     0xC68B5B51: {
         # Transport to Sanctuary Fortress
-        "!!non_layer!!": [("TXTR", 0x75a219a8)]
+        "!!non_layer!!": [Dependency("TXTR", 0x75a219a8)]
     },
     0x625A2692: {
         # Temple Transport Access
-        "!!non_layer!!": [("TXTR", 0x581c56ea)]
+        "!!non_layer!!": [Dependency("TXTR", 0x581c56ea)]
     },
     0x96F4CA1E: {
         # Minigyro Chamber
-        "Default": [("TXTR", 0xac080dfb)]
+        "Default": [Dependency("TXTR", 0xac080dfb)]
     },
     0x5BBF334F: {
         # Staging Area
-        "!!non_layer!!": [("TXTR", 0x738feb19)]
+        "!!non_layer!!": [Dependency("TXTR", 0x738feb19)]
     }
 }
 
@@ -742,19 +742,19 @@ class Area:
             geometry_section = self.mrea.get_raw_section("geometry_section")
             if geometry_section:
                 for asset_id in PrefixedArray(Int32ub, AssetId32).parse(geometry_section[0]):
-                    yield from self.asset_manager.get_dependencies_for_asset(asset_id, True)
+                    yield from self.asset_manager.get_dependencies_for_asset(asset_id)
         else:
             geometry = self.mrea.get_geometry()
             if geometry is not None:
-                yield from dependencies_for_material_set(geometry[0].materials, self.asset_manager, True)
+                yield from dependencies_for_material_set(geometry[0].materials, self.asset_manager)
 
         valid_asset = self.asset_manager.target_game.is_valid_asset_id
         if valid_asset(portal_area := self.mrea.get_portal_area()):
-            yield "PTLA", portal_area
+            yield Dependency("PTLA", portal_area)
         if valid_asset(static_geometry_map := self.mrea.get_static_geometry_map()):
-            yield "EGMC", static_geometry_map
+            yield Dependency("EGMC", static_geometry_map)
         if valid_asset(path := self.mrea.get_path()):
-            yield "PATH", path
+            yield Dependency("PATH", path)
 
     def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
         layer_deps = list(layer_deps)
@@ -785,7 +785,6 @@ class Area:
                 non_layer_deps.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
             layer_deps.append(non_layer_deps)
 
-
         layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
 
         if self.mrea_asset_id in _hardcoded_dependencies:
@@ -799,39 +798,37 @@ class Area:
 
                 layer_deps[layer.index].extend(missing)
 
+        layer_deps = [
+            [dep for dep in layer if not dep.exclude_for_mlvl]
+            for layer in layer_deps
+        ]
+
         offset = 0
         offsets = []
-        for layer in layer_deps:
+        for layer_dep in layer_deps:
             offsets.append(offset)
-            offset += len(layer)
+            offset += len(layer_dep)
 
-        deps = list(itertools.chain(*layer_deps))
-        deps = [Container(asset_type=typ, asset_id=idx) for typ, idx in deps]
+        fancy_deps: list[Dependency] = list(itertools.chain(*layer_deps))
+        deps = [Container(asset_type=dep.type, asset_id=dep.id) for dep in fancy_deps]
         self._raw.dependencies.dependencies = deps
         self._raw.dependencies.offsets = offsets
 
     @property
-    def layer_dependencies(self):
+    def layer_dependencies(self) -> dict[str, list[Dependency]]:
         return {
             layer.name: list(layer.dependencies)
             for layer in self.layers
         }
 
     @property
-    def all_layer_deps(self):
-        deps = set()
-        for layer_deps in self.layer_dependencies.values():
-            deps.update(dep["asset_id"] for dep in layer_deps)
-        return deps
-
-    @property
-    def non_layer_dependencies(self):
+    def non_layer_dependencies(self) -> Iterator[Dependency]:
         deps = self._raw.dependencies
         global_deps = deps.dependencies[deps.offsets[len(self._layer_names)]:]
-        yield from [(dep.asset_type, dep.asset_id) for dep in global_deps]
+        yield from [Dependency(dep.asset_type, dep.asset_id) for dep in global_deps]
 
     @property
-    def dependencies(self):
+    def dependencies(self) -> dict[str, list[Dependency]]:
         deps = self.layer_dependencies
         deps["!!non_layer!!"] = list(self.non_layer_dependencies)
         return deps

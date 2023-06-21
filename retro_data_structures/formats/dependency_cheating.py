@@ -145,11 +145,11 @@ def hint_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: 
         yield from asset_manager.get_dependencies_for_asset(h.popup_strg, is_mlvl)
         for loc in h.locations:
             yield from asset_manager.get_dependencies_for_asset(loc.map_text_strg, is_mlvl)
-            if not is_mlvl:
-                # there's no way these are recursive, right?
-                # if they're even valid dependencies at all
-                yield "MLVL", loc.mlvl
-                yield "MREA", loc.mrea
+            # if not is_mlvl:
+            #     # there's no way these are recursive, right?
+            #     # if they're even valid dependencies at all
+            #     yield "MLVL", loc.mlvl, False
+            #     yield "MREA", loc.mrea, False
 
 
 _rule = construct.Pointer(0x5, construct.Int32ub)
