@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from retro_data_structures.formats.script_object import _try_quick_get_name
 from retro_data_structures.properties.base_property import BaseProperty
 
 _root = Path(__file__).parents[1]
@@ -41,22 +42,22 @@ def _parametrize_for_game(game: str):
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("prime"))
-def test_import_and_create_prime(path):
+def test_import_and_create_prime(path: Path):
     perform_module_checks(path)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("echoes"))
-def test_import_and_create_echoes(path):
+def test_import_and_create_echoes(path: Path):
     perform_module_checks(path)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("corruption"))
-def test_import_and_create_corruption(path):
+def test_import_and_create_corruption(path: Path):
     perform_module_checks(path)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("prime_remastered"))
-def test_import_and_create_prime_remastered(path):
+def test_import_and_create_prime_remastered(path: Path):
     perform_module_checks(path)
 
 
@@ -132,6 +133,7 @@ def test_door():
     assert door.editor_properties.name == "Door"
     assert door.shell_color == Color(0.0, 1.0, 1.0, 1.0)
     assert door.vulnerability.boost_ball == WeaponVulnerability(0.0, Effect.Normal, True)
+    assert _try_quick_get_name(data) == "Door"
 
 
 def test_p1r_world_teleporter():
