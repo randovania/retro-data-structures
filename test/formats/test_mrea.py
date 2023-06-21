@@ -5,7 +5,7 @@ import pytest
 from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats import Mlvl
 from retro_data_structures.formats.mrea import Mrea
-from retro_data_structures.formats.script_object import ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ScriptInstance
 
 
 @pytest.mark.xfail
@@ -25,14 +25,14 @@ def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
     resource = prime2_asset_manager.get_raw_asset(mrea_asset_id)
 
     decoded = Mrea.parse(resource.data, target_game=prime2_asset_manager.target_game)
-    for instance in decoded.all_instances:
-        assert isinstance(instance, ScriptInstanceHelper)
+    for inst in decoded._all_non_scgn_instances():
+        assert isinstance(inst, ScriptInstance)
 
     encoded = decoded.build()
 
     decoded2 = Mrea.parse(encoded, target_game=prime2_asset_manager.target_game)
-    for instance in decoded2.all_instances:
-        assert isinstance(instance, ScriptInstanceHelper)
+    for inst in decoded2._all_non_scgn_instances():
+        assert isinstance(inst, ScriptInstance)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
 
