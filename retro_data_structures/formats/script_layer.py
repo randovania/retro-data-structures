@@ -171,15 +171,6 @@ class ScriptLayer:
         savw.raw.memory_relays.append({"instance_id": relay.id})
         return relay
 
-    def add_existing_instance(self, instance: ScriptInstance) -> ScriptInstance:
-        if instance.id.area != self._parent_area.id:
-            new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
-        else:
-            new_id = InstanceId.new(self._index, instance.id.area, instance.id.instance)
-
-        instance.id = new_id
-        return self._internal_add_instance(instance)
-
     def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)

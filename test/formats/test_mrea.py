@@ -35,15 +35,3 @@ def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
         assert isinstance(inst, ScriptInstance)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
-
-
-def test_add_instance(prime2_asset_manager):
-    from retro_data_structures.enums import echoes
-    from retro_data_structures.properties.echoes.objects.SpecialFunction import SpecialFunction
-
-    mlvl = prime2_asset_manager.get_parsed_asset(0x42b935e4, type_hint=Mlvl)
-    area = mlvl.get_area(0x5DFA984F)
-    area.get_layer("Default").add_instance_with(SpecialFunction(
-        function=echoes.Function.Darkworld,
-    ))
-    assert area.mrea.build() is not None

@@ -76,7 +76,7 @@ class InstanceId(int):
         return self & 0xffff
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(unsafe_hash=True)
 class Connection:
     state: State
     message: Message
@@ -290,7 +290,7 @@ class ScriptInstance:
         return self._raw.base_property
 
     def get_properties(self) -> BaseObjectType:
-        return self.type.from_bytes(self._raw.base_property)
+        return self.type.from_bytes(self.raw_properties)
 
     def get_properties_as(self, type_cls: Type[PropertyType]) -> PropertyType:
         props = self.get_properties()
@@ -307,12 +307,6 @@ class ScriptInstance:
 
         self._raw.base_property = data.to_bytes()
         self.on_modify()
-
-    def get_property(self, chain: Iterator[str]):
-        prop = self.get_properties()
-        for name in chain:
-            prop = getattr(prop, name)
-        return prop
 
     @contextlib.contextmanager
     def edit_properties(self, type_cls: Type[PropertyType]):
