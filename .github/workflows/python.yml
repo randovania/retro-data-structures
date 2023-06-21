@@ -150,7 +150,7 @@ jobs:
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest --fail-if-missing --skip-dependency-tests --cov retro_data_structures --cov-report=xml test
+          venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --skip-dependency-tests --durations=100 test
 
       - name: codecov
         uses: codecov/codecov-action@v3
