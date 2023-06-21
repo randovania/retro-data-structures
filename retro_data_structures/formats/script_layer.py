@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import typing
-from typing import Optional
 
 import construct
 from construct.core import (
@@ -72,7 +71,7 @@ def ConstructScriptLayer(identifier):
     )
 
 
-def new_layer(index: Optional[int], target_game: Game) -> Container:
+def new_layer(index: int | None, target_game: Game) -> Container:
     if target_game <= Game.PRIME:
         raise NotImplementedError()
     return Container({
@@ -93,7 +92,7 @@ SCGN = ConstructScriptLayer("SCGN")
 
 
 class ScriptLayer:
-    _parent_area: Optional[Area] = None
+    _parent_area: Area | None = None
     _index: int
     _modified: bool = False
 
@@ -155,7 +154,7 @@ class ScriptLayer:
         self._raw.script_instances.append(instance._raw)
         return self._get_instance_by_ref(instance.id)
 
-    def add_instance(self, instance_type: str, name: Optional[str] = None) -> ScriptInstance:
+    def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
         instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
         if name is not None:
             instance.name = name

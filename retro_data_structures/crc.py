@@ -1,7 +1,6 @@
 """
 Module for calculating CRC hashes with the algorithm and data used by Retro.
 """
-import typing
 
 _crc32_constants = [
     0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3, 0x0EDB8832,
@@ -91,7 +90,7 @@ _crc64_constants = [
 ]
 
 
-def _run_crc(table: list[int], initial: int, data: typing.Union[bytes, str]) -> int:
+def _run_crc(table: list[int], initial: int, data: bytes | str) -> int:
     if isinstance(data, str):
         data = data.encode("utf-8")
 
@@ -103,7 +102,7 @@ def _run_crc(table: list[int], initial: int, data: typing.Union[bytes, str]) -> 
     return checksum
 
 
-def crc32(data: typing.Union[bytes, str]) -> int:
+def crc32(data: bytes | str) -> int:
     return _run_crc(
         _crc32_constants,
         0xFFFFFFFF,
@@ -111,7 +110,7 @@ def crc32(data: typing.Union[bytes, str]) -> int:
     )
 
 
-def crc64(data: typing.Union[bytes, str]) -> int:
+def crc64(data: bytes | str) -> int:
     return _run_crc(
         _crc64_constants,
         0xFFFFFFFFFFFFFFFF,

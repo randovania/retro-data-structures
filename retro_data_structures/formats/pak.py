@@ -31,7 +31,7 @@ class Pak:
             return pak_gc.PAKNoData
 
     @classmethod
-    def parse(cls: typing.Type[Pak], data: bytes, target_game: Game) -> Pak:
+    def parse(cls: type[Pak], data: bytes, target_game: Game) -> Pak:
         return cls(_pak_for_game(target_game).parse(data, target_game=target_game), target_game)
 
     def build(self) -> bytes:
@@ -44,7 +44,7 @@ class Pak:
     def build_stream(self, stream: typing.BinaryIO) -> bytes:
         return _pak_for_game(self.target_game).build_stream(self._raw, stream, target_game=self.target_game)
 
-    def get_asset(self, asset_id: AssetId) -> typing.Optional[RawResource]:
+    def get_asset(self, asset_id: AssetId) -> RawResource | None:
         """
         Gets the asset of given id, getting the bytes and type
         :param asset_id:

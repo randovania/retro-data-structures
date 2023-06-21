@@ -1,4 +1,3 @@
-import typing
 
 from construct import Construct
 
@@ -113,7 +112,7 @@ def format_for(type_name: AssetType) -> Construct:
     return ALL_FORMATS[type_name.upper()]
 
 
-def resource_type_for(type_name: AssetType) -> typing.Type[BaseResource]:
+def resource_type_for(type_name: AssetType) -> type[BaseResource]:
     return ALL_RESOURCE_TYPES[type_name.upper()]
 
 

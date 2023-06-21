@@ -7,7 +7,6 @@ import typing
 import uuid
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from typing import List, Optional
 
 from retro_data_structures import dependencies, formats
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
@@ -189,7 +188,7 @@ def do_extract(args):
 
 def list_dependencies(args):
     game: Game = args.game
-    asset_ids: List[int]
+    asset_ids: list[int]
 
     asset_provider = AssetManager(get_provider_from_argument(args), game)
     if args.asset_ids is not None:
@@ -202,13 +201,13 @@ def list_dependencies(args):
         ]
 
     for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
-        print("{}: {}".format(asset_type, hex(asset_id)))
+        print(f"{asset_type}: {hex(asset_id)}")
 
 
 def do_convert(args):
     source_game: Game = args.source_game
     target_game: Game = args.target_game
-    asset_ids: List[int] = args.asset_ids
+    asset_ids: list[int] = args.asset_ids
 
     next_generated_id = 0xFFFF0000
     asset_manager = AssetManager(get_provider_from_argument(args), source_game)
@@ -247,7 +246,7 @@ def do_convert(args):
             print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
 
     print("==================\n>> All converted assets")
-    reverse_converted_ids: typing.Dict[AssetId, typing.Tuple[Game, AssetId]] = {
+    reverse_converted_ids: dict[AssetId, tuple[Game, AssetId]] = {
         v: k for k, v in converter.converted_ids.items()
     }
 
@@ -287,7 +286,7 @@ async def compare_all_files_in_path(args):
     input_path: Path = args.input_path
     file_format: str = args.format
     game: Game = args.game
-    limit: Optional[int] = args.limit
+    limit: int | None = args.limit
 
     def apply_limit(it):
         if limit is None:

@@ -1,6 +1,5 @@
 import importlib
 import io
-import typing
 from pathlib import Path
 
 import pytest
@@ -15,7 +14,7 @@ def perform_module_checks(path: Path):
     module_name = path.with_suffix("").as_posix().replace("/", ".")
     module = importlib.import_module(module_name)
 
-    module_class: typing.Type[BaseProperty] = getattr(module, path.stem)
+    module_class: type[BaseProperty] = getattr(module, path.stem)
     obj = module_class()
 
     stream = io.BytesIO()

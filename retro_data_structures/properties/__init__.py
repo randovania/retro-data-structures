@@ -1,10 +1,9 @@
-import typing
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseObjectType
 
 
-def get_game_object(game: Game, four_cc: typing.Union[str, int]) -> typing.Type[BaseObjectType]:
+def get_game_object(game: Game, four_cc: str | int) -> type[BaseObjectType]:
     if game == Game.PRIME:
         from .prime import objects as prime_objects
         return prime_objects.get_object(four_cc)

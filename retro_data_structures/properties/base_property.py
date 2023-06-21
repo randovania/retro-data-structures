@@ -20,11 +20,11 @@ class BaseProperty:
         raise NotImplementedError()
 
     @classmethod
-    def from_stream(cls: typing.Type[Self], data: typing.BinaryIO, size: typing.Optional[int] = None) -> Self:
+    def from_stream(cls: type[Self], data: typing.BinaryIO, size: int | None = None) -> Self:
         raise NotImplementedError()
 
     @classmethod
-    def from_bytes(cls: typing.Type[Self], data: bytes) -> Self:
+    def from_bytes(cls: type[Self], data: bytes) -> Self:
         stream = io.BytesIO(data)
         return cls.from_stream(stream, len(data))
 
@@ -37,7 +37,7 @@ class BaseProperty:
         return stream.getvalue()
 
     @classmethod
-    def from_json(cls: typing.Type[Self], data: typing.Any) -> Self:
+    def from_json(cls: type[Self], data: typing.Any) -> Self:
         raise NotImplementedError()
 
     def to_json(self) -> typing.Any:
@@ -75,14 +75,14 @@ class BaseProperty:
 
 class BaseObjectType(BaseProperty, ABC):
     @classmethod
-    def object_type(cls) -> typing.Union[str, int]:
+    def object_type(cls) -> str | int:
         raise NotImplementedError()
 
     @classmethod
-    def modules(cls) -> typing.List[str]:
+    def modules(cls) -> list[str]:
         return []
 
-    def get_name(self) -> typing.Optional[str]:
+    def get_name(self) -> str | None:
         raise NotImplementedError()
 
     def set_name(self, name: str) -> None:

@@ -4,8 +4,8 @@ import logging
 import typing
 import uuid
 from collections import defaultdict
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import construct
 import nod
@@ -184,8 +184,7 @@ class AssetManager:
         original_name = asset_id
         asset_id = self._resolve_asset_id(asset_id)
         try:
-            for pak_name in self._paks_for_asset_id[asset_id]:
-                yield pak_name
+            yield from self._paks_for_asset_id[asset_id]
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
@@ -245,12 +244,12 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
-    def get_asset_format(self, asset_id: NameOrAssetId) -> typing.Type[BaseResource]:
+    def get_asset_format(self, asset_id: NameOrAssetId) -> type[BaseResource]:
         asset_type = self.get_asset_type(asset_id)
         return formats.resource_type_for(asset_type)
 
     def get_parsed_asset(self, asset_id: NameOrAssetId, *,
-                         type_hint: typing.Type[T] = BaseResource) -> T:
+                         type_hint: type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
         """
@@ -261,7 +260,7 @@ class AssetManager:
         return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game,
                                   asset_manager=self)
 
-    def get_file(self, path: NameOrAssetId, type_hint: typing.Type[T] = BaseResource) -> T:
+    def get_file(self, path: NameOrAssetId, type_hint: type[T] = BaseResource) -> T:
         """
         Wrapper for get_parsed_asset. Override in subclasses for additional behavior such as automatic saving.
         """

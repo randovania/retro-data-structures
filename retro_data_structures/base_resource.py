@@ -25,7 +25,7 @@ class BaseResource:
     target_game: Game
     asset_manager: AssetManager
 
-    def __init__(self, raw: Container, target_game: Game, asset_manager: typing.Optional[AssetManager] = None):
+    def __init__(self, raw: Container, target_game: Game, asset_manager: AssetManager | None = None):
         self._raw = raw
         self.target_game = target_game
         self.asset_manager = asset_manager
@@ -40,7 +40,7 @@ class BaseResource:
 
     @classmethod
     def parse(cls, data: bytes, target_game: Game,
-              asset_manager: typing.Optional[AssetManager] = None) -> "BaseResource":
+              asset_manager: AssetManager | None = None) -> BaseResource:
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
                    target_game, asset_manager)
 

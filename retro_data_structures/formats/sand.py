@@ -2,7 +2,6 @@
 Wiki: https://wiki.axiodl.com/w/SAND_(File_Format)
 """
 import typing
-from typing import List, Optional
 
 import construct
 from construct import Const, Float32b, Int8ub, Int16ub, Int32ub, PrefixedArray, Struct
@@ -56,12 +55,12 @@ SAND = Struct(
 )
 
 
-def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
+def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game):
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
 
-def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, game: Game):
+def _yield_dependency_array(asset_ids: list[int] | None, asset_type: str, game: Game):
     if asset_ids is not None:
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)

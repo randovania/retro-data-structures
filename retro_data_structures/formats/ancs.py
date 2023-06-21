@@ -4,7 +4,7 @@ Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 from __future__ import annotations
 
 import typing
-from typing import Iterable, List, Optional
+from collections.abc import Iterable
 
 import construct
 from construct import Const, Float32b, If, Int8ub, Int16ub, Int32ub, PrefixedArray, Struct
@@ -140,19 +140,19 @@ ANCS = Struct(
 )
 
 
-def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
+def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game):
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
 
-def _yield_dependency_array(asset_ids: Optional[List[int]], asset_type: str, game: Game):
+def _yield_dependency_array(asset_ids: list[int] | None, asset_type: str, game: Game):
     if asset_ids is not None:
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
 
 def char_dependencies_for(character, asset_manager: AssetManager):
-    def _array(asset_ids: Optional[Iterable[int]]):
+    def _array(asset_ids: Iterable[int] | None):
         if asset_ids is not None:
             for asset_id in asset_ids:
                 yield from asset_manager.get_dependencies_for_asset(asset_id, must_exist=False)

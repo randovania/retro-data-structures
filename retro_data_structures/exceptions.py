@@ -1,4 +1,3 @@
-from typing import Optional
 
 from retro_data_structures.base_resource import AssetId
 
@@ -11,7 +10,7 @@ def format_asset_id(asset_id: AssetId) -> str:
 
 
 class UnknownAssetId(Exception):
-    def __init__(self, asset_id: AssetId, name: Optional[str] = None):
+    def __init__(self, asset_id: AssetId, name: str | None = None):
         msg = f"Unknown asset id {format_asset_id(asset_id)}"
         if isinstance(name, str):
             msg += f" ({name})"

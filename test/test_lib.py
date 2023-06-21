@@ -1,7 +1,6 @@
 import dataclasses
 import json
 from pathlib import Path
-from typing import List, Tuple, Type
 
 import construct
 from construct.lib.containers import Container
@@ -17,7 +16,7 @@ class TypedAsset:
     type: AssetType
 
 
-def _parse_assets_file(name: str) -> List[TypedAsset]:
+def _parse_assets_file(name: str) -> list[TypedAsset]:
     with Path(__file__).parent.joinpath("test_files", name).open() as f:
         data = json.load(f)
 
@@ -59,8 +58,8 @@ def parse_and_build_compare_auto_manager(asset_manager: AssetManager, asset_id: 
 
 
 def parse_and_build_compare(
-        asset_manager: AssetManager, asset_id: AssetId, resource_class: Type[BaseResource],
-        print_data=False) -> Tuple[RawResource, BaseResource, bytes]:
+        asset_manager: AssetManager, asset_id: AssetId, resource_class: type[BaseResource],
+        print_data=False) -> tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
     assert resource.type == resource_class.resource_type()
 
@@ -78,7 +77,7 @@ def parse_and_build_compare(
 
 def parse_and_build_compare_construct(
         asset_manager: AssetManager, asset_id: AssetId, con: construct.Construct,
-        print_data=False) -> Tuple[RawResource, BaseResource, bytes]:
+        print_data=False) -> tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
 
     decoded = con.parse(resource.data, target_game=asset_manager.target_game)

@@ -11,7 +11,8 @@ import io
 import logging
 import struct
 import typing
-from typing import TYPE_CHECKING, Iterator, Type
+from collections.abc import Iterator
+from typing import TYPE_CHECKING
 
 import construct
 from construct.core import (
@@ -223,7 +224,7 @@ class ScriptInstance:
         self.on_modify = on_modify
 
     def __repr__(self):
-        return "<ScriptInstance {} 0x{:08x}>".format(self.type_name, self.id)
+        return f"<ScriptInstance {self.type_name} 0x{self.id:08x}>"
 
     def __eq__(self, other):
         return isinstance(other, ScriptInstance) and self._raw == other._raw
@@ -251,11 +252,11 @@ class ScriptInstance:
         return cls(raw, object_properties.game(), on_modify=layer.mark_modified)
 
     @property
-    def type(self) -> Type[BaseObjectType]:
+    def type(self) -> type[BaseObjectType]:
         return properties.get_game_object(self.target_game, self.type_name)
 
     @property
-    def type_name(self) -> typing.Union[int, str]:
+    def type_name(self) -> int | str:
         return self._raw.type
 
     @property
@@ -292,7 +293,7 @@ class ScriptInstance:
     def get_properties(self) -> BaseObjectType:
         return self.type.from_bytes(self._raw.base_property)
 
-    def get_properties_as(self, type_cls: Type[PropertyType]) -> PropertyType:
+    def get_properties_as(self, type_cls: type[PropertyType]) -> PropertyType:
         props = self.get_properties()
         # hack to support using the shared_objects unions
         if hasattr(type_cls, "__args__"):
@@ -315,7 +316,7 @@ class ScriptInstance:
         return prop
 
     @contextlib.contextmanager
-    def edit_properties(self, type_cls: Type[PropertyType]):
+    def edit_properties(self, type_cls: type[PropertyType]):
         props = self.get_properties_as(type_cls)
         yield props
         self.set_properties(props)
