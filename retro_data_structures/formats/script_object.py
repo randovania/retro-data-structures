@@ -106,32 +106,44 @@ class ScriptInstanceRaw:
     base_property: bytes
 
 
+def _raw_script_instance_construct(obj_type_con, obj_len_con):
+    header = construct.Struct(
+        type=obj_type_con,
+        raw_data=construct.Prefixed(obj_len_con, construct.GreedyBytes),
+    ).compile()
+    body = construct.Struct(
+        instance_id=Int32ub,
+        connections=PrefixedArray(obj_len_con, ConstructConnection(obj_type_con)),
+        base_property=construct.GreedyBytes,
+    )
+
+    return header, body
+
+
+_PrimeRawScript = _raw_script_instance_construct(Int8ub, Int32ub)
+_EchoesRawScript = _raw_script_instance_construct(FourCC, Int16ub)
+
+
 class _ConstructScriptInstance(construct.Construct):
     def _parse(self, stream, context, path) -> ScriptInstanceRaw:
         game = game_check.get_current_game(context)
 
         if game >= Game.ECHOES:
-            obj_type_con = FourCC
-            obj_len_con = Int16ub
+            header_construct, body_construct = _EchoesRawScript
         else:
-            obj_type_con = Int8ub
-            obj_len_con = Int32ub
+            header_construct, body_construct = _PrimeRawScript
 
-        obj_type: str | int = obj_type_con._parsereport(stream, context, f"{path} -> type")
-        obj_len: int = obj_len_con._parsereport(stream, context, f"{path} -> object_length")
-        sub_stream = io.BytesIO(construct.stream_read(stream, obj_len, f"{path} -> object_raw_data"))
+        header = header_construct._parsereport(stream, context, path)
+        body = body_construct._parsereport(io.BytesIO(header.raw_data), context, path)
 
-        obj_id: int = Int32ub._parsereport(sub_stream, context, f"{path} -> instance_id")
-
-        connections = PrefixedArray(obj_len_con, ConstructConnection(obj_type_con))._parsereport(
-            sub_stream, context, f"{path} -> connections")
-
-        base_property = construct.stream_read_entire(sub_stream, f"{path} -> base_property")
+        obj_type: str | int = header.type
+        obj_id: int = body.instance_id
+        base_property = body.base_property
 
         inst_id = InstanceId(obj_id)
 
         cons = []
-        for con in connections:
+        for con in body.connections:
             try:
                 cons.append(Connection.from_construct(game, con))
             except ValueError:
@@ -149,26 +161,21 @@ class _ConstructScriptInstance(construct.Construct):
         game = game_check.get_current_game(context)
 
         if game >= Game.ECHOES:
-            obj_type_con = FourCC
-            obj_len_con = Int16ub
+            header_construct, body_construct = _EchoesRawScript
         else:
-            obj_type_con = Int8ub
-            obj_len_con = Int32ub
+            header_construct, body_construct = _PrimeRawScript
 
         sub_stream = io.BytesIO()
-        Int32ub._build(obj.id, sub_stream, context, f"{path} -> instance_id")
-        PrefixedArray(obj_len_con, ConstructConnection(obj_type_con))._build(
-            [conn.as_construct() for conn in obj.connections],
-            sub_stream,
-            context, f"{path} -> connections"
-        )
-        construct.stream_write(sub_stream, obj.base_property, len(obj.base_property), f"{path} -> base_property")
+        body_construct._build(construct.Container(
+            instance_id=obj.id,
+            connections=[conn.as_construct() for conn in obj.connections],
+            base_property=obj.base_property,
+        ), sub_stream, context, path)
 
-        obj_data = sub_stream.getvalue()
-
-        obj_type_con._build(obj.type, stream, context, f"{path} -> type")
-        obj_len_con._build(len(obj_data), stream, context, f"{path} -> object_length")
-        construct.stream_write(stream, obj_data, len(obj_data), f"{path} -> object_raw_data")
+        header_construct._build(construct.Container(
+            type=obj.type,
+            raw_data=sub_stream.getvalue(),
+        ), stream, context, path)
 
 
 ConstructScriptInstance = _ConstructScriptInstance()
