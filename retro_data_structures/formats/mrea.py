@@ -447,7 +447,7 @@ class Mrea(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MREA
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):

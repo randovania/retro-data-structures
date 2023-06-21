@@ -200,9 +200,9 @@ class Strg(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return STRG
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         def _str_to_deps(id_str: str):
-            yield from self.asset_manager.get_dependencies_for_asset(int(id_str, 16), is_mlvl)
+            yield from self.asset_manager.get_dependencies_for_asset(int(id_str, 16))
         for lang in self.languages:
             for string in self.get_strings(lang):
                 for match in image_regex.finditer(string):
