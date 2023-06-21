@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import typing
-from typing import Optional, Union
+from typing import Optional
 
 import construct
 from construct.core import (
@@ -26,7 +26,14 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
+from retro_data_structures.formats.script_object import (
+    ConstructScriptInstance,
+    InstanceId,
+    InstanceIdRef,
+    InstanceRef,
+    ScriptInstance,
+    resolve_instance_id_ref,
+)
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -77,7 +84,11 @@ def new_layer(index: Optional[int], target_game: Game) -> Container:
     })
 
 
-SCLY = IfThenElse(game_check.current_game_at_least(game_check.Game.ECHOES), ConstructScriptLayer("SCLY"), ScriptLayerPrime)
+SCLY = IfThenElse(
+    game_check.current_game_at_least(game_check.Game.ECHOES),
+    ConstructScriptLayer("SCLY"),
+    ScriptLayerPrime
+)
 SCGN = ConstructScriptLayer("SCGN")
 
 
@@ -137,7 +148,7 @@ class ScriptLayer:
         raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstance):
-        if (other := self.has_instance(instance.id)) != False:
+        if (other := self.has_instance(instance.id)) is not False:
             raise RuntimeError(f"Instance with id {instance.id} already exists. {other=}")
 
         self._modified = True

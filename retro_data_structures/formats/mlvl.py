@@ -8,18 +8,32 @@ import typing
 from typing import Iterator
 
 import construct
-from construct import (Adapter, Array, Bitwise, Const, CString, Error, Flag,
-                       Float32b, FocusedSeq, Int8ub, Int16ub, Int32ub,
-                       ListContainer, Peek, PrefixedArray, Sequence, Struct,
-                       Switch, len_)
+from construct import (
+    Adapter,
+    Array,
+    Bitwise,
+    Const,
+    CString,
+    Error,
+    Flag,
+    Float32b,
+    FocusedSeq,
+    Int8ub,
+    Int16ub,
+    Int32ub,
+    ListContainer,
+    Peek,
+    PrefixedArray,
+    Sequence,
+    Struct,
+    Switch,
+    len_,
+)
 
 from retro_data_structures.adapters.offset import OffsetAdapter
-from retro_data_structures.base_resource import (AssetType, BaseResource,
-                                                 Dependency, NameOrAssetId)
-from retro_data_structures.common_types import (AssetId32, AssetId64, FourCC,
-                                                Vector3)
-from retro_data_structures.construct_extensions.misc import \
-    PrefixedArrayWithExtra
+from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, NameOrAssetId
+from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, Vector3
+from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
