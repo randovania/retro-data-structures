@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import pathlib
 import time
 
@@ -78,10 +79,20 @@ _EXPECTED_DEPENDENCY = {
 }
 
 
+def _write_to_file(data: dict, path: pathlib.Path):
+    path.parent.mkdir(exist_ok=True, parents=True)
+    path.touch()
+
+    with path.open("w") as of:
+        json.dump(data, of, indent=4)
+
+
 @pytest.mark.skip_dependency_tests
 def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
     print()
     total_elapsed = 0.0
+
+    write_reports = os.environ.get("WRITE_DEPENDENCIES_REPORTS", "") != ""
 
     world_reports = {}
 
@@ -92,7 +103,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
         for area in mlvl.areas:
             old = area.dependencies
-            old = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in old.items()}
+            old = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in old.items()}
 
             start = time.time()
             area.build_mlvl_dependencies()
@@ -100,7 +111,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             total_elapsed += elapsed
 
             new = area.dependencies
-            new = {layer_name: set((typ, hex(idx)) for typ, idx in layer) for layer_name, layer in new.items()}
+            new = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in new.items()}
 
             missing = {
                 layer_name: old_layer.difference(new_layer)
@@ -122,18 +133,17 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
                     logging.error(msg)
                 elif extra:
                     logging.warning(msg)
-                f.parent.mkdir(exist_ok=True, parents=True)
-                f.touch()
 
                 world_reports[mlvl.world_name][area.name] = {"missing": missing, "extra": extra}
-                with f.open("w") as of:
-                    json.dump(
+                if write_reports:
+                    _write_to_file(
                         {"missing": {n: list(miss) for n, miss in missing.items() if miss},
                          "extra": {n: list(ext) for n, ext in extra.items() if ext}},
-                        of, indent=4)
+                        f)
             else:
                 logging.info(msg)
-                f.unlink(missing_ok=True)
+                if write_reports:
+                    f.unlink(missing_ok=True)
 
     logging.info(f"Total elapsed time: {total_elapsed}")
     assert world_reports == _EXPECTED_DEPENDENCY

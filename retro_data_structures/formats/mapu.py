@@ -33,7 +33,7 @@ class Mapu(BaseResource):
             raise ValueError(f"{target_game} does not support MAPU!")
         return MAPU
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
-        yield from self.asset_manager.get_dependencies_for_asset(self.raw.hexagon_mapa, is_mlvl)
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
+        yield from self.asset_manager.get_dependencies_for_asset(self.raw.hexagon_mapa)
         for world in self.raw.worlds:
-            yield from self.asset_manager.get_dependencies_for_asset(world.mlvl, is_mlvl)
+            yield from self.asset_manager.get_dependencies_for_asset(world.mlvl)

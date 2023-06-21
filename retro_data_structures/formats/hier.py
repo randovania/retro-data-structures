@@ -30,6 +30,6 @@ class Hier(BaseResource):
     def resource_type(cls) -> AssetType:
         return "DUMB"
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         for entry in self.raw.entries:
             yield from self.asset_manager.get_dependencies_for_asset(entry.string_table_id)

@@ -272,7 +272,7 @@ class Mlvl(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MLVL
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
     def __repr__(self) -> str:

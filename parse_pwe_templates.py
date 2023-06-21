@@ -721,10 +721,13 @@ class ClassDefinition:
             has_dep = True
             prop_code = prop.dependency_code.format(obj=f'self.{prop_name}')
             if prop.raw.get("ignore_dependencies_mlvl"):
-                prop_code = "if not is_mlvl:\n            " + prop_code
+                self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
+                prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
+            else:
+                prop_code = f"yield from {prop_code}"
 
             self.class_code += f"""
-    def _dependencies_for_{prop_name}(self, asset_manager, is_mlvl: bool):
+    def _dependencies_for_{prop_name}(self, asset_manager):
         {prop_code}
 """
 
@@ -735,12 +738,12 @@ class ClassDefinition:
                 if prop.dependency_code is not None
             )
             self.class_code += f"""
-    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+    def dependencies_for(self, asset_manager):
         for method, field_name, field_type in [
 {method_list}
         ]:
             try:
-                yield from method(asset_manager, is_mlvl)
+                yield from method(asset_manager)
             except Exception as e:
                 raise Exception(
                     f"Error finding dependencies for {self.class_name}.{{field_name}} ({{field_type}}): {{e}}"
@@ -748,7 +751,7 @@ class ClassDefinition:
 """
         else:
             self.class_code += """
-    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+    def dependencies_for(self, asset_manager):
         yield from []
 """
 
@@ -830,7 +833,7 @@ class Vector(BaseProperty):
             "z": self.z,
         }}
 
-    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
+    def dependencies_for(self, asset_manager):
         yield from []
 """ + game_code)
     if game_id == "PrimeRemastered":
@@ -927,8 +930,8 @@ class AnimationParameters(BaseProperty):
             "initial_anim": self.initial_anim,
         }}
 
-    def dependencies_for(self, asset_manager, is_mlvl: bool = False):
-        yield from asset_manager.get_dependencies_for_ancs(self.ancs, is_mlvl, self.character_index)
+    def dependencies_for(self, asset_manager):
+        yield from asset_manager.get_dependencies_for_ancs(self.ancs, self.character_index)
 """ + game_code)
     core_path.joinpath("Spline.py").write_text("""# Generated file
 import dataclasses
@@ -1062,7 +1065,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             raw_type = "Int"
             meta["default"] = 65535
             meta["metadata"] = {"sound": True}
-            dependency_code = "yield from asset_manager.get_audio_group_dependency({obj}, is_mlvl)"
+            dependency_code = "asset_manager.get_audio_group_dependency({obj})"
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
@@ -1071,7 +1074,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             meta["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
-            dependency_code = "yield from {obj}.dependencies_for(asset_manager, is_mlvl)"
+            dependency_code = "{obj}.dependencies_for(asset_manager)"
 
             default_override = {}
             for inner_prop in prop["properties"]:
@@ -1152,7 +1155,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
             field_meta = {"asset_types": prop["type_filter"]}
             if not any(asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")):
-                dependency_code = "yield from asset_manager.get_dependencies_for_asset({obj}, is_mlvl)"
+                dependency_code = "asset_manager.get_dependencies_for_asset({obj})"
 
             if "ignore_dependencies_mlvl" in prop:
                 field_meta["ignore_dependencies_mlvl"] = True
@@ -1187,7 +1190,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type in ["AnimationSet", "Spline", "PooledString"]:
             if raw_type == "AnimationSet":
                 prop_type = "AnimationParameters"
-                dependency_code = "yield from {obj}.dependencies_for(asset_manager, is_mlvl)"
+                dependency_code = "{obj}.dependencies_for(asset_manager)"
             else:
                 prop_type = raw_type
             needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
