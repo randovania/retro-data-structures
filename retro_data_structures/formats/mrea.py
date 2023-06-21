@@ -510,34 +510,3 @@ class Mrea(BaseResource):
                 self.target_game
             )
         return self._generated_objects_layer
-
-    @property
-    def all_instances(self) -> Iterator[ScriptInstanceHelper]:
-        for layer in self.script_layers:
-            yield from layer.instances
-
-    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
-        for layer in self.script_layers:
-            if (instance := layer.get_instance(instance_id)) is not None:
-                return instance
-        if (instance := self.generated_objects_layer.get_instance(instance_id)) is not None:
-            return instance
-
-    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
-        for layer in self.script_layers:
-            if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
-                return instance
-        if (instance := self.generated_objects_layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
-            return instance
-        raise KeyError(name)
-
-    def remove_instance(self, instance: int | InstanceId | str | ScriptInstanceHelper):
-        if isinstance(instance, str):
-            instance = self.get_instance(instance)
-        elif isinstance(instance, int):
-            instance = InstanceId(instance)
-        if isinstance(instance, ScriptInstanceHelper):
-            instance = instance.id
-
-        layers = list(self.script_layers)
-        layers[instance.layer].remove_instance(instance)

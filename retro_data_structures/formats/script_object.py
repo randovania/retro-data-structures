@@ -352,3 +352,14 @@ class ScriptInstanceHelper:
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)
+
+InstanceRef = int | InstanceId | ScriptInstanceHelper
+
+def resolve_instance_ref(inst: InstanceRef) -> InstanceId:
+    if isinstance(inst, InstanceId):
+        return inst
+    if isinstance(inst, ScriptInstanceHelper):
+        return inst.id
+    if isinstance(inst, int):
+        return InstanceId(inst)
+    raise TypeError(f"Invalid type: Expected InstanceRef, got {type(inst)}")

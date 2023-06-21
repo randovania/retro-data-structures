@@ -26,7 +26,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceRef, ScriptInstanceHelper, resolve_instance_ref
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -109,18 +109,30 @@ class ScriptLayerHelper:
         for instance in self._raw.script_instances:
             yield ScriptInstanceHelper(instance, self.target_game, on_modify=self.mark_modified)
 
-    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
-        for instance in self.instances:
-            if instance.id_matches(instance_id):
-                return instance
-        return None
+    def has_instance(self, instance: InstanceRef | str) -> bool:
+        try:
+            self._get_instance_by_name_or_ref(instance)
+            return True
+        except KeyError:
+            return False
 
-    def get_instance_by_name(self, name: str, *, raise_if_missing: bool = True) -> ScriptInstanceHelper:
+    def _get_instance_by_name_or_ref(self, instance: InstanceRef | str) -> ScriptInstanceHelper:
+        if isinstance(instance, str):
+            return self.get_instance_by_name(instance)
+        return self.get_instance(instance)
+
+    def get_instance(self, instance: InstanceRef) -> ScriptInstanceHelper:
+        instance = resolve_instance_ref(instance)
+        for instance in self.instances:
+            if instance.id_matches(instance):
+                return instance
+        raise KeyError(instance)
+
+    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
         for instance in self.instances:
             if instance.name == name:
                 return instance
-        if raise_if_missing:
-            raise KeyError(name)
+        raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstanceHelper):
         if self.get_instance(instance.id) is not None:
@@ -155,11 +167,11 @@ class ScriptLayerHelper:
         instance.id = new_id
         return self._internal_add_instance(instance)
 
-    def remove_instance(self, instance: Union[int, str, ScriptInstanceHelper]):
+    def remove_instance(self, instance: InstanceRef | str):
         if isinstance(instance, str):
             instance = self.get_instance_by_name(instance)
-        if isinstance(instance, ScriptInstanceHelper):
-            instance = instance.id
+        else:
+            instance = self.get_instance(instance)
 
         matching_instances = [
             i for i in self._raw.script_instances
