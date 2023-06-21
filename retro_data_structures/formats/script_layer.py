@@ -134,12 +134,12 @@ class ScriptLayer:
                 raise
             return None
 
-    def _get_instance_by_ref(self, instance: InstanceIdRef) -> ScriptInstance:
-        instance = resolve_instance_id_ref(instance)
-        for inst in self.instances:
-            if inst.id_matches(instance):
+    def _get_instance_by_ref(self, ref: InstanceIdRef) -> ScriptInstance:
+        ref = resolve_instance_id_ref(ref)
+        for instance in self.instances:
+            if instance.id_matches(ref):
                 return instance
-        raise KeyError(instance)
+        raise KeyError(ref)
 
     def _get_instance_by_name(self, name: str) -> ScriptInstance:
         for instance in self.instances:
@@ -188,7 +188,7 @@ class ScriptLayer:
 
         matching_instances = [
             i for i in self._raw.script_instances
-            if i.id == instance
+            if i.id == instance.id
         ]
 
         if not matching_instances:
