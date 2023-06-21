@@ -14,7 +14,7 @@ from retro_data_structures.base_resource import AssetType, BaseResource, Depende
 from retro_data_structures.common_types import AssetId32, FourCC
 from retro_data_structures.formats import dgrp
 from retro_data_structures.formats.dgrp import DGRP
-from retro_data_structures.formats.script_object import ConstructScriptInstance, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import ConstructScriptInstance, ScriptInstance
 from retro_data_structures.game_check import Game
 
 ScanImage = Struct(
@@ -84,12 +84,12 @@ class Scan(BaseResource):
             for dep in self.raw.dependencies:
                 yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id, is_mlvl)
 
-    _scannable_object_info: ScriptInstanceHelper | None = None
+    _scannable_object_info: ScriptInstance | None = None
     @property
-    def scannable_object_info(self) -> ScriptInstanceHelper:
+    def scannable_object_info(self) -> ScriptInstance:
         assert self.target_game != Game.PRIME
         if self._scannable_object_info is None:
-            self._scannable_object_info = ScriptInstanceHelper(self._raw.scannable_object_info, self.target_game,
+            self._scannable_object_info = ScriptInstance(self._raw.scannable_object_info, self.target_game,
                                                                on_modify=self.rebuild_dependencies)
         return self._scannable_object_info
 

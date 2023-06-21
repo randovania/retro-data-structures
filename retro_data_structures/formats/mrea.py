@@ -34,8 +34,8 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper, new_layer
-from retro_data_structures.formats.script_object import InstanceRef, ScriptInstanceHelper, resolve_instance_ref
+from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
+from retro_data_structures.formats.script_object import InstanceRef, ScriptInstance, resolve_instance_ref
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
@@ -431,7 +431,7 @@ MREA = MREAConstruct()
 
 
 class Mrea(BaseResource):
-    _script_layer_helpers: Optional[typing.Dict[int, ScriptLayerHelper]] = None
+    _script_layer_helpers: Optional[typing.Dict[int, ScriptLayer]] = None
 
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -484,20 +484,20 @@ class Mrea(BaseResource):
         return super().build()
 
     @property
-    def script_layers(self) -> Iterator[ScriptLayerHelper]:
+    def script_layers(self) -> Iterator[ScriptLayer]:
         self._ensure_decoded_section("script_layers_section", lazy_load=self.target_game != Game.PRIME)
 
         if self.target_game == Game.PRIME:
             section = self._raw.sections.script_layers_section[0]
             for i, layer in enumerate(section.layers):
-                yield ScriptLayerHelper(layer, i, self.target_game)
+                yield ScriptLayer(layer, i, self.target_game)
         else:
             if self._script_layer_helpers is None:
                 self._script_layer_helpers = {}
 
             for i, section in enumerate(self._raw.sections.script_layers_section):
                 if i not in self._script_layer_helpers:
-                    self._script_layer_helpers[i] = ScriptLayerHelper(
+                    self._script_layer_helpers[i] = ScriptLayer(
                         _CATEGORY_ENCODINGS["script_layers_section"].parse(
                             section, target_game=self.target_game
                         ),
@@ -507,12 +507,12 @@ class Mrea(BaseResource):
 
             yield from self._script_layer_helpers.values()
 
-    _generated_objects_layer: ScriptLayerHelper | None = None
+    _generated_objects_layer: ScriptLayer | None = None
     @property
-    def generated_objects_layer(self) -> ScriptLayerHelper:
+    def generated_objects_layer(self) -> ScriptLayer:
         assert self.target_game >= Game.ECHOES
         if self._generated_objects_layer is None:
-            self._generated_objects_layer = ScriptLayerHelper(
+            self._generated_objects_layer = ScriptLayer(
                 self.get_section("generated_script_objects_section")[0],
                 None,
                 self.target_game
@@ -661,18 +661,18 @@ class AreaWrapper:
         return self._raw.area_mrea_id
 
     @property
-    def layers(self) -> Iterator[ScriptLayerHelper]:
+    def layers(self) -> Iterator[ScriptLayer]:
         for layer in self.mrea.script_layers:
             yield layer.with_parent(self)
 
     @property
-    def generated_objects_layer(self) -> ScriptLayerHelper:
+    def generated_objects_layer(self) -> ScriptLayer:
         return self.mrea.generated_objects_layer.with_parent(self)
 
-    def get_layer(self, name: str) -> ScriptLayerHelper:
+    def get_layer(self, name: str) -> ScriptLayer:
         return next(layer for layer in self.layers if layer.name == name)
 
-    def add_layer(self, name: str, active: bool = True) -> ScriptLayerHelper:
+    def add_layer(self, name: str, active: bool = True) -> ScriptLayer:
         index = len(self._layer_names)
         self._layer_names.append(name)
         self._flags.append(active)
@@ -686,12 +686,12 @@ class AreaWrapper:
         return next(i for i in itertools.count() if i not in ids)
 
     @property
-    def all_instances(self) -> Iterator[ScriptInstanceHelper]:
+    def all_instances(self) -> Iterator[ScriptInstance]:
         for layer in self.layers:
             yield from layer.instances
         yield from self.generated_objects_layer.instances
 
-    def get_instance(self, instance_id: InstanceRef) -> ScriptInstanceHelper:
+    def get_instance(self, instance_id: InstanceRef) -> ScriptInstance:
         instance_id = resolve_instance_ref(instance_id)
         layer = self.get_layer_for_instance(instance_id)
 
@@ -702,7 +702,7 @@ class AreaWrapper:
 
         raise KeyError(f"No instance with id {instance_id} found on layer {layer}")
 
-    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+    def get_instance_by_name(self, name: str) -> ScriptInstance:
         for layer in self.layers:
             if layer.has_instance(name):
                 return layer.get_instance_by_name(name)
