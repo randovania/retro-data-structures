@@ -129,8 +129,6 @@ jobs:
 
   full_test:
     runs-on: self-hosted
-    needs:
-      - build
 
     steps:
       - name: Checkout
@@ -143,14 +141,14 @@ jobs:
         run: python -m venv venv
 
       - name: Install Python packages
-        run: venv/bin/python -m pip install --upgrade pip pytest pytest-cov
+        run: venv/bin/python -m pip install --upgrade pip pytest pytest-cov pytest-xdist
 
       - name: install built wheel
         run: venv/bin/python -m pip install -e .
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --skip-dependency-tests --durations=100 test
+          venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --durations=100 -n 2 test
 
       - name: codecov
         uses: codecov/codecov-action@v3
