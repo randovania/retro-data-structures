@@ -25,8 +25,14 @@ def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
     resource = prime2_asset_manager.get_raw_asset(mrea_asset_id)
 
     decoded = Mrea.parse(resource.data, target_game=prime2_asset_manager.target_game)
+    for inst in decoded._all_non_scgn_instances():
+        assert isinstance(inst, ScriptInstance)
+
     encoded = decoded.build()
+
     decoded2 = Mrea.parse(encoded, target_game=prime2_asset_manager.target_game)
+    for inst in decoded2._all_non_scgn_instances():
+        assert isinstance(inst, ScriptInstance)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
 

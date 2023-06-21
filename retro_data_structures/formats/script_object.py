@@ -267,8 +267,8 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, other: InstanceRef) -> bool:
-        other = resolve_instance_ref(other)
+    def id_matches(self, other: InstanceIdRef) -> bool:
+        other = resolve_instance_id_ref(other)
         return self.id.area == other.area and self.id.instance == other.instance
 
     @property
@@ -351,13 +351,14 @@ class ScriptInstance:
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)
 
-InstanceRef = int | InstanceId | ScriptInstance
+InstanceIdRef = int | InstanceId | ScriptInstance
+InstanceRef = InstanceIdRef | str
 
-def resolve_instance_ref(inst: InstanceRef) -> InstanceId:
+def resolve_instance_id_ref(inst: InstanceIdRef) -> InstanceId:
     if isinstance(inst, InstanceId):
         return inst
     if isinstance(inst, ScriptInstance):
         return inst.id
     if isinstance(inst, int):
         return InstanceId(inst)
-    raise TypeError(f"Invalid type: Expected InstanceRef, got {type(inst)}")
+    raise TypeError(f"Invalid type: Expected InstanceIdRef, got {type(inst)}")

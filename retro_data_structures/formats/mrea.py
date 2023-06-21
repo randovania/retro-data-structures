@@ -35,7 +35,7 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
-from retro_data_structures.formats.script_object import InstanceRef, ScriptInstance, resolve_instance_ref
+from retro_data_structures.formats.script_object import InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
@@ -483,6 +483,10 @@ class Mrea(BaseResource):
                 self._raw.sections.script_layers_section[i] = section._raw
         return super().build()
 
+    def _all_non_scgn_instances(self) -> Iterator[ScriptInstance]:
+        for layer in self.script_layers:
+            yield from layer.instances
+
     @property
     def script_layers(self) -> Iterator[ScriptLayer]:
         self._ensure_decoded_section("script_layers_section", lazy_load=self.target_game != Game.PRIME)
@@ -691,30 +695,21 @@ class Area:
             yield from layer.instances
         yield from self.generated_objects_layer.instances
 
-    def get_instance(self, instance_id: InstanceRef) -> ScriptInstance:
-        instance_id = resolve_instance_ref(instance_id)
-        layer = self.get_layer_for_instance(instance_id)
-
-        if layer.has_instance(instance_id):
-            return layer.get_instance(instance_id)
-        if self.generated_objects_layer.has_instance(instance_id):
-            return self.generated_objects_layer.get_instance(instance_id)
-
-        raise KeyError(f"No instance with id {instance_id} found on layer {layer}")
-
-    def get_instance_by_name(self, name: str) -> ScriptInstance:
+    def get_instance(self, instance: InstanceRef) -> ScriptInstance:
+        if (inst := self.generated_objects_layer.get_instance(instance, must_exist=False)):
+            return inst
         for layer in self.layers:
-            if layer.has_instance(name):
-                return layer.get_instance_by_name(name)
-        if self.generated_objects_layer.has_instance(name):
-            return self.generated_objects_layer.get_instance_by_name(name)
-        raise KeyError(f"No instance named {name} found on layer {layer}")
+            if (inst := layer.get_instance(instance, must_exist=False)) is not None:
+                return inst
 
-    def get_layer_for_instance(self, instace: InstanceRef):
-        instance = resolve_instance_ref(instance)
+        if isinstance(instance, InstanceIdRef):
+            instance = resolve_instance_id_ref(instance)
+        raise KeyError(f"No instance {instance} found")
+
+    def get_layer_for_instance(self, instance: InstanceRef) -> ScriptLayer:
         if self.generated_objects_layer.has_instance(instance):
             return self.generated_objects_layer
-        return next(layer for layer in self.layers if layer.index == instace.layer)
+        return next(layer for layer in self.layers if layer.has_instance(instance))
 
     def remove_instance(self, instance: InstanceRef):
         self.get_layer_for_instance(instance).remove_instance(instance)

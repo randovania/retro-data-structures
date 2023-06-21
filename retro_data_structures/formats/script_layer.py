@@ -26,7 +26,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceRef, ScriptInstance, resolve_instance_ref
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -109,27 +109,28 @@ class ScriptLayer:
         for instance in self._raw.script_instances:
             yield ScriptInstance(instance, self.target_game, on_modify=self.mark_modified)
 
-    def has_instance(self, instance: InstanceRef | str) -> bool:
+    def has_instance(self, instance: InstanceRef) -> bool:
+        return self.get_instance(instance, must_exist=False) is not None
+
+    def get_instance(self, instance: InstanceRef, *, must_exist: bool = True) -> ScriptInstance | None:
         try:
-            self._get_instance_by_name_or_ref(instance)
+            if isinstance(instance, str):
+                return self._get_instance_by_name(instance)
+            else:
+                return self._get_instance_by_ref(instance)
         except KeyError:
-            return False
-        else:
-            return True
+            if must_exist:
+                raise
+            return None
 
-    def _get_instance_by_name_or_ref(self, instance: InstanceRef | str) -> ScriptInstance:
-        if isinstance(instance, str):
-            return self.get_instance_by_name(instance)
-        return self.get_instance(instance)
-
-    def get_instance(self, instance: InstanceRef) -> ScriptInstance:
-        instance = resolve_instance_ref(instance)
+    def _get_instance_by_ref(self, instance: InstanceIdRef) -> ScriptInstance:
+        instance = resolve_instance_id_ref(instance)
         for inst in self.instances:
             if inst.id_matches(instance):
                 return instance
         raise KeyError(instance)
 
-    def get_instance_by_name(self, name: str) -> ScriptInstance:
+    def _get_instance_by_name(self, name: str) -> ScriptInstance:
         for instance in self.instances:
             if instance.name == name:
                 return instance
@@ -141,7 +142,7 @@ class ScriptLayer:
 
         self._modified = True
         self._raw.script_instances.append(instance._raw)
-        return self.get_instance(instance.id)
+        return self._get_instance_by_ref(instance.id)
 
     def add_instance(self, instance_type: str, name: Optional[str] = None) -> ScriptInstance:
         instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
@@ -168,11 +169,11 @@ class ScriptLayer:
         instance.id = new_id
         return self._internal_add_instance(instance)
 
-    def remove_instance(self, instance: InstanceRef | str):
+    def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
-            instance = self.get_instance_by_name(instance)
+            instance = self._get_instance_by_name(instance)
         else:
-            instance = self.get_instance(instance)
+            instance = self._get_instance_by_ref(instance)
 
         matching_instances = [
             i for i in self._raw.script_instances
