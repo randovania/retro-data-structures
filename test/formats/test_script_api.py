@@ -106,7 +106,7 @@ def test_edit_properties(prime2_area: Area):
 
 
 def test_edit_connections(prime2_area: Area):
-    from retro_data_structures.enums.echoes import State, Message
+    from retro_data_structures.enums.echoes import Message, State
 
     pickup = prime2_area.get_instance("Pickup Object")
     relay = prime2_area.get_instance("Post Pickup")

@@ -3,7 +3,6 @@ from test import test_lib
 import pytest
 
 from retro_data_structures.base_resource import AssetId
-from retro_data_structures.formats import Mlvl
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_object import ScriptInstance
 
