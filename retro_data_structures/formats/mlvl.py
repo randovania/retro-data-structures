@@ -2,6 +2,7 @@
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
+import dataclasses
 
 import itertools
 import typing
@@ -43,7 +44,7 @@ from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.savw import Savw
 from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
+from retro_data_structures.formats.script_object import InstanceId, InstanceRef, ScriptInstanceHelper, resolve_instance_ref
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
 
@@ -67,24 +68,29 @@ MLVLMemoryRelay = Struct(
     active=Int8ub,
 )
 
+@dataclasses.dataclass
+class LayerFlags:
+    layer_count: int
+    layer_flags: list[bool]
 
-class LayerFlags(Adapter):
+
+class LayerFlagsAdapter(Adapter):
     def __init__(self):
         super().__init__(Struct(
             layer_count=Int32ub,
             layer_flags=Bitwise(Array(64, Flag)),
         ))
 
-    def _decode(self, obj, context, path):
+    def _decode(self, obj: LayerFlags, context, path):
         return ListContainer(reversed(obj.layer_flags))[:obj.layer_count]
 
     def _encode(self, obj, context, path):
         flags = [True for i in range(64)]
         flags[:len(obj)] = obj
-        return Container({
-            "layer_count": len(obj),
-            "layer_flags": list(reversed(flags))
-        })
+        return LayerFlags(
+            layer_count=len(obj),
+            layer_flags=list(reversed(flags))
+        )
 
 
 class LayerNameOffsetAdapter(OffsetAdapter):
@@ -230,7 +236,7 @@ def create(version: int, asset_id):
 
     fields.extend(
         [
-            "area_layer_flags" / PrefixedArray(Int32ub, LayerFlags()),
+            "area_layer_flags" / PrefixedArray(Int32ub, LayerFlagsAdapter()),
             "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
         ]
     )
@@ -353,20 +359,14 @@ _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
 
 
 class AreaWrapper:
-    _flags: Container
-    _layer_names: ListContainer
-    _index: int
-
     _mrea: Mrea = None
     _strg: Strg = None
 
-    # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
-    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container,
-                 index: int, parent_mlvl: Mlvl):
+    def __init__(self, raw: Container, index: int, parent_mlvl: Mlvl):
         self._raw = raw
-        self.asset_manager = asset_manager
-        self._flags = flags
-        self._layer_names = names
+        self.asset_manager = parent_mlvl.asset_manager
+        self._flags = parent_mlvl.layer_flags_for_area_index(index)
+        self._layer_names = parent_mlvl.layer_names_for_area_index(index)
         self._index = index
         self._parent_mlvl = parent_mlvl
 
@@ -610,14 +610,23 @@ class Mlvl(BaseResource):
 
     @property
     def areas(self) -> Iterator[AreaWrapper]:
-        offsets = self._raw.area_layer_name_offset
-        names = self._raw.layer_names
         for i, area in enumerate(self._raw.areas):
-            area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
-            yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
+            yield AreaWrapper(area, i, self)
 
     def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
+
+    def layer_names_for_area_index(self, index: int) -> list[str]:
+        offsets = self._raw.area_layer_name_offset
+        names = self._raw.layer_names
+        return (
+            names[offsets[index]:]
+            if index == len(self._raw.areas) - 1 else
+            names[offsets[index]:offsets[index+1]]
+        )
+
+    def layer_flags_for_area_index(self, index: int) -> LayerFlags:
+        return self._raw.area_layer_flags[index]
 
     _name_strg_cached: Strg = None
     _dark_strg_cached: Strg = None
