@@ -148,8 +148,8 @@ class ScriptLayer:
         raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstance):
-        if (other := self.has_instance(instance.id)) is not False:
-            raise RuntimeError(f"Instance with id {instance.id} already exists. {other=}")
+        if self.has_instance(instance.id):
+            raise RuntimeError(f"Instance with id {instance.id} already exists")
 
         self._modified = True
         self._raw.script_instances.append(instance._raw)
