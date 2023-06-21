@@ -112,9 +112,10 @@ class ScriptLayer:
     def has_instance(self, instance: InstanceRef | str) -> bool:
         try:
             self._get_instance_by_name_or_ref(instance)
-            return True
         except KeyError:
             return False
+        else:
+            return True
 
     def _get_instance_by_name_or_ref(self, instance: InstanceRef | str) -> ScriptInstance:
         if isinstance(instance, str):
@@ -123,8 +124,8 @@ class ScriptLayer:
 
     def get_instance(self, instance: InstanceRef) -> ScriptInstance:
         instance = resolve_instance_ref(instance)
-        for instance in self.instances:
-            if instance.id_matches(instance):
+        for inst in self.instances:
+            if inst.id_matches(instance):
                 return instance
         raise KeyError(instance)
 
@@ -135,8 +136,8 @@ class ScriptLayer:
         raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstance):
-        if self.has_instance(instance.id):
-            raise RuntimeError(f"Instance with id {instance.id} already exists.")
+        if (other := self.has_instance(instance.id)) != False:
+            raise RuntimeError(f"Instance with id {instance.id} already exists. {other=}")
 
         self._modified = True
         self._raw.script_instances.append(instance._raw)
@@ -224,6 +225,7 @@ class ScriptLayer:
         self._parent_area._layer_names[self._index] = value
 
     def new_instance_id(self) -> InstanceId:
+        self.assert_parent()
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
 
     def is_modified(self) -> bool:

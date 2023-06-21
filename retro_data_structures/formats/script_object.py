@@ -222,7 +222,7 @@ class ScriptInstance:
         self.target_game = target_game
         self.on_modify = on_modify
 
-    def __str__(self):
+    def __repr__(self):
         return "<ScriptInstance {} 0x{:08x}>".format(self.type_name, self.id)
 
     def __eq__(self, other):
@@ -267,10 +267,9 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, id: InstanceRef) -> bool:
-        id = resolve_instance_ref(id)
-
-        return self.id.area == id.area and self.id.instance == id.instance
+    def id_matches(self, other: InstanceRef) -> bool:
+        other = resolve_instance_ref(other)
+        return self.id.area == other.area and self.id.instance == other.instance
 
     @property
     def name(self) -> str | None:
