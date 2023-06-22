@@ -119,7 +119,6 @@ class AssetManager:
     _audio_group_dependency: Dgrp | None = None
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
-    _cached_mlvl_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
 
     def __init__(self, provider: FileProvider, target_game: Game):
@@ -132,7 +131,6 @@ class AssetManager:
         self._update_headers()
 
         self._cached_dependencies = {}
-        self._cached_mlvl_dependencies = {}
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
 
         self._sound_id_to_agsc: dict[int, AssetId | None] = {}
@@ -386,22 +384,19 @@ class AssetManager:
 
         return self._in_memory_paks[pak_name]
 
-    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, is_mlvl: bool = False, not_exist_ok: bool = False,
-                                   ) -> Iterator[Dependency]:
+    def _get_dependencies_for_asset(self, asset_id: NameOrAssetId, must_exist: bool,
+                                    ) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
 
-        if is_mlvl and asset_id in self.target_game.mlvl_dependencies_to_ignore:
-            return
-
         if not self.does_asset_exists(asset_id):
-            if not not_exist_ok:
+            if must_exist:
                 raise UnknownAssetId(asset_id)
             return
 
         asset_type = self.get_asset_type(asset_id)
 
-        dep_cache = self._cached_mlvl_dependencies if is_mlvl else self._cached_dependencies
+        dep_cache = self._cached_dependencies
         deps: tuple[Dependency, ...] = ()
 
         if asset_id in dep_cache:
@@ -409,22 +404,24 @@ class AssetManager:
             deps = dep_cache[asset_id]
         else:
             if dependency_cheating.should_cheat_asset(asset_type):
-                deps = tuple(dependency_cheating.get_cheated_dependencies(
-                    self.get_raw_asset(asset_id),
-                    self, is_mlvl
-                ))
+                deps = tuple(dependency_cheating.get_cheated_dependencies(self.get_raw_asset(asset_id), self))
 
             elif formats.has_resource_type(asset_type):
                 if self.get_asset_format(asset_id).has_dependencies(self.target_game):
-                    deps = tuple(self.get_parsed_asset(asset_id).dependencies_for(is_mlvl))
+                    deps = tuple(self.get_parsed_asset(asset_id).dependencies_for())
 
             logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             dep_cache[asset_id] = deps
 
         yield from deps
-        yield Dependency(asset_type, asset_id)
+        yield Dependency(asset_type, asset_id, False)
 
-    def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, is_mlvl: bool = False, char_index: int | None = None):
+    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, *, must_exist: bool = False) -> Iterator[Dependency]:
+        override = asset_id in self.target_game.mlvl_dependencies_to_ignore
+        for it in self._get_dependencies_for_asset(asset_id, must_exist):
+            yield Dependency(it.type, it.id, it.exclude_for_mlvl or override)
+
+    def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, char_index: int | None = None):
         if not self.target_game.is_valid_asset_id(asset_id):
             return
 
@@ -432,16 +429,17 @@ class AssetManager:
             raise ValueError(f"{hex(asset_id)} ({asset_type}) is not an ANCS!")
 
         if char_index is None:
-            yield from self.get_dependencies_for_asset(asset_id, is_mlvl)
+            yield from self.get_dependencies_for_asset(asset_id)
             return
 
         if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
             logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
         else:
+            from retro_data_structures.formats.ancs import Ancs
             deps = list(self.target_game.special_ancs_dependencies(asset_id))
-            ancs = self.get_parsed_asset(asset_id)
-            deps.extend(ancs.dependencies_for(is_mlvl, char_index=char_index))
+            ancs: Ancs = self.get_parsed_asset(asset_id)
+            deps.extend(ancs.ancs_dependencies_for(char_index=char_index))
             deps = tuple(deps)
             self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
 
@@ -474,22 +472,20 @@ class AssetManager:
             if define_id in define_id_to_agsc:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
 
-    def get_audio_group_dependency(self, sound_id: int, is_mlvl: bool = False) -> Iterator[Dependency]:
+    def get_audio_group_dependency(self, sound_id: int) -> Iterator[Dependency]:
         agsc = self._sound_id_to_agsc[sound_id]
         if agsc is None:
             return
 
-        dep = ("AGSC", agsc)
+        if self._audio_group_dependency is None:
+            # audio_groups_single_player_DGRP
+            self._audio_group_dependency = self.get_file(0x31CB5ADB)
 
-        if is_mlvl:
-            if self._audio_group_dependency is None:
-                # audio_groups_single_player_DGRP
-                self._audio_group_dependency = self.get_file(0x31CB5ADB)
-
-            if dep in self._audio_group_dependency.direct_dependencies:
-                return
-
-        yield dep
+        dep = Dependency("AGSC", agsc, False)
+        if dep in self._audio_group_dependency.direct_dependencies:
+            yield Dependency("AGSC", agsc, True)
+        else:
+            yield dep
 
     def _write_custom_names(self, output_path: Path):
         custom_names = output_path.joinpath("custom_names.json")

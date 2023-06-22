@@ -95,11 +95,11 @@ class Game(Enum):
     def special_ancs_dependencies(self, ancs: AssetId):
         if self == Game.ECHOES and ancs == 0xC043D342:
             # every gun animation needs these i guess
-            yield Dependency("TXTR", 0x9e6f9531)
-            yield Dependency("TXTR", 0xcea098fe)
-            yield Dependency("TXTR", 0x607638ea)
-            yield Dependency("TXTR", 0x578e51b8)
-            yield Dependency("TXTR", 0x1e7b6c64)
+            yield Dependency("TXTR", 0x9e6f9531, False)
+            yield Dependency("TXTR", 0xcea098fe, False)
+            yield Dependency("TXTR", 0x607638ea, False)
+            yield Dependency("TXTR", 0x578e51b8, False)
+            yield Dependency("TXTR", 0x1e7b6c64, False)
 
 
 def get_current_game(ctx) -> Game:

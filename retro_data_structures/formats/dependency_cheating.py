@@ -23,14 +23,14 @@ class UnableToCheatError(Exception):
     pass
 
 
-def _cheat(stream: bytes, asset_manager: AssetManager, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+def _cheat(stream: bytes, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     asset_id_size = 4 if asset_manager.target_game.uses_asset_id_32 else 8
     max_byte = len(stream) - asset_id_size
     fmt = ">L" if asset_manager.target_game.uses_asset_id_32 else ">Q"
 
     for i in range(max_byte):
         possible_id = struct.unpack_from(fmt, buffer=stream, offset=i)[0]
-        yield from asset_manager.get_dependencies_for_asset(possible_id, is_mlvl, not_exist_ok=True)
+        yield from asset_manager.get_dependencies_for_asset(possible_id, must_exist=False)
 
 
 _csng = construct.FocusedSeq(
@@ -41,15 +41,13 @@ _csng = construct.FocusedSeq(
 )
 
 
-def csng_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
-    yield from asset_manager.get_dependencies_for_asset(_csng.parse(asset), is_mlvl)
+def csng_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    yield from asset_manager.get_dependencies_for_asset(_csng.parse(asset))
 
 
-def dumb_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
+def dumb_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     hier = Hier.parse(asset.data, asset_manager.target_game, asset_manager)
-    yield from hier.dependencies_for(is_mlvl)
+    yield from hier.dependencies_for()
 
 
 _frme = construct.FocusedSeq(
@@ -62,11 +60,10 @@ _frme = construct.FocusedSeq(
 )
 
 
-def frme_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
+def frme_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     for dep in _frme.parse(asset.data):
         try:
-            yield from asset_manager.get_dependencies_for_asset(dep, is_mlvl)
+            yield from asset_manager.get_dependencies_for_asset(dep)
         except UnknownAssetId:
             raise UnableToCheatError()
 
@@ -112,11 +109,10 @@ _fsm2 = construct.Struct(
 )
 
 
-def fsm2_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
+def fsm2_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     fsm2 = _fsm2.parse(asset.data)
     for unk in fsm2.unk3:
-        yield from asset_manager.get_dependencies_for_asset(unk.dep, is_mlvl)
+        yield from asset_manager.get_dependencies_for_asset(unk.dep)
 
 
 _hint = construct.Struct(
@@ -138,26 +134,23 @@ _hint = construct.Struct(
 )
 
 
-def hint_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
+def hint_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     hint = _hint.parse(asset.data)
     for h in hint.hints:
-        yield from asset_manager.get_dependencies_for_asset(h.popup_strg, is_mlvl)
+        yield from asset_manager.get_dependencies_for_asset(h.popup_strg)
         for loc in h.locations:
-            yield from asset_manager.get_dependencies_for_asset(loc.map_text_strg, is_mlvl)
-            if not is_mlvl:
-                # there's no way these are recursive, right?
-                # if they're even valid dependencies at all
-                yield "MLVL", loc.mlvl
-                yield "MREA", loc.mrea
+            yield from asset_manager.get_dependencies_for_asset(loc.map_text_strg)
+            # # there's no way these are recursive, right?
+            # # if they're even valid dependencies at all
+            # yield "MLVL", loc.mlvl, False
+            # yield "MREA", loc.mrea, False
 
 
 _rule = construct.Pointer(0x5, construct.Int32ub)
 
 
-def rule_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False,
-                      ) -> typing.Iterator[Dependency]:
-    yield from asset_manager.get_dependencies_for_asset(_rule.parse(asset.data), is_mlvl)
+def rule_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    yield from asset_manager.get_dependencies_for_asset(_rule.parse(asset.data))
 
 
 _font = construct.FocusedSeq(
@@ -168,9 +161,8 @@ _font = construct.FocusedSeq(
 )
 
 
-def font_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
-                      ) -> typing.Iterator[Dependency]:
-    yield from asset_manager.get_dependencies_for_asset(_font.parse(asset.data), is_mlvl)
+def font_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    yield from asset_manager.get_dependencies_for_asset(_font.parse(asset.data))
 
 
 _cmdl = construct.Struct(
@@ -190,15 +182,14 @@ _cmdl = construct.Struct(
 )
 
 
-def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
-                      ) -> typing.Iterator[Dependency]:
+def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     if asset_manager.target_game >= Game.CORRUPTION:
         raise UnableToCheatError()
 
     decoded = _cmdl.parse(asset.data)
     for material_set in decoded.material_sets:
         for txtr_id in material_set:
-            yield from asset_manager.get_dependencies_for_asset(txtr_id, is_mlvl)
+            yield from asset_manager.get_dependencies_for_asset(txtr_id)
 
 
 ALL_EFFECTS = [Part]
@@ -208,8 +199,7 @@ def _make_re(types: typing.Iterable[AssetType]):
     return re.compile(b"|".join(key.encode("ascii") for key in types))
 
 
-def effect_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
-                        ) -> typing.Iterator[Dependency]:
+def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     try:
         effect_type = next(c for c in ALL_EFFECTS if c.resource_type() == asset.type)
 
@@ -220,8 +210,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl
                 target_game=asset_manager.target_game,
             )
             if element is not None:
-                yield from asset_manager.get_dependencies_for_asset(element.id, is_mlvl,
-                                                                    not_exist_ok=True)
+                yield from asset_manager.get_dependencies_for_asset(element.id, must_exist=False)
 
         for match in _make_re(effect_type.spawn_system_keys()).finditer(asset.data):
             element = effect_script.SpawnSystemKeyframeData.parse(
@@ -231,8 +220,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl
             if element.magic != "NONE":
                 for spawn in element.value.spawns:
                     for t in spawn.v2:
-                        yield from asset_manager.get_dependencies_for_asset(t.id, is_mlvl,
-                                                                            not_exist_ok=True)
+                        yield from asset_manager.get_dependencies_for_asset(t.id, must_exist=False)
 
         for match in _make_re(effect_type.asset_id_keys()).finditer(asset.data):
             element = effect_script.GetAssetId.parse(
@@ -240,8 +228,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl
                 target_game=asset_manager.target_game,
             )
             if element is not None and element.body is not None:
-                yield from asset_manager.get_dependencies_for_asset(element.body, is_mlvl,
-                                                                    not_exist_ok=True)
+                yield from asset_manager.get_dependencies_for_asset(element.body, must_exist=False)
     except Exception:
         raise UnableToCheatError()
 
@@ -263,13 +250,12 @@ def should_cheat_asset(asset_type: AssetType) -> bool:
     return asset_type in _FORMATS_TO_CHEAT
 
 
-def get_cheated_dependencies(asset: RawResource, asset_manager: AssetManager, is_mlvl: bool = False
-                             ) -> typing.Iterator[Dependency]:
+def get_cheated_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     if asset.type in _FORMATS_TO_CHEAT:
         try:
-            yield from _FORMATS_TO_CHEAT[asset.type](asset, asset_manager, is_mlvl)
+            yield from _FORMATS_TO_CHEAT[asset.type](asset, asset_manager)
             return
         except UnableToCheatError:
             pass
 
-    yield from _cheat(asset.data, asset_manager, is_mlvl)
+    yield from _cheat(asset.data, asset_manager)

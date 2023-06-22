@@ -26,9 +26,9 @@ class Mapw(BaseResource):
     def construct_class(cls, target_game: Game) -> construct.Construct:
         return MAPW
 
-    def dependencies_for(self, is_mlvl: bool = False) -> typing.Iterator[Dependency]:
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         for item in self.raw.area_map:
-            yield from self.asset_manager.get_dependencies_for_asset(item, is_mlvl)
+            yield from self.asset_manager.get_dependencies_for_asset(item)
 
     def get_mapa_id(self, index: int) -> AssetId:
         return self.raw.area_map[index]

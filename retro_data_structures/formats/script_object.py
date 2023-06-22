@@ -342,7 +342,8 @@ class ScriptInstance:
         self.connections = [c for c in self.connections if c.target != target]
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
-        yield from self.get_properties().dependencies_for(asset_manager, is_mlvl=True)
+        yield from self.get_properties().dependencies_for(asset_manager)
+
 
 InstanceIdRef = int | InstanceId | ScriptInstance
 InstanceRef = InstanceIdRef | str
