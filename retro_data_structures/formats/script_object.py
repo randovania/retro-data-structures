@@ -22,7 +22,6 @@ from construct.core import (
     Int32ub,
     PrefixedArray,
     Struct,
-    Union,
 )
 
 from retro_data_structures import game_check, properties
@@ -77,7 +76,7 @@ class InstanceId(int):
         return self & 0xffff
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class Connection:
     state: State
     message: Message
@@ -291,7 +290,7 @@ class ScriptInstance:
         return self._raw.base_property
 
     def get_properties(self) -> BaseObjectType:
-        return self.type.from_bytes(self._raw.base_property)
+        return self.type.from_bytes(self.raw_properties)
 
     def get_properties_as(self, type_cls: type[PropertyType]) -> PropertyType:
         props = self.get_properties()
@@ -309,12 +308,6 @@ class ScriptInstance:
         self._raw.base_property = data.to_bytes()
         self.on_modify()
 
-    def get_property(self, chain: Iterator[str]):
-        prop = self.get_properties()
-        for name in chain:
-            prop = getattr(prop, name)
-        return prop
-
     @contextlib.contextmanager
     def edit_properties(self, type_cls: type[PropertyType]):
         props = self.get_properties_as(type_cls)
@@ -330,23 +323,23 @@ class ScriptInstance:
         self._raw.connections = tuple(value)
         self.on_modify()
 
-    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstance):
+    def add_connection(self, state: str | State, message: str | Message, target: InstanceIdRef):
+        target = resolve_instance_id_ref(target)
+
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
 
         self.connections = self.connections + (Connection(
             state=_resolve_to_enum(correct_state, state),
             message=_resolve_to_enum(correct_message, message),
-            target=target.id
+            target=target
         ),)
 
     def remove_connection(self, connection: Connection):
         self.connections = [c for c in self.connections if c is not connection]
 
-    def remove_connections(self, target: Union[int, ScriptInstance]):
-        if isinstance(target, ScriptInstance):
-            target = target.id
-
+    def remove_connections(self, target: InstanceIdRef):
+        target = resolve_instance_id_ref(target)
         self.connections = [c for c in self.connections if c.target != target]
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
