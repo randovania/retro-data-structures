@@ -133,12 +133,12 @@ class ScriptLayer:
                 raise
             return None
 
-    def _get_instance_by_ref(self, ref: InstanceIdRef) -> ScriptInstance:
-        ref = resolve_instance_id_ref(ref)
-        for instance in self.instances:
-            if instance.id_matches(ref):
+    def _get_instance_by_ref(self, instance: InstanceIdRef) -> ScriptInstance:
+        instance = resolve_instance_id_ref(instance)
+        for inst in self.instances:
+            if inst.id_matches(instance):
                 return instance
-        raise KeyError(ref)
+        raise KeyError(instance)
 
     def _get_instance_by_name(self, name: str) -> ScriptInstance:
         for instance in self.instances:
@@ -170,6 +170,15 @@ class ScriptLayer:
         savw.raw.memory_relays.append({"instance_id": relay.id})
         return relay
 
+    def add_existing_instance(self, instance: ScriptInstance) -> ScriptInstance:
+        if instance.id.area != self._parent_area.id:
+            new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
+        else:
+            new_id = InstanceId.new(self._index, instance.id.area, instance.id.instance)
+
+        instance.id = new_id
+        return self._internal_add_instance(instance)
+
     def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)
@@ -178,7 +187,7 @@ class ScriptLayer:
 
         matching_instances = [
             i for i in self._raw.script_instances
-            if i.id == instance.id
+            if i.id == instance
         ]
 
         if not matching_instances:
