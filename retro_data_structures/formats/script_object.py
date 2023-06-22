@@ -75,7 +75,7 @@ class InstanceId(int):
         return self & 0xffff
 
 
-@dataclasses.dataclass(unsafe_hash=True)
+@dataclasses.dataclass(frozen=True)
 class Connection:
     state: State
     message: Message
