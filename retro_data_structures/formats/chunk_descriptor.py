@@ -1,4 +1,3 @@
-import typing
 
 import construct
 from construct import Const, Int32ul, Int64ul, Struct
@@ -7,7 +6,7 @@ from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 
 
-def ChunkDescriptor(data_types: typing.Dict[str, construct.Construct]):
+def ChunkDescriptor(data_types: dict[str, construct.Construct]):
     return Struct(
         id=FourCC,
         data=construct.Prefixed(

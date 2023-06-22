@@ -5,8 +5,9 @@ from __future__ import annotations
 
 import typing
 import uuid
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable
+from typing import Any
 
 import construct
 from construct.core import IfThenElse
@@ -62,7 +63,7 @@ class Game(Enum):
         return self in {Game.ECHOES, Game.CORRUPTION}
 
     @property
-    def invalid_asset_id(self) -> typing.Union[int, uuid.UUID]:
+    def invalid_asset_id(self) -> int | uuid.UUID:
         if self.uses_asset_id_32:
             return (1 << 32) - 1
         elif self.uses_asset_id_64:
@@ -80,7 +81,7 @@ class Game(Enum):
         if self.uses_asset_id_32:
             return crc32(asset_name)
 
-    def is_valid_asset_id(self, asset_id: typing.Union[int, uuid.UUID]) -> bool:
+    def is_valid_asset_id(self, asset_id: int | uuid.UUID) -> bool:
         if self <= Game.ECHOES and asset_id == 0:
             return False
         return asset_id != self.invalid_asset_id
@@ -143,7 +144,7 @@ class CurrentGameCheck(IfThenElse):
 
     def _emitparse(self, code: construct.CodeGen):
         code.append("from retro_data_structures import game_check")
-        return "((%s) if (game_check.get_current_game(this) >= game_check.Game.%s) else (%s))" % (
+        return "(({}) if (game_check.get_current_game(this) >= game_check.Game.{}) else ({}))".format(
             self.thensubcon._compileparse(code),
             self.target_game.name,
             self.elsesubcon._compileparse(code),

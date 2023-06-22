@@ -7,8 +7,8 @@ import copy
 import io
 import itertools
 import typing
+from collections.abc import Iterator
 from enum import IntEnum
-from typing import Iterator, Optional
 
 import construct
 from construct import Aligned, If, Int32ub, PrefixedArray, Struct
@@ -175,7 +175,7 @@ def _get_compressed_block_subcon(compressed_size, uncompressed_size):
     return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
 
 
-def _decode_category(category: typing.List[bytes], subcon: construct.Construct, context, path):
+def _decode_category(category: list[bytes], subcon: construct.Construct, context, path):
     result = ListContainer()
 
     for section in category:
@@ -189,7 +189,7 @@ def _decode_category(category: typing.List[bytes], subcon: construct.Construct, 
     return result
 
 
-def _encode_category(category: typing.List, subcon: construct.Construct, context, path) -> typing.List[bytes]:
+def _encode_category(category: list, subcon: construct.Construct, context, path) -> list[bytes]:
     result = ListContainer()
 
     for section in category:
@@ -214,7 +214,7 @@ class MREAConstruct(construct.Construct):
     def _aligned_parse(self, conn: construct.Construct, stream, context, path):
         return Aligned(32, conn)._parsereport(stream, context, path)
 
-    def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> typing.List[bytes]:
+    def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> list[bytes]:
         compressed_block_headers = self._aligned_parse(
             Array(mrea_header.compressed_block_count, CompressedBlockHeader),
             stream, context, path
@@ -286,8 +286,8 @@ class MREAConstruct(construct.Construct):
             sections=construct.Container(),
         )
 
-    def _encode_compressed_blocks(self, data_sections: typing.List[bytes],
-                                  category_starts: typing.Dict[str, typing.Optional[int]],
+    def _encode_compressed_blocks(self, data_sections: list[bytes],
+                                  category_starts: dict[str, int | None],
                                   context, path):
         def _start_new_group(group_size, section_size, curr_label, prev_label):
             if group_size == 0:
@@ -437,7 +437,7 @@ MREA = MREAConstruct()
 
 
 class Mrea(BaseResource):
-    _script_layer_helpers: Optional[typing.Dict[int, ScriptLayer]] = None
+    _script_layer_helpers: dict[int, ScriptLayer] | None = None
 
     @classmethod
     def resource_type(cls) -> AssetType:

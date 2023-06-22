@@ -178,7 +178,7 @@ class RDSPropertyAdapter(construct.Adapter):
             return obj
         return property_class.from_bytes(obj)
 
-    def _encode(self, obj: typing.Union[BaseProperty, bytes], context, path):
+    def _encode(self, obj: BaseProperty | bytes, context, path):
         if isinstance(obj, BaseProperty):
             return obj.to_bytes()
         return obj
@@ -279,7 +279,7 @@ T = typing.TypeVar("T")
 @dataclass(frozen=True)
 class Instance:
     guid: uuid.UUID
-    properties: typing.Union[BaseProperty, Container]
+    properties: BaseProperty | Container
 
 
 class Room(BaseResource):
@@ -300,7 +300,7 @@ class Room(BaseResource):
         else:
             return self.raw.strp.pools[0][pooled_string.index:pooled_string.index + pooled_string.size_or_str]
 
-    def properties_of_type(self, t: typing.Type[T]) -> typing.Iterator[T]:
+    def properties_of_type(self, t: type[T]) -> typing.Iterator[T]:
         for prop in self.raw.script_data.properties:
             if isinstance(prop.data, t):
                 yield prop.data

@@ -1,5 +1,6 @@
 import logging
-from typing import Any, Callable, Dict, Iterator, List, Set
+from collections.abc import Callable, Iterator
+from typing import Any
 
 from retro_data_structures import formats
 from retro_data_structures.asset_manager import AssetManager
@@ -51,7 +52,7 @@ def _internal_dependencies_for(
         target_game: Game,
         asset_id: AssetId,
         obj_type: AssetType,
-        deps_by_asset_id: Dict[AssetId, Set[Dependency]],
+        deps_by_asset_id: dict[AssetId, set[Dependency]],
 ):
     if asset_id in deps_by_asset_id:
         return
@@ -74,9 +75,9 @@ def _internal_dependencies_for(
 
 
 def recursive_dependencies_for(asset_manager: AssetManager,
-                               asset_ids: List[AssetId],
-                               ) -> Set[Dependency]:
-    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
+                               asset_ids: list[AssetId],
+                               ) -> set[Dependency]:
+    deps_by_asset_id: dict[AssetId, set[Dependency]] = {}
 
     def get_asset(aid: AssetId):
         return asset_manager.get_parsed_asset(aid).raw
@@ -92,8 +93,8 @@ def recursive_dependencies_for(asset_manager: AssetManager,
     return result
 
 
-def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId, Set[Dependency]]:
-    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
+def all_converted_dependencies(asset_converter: AssetConverter) -> dict[AssetId, set[Dependency]]:
+    deps_by_asset_id: dict[AssetId, set[Dependency]] = {}
 
     def get_asset(asset_id: AssetId):
         try:
@@ -111,9 +112,9 @@ def all_converted_dependencies(asset_converter: AssetConverter) -> Dict[AssetId,
 
 
 def recursive_dependencies_for_editor(editor: AssetManager,
-                                      asset_ids: List[AssetId],
-                                      ) -> Set[Dependency]:
-    deps_by_asset_id: Dict[AssetId, Set[Dependency]] = {}
+                                      asset_ids: list[AssetId],
+                                      ) -> set[Dependency]:
+    deps_by_asset_id: dict[AssetId, set[Dependency]] = {}
 
     def _recursive(asset_id: AssetId):
         if asset_id in deps_by_asset_id:

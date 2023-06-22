@@ -150,7 +150,7 @@ def _parse_properties(game: Game, property_data: construct.Container, build: boo
                     elif len(new_encoded) > len(original):
                         print(f"Instance {instance.identifier} of type {type_name} is longer than the original")
 
-    print("Processed properties in {:0.4f} seconds".format(time.time() - start_time))
+    print(f"Processed properties in {time.time() - start_time:0.4f} seconds")
 
 
 def do_parse_properties(game: Game, args):

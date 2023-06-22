@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import dataclasses
-import typing
 
 import construct
 from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalString, PrefixedArray, Rebuild, Struct
@@ -51,9 +50,9 @@ class PakFile:
     asset_id: AssetId
     asset_type: AssetType
     should_compress: bool
-    uncompressed_data: typing.Optional[bytes]
-    compressed_data: typing.Optional[bytes]
-    extra: typing.Optional[construct.Container] = None
+    uncompressed_data: bytes | None
+    compressed_data: bytes | None
+    extra: construct.Container | None = None
 
     def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
@@ -80,8 +79,8 @@ class PakFile:
 
 @dataclasses.dataclass
 class PakBody:
-    named_resources: typing.Dict[str, Dependency]
-    files: typing.List[PakFile]
+    named_resources: dict[str, Dependency]
+    files: list[PakFile]
 
 
 class ConstructPakGc(construct.Construct):

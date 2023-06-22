@@ -245,7 +245,7 @@ class Strg(BaseResource):
         if not found:
             raise ValueError(f"No language {language} found in STRG")
 
-    def set_strings(self, language: str, strings: typing.List[str]):
+    def set_strings(self, language: str, strings: list[str]):
         found = False
 
         if self._raw.prime3:
@@ -270,11 +270,11 @@ class Strg(BaseResource):
             raise ValueError(f"No language {language} found in STRG")
 
     @property
-    def strings(self) -> typing.List[str]:
+    def strings(self) -> list[str]:
         return list(self.get_strings("ENGL"))
 
     @strings.setter
-    def strings(self, value: typing.List[str]):
+    def strings(self, value: list[str]):
         self.set_strings("ENGL", value)
 
     def set_string(self, index: int, value: str, *, language: str = "ENGL"):

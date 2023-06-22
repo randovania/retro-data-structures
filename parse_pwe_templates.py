@@ -46,11 +46,11 @@ def get_endianness(game_id):
 @dataclasses.dataclass(frozen=True)
 class EnumDefinition:
     name: str
-    values: typing.Dict[str, typing.Any]
+    values: dict[str, typing.Any]
     enum_base: str = "Enum"
 
 
-_enums_by_game: typing.Dict[str, typing.List[EnumDefinition]] = {}
+_enums_by_game: dict[str, list[EnumDefinition]] = {}
 
 
 def _scrub_enum(string: str):
@@ -61,7 +61,7 @@ def _scrub_enum(string: str):
     return s
 
 
-def create_enums_file(game_id: str, enums: typing.List[EnumDefinition]):
+def create_enums_file(game_id: str, enums: list[EnumDefinition]):
     code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\n'
     endianness = get_endianness(game_id)
 
@@ -272,7 +272,7 @@ def parse_property_archetypes(path: Path, game_id: str) -> dict:
         raise ValueError(f"Unknown Archetype format: {_type}")
 
 
-property_names: typing.Dict[int, str] = {}
+property_names: dict[int, str] = {}
 
 
 def read_property_names(map_path: Path):
@@ -290,14 +290,14 @@ def read_property_names(map_path: Path):
     return property_names
 
 
-def get_paths(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
+def get_paths(elements: typing.Iterable[Element]) -> dict[str, str]:
     return {
         item.find("Key").text: item.find("Value").attrib["Path"]
         for item in elements
     }
 
 
-def get_key_map(elements: typing.Iterable[Element]) -> typing.Dict[str, str]:
+def get_key_map(elements: typing.Iterable[Element]) -> dict[str, str]:
     return {
         item.find("Key").text: item.find("Value").text
         for item in elements
@@ -343,16 +343,16 @@ class PropDetails:
     raw: dict
     prop_type: str
     need_enums: bool
-    comment: typing.Optional[str]
+    comment: str | None
     parse_code: str
     build_code: list[str]
     from_json_code: str
     to_json_code: str
     custom_cook_pref: bool
-    known_size: typing.Optional[int]
+    known_size: int | None
     meta: dict
     needed_imports: dict[str, str]
-    format_specifier: typing.Optional[str]
+    format_specifier: str | None
     dependency_code: str | None
 
     @property
@@ -386,7 +386,7 @@ class ClassDefinition:
     after_class_code: str = ""
     properties_builder: str = ""
     property_count: int = 0
-    modules: typing.List[str] = dataclasses.field(default_factory=list)
+    modules: list[str] = dataclasses.field(default_factory=list)
 
     all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
     needed_imports: dict = dataclasses.field(default_factory=dict)
@@ -1297,7 +1297,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                            meta=meta, needed_imports=needed_imports, format_specifier=format_specifier,
                            dependency_code=dependency_code)
 
-    def parse_struct(name: str, this, output_path: Path, struct_fourcc: typing.Optional[str] = None):
+    def parse_struct(name: str, this, output_path: Path, struct_fourcc: str | None = None):
         is_struct = struct_fourcc is not None and game_id != "PrimeRemastered"
         if this["type"] != "Struct":
             print("Ignoring {}. Is a {}".format(name, this["type"]))
@@ -1579,7 +1579,7 @@ def write_shared_types_helpers(all_games: dict):
     )
 
 
-def parse(game_ids: typing.Optional[typing.Iterable[str]] = None) -> dict:
+def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
     base_dir = Path(__file__).parent
     templates_path = base_dir.joinpath("retro-script-object-templates")
     read_property_names(templates_path / "PropertyMap.xml")

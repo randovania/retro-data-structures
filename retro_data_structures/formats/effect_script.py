@@ -1,5 +1,5 @@
 import typing
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 import construct
 from construct import (
@@ -1298,7 +1298,7 @@ def effect_script(magic: str, effect_types: dict):
         )
     )
 
-def _yield_dependency_if_valid(asset_id: Optional[int], asset_type: str, game: Game):
+def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game):
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 

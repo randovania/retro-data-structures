@@ -1,7 +1,8 @@
 import copy
 import dataclasses
 import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource
@@ -11,7 +12,7 @@ from retro_data_structures.game_check import Game
 
 @dataclasses.dataclass(frozen=True)
 class AssetDetails:
-    asset_id: Optional[AssetId]
+    asset_id: AssetId | None
     asset_type: AssetType
     original_game: Game
 
@@ -37,15 +38,15 @@ class ConvertedAsset:
 
 class AssetConverter:
     target_game: Game
-    asset_providers: Dict[Game, AssetManager]
+    asset_providers: dict[Game, AssetManager]
     id_generator: IdGenerator
-    converted_ids: Dict[Tuple[Game, AssetId], AssetId]
-    converted_assets: Dict[AssetId, ConvertedAsset]
+    converted_ids: dict[tuple[Game, AssetId], AssetId]
+    converted_assets: dict[AssetId, ConvertedAsset]
 
     def __init__(
             self,
             target_game: Game,
-            asset_providers: Dict[Game, AssetManager],
+            asset_providers: dict[Game, AssetManager],
             id_generator: IdGenerator,
             converters: Callable[[AssetDetails], ResourceConverter],
     ):
@@ -58,7 +59,7 @@ class AssetConverter:
         self._being_converted = set()
 
     def convert_id(
-            self, asset_id: Optional[AssetId], source_game: Game, *, missing_assets_as_invalid: bool = True
+            self, asset_id: AssetId | None, source_game: Game, *, missing_assets_as_invalid: bool = True
     ) -> AssetId:
         if asset_id is not None and source_game.is_valid_asset_id(asset_id):
             try:
