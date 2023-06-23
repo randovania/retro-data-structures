@@ -530,6 +530,7 @@ class Area:
     _strg: Strg = None
 
     # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
+    # FIXME: also every time i've tried to do this it breaks mlvl dependencies. good luck!
     def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container,
                  index: int, parent_mlvl: Mlvl):
         self._raw = raw
