@@ -2,11 +2,13 @@ import json
 import logging
 import os
 import pathlib
+import pprint
 import time
 
 import pytest
 
 from retro_data_structures.asset_manager import AssetManager
+from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats.mlvl import Mlvl
 
 _MLVLS = (
@@ -147,3 +149,33 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
     logging.info(f"Total elapsed time: {total_elapsed}")
     assert world_reports == _EXPECTED_DEPENDENCY
+
+
+@pytest.mark.parametrize("asset_id", _MLVLS)
+def test_mlvl_garbo(prime2_asset_manager: AssetManager, asset_id: AssetId):
+    mlvl = prime2_asset_manager.get_file(asset_id, Mlvl)
+
+    sizes = {
+        area.internal_name: sum(
+            len(deps)
+            for deps in area.dependencies.values()
+        )
+        for area in mlvl.areas
+    }
+    sizes = dict(sorted(sizes.items(), key=lambda it: it[1]))
+    pprint.pp(sizes)
+    assert sizes == {}
+
+
+@pytest.mark.parametrize(["mlvl_id", "mrea_id"], [
+    # (0x3BFA3EFF, 0x85499AA7)
+    (0x3BFA3EFF, 0x4E154902),
+])
+def test_mlvl_build_dependencies_identical(prime2_asset_manager: AssetManager, mlvl_id, mrea_id):
+    mlvl = prime2_asset_manager.get_file(mlvl_id, Mlvl)
+    area = mlvl.get_area(mrea_id)
+
+    before = area.dependencies
+    area.build_mlvl_dependencies()
+
+    assert area.dependencies == before
