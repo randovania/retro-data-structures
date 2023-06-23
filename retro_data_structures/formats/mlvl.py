@@ -3,10 +3,8 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
 
-import itertools
 import typing
 from collections.abc import Iterator
-from itertools import count
 
 import construct
 from construct import (
@@ -38,17 +36,14 @@ from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, Vec
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
-from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.guid import GUID
-from retro_data_structures.formats.mrea import Area, Mrea
+from retro_data_structures.formats.mrea import Area
 from retro_data_structures.formats.savw import Savw
-from retro_data_structures.formats.script_layer import ScriptLayer, new_layer
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstance
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
-    from retro_data_structures.asset_manager import AssetManager
+    pass
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,

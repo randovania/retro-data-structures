@@ -25,7 +25,14 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id
+from retro_data_structures.formats.script_object import (
+    ConstructScriptInstance,
+    InstanceId,
+    InstanceIdRef,
+    InstanceRef,
+    ScriptInstance,
+    resolve_instance_id,
+)
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -76,7 +83,11 @@ def new_layer(index: int | None, target_game: Game) -> Container:
     })
 
 
-SCLY = IfThenElse(game_check.current_game_at_least(game_check.Game.ECHOES), ConstructScriptLayer("SCLY"), ScriptLayerPrime)
+SCLY = IfThenElse(
+    game_check.current_game_at_least(game_check.Game.ECHOES),
+    ConstructScriptLayer("SCLY"),
+    ScriptLayerPrime
+)
 SCGN = ConstructScriptLayer("SCGN")
 
 

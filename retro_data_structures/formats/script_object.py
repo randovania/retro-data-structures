@@ -22,7 +22,6 @@ from construct.core import (
     Int32ub,
     PrefixedArray,
     Struct,
-    Union,
 )
 
 from retro_data_structures import game_check, properties

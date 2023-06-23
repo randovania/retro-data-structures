@@ -2,6 +2,7 @@
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
 from __future__ import annotations
+
 import copy
 import io
 import itertools
@@ -35,7 +36,10 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
-from retro_data_structures.formats.script_object import InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id
+from retro_data_structures.formats.script_object import (
+    InstanceRef,
+    ScriptInstance,
+)
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry

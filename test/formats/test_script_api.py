@@ -3,7 +3,7 @@ import pytest
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums
 from retro_data_structures.formats import script_object
-from retro_data_structures.formats.mlvl import Mlvl, Area
+from retro_data_structures.formats.mlvl import Area, Mlvl
 from retro_data_structures.formats.script_object import InstanceId
 
 
