@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import itertools
 import typing
 
 import construct
@@ -342,8 +343,17 @@ CMDL = Struct(
 
 def dependencies_for_material_set(mat, asset_manager: AssetManager):
     if asset_manager.target_game <= Game.ECHOES:
-        for file_id in mat.texture_file_ids:
-            yield from asset_manager.get_dependencies_for_asset(file_id)
+        ids = mat.texture_file_ids
+        for i in itertools.count(1):
+            had_any = False
+            for material in mat.materials:
+                if i <= len(material.texture_indices):
+                    had_any = True
+                    yield from asset_manager.get_dependencies_for_asset(
+                        ids[material.texture_indices[-i]]
+                    )
+            if not had_any:
+                break
 
     if Game.CORRUPTION <= asset_manager.target_game:
         for material in mat.materials:

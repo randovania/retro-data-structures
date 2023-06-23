@@ -11,7 +11,7 @@ from retro_data_structures.common_types import AssetId32, String
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import UnknownAssetId
-from retro_data_structures.formats import Part, effect_script
+from retro_data_structures.formats import Part, cmdl, effect_script
 from retro_data_structures.formats.hier import Hier
 from retro_data_structures.game_check import Game
 
@@ -176,7 +176,22 @@ _cmdl = construct.Struct(
     _=AlignTo(32),
     material_sets=construct.Array(construct.this.material_set_count, DataSection(
         # Assumes Prime 1/2
-        construct.PrefixedArray(construct.Int32ub, AssetId32),
+        construct.Struct(
+            texture_file_ids=construct.PrefixedArray(construct.Int32ub, AssetId32),
+            material_count=construct.Int32ub,
+            material_end_offsets=construct.Array(construct.this.material_count, construct.Int32ub),
+            material_end_start=construct.Tell,
+            materials=construct.Array(
+                construct.this.material_count,
+                construct.Struct(
+                    flags=construct.Int32ub,
+                    texture_indices=construct.PrefixedArray(construct.Int32ub, construct.Int32ub),
+                    end=construct.Seek(
+                        lambda ctx: ctx._.material_end_start + ctx._.material_end_offsets[ctx._index]
+                    ),
+                )
+            ),
+        ),
         size=lambda: construct.Computed(lambda ctx: ctx.data_section_sizes[ctx._index])
     )),
 )
@@ -188,8 +203,8 @@ def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
 
     decoded = _cmdl.parse(asset.data)
     for material_set in decoded.material_sets:
-        for txtr_id in material_set:
-            yield from asset_manager.get_dependencies_for_asset(txtr_id)
+        yield from cmdl.dependencies_for_material_set(material_set, asset_manager)
+
 
 
 ALL_EFFECTS = [Part]

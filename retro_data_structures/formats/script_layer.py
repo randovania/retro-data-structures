@@ -239,12 +239,12 @@ class ScriptLayer:
         for instance in self.instances:
             deps.extend(instance.mlvl_dependencies_for(asset_manager))
 
-        unique_deps: set[Dependency] = set()
+        seen_deps: set[Dependency] = set()
         for dep in deps:
-            if dep in unique_deps or dep.exclude_for_mlvl:
+            if dep in seen_deps or dep.exclude_for_mlvl:
                 continue
             # specifically keep the order of the *first* appearance of the dependency
-            unique_deps.add(dep)
+            seen_deps.add(dep)
             yield dep
 
     @property
