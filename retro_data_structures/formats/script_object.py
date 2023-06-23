@@ -34,7 +34,7 @@ from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.script_layer import ScriptLayerHelper
+    from retro_data_structures.formats.script_layer import ScriptLayer
     from retro_data_structures.properties.base_property import BaseObjectType
 
     PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
@@ -214,7 +214,7 @@ def _try_quick_get_name(data: bytes) -> str | None:
         return None
 
 
-class ScriptInstanceHelper:
+class ScriptInstance:
     _raw: ScriptInstanceRaw
     target_game: Game
 
@@ -227,10 +227,10 @@ class ScriptInstanceHelper:
         return f"<ScriptInstance {self.type_name} 0x{self.id:08x}>"
 
     def __eq__(self, other):
-        return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
+        return isinstance(other, ScriptInstance) and self._raw == other._raw
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
+    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
         property_type = properties.get_game_object(target_game, instance_type)
 
         raw = ScriptInstanceRaw(
@@ -242,7 +242,7 @@ class ScriptInstanceHelper:
         return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
-    def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
+    def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayer) -> ScriptInstance:
         raw = ScriptInstanceRaw(
             type=object_properties.object_type(),
             id=layer.new_instance_id(),
@@ -332,7 +332,7 @@ class ScriptInstanceHelper:
         self._raw.connections = tuple(value)
         self.on_modify()
 
-    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstanceHelper):
+    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstance):
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
 
@@ -345,8 +345,8 @@ class ScriptInstanceHelper:
     def remove_connection(self, connection: Connection):
         self.connections = [c for c in self.connections if c is not connection]
 
-    def remove_connections(self, target: Union[int, ScriptInstanceHelper]):
-        if isinstance(target, ScriptInstanceHelper):
+    def remove_connections(self, target: Union[int, ScriptInstance]):
+        if isinstance(target, ScriptInstance):
             target = target.id
 
         self.connections = [c for c in self.connections if c.target != target]

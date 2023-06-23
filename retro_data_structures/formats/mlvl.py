@@ -42,8 +42,8 @@ from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.savw import Savw
-from retro_data_structures.formats.script_layer import ScriptLayerHelper, new_layer
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
+from retro_data_structures.formats.script_layer import ScriptLayer, new_layer
+from retro_data_structures.formats.script_object import InstanceId, ScriptInstance
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
 
@@ -352,7 +352,7 @@ _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
 }
 
 
-class AreaWrapper:
+class Area:
     _flags: Container
     _layer_names: ListContainer
     _index: int
@@ -410,18 +410,18 @@ class AreaWrapper:
         return self._raw.area_mrea_id
 
     @property
-    def layers(self) -> Iterator[ScriptLayerHelper]:
+    def layers(self) -> Iterator[ScriptLayer]:
         for layer in self.mrea.script_layers:
             yield layer.with_parent(self)
 
     @property
-    def generated_objects_layer(self) -> ScriptLayerHelper:
+    def generated_objects_layer(self) -> ScriptLayer:
         return self.mrea.generated_objects_layer
 
-    def get_layer(self, name: str) -> ScriptLayerHelper:
+    def get_layer(self, name: str) -> ScriptLayer:
         return next(layer for layer in self.layers if layer.name == name)
 
-    def add_layer(self, name: str, active: bool = True) -> ScriptLayerHelper:
+    def add_layer(self, name: str, active: bool = True) -> ScriptLayer:
         index = len(self._layer_names)
         self._layer_names.append(name)
         self._flags.append(active)
@@ -434,7 +434,7 @@ class AreaWrapper:
         ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
         return next(i for i in count() if i not in ids)
 
-    def get_instance(self, instance_id: int | InstanceId) -> ScriptInstanceHelper | None:
+    def get_instance(self, instance_id: typing.Union[int, InstanceId]) -> typing.Optional[ScriptInstance]:
         if not isinstance(instance_id, InstanceId):
             instance_id = InstanceId(instance_id)
 
@@ -444,10 +444,10 @@ class AreaWrapper:
 
         return None
 
-    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+    def get_instance_by_name(self, name: str) -> ScriptInstance:
         return self.mrea.get_instance_by_name(name)
 
-    def _raw_connect_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+    def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]
         assert len(source_dock.connecting_dock) == 1, "Only docks with one connection supported"
         source_dock.connecting_dock[0].area_index = target_area._index
@@ -460,7 +460,7 @@ class AreaWrapper:
                     attached_area_index.append(c.area_index)
         self._raw.attached_area_index = construct.ListContainer(attached_area_index)
 
-    def connect_dock_to(self, source_dock_number: int, target_area: AreaWrapper, target_dock_number: int):
+    def connect_dock_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         self._raw_connect_to(source_dock_number, target_area, target_dock_number)
         target_area._raw_connect_to(target_dock_number, self, source_dock_number)
 
@@ -586,14 +586,14 @@ class Mlvl(BaseResource):
             return super().__repr__()
 
     @property
-    def areas(self) -> Iterator[AreaWrapper]:
+    def areas(self) -> Iterator[Area]:
         offsets = self._raw.area_layer_name_offset
         names = self._raw.layer_names
         for i, area in enumerate(self._raw.areas):
             area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
-            yield AreaWrapper(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
+            yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
 
-    def get_area(self, asset_id: NameOrAssetId) -> AreaWrapper:
+    def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
 
     _name_strg_cached: Strg = None

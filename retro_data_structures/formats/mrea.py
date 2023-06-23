@@ -30,8 +30,8 @@ from retro_data_structures.data_section import DataSection
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayerHelper
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstanceHelper
+from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer
+from retro_data_structures.formats.script_object import InstanceId, ScriptInstance
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect, Game
@@ -423,7 +423,7 @@ MREA = MREAConstruct()
 
 
 class Mrea(BaseResource):
-    _script_layer_helpers: dict[int, ScriptLayerHelper] | None = None
+    _script_layer_helpers: dict[int, ScriptLayer] | None = None
 
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -476,20 +476,20 @@ class Mrea(BaseResource):
         return super().build()
 
     @property
-    def script_layers(self) -> Iterator[ScriptLayerHelper]:
+    def script_layers(self) -> Iterator[ScriptLayer]:
         self._ensure_decoded_section("script_layers_section", lazy_load=self.target_game != Game.PRIME)
 
         if self.target_game == Game.PRIME:
             section = self._raw.sections.script_layers_section[0]
             for i, layer in enumerate(section.layers):
-                yield ScriptLayerHelper(layer, i, self.target_game)
+                yield ScriptLayer(layer, i, self.target_game)
         else:
             if self._script_layer_helpers is None:
                 self._script_layer_helpers = {}
 
             for i, section in enumerate(self._raw.sections.script_layers_section):
                 if i not in self._script_layer_helpers:
-                    self._script_layer_helpers[i] = ScriptLayerHelper(
+                    self._script_layer_helpers[i] = ScriptLayer(
                         _CATEGORY_ENCODINGS["script_layers_section"].parse(
                             section, target_game=self.target_game
                         ),
@@ -499,12 +499,12 @@ class Mrea(BaseResource):
 
             yield from self._script_layer_helpers.values()
 
-    _generated_objects_layer: ScriptLayerHelper | None = None
+    _generated_objects_layer: ScriptLayer | None = None
     @property
-    def generated_objects_layer(self) -> ScriptLayerHelper:
+    def generated_objects_layer(self) -> ScriptLayer:
         assert self.target_game >= Game.ECHOES
         if self._generated_objects_layer is None:
-            self._generated_objects_layer = ScriptLayerHelper(
+            self._generated_objects_layer = ScriptLayer(
                 self.get_section("generated_script_objects_section")[0],
                 None,
                 self.target_game
@@ -512,18 +512,18 @@ class Mrea(BaseResource):
         return self._generated_objects_layer
 
     @property
-    def all_instances(self) -> Iterator[ScriptInstanceHelper]:
+    def all_instances(self) -> Iterator[ScriptInstance]:
         for layer in self.script_layers:
             yield from layer.instances
 
-    def get_instance(self, instance_id: int) -> ScriptInstanceHelper | None:
+    def get_instance(self, instance_id: int) -> ScriptInstance | None:
         for layer in self.script_layers:
             if (instance := layer.get_instance(instance_id)) is not None:
                 return instance
         if (instance := self.generated_objects_layer.get_instance(instance_id)) is not None:
             return instance
 
-    def get_instance_by_name(self, name: str) -> ScriptInstanceHelper:
+    def get_instance_by_name(self, name: str) -> ScriptInstance:
         for layer in self.script_layers:
             if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
                 return instance
@@ -531,12 +531,12 @@ class Mrea(BaseResource):
             return instance
         raise KeyError(name)
 
-    def remove_instance(self, instance: int | InstanceId | str | ScriptInstanceHelper):
+    def remove_instance(self, instance: int | InstanceId | str | ScriptInstance):
         if isinstance(instance, str):
             instance = self.get_instance(instance)
         elif isinstance(instance, int):
             instance = InstanceId(instance)
-        if isinstance(instance, ScriptInstanceHelper):
+        if isinstance(instance, ScriptInstance):
             instance = instance.id
 
         layers = list(self.script_layers)
