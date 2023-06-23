@@ -658,7 +658,7 @@ class Area:
         if self.asset_manager.target_game <= Game.ECHOES:
             geometry_section = self.mrea.get_raw_section("geometry_section")
             if geometry_section:
-                for asset_id in PrefixedArray(Int32ub, AssetId32).parse(geometry_section[0]):
+                for asset_id in reversed(PrefixedArray(Int32ub, AssetId32).parse(geometry_section[0])):
                     yield from self.asset_manager.get_dependencies_for_asset(asset_id)
         else:
             geometry = self.mrea.get_geometry()
@@ -698,10 +698,11 @@ class Area:
             layer_deps.append(list(self.non_layer_dependencies))
         else:
             non_layer_deps = list(self.build_non_layer_dependencies())
+            print("??????????? non_layer_deps")
+            print(non_layer_deps)
             if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
                 non_layer_deps.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
             layer_deps.append(non_layer_deps)
-
 
         layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
 
@@ -750,6 +751,7 @@ class Area:
         deps = self.layer_dependencies
         deps["!!non_layer!!"] = list(self.non_layer_dependencies)
         return deps
+
 
 _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
     0xD7C3B839: {
