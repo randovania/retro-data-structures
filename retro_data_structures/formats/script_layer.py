@@ -108,7 +108,7 @@ class ScriptLayerHelper:
         for instance in self._raw.script_instances:
             yield ScriptInstanceHelper(instance, self.target_game, on_modify=self.mark_modified)
 
-    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
+    def get_instance(self, instance_id: int) -> ScriptInstanceHelper:
         for instance in self.instances:
             if instance.id_matches(instance_id):
                 return instance
@@ -154,7 +154,7 @@ class ScriptLayerHelper:
         instance.id = new_id
         return self._internal_add_instance(instance)
 
-    def remove_instance(self, instance: Union[int, str, ScriptInstanceHelper]):
+    def remove_instance(self, instance: int | str | ScriptInstanceHelper):
         if isinstance(instance, str):
             instance = self.get_instance_by_name(instance)
         if isinstance(instance, ScriptInstanceHelper):

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import itertools
 import typing
-from itertools import count
 from collections.abc import Iterator
+from itertools import count
 
 import construct
 from construct import (
@@ -434,7 +434,7 @@ class AreaWrapper:
         ids = [instance.id.instance for layer in self.layers for instance in layer.instances]
         return next(i for i in count() if i not in ids)
 
-    def get_instance(self, instance_id: typing.Union[int, InstanceId]) -> typing.Optional[ScriptInstanceHelper]:
+    def get_instance(self, instance_id: int | InstanceId) -> ScriptInstanceHelper | None:
         if not isinstance(instance_id, InstanceId):
             instance_id = InstanceId(instance_id)
 
