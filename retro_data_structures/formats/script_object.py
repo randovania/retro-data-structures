@@ -77,7 +77,7 @@ class InstanceId(int):
         return self & 0xffff
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class Connection:
     state: State
     message: Message
@@ -268,11 +268,9 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, id: int | InstanceId) -> bool:
-        if not isinstance(id, InstanceId):
-            id = InstanceId(id)
-
-        return self.id.area == id.area and self.id.instance == id.instance
+    def id_matches(self, other: InstanceIdRef) -> bool:
+        other = resolve_instance_id_ref(other)
+        return self.id.area == other.area and self.id.instance == other.instance
 
     @property
     def name(self) -> str | None:
@@ -332,24 +330,37 @@ class ScriptInstance:
         self._raw.connections = tuple(value)
         self.on_modify()
 
-    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstance):
+    def add_connection(self, state: str | State, message: str | Message, target: InstanceIdRef):
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
+
+        target = resolve_instance_id_ref(target)
 
         self.connections = self.connections + (Connection(
             state=_resolve_to_enum(correct_state, state),
             message=_resolve_to_enum(correct_message, message),
-            target=target.id
+            target=target
         ),)
 
     def remove_connection(self, connection: Connection):
-        self.connections = [c for c in self.connections if c is not connection]
+        self.connections = [c for c in self.connections if c != connection]
 
-    def remove_connections(self, target: Union[int, ScriptInstance]):
-        if isinstance(target, ScriptInstance):
-            target = target.id
-
+    def remove_connections_from(self, target: InstanceIdRef):
+        target = resolve_instance_id_ref(target)
         self.connections = [c for c in self.connections if c.target != target]
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         yield from self.get_properties().dependencies_for(asset_manager)
+
+
+InstanceIdRef = InstanceId | int | ScriptInstance
+InstanceRef = InstanceIdRef | str
+
+def resolve_instance_id_ref(inst: InstanceIdRef) -> InstanceId:
+    if isinstance(inst, InstanceId):
+        return inst
+    if isinstance(inst, ScriptInstance):
+        return inst.id
+    if isinstance(inst, int):
+        return InstanceId(inst)
+    raise TypeError(f"Invalid type: Expected InstanceIdRef, got {type(inst)}")

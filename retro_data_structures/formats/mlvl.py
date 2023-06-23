@@ -440,12 +440,12 @@ class Area:
 
         for layer in self.layers:
             if instance_id.layer == layer.index:
-                return layer.get_instance(instance_id)
+                return layer._get_instance_by_id(instance_id)
 
         return None
 
     def get_instance_by_name(self, name: str) -> ScriptInstance:
-        return self.mrea.get_instance_by_name(name)
+        return self.mrea._get_instance_by_name(name)
 
     def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]

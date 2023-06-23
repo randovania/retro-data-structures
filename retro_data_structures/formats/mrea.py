@@ -31,7 +31,7 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer
-from retro_data_structures.formats.script_object import InstanceId, ScriptInstance
+from retro_data_structures.formats.script_object import InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect, Game
@@ -512,32 +512,29 @@ class Mrea(BaseResource):
         return self._generated_objects_layer
 
     @property
+    def all_layers(self) -> Iterator[ScriptLayer]:
+        yield from self.script_layers
+        yield self.generated_objects_layer
+
+    @property
     def all_instances(self) -> Iterator[ScriptInstance]:
         for layer in self.script_layers:
             yield from layer.instances
 
-    def get_instance(self, instance_id: int) -> ScriptInstance | None:
-        for layer in self.script_layers:
-            if (instance := layer.get_instance(instance_id)) is not None:
-                return instance
-        if (instance := self.generated_objects_layer.get_instance(instance_id)) is not None:
-            return instance
-
-    def get_instance_by_name(self, name: str) -> ScriptInstance:
-        for layer in self.script_layers:
-            if (instance := layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
-                return instance
-        if (instance := self.generated_objects_layer.get_instance_by_name(name, raise_if_missing=False)) is not None:
-            return instance
-        raise KeyError(name)
+    def get_instance(self, ref: InstanceRef) -> ScriptInstance:
+        for layer in self.all_layers:
+            try:
+                return layer.get_instance(ref)
+            except KeyError:
+                pass
+        raise KeyError(ref)
 
     def remove_instance(self, instance: int | InstanceId | str | ScriptInstance):
-        if isinstance(instance, str):
-            instance = self.get_instance(instance)
-        elif isinstance(instance, int):
-            instance = InstanceId(instance)
-        if isinstance(instance, ScriptInstance):
-            instance = instance.id
-
-        layers = list(self.script_layers)
-        layers[instance.layer].remove_instance(instance)
+        for layer in self.all_layers:
+            try:
+                layer.remove_instance(instance)
+            except KeyError:
+                pass
+            else:
+                return
+        raise KeyError(instance)

@@ -25,7 +25,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, ScriptInstance
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -108,26 +108,38 @@ class ScriptLayer:
         for instance in self._raw.script_instances:
             yield ScriptInstance(instance, self.target_game, on_modify=self.mark_modified)
 
-    def get_instance(self, instance_id: int) -> ScriptInstance | None:
+    def has_instance(self, ref: InstanceRef) -> bool:
+        try:
+            self.get_instance(ref)
+        except KeyError:
+            return False
+        return True
+
+    def get_instance(self, ref: InstanceRef) -> ScriptInstance:
+        if isinstance(ref, str):
+            return self._get_instance_by_name(ref)
+        return self._get_instance_by_id(ref)
+
+    def _get_instance_by_id(self, instance_id: InstanceIdRef) -> ScriptInstance:
+        instance_id = resolve_instance_id_ref(instance_id)
         for instance in self.instances:
             if instance.id_matches(instance_id):
                 return instance
-        return None
+        raise KeyError(instance_id)
 
-    def get_instance_by_name(self, name: str, *, raise_if_missing: bool = True) -> ScriptInstance:
+    def _get_instance_by_name(self, name: str) -> ScriptInstance:
         for instance in self.instances:
             if instance.name == name:
                 return instance
-        if raise_if_missing:
-            raise KeyError(name)
+        raise KeyError(name)
 
     def _internal_add_instance(self, instance: ScriptInstance):
-        if self.get_instance(instance.id) is not None:
+        if self.has_instance(instance):
             raise RuntimeError(f"Instance with id {instance.id} already exists.")
 
         self._modified = True
         self._raw.script_instances.append(instance._raw)
-        return self.get_instance(instance.id)
+        return self._get_instance_by_id(instance.id)
 
     def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
         instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
@@ -145,20 +157,10 @@ class ScriptLayer:
         savw.raw.memory_relays.append({"instance_id": relay.id})
         return relay
 
-    def add_existing_instance(self, instance: ScriptInstance) -> ScriptInstance:
-        if instance.id.area != self._parent_area.id:
-            new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
-        else:
-            new_id = InstanceId.new(self._index, instance.id.area, instance.id.instance)
-
-        instance.id = new_id
-        return self._internal_add_instance(instance)
-
-    def remove_instance(self, instance: int | str | ScriptInstance):
+    def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
-            instance = self.get_instance_by_name(instance)
-        if isinstance(instance, ScriptInstance):
-            instance = instance.id
+            instance = self._get_instance_by_name(instance)
+        instance = resolve_instance_id_ref(instance)
 
         matching_instances = [
             i for i in self._raw.script_instances
