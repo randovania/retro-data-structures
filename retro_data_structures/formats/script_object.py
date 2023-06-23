@@ -22,6 +22,7 @@ from construct.core import (
     Int32ub,
     PrefixedArray,
     Struct,
+    Union,
 )
 
 from retro_data_structures import game_check, properties
@@ -33,7 +34,7 @@ from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.script_layer import ScriptLayer
+    from retro_data_structures.formats.script_layer import ScriptLayerHelper
     from retro_data_structures.properties.base_property import BaseObjectType
 
     PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
@@ -76,7 +77,7 @@ class InstanceId(int):
         return self & 0xffff
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclasses.dataclass()
 class Connection:
     state: State
     message: Message
@@ -213,7 +214,7 @@ def _try_quick_get_name(data: bytes) -> str | None:
         return None
 
 
-class ScriptInstance:
+class ScriptInstanceHelper:
     _raw: ScriptInstanceRaw
     target_game: Game
 
@@ -226,10 +227,10 @@ class ScriptInstance:
         return f"<ScriptInstance {self.type_name} 0x{self.id:08x}>"
 
     def __eq__(self, other):
-        return isinstance(other, ScriptInstance) and self._raw == other._raw
+        return isinstance(other, ScriptInstanceHelper) and self._raw == other._raw
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
+    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
         property_type = properties.get_game_object(target_game, instance_type)
 
         raw = ScriptInstanceRaw(
@@ -241,7 +242,7 @@ class ScriptInstance:
         return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
-    def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayer) -> ScriptInstance:
+    def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayerHelper) -> ScriptInstanceHelper:
         raw = ScriptInstanceRaw(
             type=object_properties.object_type(),
             id=layer.new_instance_id(),
@@ -267,9 +268,11 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, other: InstanceIdRef) -> bool:
-        other = resolve_instance_id_ref(other)
-        return self.id.area == other.area and self.id.instance == other.instance
+    def id_matches(self, id: int | InstanceId) -> bool:
+        if not isinstance(id, InstanceId):
+            id = InstanceId(id)
+
+        return self.id.area == id.area and self.id.instance == id.instance
 
     @property
     def name(self) -> str | None:
@@ -290,7 +293,7 @@ class ScriptInstance:
         return self._raw.base_property
 
     def get_properties(self) -> BaseObjectType:
-        return self.type.from_bytes(self.raw_properties)
+        return self.type.from_bytes(self._raw.base_property)
 
     def get_properties_as(self, type_cls: type[PropertyType]) -> PropertyType:
         props = self.get_properties()
@@ -308,6 +311,12 @@ class ScriptInstance:
         self._raw.base_property = data.to_bytes()
         self.on_modify()
 
+    def get_property(self, chain: Iterator[str]):
+        prop = self.get_properties()
+        for name in chain:
+            prop = getattr(prop, name)
+        return prop
+
     @contextlib.contextmanager
     def edit_properties(self, type_cls: type[PropertyType]):
         props = self.get_properties_as(type_cls)
@@ -323,37 +332,24 @@ class ScriptInstance:
         self._raw.connections = tuple(value)
         self.on_modify()
 
-    def add_connection(self, state: str | State, message: str | Message, target: InstanceIdRef):
-        target = resolve_instance_id_ref(target)
-
+    def add_connection(self, state: str | State, message: str | Message, target: ScriptInstanceHelper):
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
 
         self.connections = self.connections + (Connection(
             state=_resolve_to_enum(correct_state, state),
             message=_resolve_to_enum(correct_message, message),
-            target=target
+            target=target.id
         ),)
 
     def remove_connection(self, connection: Connection):
         self.connections = [c for c in self.connections if c is not connection]
 
-    def remove_connections(self, target: InstanceIdRef):
-        target = resolve_instance_id_ref(target)
+    def remove_connections(self, target: Union[int, ScriptInstanceHelper]):
+        if isinstance(target, ScriptInstanceHelper):
+            target = target.id
+
         self.connections = [c for c in self.connections if c.target != target]
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         yield from self.get_properties().dependencies_for(asset_manager)
-
-
-InstanceIdRef = int | InstanceId | ScriptInstance
-InstanceRef = InstanceIdRef | str
-
-def resolve_instance_id_ref(inst: InstanceIdRef) -> InstanceId:
-    if isinstance(inst, InstanceId):
-        return inst
-    if isinstance(inst, ScriptInstance):
-        return inst.id
-    if isinstance(inst, int):
-        return InstanceId(inst)
-    raise TypeError(f"Invalid type: Expected InstanceIdRef, got {type(inst)}")
