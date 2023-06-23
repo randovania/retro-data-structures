@@ -308,12 +308,6 @@ class ScriptInstance:
         self._raw.base_property = data.to_bytes()
         self.on_modify()
 
-    def get_property(self, chain: Iterator[str]):
-        prop = self.get_properties()
-        for name in chain:
-            prop = getattr(prop, name)
-        return prop
-
     @contextlib.contextmanager
     def edit_properties(self, type_cls: type[PropertyType]):
         props = self.get_properties_as(type_cls)
