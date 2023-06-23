@@ -25,20 +25,13 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import (
-    ConstructScriptInstance,
-    InstanceId,
-    InstanceIdRef,
-    InstanceRef,
-    ScriptInstance,
-    resolve_instance_id_ref,
-)
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, ScriptInstanceHelper
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.mlvl import Area
+    from retro_data_structures.formats.mlvl import AreaWrapper
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -61,7 +54,7 @@ ScriptLayerPrime = Struct(
 )
 
 
-def ConstructScriptLayer(identifier):
+def ScriptLayer(identifier):
     return Struct(
         "magic" / Const(identifier, FourCC),
         "unknown" / Int8ub,
@@ -83,16 +76,12 @@ def new_layer(index: int | None, target_game: Game) -> Container:
     })
 
 
-SCLY = IfThenElse(
-    game_check.current_game_at_least(game_check.Game.ECHOES),
-    ConstructScriptLayer("SCLY"),
-    ScriptLayerPrime
-)
-SCGN = ConstructScriptLayer("SCGN")
+SCLY = IfThenElse(game_check.current_game_at_least(game_check.Game.ECHOES), ScriptLayer("SCLY"), ScriptLayerPrime)
+SCGN = ScriptLayer("SCGN")
 
 
-class ScriptLayer:
-    _parent_area: Area | None = None
+class ScriptLayerHelper:
+    _parent_area: AreaWrapper | None = None
     _index: int
     _modified: bool = False
 
@@ -106,7 +95,7 @@ class ScriptLayer:
             return f"{self.name} ({'Active' if self.active else 'Inactive'})"
         return super().__repr__()
 
-    def with_parent(self, parent: Area) -> ScriptLayer:
+    def with_parent(self, parent: AreaWrapper) -> ScriptLayerHelper:
         self._parent_area = parent
         return self
 
@@ -117,60 +106,46 @@ class ScriptLayer:
     @property
     def instances(self):
         for instance in self._raw.script_instances:
-            yield ScriptInstance(instance, self.target_game, on_modify=self.mark_modified)
+            yield ScriptInstanceHelper(instance, self.target_game, on_modify=self.mark_modified)
 
-    def has_instance(self, instance: InstanceRef) -> bool:
-        return self.get_instance(instance, must_exist=False) is not None
-
-    def get_instance(self, instance: InstanceRef, *, must_exist: bool = True) -> ScriptInstance | None:
-        try:
-            if isinstance(instance, str):
-                return self._get_instance_by_name(instance)
-            else:
-                return self._get_instance_by_ref(instance)
-        except KeyError:
-            if must_exist:
-                raise
-            return None
-
-    def _get_instance_by_ref(self, instance: InstanceIdRef) -> ScriptInstance:
-        instance = resolve_instance_id_ref(instance)
-        for inst in self.instances:
-            if inst.id_matches(instance):
+    def get_instance(self, instance_id: int) -> Optional[ScriptInstanceHelper]:
+        for instance in self.instances:
+            if instance.id_matches(instance_id):
                 return instance
-        raise KeyError(instance)
+        return None
 
-    def _get_instance_by_name(self, name: str) -> ScriptInstance:
+    def get_instance_by_name(self, name: str, *, raise_if_missing: bool = True) -> ScriptInstanceHelper:
         for instance in self.instances:
             if instance.name == name:
                 return instance
-        raise KeyError(name)
+        if raise_if_missing:
+            raise KeyError(name)
 
-    def _internal_add_instance(self, instance: ScriptInstance):
-        if self.has_instance(instance.id):
-            raise RuntimeError(f"Instance with id {instance.id} already exists")
+    def _internal_add_instance(self, instance: ScriptInstanceHelper):
+        if self.get_instance(instance.id) is not None:
+            raise RuntimeError(f"Instance with id {instance.id} already exists.")
 
         self._modified = True
         self._raw.script_instances.append(instance._raw)
-        return self._get_instance_by_ref(instance.id)
+        return self.get_instance(instance.id)
 
-    def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
-        instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
+    def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstanceHelper:
+        instance = ScriptInstanceHelper.new_instance(self.target_game, instance_type, self)
         if name is not None:
             instance.name = name
         return self._internal_add_instance(instance)
 
-    def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstance:
-        instance = ScriptInstance.new_from_properties(object_properties, self)
+    def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstanceHelper:
+        instance = ScriptInstanceHelper.new_from_properties(object_properties, self)
         return self._internal_add_instance(instance)
 
-    def add_memory_relay(self, name: str | None = None) -> ScriptInstance:
+    def add_memory_relay(self, name: str | None = None) -> ScriptInstanceHelper:
         relay = self.add_instance("MRLY", name)
         savw = self._parent_area._parent_mlvl.savw
         savw.raw.memory_relays.append({"instance_id": relay.id})
         return relay
 
-    def add_existing_instance(self, instance: ScriptInstance) -> ScriptInstance:
+    def add_existing_instance(self, instance: ScriptInstanceHelper) -> ScriptInstanceHelper:
         if instance.id.area != self._parent_area.id:
             new_id = InstanceId.new(self._index, self._parent_area.id, self._parent_area.next_instance_id)
         else:
@@ -179,11 +154,11 @@ class ScriptLayer:
         instance.id = new_id
         return self._internal_add_instance(instance)
 
-    def remove_instance(self, instance: InstanceRef):
+    def remove_instance(self, instance: Union[int, str, ScriptInstanceHelper]):
         if isinstance(instance, str):
-            instance = self._get_instance_by_name(instance)
-        else:
-            instance = self._get_instance_by_ref(instance)
+            instance = self.get_instance_by_name(instance)
+        if isinstance(instance, ScriptInstanceHelper):
+            instance = instance.id
 
         matching_instances = [
             i for i in self._raw.script_instances
@@ -236,7 +211,6 @@ class ScriptLayer:
         self._parent_area._layer_names[self._index] = value
 
     def new_instance_id(self) -> InstanceId:
-        self.assert_parent()
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
 
     def is_modified(self) -> bool:
