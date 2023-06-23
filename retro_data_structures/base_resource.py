@@ -19,6 +19,12 @@ class Dependency(typing.NamedTuple):
     id: AssetId
     exclude_for_mlvl: bool = False
 
+    def __repr__(self):
+        s = f"Dep {self.type} 0x{self.id:08X}"
+        if self.exclude_for_mlvl:
+            s += " (non-MLVL)"
+        return s
+
 
 class BaseResource:
     _raw: Container
