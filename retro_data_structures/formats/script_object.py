@@ -269,7 +269,7 @@ class ScriptInstance:
         self.on_modify()
 
     def id_matches(self, other: InstanceIdRef) -> bool:
-        other = resolve_instance_id_ref(other)
+        other = resolve_instance_id(other)
         return self.id.area == other.area and self.id.instance == other.instance
 
     @property
@@ -334,7 +334,7 @@ class ScriptInstance:
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
 
-        target = resolve_instance_id_ref(target)
+        target = resolve_instance_id(target)
 
         self.connections = self.connections + (Connection(
             state=_resolve_to_enum(correct_state, state),
@@ -346,7 +346,7 @@ class ScriptInstance:
         self.connections = [c for c in self.connections if c != connection]
 
     def remove_connections_from(self, target: InstanceIdRef):
-        target = resolve_instance_id_ref(target)
+        target = resolve_instance_id(target)
         self.connections = [c for c in self.connections if c.target != target]
 
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
@@ -356,7 +356,7 @@ class ScriptInstance:
 InstanceIdRef = InstanceId | int | ScriptInstance
 InstanceRef = InstanceIdRef | str
 
-def resolve_instance_id_ref(inst: InstanceIdRef) -> InstanceId:
+def resolve_instance_id(inst: InstanceIdRef) -> InstanceId:
     if isinstance(inst, InstanceId):
         return inst
     if isinstance(inst, ScriptInstance):

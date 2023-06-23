@@ -25,7 +25,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
-from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id_ref
+from retro_data_structures.formats.script_object import ConstructScriptInstance, InstanceId, InstanceIdRef, InstanceRef, ScriptInstance, resolve_instance_id
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties import BaseObjectType
 
@@ -121,7 +121,7 @@ class ScriptLayer:
         return self._get_instance_by_id(ref)
 
     def _get_instance_by_id(self, instance_id: InstanceIdRef) -> ScriptInstance:
-        instance_id = resolve_instance_id_ref(instance_id)
+        instance_id = resolve_instance_id(instance_id)
         for instance in self.instances:
             if instance.id_matches(instance_id):
                 return instance
@@ -160,7 +160,7 @@ class ScriptLayer:
     def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)
-        instance = resolve_instance_id_ref(instance)
+        instance = resolve_instance_id(instance)
 
         matching_instances = [
             i for i in self._raw.script_instances

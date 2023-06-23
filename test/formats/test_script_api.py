@@ -50,16 +50,16 @@ def test_add_layer(prime2_area: Area, active: bool):
 
 def test_get_instance(prime2_area: Area):
     idx, name = 0x0045006B, "Pickup Object"
-    inst = prime2_area.mrea.get_instance(idx)
+    inst = prime2_area.get_instance(idx)
     assert inst.name == name
 
-    inst = prime2_area.mrea.get_instance(name)
+    inst = prime2_area.get_instance(name)
     assert inst.id == idx
 
 def test_remove_instance(prime2_area: Area):
-    old_len = len(list(prime2_area.mrea.all_instances))
-    prime2_area.mrea.remove_instance("Pickup Object")
-    assert len(list(prime2_area.mrea.all_instances)) == old_len - 1
+    old_len = len(list(prime2_area.all_instances))
+    prime2_area.remove_instance("Pickup Object")
+    assert len(list(prime2_area.all_instances)) == old_len - 1
 
 
 # Script Layer
@@ -95,7 +95,7 @@ def test_edit_layer(prime2_area: Area, name: str, active: bool):
 def test_edit_properties(prime2_area: Area):
     from retro_data_structures.properties.echoes.objects.Pickup import Pickup
 
-    inst = prime2_area.mrea.get_instance("Pickup Object")
+    inst = prime2_area.get_instance("Pickup Object")
 
     inst.name = "Test"
     assert inst.name == "Test"
@@ -107,8 +107,8 @@ def test_edit_properties(prime2_area: Area):
 def test_edit_connections(prime2_area: Area):
     from retro_data_structures.enums.echoes import Message, State
 
-    pickup = prime2_area.mrea.get_instance("Pickup Object")
-    relay = prime2_area.mrea.get_instance("Post Pickup")
+    pickup = prime2_area.get_instance("Pickup Object")
+    relay = prime2_area.get_instance("Post Pickup")
 
     original_connections = pickup.connections
 
