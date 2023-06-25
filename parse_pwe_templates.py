@@ -14,6 +14,8 @@ import inflection
 # ruff: noqa: E501
 # ruff: noqa: C901
 
+rds_root = Path(__file__).parent.joinpath("src", "retro_data_structures")
+
 _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
@@ -1019,7 +1021,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         for name, path in get_paths(root.find("PropertyArchetypes")).items()
     }
 
-    code_path = Path(__file__).parent.joinpath("retro_data_structures", "properties", _game_id_to_file[game_id])
+    code_path = rds_root.joinpath("properties", _game_id_to_file[game_id])
     _ensure_is_generated_dir(code_path)
     import_base = f"retro_data_structures.properties.{_game_id_to_file[game_id]}"
     endianness = get_endianness(game_id)
@@ -1550,14 +1552,13 @@ def write_shared_types_helpers(all_games: dict):
             if "Unknown" not in enum_def.name:
                 all_enums[_scrub_enum(enum_def.name)].append(game_id)
 
-    root = Path(__file__).parent.joinpath("retro_data_structures")
     write_shared_type_with_common_import(
-        root.joinpath("enums", "shared_enums.py"),
+        rds_root.joinpath("enums", "shared_enums.py"),
         "enums",
         "enums",
         all_enums,
     )
-    path_to_props = root.joinpath("properties")
+    path_to_props = rds_root.joinpath("properties")
     write_shared_type_with_common_import(
         path_to_props.joinpath("shared_objects.py"),
         "objects",
@@ -1598,12 +1599,11 @@ def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
 
 def persist_data(parse_result):
     logging.info("Persisting the parsed properties")
-    base_dir = Path(__file__).parent
 
     # First write the enums
     for game_id in parse_result.keys():
         if game_id in _game_id_to_file:
-            base_dir.joinpath(f"retro_data_structures/enums/{_game_id_to_file[game_id]}.py").write_text(
+            rds_root.joinpath("enums", f"{_game_id_to_file[game_id]}.py").write_text(
                 create_enums_file(game_id, _enums_by_game[game_id])
             )
 
