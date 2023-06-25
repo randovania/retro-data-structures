@@ -115,7 +115,7 @@ def _raw_script_instance_construct(obj_type_con, obj_len_con):
         instance_id=Int32ub,
         connections=PrefixedArray(obj_len_con, ConstructConnection(obj_type_con)),
         base_property=construct.GreedyBytes,
-    )
+    ).compile()
 
     return header, body
 
@@ -133,8 +133,8 @@ class _ConstructScriptInstance(construct.Construct):
         else:
             header_construct, body_construct = _PrimeRawScript
 
-        header = header_construct._parsereport(stream, context, path)
-        body = body_construct._parsereport(io.BytesIO(header.raw_data), context, path)
+        header = header_construct._parse(stream, context, path)
+        body = body_construct._parse(io.BytesIO(header.raw_data), context, path)
 
         obj_type: str | int = header.type
         obj_id: int = body.instance_id
