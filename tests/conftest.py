@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
-from test import test_lib
 
 import pytest
 
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
 from retro_data_structures.game_check import Game
+from tests import test_lib
 
 _FAIL_INSTEAD_OF_SKIP = False
 

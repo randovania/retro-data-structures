@@ -1,6 +1,5 @@
-from test import test_lib
-
 import pytest
+from tests import test_lib
 
 from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats.strg import Strg

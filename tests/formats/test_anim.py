@@ -1,4 +1,4 @@
-from test import test_lib
+from tests import test_lib
 
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
