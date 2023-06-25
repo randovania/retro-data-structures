@@ -27,17 +27,19 @@ from construct import (
     Sequence,
     Struct,
     Switch,
-    len_,
 )
 
-from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, NameOrAssetId
-from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, Vector3
+from retro_data_structures.common_types import AssetId32, AssetId64, Vector3
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
-from retro_data_structures.formats.mrea import Area
+from retro_data_structures.formats.mrea import (
+    Area,
+    AreaDependencyAdapter,
+    AreaModuleDependencyAdapter,
+)
 from retro_data_structures.formats.savw import Savw
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
@@ -82,41 +84,7 @@ class LayerFlags(Adapter):
         })
 
 
-class LayerNameOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.layer_names
-
-    def _get_table_length(self, context):
-        return len(self._get_table(context))
-
-    def _get_item_size(self, item):
-        return len(item.encode('utf-8'))
-
-
-class AreaDependencyOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.dependencies_b
-
-    def _get_table_length(self, context):
-        return len_(self._get_table(context))
-
-    def _get_item_size(self, item):
-        return 8
-
-
 def create_area(version: int, asset_id):
-    MLVLAreaDependency = Struct(
-        asset_id=asset_id,
-        asset_type=FourCC,
-    )
-
-    # TODO: better offset stuff
-    MLVLAreaDependencies = Struct(
-        Const(0, Int32ub),
-        "dependencies" / PrefixedArray(Int32ub, MLVLAreaDependency),
-        "offsets" / PrefixedArray(Int32ub, Int32ub),
-    )
-
     area_fields = [
         "area_name_id" / asset_id,
         "area_transform" / Array(12, Float32b),
@@ -131,18 +99,14 @@ def create_area(version: int, asset_id):
 
     # Corruption
     if version < 0x19:
-        area_fields.append("dependencies" / MLVLAreaDependencies)
+        area_fields.append("dependencies" / AreaDependencyAdapter(asset_id))
 
     area_fields.append("docks" / PrefixedArray(Int32ub, MLVLDock))
 
     # Echoes
     if version == 0x17:
         area_fields.append(
-            "module_dependencies"
-            / Struct(
-                rel_module=PrefixedArray(Int32ub, CString("utf-8")),
-                rel_offset=PrefixedArray(Int32ub, Int32ub),
-            )
+            "module_dependencies" / AreaModuleDependencyAdapter()
         )
 
     # DKCR
