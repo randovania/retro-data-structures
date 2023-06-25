@@ -2,8 +2,6 @@
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
-import dataclasses
-import itertools
 
 import typing
 from collections.abc import Iterator
@@ -29,17 +27,19 @@ from construct import (
     Sequence,
     Struct,
     Switch,
-    len_,
 )
 
-from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, NameOrAssetId
-from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, Vector3
+from retro_data_structures.common_types import AssetId32, AssetId64, Vector3
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
-from retro_data_structures.formats.mrea import Area, AreaDependencies, AreaDependencyAdapter, AreaModuleDependencyAdapter
+from retro_data_structures.formats.mrea import (
+    Area,
+    AreaDependencyAdapter,
+    AreaModuleDependencyAdapter,
+)
 from retro_data_structures.formats.savw import Savw
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game

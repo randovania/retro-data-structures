@@ -48,7 +48,7 @@ from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.mlvl import Mlvl, AreaDependencies
+    from retro_data_structures.formats.mlvl import Mlvl
 
 
 class MREAVersion(IntEnum):
