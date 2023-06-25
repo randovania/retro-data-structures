@@ -206,3 +206,4 @@ def test_compare_mlvl(prime2_asset_manager: AssetManager):
     new_deps: AreaDependencies = new.raw.areas[0]["dependencies"]
 
     assert old_deps == new_deps
+    assert set(old_deps.all_dependencies) == set(new_deps.all_dependencies)

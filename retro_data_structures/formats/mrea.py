@@ -74,8 +74,7 @@ class AreaDependencyAdapter(Adapter):
 
     def _decode(self, obj, context, path) -> AreaDependencies:
         layers = []
-        for i in range(len(obj.offsets) - 1):
-            start, finish = obj.offsets[i], obj.offsets[i+1]
+        for start, finish in zip(obj.offsets, obj.offsets[1:]):
             layers.append([
                 Dependency(dep.asset_type, dep.asset_id)
                 for dep in obj.dependencies[start:finish]
@@ -116,10 +115,10 @@ class AreaModuleDependencyAdapter(Adapter):
         ))
 
     def _decode(self, obj, context, path) -> list[list[str]]:
-        offsets = list(zip(*[iter(obj.rel_offset)]*2))
+        offset_iter = iter(obj.rel_offset)
         return [
             obj.rel_module[start:finish]
-            for start, finish in offsets
+            for start, finish in zip(offset_iter, offset_iter)
         ]
 
     def _encode(self, obj: list[list[str]], context, path):
@@ -837,7 +836,7 @@ class Area:
                 (not only_modified)
                 or layers[layer].is_modified()
             ):
-                layer_rels[layer].extend(instance.get_properties().modules())
+                layer_rels[layer].extend(instance.type.modules())
 
         layer_rels = [
             list(dict.fromkeys(layer))
