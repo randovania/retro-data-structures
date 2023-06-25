@@ -34,12 +34,13 @@ Homepage = "https://github.com/randovania/retro-data-structures"
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
-write_to = "retro_data_structures/version.py"
+write_to = "src/retro_data_structures/version.py"
 git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 
 [tool.ruff]
 line-length = 120
 select = ["E", "F", "W", "C90", "I", "UP"]
+src = ["src"]
 
 # Version to target for generated code.
 target-version = "py310"

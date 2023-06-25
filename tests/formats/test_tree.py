@@ -1,4 +1,4 @@
-from test import test_lib
+from tests import test_lib
 
 from retro_data_structures.formats.tree import TREE
 

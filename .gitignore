@@ -132,4 +132,4 @@ dmypy.json
 /.idea
 
 # Version
-retro_data_structures/version.py
+src/retro_data_structures/version.py

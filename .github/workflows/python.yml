@@ -80,7 +80,7 @@ jobs:
         shell: bash
 
       - name: test
-        run: python -m pytest test/
+        run: python -m pytest
 
   pypi:
     runs-on: 'ubuntu-latest'
@@ -148,7 +148,7 @@ jobs:
 
       - name: Run Tests
         run:
-          venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --durations=100 -n 2 test
+          venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --durations=100 -n 2
 
       - name: codecov
         uses: codecov/codecov-action@v3
