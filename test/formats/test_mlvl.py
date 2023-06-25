@@ -197,8 +197,7 @@ def test_compare_mlvl(prime2_asset_manager: AssetManager):
     old_deps = AreaDependencies(old_deps.layers, old_deps.non_layer)
 
     area = next(mlvl.areas)
-    area.build_mlvl_dependencies()
-    area.build_module_dependencies()
+    area.update_all_dependencies()
 
     prime2_asset_manager.replace_asset(mlvl_id, mlvl)
     new = prime2_asset_manager.get_parsed_asset(mlvl_id, type_hint=Mlvl)
