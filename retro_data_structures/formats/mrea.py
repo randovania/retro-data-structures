@@ -4,6 +4,7 @@ Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 from __future__ import annotations
 
 import copy
+import dataclasses
 import io
 import itertools
 import typing
@@ -11,7 +12,7 @@ from collections.abc import Iterator
 from enum import IntEnum
 
 import construct
-from construct import Aligned, If, Int32ub, PrefixedArray, Struct
+from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Struct
 from construct.core import (
     Array,
     Computed,
@@ -25,7 +26,7 @@ from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
-from retro_data_structures.common_types import AssetId32, FourCC, Transform4f
+from retro_data_structures.common_types import AssetId32, FourCC, String, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
@@ -47,7 +48,7 @@ from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
-    from retro_data_structures.formats.mlvl import Mlvl
+    from retro_data_structures.formats.mlvl import Mlvl, AreaDependencies
 
 
 class MREAVersion(IntEnum):
@@ -58,6 +59,81 @@ class MREAVersion(IntEnum):
     CorruptionE3Prototype = 0x1D
     Corruption = 0x1E
     DonkeyKongCountryReturns = 0x20
+
+
+class AreaDependencyAdapter(Adapter):
+    def __init__(self, asset_id):
+        super().__init__(Struct(
+            Const(0, Int32ub),
+            "dependencies" / PrefixedArray(Int32ub, Struct(
+                asset_id=asset_id,
+                asset_type=FourCC,
+            )),
+            "offsets" / PrefixedArray(Int32ub, Int32ub),
+        ))
+
+    def _decode(self, obj, context, path) -> AreaDependencies:
+        layers = []
+        for i in range(len(obj.offsets) - 1):
+            start, finish = obj.offsets[i], obj.offsets[i+1]
+            layers.append([
+                Dependency(dep.asset_type, dep.asset_id)
+                for dep in obj.dependencies[start:finish]
+            ])
+
+        non_layer = [
+            Dependency(dep.asset_type, dep.asset_id)
+            for dep in obj.dependencies[obj.offsets[-1]:]
+        ]
+
+        return AreaDependencies(layers, non_layer)
+
+    def _encode(self, obj: AreaDependencies, context, path):
+        layer_deps = list(obj.layers)
+        layer_deps.append(obj.non_layer)
+
+        deps = []
+        offsets = []
+        for layer_dep in layer_deps:
+            offsets.append(len(deps))
+            deps.extend(
+                Container(asset_type=dep.type, asset_id=dep.id)
+                for dep in layer_dep
+                if not dep.exclude_for_mlvl
+            )
+
+        return {
+            "dependencies": deps,
+            "offsets": offsets
+        }
+
+
+class AreaModuleDependencyAdapter(Adapter):
+    def __init__(self):
+        super().__init__(Struct(
+            rel_module=PrefixedArray(Int32ub, String),
+            rel_offset=PrefixedArray(Int32ub, Int32ub),
+        ))
+
+    def _decode(self, obj, context, path) -> list[list[str]]:
+        offsets = list(zip(*[iter(obj.rel_offset)]*2))
+        return [
+            obj.rel_module[start:finish]
+            for start, finish in offsets
+        ]
+
+    def _encode(self, obj: list[list[str]], context, path):
+        offset = 0
+        offsets = []
+        for layer in obj:
+            offsets.append(offset)
+            offset += len(layer)
+            offsets.append(offset)
+
+        return {
+            "rel_module": list(itertools.chain(*obj)),
+            "rel_offset": offsets
+        }
 
 
 _all_categories = [
@@ -525,6 +601,26 @@ class Mrea(BaseResource):
         return self._generated_objects_layer
 
 
+@dataclasses.dataclass(frozen=True)
+class AreaDependencies:
+    layers: list[list[Dependency]]
+    non_layer: list[Dependency]
+
+    @property
+    def all_dependencies(self) -> Iterator[Dependency]:
+        for layer in self.layers:
+            yield from layer
+        yield from self.non_layer
+
+    def __eq__(self, __value: object) -> bool:
+        if not isinstance(__value, AreaDependencies):
+            return False
+        for self_layer, other_layer in zip(self.layers, __value.layers):
+            if set(self_layer) != set(other_layer):
+                return False
+        return set(self.non_layer) == set(__value.non_layer)
+
+
 class Area:
     _flags: Container
     _layer_names: ListContainer
@@ -590,7 +686,7 @@ class Area:
 
     @property
     def generated_objects_layer(self) -> ScriptLayer:
-        return self.mrea.generated_objects_layer
+        return self.mrea.generated_objects_layer.with_parent(self)
 
     @property
     def all_layers(self) -> Iterator[ScriptLayer]:
@@ -693,16 +789,6 @@ class Area:
             ) for layer in self.layers
         ]
 
-        if only_modified:
-            # assume we never modify these
-            layer_deps.append(list(self.non_layer_dependencies))
-        else:
-            non_layer_deps = list(self.build_non_layer_dependencies())
-            if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
-                non_layer_deps.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
-            layer_deps.append(non_layer_deps)
-
-
         layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
 
         if self.mrea_asset_id in _hardcoded_dependencies:
@@ -711,45 +797,91 @@ class Area:
                     continue
 
                 layer = self.get_layer(layer_name)
-                if only_modified and not layer.is_modified:
+                if only_modified and not layer.is_modified():
                     continue
 
                 layer_deps[layer.index].extend(missing)
 
-        layer_deps = [
-            [dep for dep in layer if not dep.exclude_for_mlvl]
-            for layer in layer_deps
+        if only_modified:
+            # assume we never modify these
+            non_layer = self.dependencies.non_layer
+        else:
+            non_layer = list(self.build_non_layer_dependencies())
+            if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
+                non_layer.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
+
+        self.dependencies = AreaDependencies(layer_deps, non_layer)
+
+    def ensure_dependencies_in_paks(self):
+        asset_manager = self._parent_mlvl.asset_manager
+        paks = asset_manager.find_paks(self.mrea_asset_id)
+        for dep in self.dependencies.all_dependencies:
+            for pak in paks:
+                asset_manager.ensure_present(pak, dep.id)
+
+    def build_module_dependencies(self, only_modified: bool = False):
+        if self._parent_mlvl.asset_manager.target_game == Game.PRIME:
+            return
+        layers = list(self.layers)
+        layer_rels = [
+            list(
+                layer.build_module_dependencies()
+                if (not only_modified) or layer.is_modified() else
+                layer.module_dependencies
+            ) for layer in layers
         ]
 
-        offset = 0
-        offsets = []
-        for layer_dep in layer_deps:
-            offsets.append(offset)
-            offset += len(layer_dep)
+        for instance in self.generated_objects_layer.instances:
+            layer = instance.id.layer
+            if (
+                (not only_modified)
+                or layers[layer].is_modified()
+            ):
+                layer_rels[layer].extend(instance.get_properties().modules())
 
-        fancy_deps: list[Dependency] = list(itertools.chain(*layer_deps))
-        deps = [Container(asset_type=dep.type, asset_id=dep.id) for dep in fancy_deps]
-        self._raw.dependencies.dependencies = deps
-        self._raw.dependencies.offsets = offsets
+        layer_rels = [
+            list(dict.fromkeys(layer))
+            for layer in layer_rels
+        ]
+        self.module_dependencies = layer_rels
 
     @property
-    def layer_dependencies(self) -> dict[str, list[Dependency]]:
+    def dependencies(self) -> AreaDependencies:
+        return self._raw.dependencies
+
+    @dependencies.setter
+    def dependencies(self, new: AreaDependencies):
+        self._raw.dependencies = new
+
+    @property
+    def dependencies_by_layer(self) -> dict[str, list[Dependency]]:
+        deps = {
+            layer.name: [dep for dep in layer.dependencies if not dep.exclude_for_mlvl]
+            for layer in self.layers
+        }
+        deps["!!non_layer!!"] = list(self.dependencies.non_layer)
+        return deps
+
+    @property
+    def module_dependencies(self) -> list[list[str]]:
+        return self._raw.module_dependencies
+
+    @module_dependencies.setter
+    def module_dependencies(self, new: list[list[str]]):
+        self._raw.module_dependencies = new
+
+    @property
+    def module_dependencies_by_layer(self) -> dict[str, list[str]]:
         return {
-            layer.name: list(layer.dependencies)
+            layer.name: list(layer.module_dependencies)
             for layer in self.layers
         }
 
-    @property
-    def non_layer_dependencies(self) -> Iterator[Dependency]:
-        deps = self._raw.dependencies
-        global_deps = deps.dependencies[deps.offsets[len(self._layer_names)]:]
-        yield from [Dependency(dep.asset_type, dep.asset_id) for dep in global_deps]
+    def update_all_dependencies(self, only_modified: bool = False):
+        self.build_mlvl_dependencies(only_modified)
+        self.build_module_dependencies(only_modified)
+        self.ensure_dependencies_in_paks()
 
-    @property
-    def dependencies(self) -> dict[str, list[Dependency]]:
-        deps = self.layer_dependencies
-        deps["!!non_layer!!"] = list(self.non_layer_dependencies)
-        return deps
 
 _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
     0xD7C3B839: {

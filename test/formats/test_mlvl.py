@@ -8,6 +8,7 @@ import pytest
 
 from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats.mlvl import Mlvl
+from retro_data_structures.formats.mrea import AreaDependencies
 
 _MLVLS = (
     0x3BFA3EFF,  # Temple Grounds
@@ -102,7 +103,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
         world_reports[mlvl.world_name] = {}
 
         for area in mlvl.areas:
-            old = area.dependencies
+            old = area.dependencies_by_layer
             old = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in old.items()}
 
             start = time.time()
@@ -110,7 +111,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             elapsed = time.time() - start
             total_elapsed += elapsed
 
-            new = area.dependencies
+            new = area.dependencies_by_layer
             new = {layer_name: set((typ, hex(idx)) for typ, idx, _ in layer) for layer_name, layer in new.items()}
 
             missing = {
@@ -147,3 +148,61 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
     logging.info(f"Total elapsed time: {total_elapsed}")
     assert world_reports == _EXPECTED_DEPENDENCY
+
+
+_EXPECTED_MODULES = {
+    "Temple Grounds": {},
+    "Great Temple": {},
+    "Agon Wastes": {},
+    "Torvus Bog": {},
+    "Sanctuary Fortress": {}
+}
+
+@pytest.mark.skip_dependency_tests
+def test_module_dependencies(prime2_asset_manager: AssetManager):
+    write_reports = os.environ.get("WRITE_DEPENDENCIES_REPORTS", "") != ""
+
+    world_reports = {}
+
+    for mlvl_id in _MLVLS:
+        mlvl = prime2_asset_manager.get_file(mlvl_id, Mlvl)
+        logging.info(mlvl.world_name)
+        world_reports[mlvl.world_name] = {}
+
+        for area in mlvl.areas:
+            old = area.module_dependencies_by_layer
+            area.build_module_dependencies()
+            new = area.module_dependencies_by_layer
+
+            f = pathlib.Path(f"area_deps/{mlvl.world_name}/{area.name}.json")
+            msg = f"    {area.name}"
+            if old != new:
+                logging.error(msg)
+                world_reports[mlvl.world_name][area.name] = {"old": old, "new": new}
+                if write_reports:
+                    _write_to_file(world_reports[mlvl.world_name][area.name], f)
+            else:
+                logging.info(msg)
+                if write_reports:
+                    f.unlink(missing_ok=True)
+
+    assert world_reports == _EXPECTED_MODULES
+
+
+def test_compare_mlvl(prime2_asset_manager: AssetManager):
+    mlvl_id = 0x3BFA3EFF
+    mlvl = prime2_asset_manager.get_parsed_asset(mlvl_id, type_hint=Mlvl)
+
+    old_deps: AreaDependencies = mlvl.raw.areas[0].dependencies
+    old_deps = AreaDependencies(old_deps.layers, old_deps.non_layer)
+
+    area = next(mlvl.areas)
+    area.build_mlvl_dependencies()
+    area.build_module_dependencies()
+
+    prime2_asset_manager.replace_asset(mlvl_id, mlvl)
+    new = prime2_asset_manager.get_parsed_asset(mlvl_id, type_hint=Mlvl)
+
+    new_deps: AreaDependencies = new.raw.areas[0]["dependencies"]
+
+    assert old_deps == new_deps
