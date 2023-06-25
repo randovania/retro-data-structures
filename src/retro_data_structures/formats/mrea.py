@@ -67,21 +67,21 @@ class AreaDependencyAdapter(Adapter):
             Const(0, Int32ub),
             "dependencies" / PrefixedArray(Int32ub, Struct(
                 asset_id=asset_id,
-                asset_type=FourCC,
+                asset_type=construct.Bytes(4),
             )),
             "offsets" / PrefixedArray(Int32ub, Int32ub),
-        ))
+        ).compile())
 
     def _decode(self, obj, context, path) -> AreaDependencies:
         layers = []
         for start, finish in zip(obj.offsets, obj.offsets[1:]):
             layers.append([
-                Dependency(dep.asset_type, dep.asset_id)
+                Dependency(dep.asset_type.decode("ascii"), dep.asset_id)
                 for dep in obj.dependencies[start:finish]
             ])
 
         non_layer = [
-            Dependency(dep.asset_type, dep.asset_id)
+            Dependency(dep.asset_type.decode("ascii"), dep.asset_id)
             for dep in obj.dependencies[obj.offsets[-1]:]
         ]
 
@@ -96,7 +96,7 @@ class AreaDependencyAdapter(Adapter):
         for layer_dep in layer_deps:
             offsets.append(len(deps))
             deps.extend(
-                Container(asset_type=dep.type, asset_id=dep.id)
+                Container(asset_type=dep.type.encode("ascii"), asset_id=dep.id)
                 for dep in layer_dep
                 if not dep.exclude_for_mlvl
             )
