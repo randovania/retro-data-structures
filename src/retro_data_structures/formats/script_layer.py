@@ -91,6 +91,22 @@ SCLY = IfThenElse(
 SCGN = ConstructScriptLayer("SCGN")
 
 
+def dependencies_for_layer(asset_manager: AssetManager,
+                           instances: typing.Iterable[ScriptInstance]
+                          ) -> typing.Iterator[Dependency]:
+    deps: list[Dependency] = []
+    for instance in instances:
+        deps.extend(instance.mlvl_dependencies_for(asset_manager))
+
+    unique_deps: set[Dependency] = set()
+    for dep in deps:
+        if dep in unique_deps:
+            continue
+        # specifically keep the order of the *first* appearance of the dependency
+        unique_deps.add(dep)
+        yield dep
+
+
 class ScriptLayer:
     _parent_area: Area | None = None
     _index: int
@@ -233,19 +249,8 @@ class ScriptLayer:
         self._modified = True
 
     def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-        logging.debug(f"        Layer: {self.name}")
-
-        deps: list[Dependency] = []
-        for instance in self.instances:
-            deps.extend(instance.mlvl_dependencies_for(asset_manager))
-
-        unique_deps: set[Dependency] = set()
-        for dep in deps:
-            if dep in unique_deps:
-                continue
-            # specifically keep the order of the *first* appearance of the dependency
-            unique_deps.add(dep)
-            yield dep
+        logging.debug("        Layer: %s", self.name)
+        yield from dependencies_for_layer(asset_manager, self.instances)
 
     @property
     def dependencies(self) -> typing.Iterator[Dependency]:

@@ -31,7 +31,7 @@ from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
 from retro_data_structures.data_section import DataSection
-from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
@@ -522,7 +522,7 @@ class Mrea(BaseResource):
         return MREA
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        raise NotImplementedError()
+        raise DependenciesHandledElsewhere()
 
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
         if section_name not in self._raw.sections:
@@ -810,6 +810,11 @@ class Area:
                 non_layer.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
 
         self.dependencies = AreaDependencies(layer_deps, non_layer)
+
+    def dependencies_for(self):
+        yield from self.dependencies.all_dependencies
+        yield from self.asset_manager.get_dependencies_for_asset(self.mrea_asset_id)
+        yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
 
     def ensure_dependencies_in_paks(self):
         asset_manager = self._parent_mlvl.asset_manager

@@ -7,12 +7,13 @@ import typing
 import construct
 
 from retro_data_structures.base_resource import AssetType, Dependency, RawResource
-from retro_data_structures.common_types import AssetId32, String
+from retro_data_structures.common_types import AssetId32, FourCC, String
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Part, effect_script
 from retro_data_structures.formats.hier import Hier
+from retro_data_structures.formats.tree import Tree
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
@@ -42,12 +43,23 @@ _csng = construct.FocusedSeq(
 
 
 def csng_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-    yield from asset_manager.get_dependencies_for_asset(_csng.parse(asset))
+    yield from asset_manager.get_dependencies_for_asset(_csng.parse(asset.data))
 
 
 def dumb_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-    hier = Hier.parse(asset.data, asset_manager.target_game, asset_manager)
-    yield from hier.dependencies_for()
+    try:
+        magic = FourCC.parse(asset.data)
+    except Exception:
+        raise UnableToCheatError()
+
+    if magic == "HIER":
+        hier = Hier.parse(asset.data, asset_manager.target_game, asset_manager)
+        yield from hier.dependencies_for()
+    elif magic == "TREE":
+        tree = Tree.parse(asset.data, asset_manager.target_game, asset_manager)
+        yield from tree.dependencies_for()
+    else:
+        raise UnableToCheatError()
 
 
 _frme = construct.FocusedSeq(
