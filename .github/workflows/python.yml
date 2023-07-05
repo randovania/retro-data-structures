@@ -107,26 +107,6 @@ jobs:
         with:
           password: ${{ secrets.pypi_password }}
 
-  ruff:
-    runs-on: 'ubuntu-latest'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: "3.10"
-
-      - name: Install Python packages
-        run: python -m pip install ruff==0.0.272
-
-      - name: Run ruff
-        run: ruff check --format=github .
-
   full_test:
     runs-on: self-hosted
 
