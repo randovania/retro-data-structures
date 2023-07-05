@@ -1,6 +1,7 @@
 import fnmatch
 import json
 import logging
+import time
 import typing
 import uuid
 from collections import defaultdict
@@ -21,7 +22,7 @@ from retro_data_structures.base_resource import (
     Resource,
     resolve_asset_id,
 )
-from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
@@ -112,7 +113,7 @@ class AssetManager:
     headers: dict[str, construct.Container]
     _paks_for_asset_id: dict[AssetId, set[str]]
     _types_for_asset_id: dict[AssetId, AssetType]
-    _ensured_asset_ids: dict[str, set[AssetId]]
+    # _ensured_asset_ids: dict[str, set[AssetId]]
     _modified_resources: dict[AssetId, RawResource | None]
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
@@ -220,7 +221,7 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
-    def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
+    def get_raw_asset(self, asset_id: NameOrAssetId, *, can_be_compressed: bool = False) -> RawResource:
         """
         Gets the bytes data for the given asset name/id, optionally restricting from which pak.
         :raises ValueError if the asset doesn't exist.
@@ -238,7 +239,7 @@ class AssetManager:
         try:
             for pak_name in self._paks_for_asset_id[asset_id]:
                 pak = self.get_pak(pak_name)
-                result = pak.get_asset(asset_id)
+                result = pak.get_asset(asset_id, can_be_compressed)
                 if result is not None:
                     return result
         except KeyError:
@@ -341,6 +342,7 @@ class AssetManager:
 
         self._modified_resources[asset_id] = None
 
+        return
         # If this asset id was previously ensured, remove that
         for ensured_ids in self._ensured_asset_ids.values():
             if asset_id in ensured_ids:
@@ -350,6 +352,7 @@ class AssetManager:
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
+        return
         if pak_name not in self._ensured_asset_ids:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 
@@ -417,7 +420,11 @@ class AssetManager:
 
     def get_dependencies_for_asset(self, asset_id: NameOrAssetId, *, must_exist: bool = False) -> Iterator[Dependency]:
         override = asset_id in self.target_game.mlvl_dependencies_to_ignore
-        for it in self._get_dependencies_for_asset(asset_id, must_exist):
+        try:
+            deps = self._get_dependencies_for_asset(asset_id, must_exist)
+        except DependenciesHandledElsewhere:
+            return
+        for it in deps:
             yield Dependency(it.type, it.id, it.exclude_for_mlvl or override)
 
     def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, char_index: int | None = None):
@@ -442,7 +449,12 @@ class AssetManager:
             deps = tuple(deps)
             self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
 
-        yield from deps
+        for dep in self.get_dependencies_for_asset(asset_id):
+            if (char_dep := next((d for d in deps if d.id == dep.id), None)) is not None:
+                yield char_dep
+            else:
+                yield Dependency(dep.type, dep.id, True)
+
         yield Dependency("ANCS", asset_id)
 
     def build_audio_group_dependency_table(self):
@@ -498,38 +510,66 @@ class AssetManager:
                 indent=4,
             )
 
-    def save_modifications(self, output_path: Path):
+    def _get_modified_paks(self) -> set[str]:
         modified_paks = set()
-        asset_ids_to_copy = {}
-
         for asset_id in self._modified_resources.keys():
             modified_paks.update(self._paks_for_asset_id[asset_id])
+        return modified_paks
+
+    def save_modifications(self, output_path: Path):
+        modified_paks = self._get_modified_paks()
+        all_assets: dict[AssetId, RawResource] = {}
 
         # Make sure all paks were loaded
         for pak_name in modified_paks:
             self.get_pak(pak_name)
 
         # Read all asset ids we need to copy somewhere else
-        for asset_ids in self._ensured_asset_ids.values():
-            for asset_id in asset_ids:
-                if asset_id not in asset_ids_to_copy:
-                    asset_ids_to_copy[asset_id] = self.get_raw_asset(asset_id)
+        for asset_id in self.all_asset_ids():
+            if (
+                asset_id not in all_assets
+                and asset_id not in self._modified_resources
+                or self._modified_resources[asset_id] is not None
+            ):
+                all_assets[asset_id] = self.get_raw_asset(asset_id, can_be_compressed=True)
+
+        discovered_deps_for_pak: dict[str, set[AssetId]] = {}
+        for pak_name in self.all_paks:
+            deps = set()
+            for asset in self.get_pak(pak_name).named_assets.values():
+                deps.update(dep.id for dep in self.get_dependencies_for_asset(asset.id))
+            discovered_deps_for_pak[pak_name] = deps
+
+        asset_ids_for_pak: dict[str, set[AssetId]] = defaultdict(set)
+        for asset_id, paks in self._paks_for_asset_id.items():
+            for pak in paks:
+                asset_ids_for_pak[pak].add(asset_id)
+
+        orphaned_assets_for_pak = {
+            pak: asset_ids_for_pak[pak].difference(discovered_deps_for_pak[pak])
+            for pak in self.all_paks
+        }
 
         # Update the PAKs
-        for pak_name in modified_paks:
+        for pak_name in sorted(modified_paks):
             logger.info("Updating %s", pak_name)
             pak = self._in_memory_paks.pop(pak_name)
 
-            for asset_id, raw_asset in self._modified_resources.items():
-                if pak_name in self._paks_for_asset_id[asset_id]:
-                    if raw_asset is None:
-                        pak.remove_asset(asset_id)
-                    else:
-                        pak.replace_asset(asset_id, raw_asset)
+            start_time = time.time()
 
-            # Add the files that were ensured to be present in this pak
-            for asset_id in self._ensured_asset_ids[pak_name]:
-                pak.add_asset(asset_id, asset_ids_to_copy[asset_id])
+            # Rebuild pak dependencies
+            pak.clear_assets()
+
+            for name, asset in pak.named_assets.items():
+                logger.debug("Adding dependencies for %s", name)
+                for dep in self.get_dependencies_for_asset(asset.id):
+                    pak.add_asset(dep.id, all_assets[dep.id], dep.can_duplicate)
+
+            for asset in sorted(orphaned_assets_for_pak[pak_name]):
+                pak.add_asset(asset, all_assets[asset])
+
+            finish_time = time.time()
+            logger.info("Finished %s in %fs", pak_name, finish_time-start_time)
 
             # Write the data
             out_pak_path = output_path.joinpath(pak_name)
@@ -537,6 +577,8 @@ class AssetManager:
             out_pak_path.parent.mkdir(parents=True, exist_ok=True)
             with out_pak_path.open("w+b") as f:
                 pak.build_stream(f)
+
+            # pak_pbar.update()
 
         self._write_custom_names(output_path)
         self._modified_resources = {}

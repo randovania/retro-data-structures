@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import math
 
 import construct
 from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalString, PrefixedArray, Rebuild, Struct
@@ -49,10 +50,13 @@ CompressedPakResource = FocusedSeq(
 class PakFile:
     asset_id: AssetId
     asset_type: AssetType
-    should_compress: bool
     uncompressed_data: bytes | None
     compressed_data: bytes | None
     extra: construct.Container | None = None
+    target_game: Game | None = None
+
+    def __repr__(self) -> str:
+        return f"PakFile(asset_id=0x{self.asset_id:08X}, asset_type={self.asset_type})"
 
     def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
@@ -75,6 +79,82 @@ class PakFile:
     def set_new_data(self, data: bytes):
         self.uncompressed_data = data
         self.compressed_data = None
+
+    def get_data(self, target_game: Game) -> bytes:
+        if self.should_compress(target_game):
+            return self.get_compressed(target_game)
+        return self.get_decompressed(target_game)
+
+    def _padded_size(self, size: int, target_game: Game) -> int:
+        align = 32 if target_game.uses_asset_id_32 else 64
+        return math.ceil(size/align) * align
+
+    def get_size(self, target_game: Game) -> int:
+        size = len(self.get_data(target_game))
+        return self._padded_size(size, target_game)
+
+    def should_compress(self, target_game: Game) -> bool:
+        if target_game >= Game.PRIME_REMASTER:
+            raise NotImplementedError()
+
+        always_compress = {
+            "TXTR",
+            "CMDL",
+            "CSKR",
+            "ANCS",
+            "ANIM",
+            "FONT"
+        }
+
+        conditional_compress = {
+            "PART",
+            "ELSC",
+            "SWHC",
+            "WPSC",
+            "DPSC",
+            "CRSC"
+        }
+
+        threshold = 0x80
+
+        if target_game == Game.CORRUPTION:
+            always_compress.update(
+                "CHAR",
+                "SAND",
+                "CSMP",
+                "STRG",
+                "CAAD",
+                "DCLN",
+                "USRC"
+            )
+
+            conditional_compress.update(
+                "BFRC",
+                "SPSC"
+            )
+
+            threshold = 0x80
+
+        uncompressed = self._padded_size(
+            len(self.get_decompressed(target_game)),
+            target_game
+        )
+        should_compress = (
+            self.asset_type in always_compress
+            or (
+                self.asset_type in conditional_compress
+                and uncompressed >= threshold
+            )
+        )
+
+        if should_compress:
+            diff = self._padded_size(
+                len(self.get_compressed(target_game)),
+                target_game
+            ) - uncompressed
+            should_compress = diff < 0
+
+        return should_compress
 
 
 @dataclasses.dataclass
@@ -104,11 +184,10 @@ class ConstructPakGc(construct.Construct):
                 compressed_data = None
 
             files.append(PakFile(
-                resource.asset.id,
-                resource.asset.type,
-                resource.compressed > 0,
-                uncompressed_data,
-                compressed_data,
+                asset_id=resource.asset.id,
+                asset_type=resource.asset.type,
+                uncompressed_data=uncompressed_data,
+                compressed_data=compressed_data,
             ))
 
         return PakBody(
@@ -152,17 +231,10 @@ class ConstructPakGc(construct.Construct):
         PAKNoData._build(header, stream, context, path)
         AlignTo(32)._build(None, stream, context, path)
 
+        game = game_check.get_current_game(context)
         for i, file in enumerate(obj.files):
-            compressed = file.should_compress
-            if compressed:
-                data = file.get_compressed(game_check.get_current_game(context))
-            else:
-                data = file.get_decompressed(game_check.get_current_game(context))
-
-            # TODO: don't compress if it ends up bigger
-            # if len(data) > len(file.data):
-            #     compressed = False
-            #     data = file.data
+            compressed = file.should_compress(game)
+            data = file.get_data(game)
 
             pad = 32 - (len(data) % 32)
             if pad < 32:

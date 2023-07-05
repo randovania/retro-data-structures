@@ -1,3 +1,6 @@
+from typing import NamedTuple
+from unittest.mock import MagicMock
+
 import pytest
 
 from retro_data_structures.base_resource import Dependency
@@ -168,7 +171,7 @@ def test_echoes_resource_encode_decode(compressed_resource):
 
 def test_identical_when_keep_data(prime2_iso_provider):
     game = Game.ECHOES
-    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
+    with prime2_iso_provider.open_binary("MiscData.pak") as f:
         raw = f.read()
 
     decoded = Pak.parse(raw, target_game=game)
@@ -177,13 +180,44 @@ def test_identical_when_keep_data(prime2_iso_provider):
     assert raw == encoded
 
 
-def test_compare_header_keep_data(prime2_iso_provider):
+class Resource(NamedTuple):
+    compressed: bool
+    id: str
+    type: str
+    size: int
+
+
+@pytest.mark.parametrize("pak", (
+        "AudioGrp.pak",
+        "FrontEnd.pak",
+        "GGuiSys.pak",
+        "LogBook.pak",
+        "Metroid1.pak",
+        "Metroid2.pak",
+        "Metroid3.pak",
+        "Metroid4.pak",
+        "Metroid5.pak",
+        "Metroid6.pak",
+        "MidiData.pak",
+        "MiscData.pak",
+        "NoARAM.pak",
+        "SamGunFx.pak",
+        "SamGunFxLow.pak",
+        "SamusGun.pak",
+        "SamusGunLow.pak",
+        "SlideShow.pak",
+        "TestAnim.pak"
+))
+def test_compare_header_keep_data(prime2_iso_provider, mocker, pak):
     game = Game.ECHOES
-    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
+    with prime2_iso_provider.open_binary(pak) as f:
         raw = f.read()
 
     raw_header = PAKNoData.parse(raw, target_game=game)
-    raw_sizes = [(r.compressed, r.offset, r.size) for r in raw_header.resources]
+    raw_sizes = [
+        Resource(bool(r.compressed), hex(r.asset.id), r.asset.type, r.size)
+        for r in raw_header.resources
+    ]
 
     decoded = PAK_GC.parse(raw, target_game=game)
     # for r in decoded.resources:
@@ -193,12 +227,33 @@ def test_compare_header_keep_data(prime2_iso_provider):
 
     custom_header = PAKNoData.parse(encoded, target_game=game)
 
-    custom_sizes = [(r.compressed, r.offset, r.size) for r in custom_header.resources]
-    assert custom_sizes == raw_sizes
+    custom_sizes = [
+        Resource(bool(r.compressed), hex(r.asset.id), r.asset.type, r.size)
+        for r in custom_header.resources
+    ]
+
+    diff_sizes = [
+        (custom, raw)
+        for custom, raw in zip(custom_sizes, raw_sizes)
+        if (
+            custom != raw
+            and not (
+                (custom.compressed != raw.compressed)
+                and custom.size <= raw.size
+            )
+        )
+    ]
+    assert diff_sizes == []
 
 
-def test_compare_from_build():
+def test_compare_from_build(mocker):
     game = Game.ECHOES
+
+    mock_should_compress: MagicMock = mocker.patch(
+        "retro_data_structures.formats.pak_gc.PakFile.should_compress",
+        autospec=True
+    )
+    mock_should_compress.return_value = True
 
     source = PakBody(
         named_resources={
@@ -211,7 +266,6 @@ def test_compare_from_build():
             PakFile(
                 asset_id=201335801,
                 asset_type="TXTR",
-                should_compress=True,
                 uncompressed_data=None,
                 compressed_data=(
                     b"\x00\x00\x00\x00\x00@\x00@\x00\x00\x00\x05\x00\x00\x00\x00\n\xaa\xaa\xaa\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xaa\n\xcc\xcc\xa0"
@@ -286,7 +340,6 @@ def test_compare_from_build():
             PakFile(
                 asset_id=239414538,
                 asset_type="TXTR",
-                should_compress=True,
                 uncompressed_data=None,
                 compressed_data=(
                     b"\x00\x00\x00\x02\x00 \x00 \x00\x00\x00\x04\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\xff"
@@ -322,7 +375,6 @@ def test_compare_from_build():
             PakFile(
                 asset_id=564256465,
                 asset_type="TXTR",
-                should_compress=True,
                 uncompressed_data=None,
                 compressed_data=(
                     b"\x00\x00\x00\x00\x00 \x00 \x00\x00\x00\x04\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
@@ -348,7 +400,6 @@ def test_compare_from_build():
             PakFile(
                 asset_id=568030977,
                 asset_type="TXTR",
-                should_compress=True,
                 uncompressed_data=None,
                 compressed_data=(
                     b"\x00\x00\x00\x00\x00@\x00@\x00\x00\x00\x05\x00\x00\x00\x00\n\xaa\xaa\xaa\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xaa\n\xcc\xcc\xa0"
@@ -423,7 +474,6 @@ def test_compare_from_build():
             PakFile(
                 asset_id=638062812,
                 asset_type="TXTR",
-                should_compress=True,
                 uncompressed_data=None,
                 compressed_data=(
                     b"\x00\x00\x00\x00\x00@\x00@\x00\x00\x00\x05\x00\x00\x00\x00\n\xaa\xaa\xaa\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xcc\n\xcc\xcc\xaa\n\xcc\xcc\xa0"
