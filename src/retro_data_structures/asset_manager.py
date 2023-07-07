@@ -161,9 +161,12 @@ class AssetManager:
                 for name, asset_id in json.loads(custom_names_text).items()
             })
 
-        self.all_paks = list(
-            self.provider.rglob("*.pak")
-        )
+        self.all_paks = [
+            f for f in self.provider.rglob("*.pak")
+            # The paks named Low normally has different versions of assets, but with the same asset id
+            # Let's skip them here to not accidentally load from these paks instead of others
+            if not f.endswith("Low.pak")
+        ]
 
         for name in self.all_paks:
             with self.provider.open_binary(name) as f:
