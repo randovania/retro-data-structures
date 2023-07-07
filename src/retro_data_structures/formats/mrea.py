@@ -607,9 +607,9 @@ class AreaDependencies:
 
     @property
     def all_dependencies(self) -> Iterator[Dependency]:
+        yield from self.non_layer
         for layer in self.layers:
             yield from layer
-        yield from self.non_layer
 
     def __eq__(self, __value: object) -> bool:
         if not isinstance(__value, AreaDependencies):
@@ -814,7 +814,7 @@ class Area:
     def dependencies_for(self):
         yield from self.dependencies.all_dependencies
         yield from self.asset_manager.get_dependencies_for_asset(self.mrea_asset_id)
-        yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
+        # yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
 
     def ensure_dependencies_in_paks(self):
         asset_manager = self._parent_mlvl.asset_manager

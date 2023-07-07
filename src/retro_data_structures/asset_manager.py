@@ -1,6 +1,7 @@
 import fnmatch
 import json
 import logging
+import os
 import time
 import typing
 import uuid
@@ -100,6 +101,15 @@ class IsoFileProvider(FileProvider):
 
     def get_dol(self) -> bytes:
         return self.data.get_dol()
+
+    def extract_to_directory(self, out_path: Path):
+        context = nod.ExtractionContext()
+        context.set_progress_callback(
+            lambda path, progress: logger.info(
+                f"Extraction {progress:.0%} Complete; Current node: {path}"
+            )
+        )
+        self.data.extract_to_directory(os.fspath(out_path), context)
 
 
 class AssetManager:
@@ -375,7 +385,7 @@ class AssetManager:
 
     def get_pak(self, pak_name: str) -> Pak:
         if pak_name not in self._ensured_asset_ids:
-            raise ValueError(f"Unknown pak_name: {pak_name}")
+            raise ValueError(f"Unknown pak_name: {pak_name}. Known names: {tuple(self._ensured_asset_ids.keys())}")
 
         if pak_name not in self._in_memory_paks:
             logger.info("Reading %s", pak_name)
@@ -511,6 +521,7 @@ class AssetManager:
             )
 
     def _get_modified_paks(self) -> set[str]:
+        return set(self.all_paks)
         modified_paks = set()
         for asset_id in self._modified_resources.keys():
             modified_paks.update(self._paks_for_asset_id[asset_id])
@@ -560,13 +571,13 @@ class AssetManager:
             # Rebuild pak dependencies
             pak.clear_assets()
 
+            for asset in sorted(orphaned_assets_for_pak[pak_name]):
+                pak.add_asset(asset, all_assets[asset])
+
             for name, asset in pak.named_assets.items():
                 logger.debug("Adding dependencies for %s", name)
                 for dep in self.get_dependencies_for_asset(asset.id):
                     pak.add_asset(dep.id, all_assets[dep.id], dep.can_duplicate)
-
-            for asset in sorted(orphaned_assets_for_pak[pak_name]):
-                pak.add_asset(asset, all_assets[asset])
 
             finish_time = time.time()
             logger.info("Finished %s in %fs", pak_name, finish_time-start_time)
