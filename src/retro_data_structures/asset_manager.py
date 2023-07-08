@@ -172,9 +172,12 @@ class AssetManager:
                 for name, asset_id in json.loads(custom_names_text).items()
             })
 
-        self.all_paks = list(
-            self.provider.rglob("*.pak")
-        )
+        self.all_paks = [
+            f for f in self.provider.rglob("*.pak")
+            # # The paks named Low normally has different versions of assets, but with the same asset id
+            # # Let's skip them here to not accidentally load from these paks instead of others
+            # if not f.endswith("Low.pak")
+        ]
 
         for name in self.all_paks:
             with self.provider.open_binary(name) as f:
@@ -446,6 +449,7 @@ class AssetManager:
 
         if char_index is None:
             yield from self.get_dependencies_for_asset(asset_id)
+            yield from self.target_game.special_ancs_dependencies(asset_id)
             return
 
         if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
@@ -462,8 +466,8 @@ class AssetManager:
         for dep in self.get_dependencies_for_asset(asset_id):
             if (char_dep := next((d for d in deps if d.id == dep.id), None)) is not None:
                 yield char_dep
-            else:
-                yield Dependency(dep.type, dep.id, True)
+            # else:
+            #     yield Dependency(dep.type, dep.id, True)
 
         yield Dependency("ANCS", asset_id)
 
@@ -504,6 +508,7 @@ class AssetManager:
 
         dep = Dependency("AGSC", agsc, False)
         if dep in self._audio_group_dependency.direct_dependencies:
+            return
             yield Dependency("AGSC", agsc, True)
         else:
             yield dep
@@ -530,10 +535,15 @@ class AssetManager:
     def save_modifications(self, output_path: Path):
         modified_paks = self._get_modified_paks()
         all_assets: dict[AssetId, RawResource] = {}
+        named_assets: dict[str, dict[AssetId, RawResource]] = {}
 
         # Make sure all paks were loaded
         for pak_name in modified_paks:
-            self.get_pak(pak_name)
+            pak = self.get_pak(pak_name)
+            named_assets[pak_name] = {
+                asset.id: pak.get_asset(asset.id, True)
+                for asset in pak.named_assets.values()
+            }
 
         # Read all asset ids we need to copy somewhere else
         for asset_id in self.all_asset_ids():
@@ -544,22 +554,22 @@ class AssetManager:
             ):
                 all_assets[asset_id] = self.get_raw_asset(asset_id, can_be_compressed=True)
 
-        discovered_deps_for_pak: dict[str, set[AssetId]] = {}
-        for pak_name in self.all_paks:
-            deps = set()
-            for asset in self.get_pak(pak_name).named_assets.values():
-                deps.update(dep.id for dep in self.get_dependencies_for_asset(asset.id))
-            discovered_deps_for_pak[pak_name] = deps
+        # discovered_deps_for_pak: dict[str, set[AssetId]] = {}
+        # for pak_name in self.all_paks:
+        #     deps = set()
+        #     for asset in self.get_pak(pak_name).named_assets.values():
+        #         deps.update(dep.id for dep in self.get_dependencies_for_asset(asset.id))
+        #     discovered_deps_for_pak[pak_name] = deps
 
-        asset_ids_for_pak: dict[str, set[AssetId]] = defaultdict(set)
-        for asset_id, paks in self._paks_for_asset_id.items():
-            for pak in paks:
-                asset_ids_for_pak[pak].add(asset_id)
+        # asset_ids_for_pak: dict[str, set[AssetId]] = defaultdict(set)
+        # for asset_id, paks in self._paks_for_asset_id.items():
+        #     for pak in paks:
+        #         asset_ids_for_pak[pak].add(asset_id)
 
-        orphaned_assets_for_pak = {
-            pak: asset_ids_for_pak[pak].difference(discovered_deps_for_pak[pak])
-            for pak in self.all_paks
-        }
+        # orphaned_assets_for_pak = {
+        #     pak: asset_ids_for_pak[pak].difference(discovered_deps_for_pak[pak])
+        #     for pak in self.all_paks
+        # }
 
         # Update the PAKs
         for pak_name in sorted(modified_paks):
@@ -571,13 +581,18 @@ class AssetManager:
             # Rebuild pak dependencies
             pak.clear_assets()
 
-            for asset in sorted(orphaned_assets_for_pak[pak_name]):
-                pak.add_asset(asset, all_assets[asset])
+            # for asset in sorted(orphaned_assets_for_pak[pak_name]):
+            #     pak.add_asset(asset, all_assets[asset])
 
             for name, asset in pak.named_assets.items():
                 logger.debug("Adding dependencies for %s", name)
                 for dep in self.get_dependencies_for_asset(asset.id):
-                    pak.add_asset(dep.id, all_assets[dep.id], dep.can_duplicate)
+                    if dep.id in named_assets[pak_name]:
+                        cache = named_assets[pak_name]
+                    else:
+                        cache = all_assets
+
+                    pak.add_asset(dep.id, cache[dep.id], dep.can_duplicate)
 
             finish_time = time.time()
             logger.info("Finished %s in %fs", pak_name, finish_time-start_time)

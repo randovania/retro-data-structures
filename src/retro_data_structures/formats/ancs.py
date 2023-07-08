@@ -235,13 +235,14 @@ class Ancs(BaseResource):
                     yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager,
                                                      char_index)
 
-        if char_index is not None:
-            chars = [self.raw.character_set.characters[char_index]]
-        else:
-            chars = self.raw.character_set.characters
-
-        for char in chars:
-            yield from char_deps(char)
+        for i, char in enumerate(self.raw.character_set.characters):
+            if char_index is not None and i != char_index:
+                yield from (
+                    Dependency(dep.type, dep.id, True, dep.can_duplicate)
+                    for dep in char_deps(char)
+                )
+            else:
+                yield from char_deps(char)
 
         for transition in self.raw.animation_set.transitions:
             yield from meta_transition.dependencies_for(transition.transition, self.asset_manager)

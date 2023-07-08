@@ -232,15 +232,17 @@ def test_compare_header_keep_data(prime2_iso_provider, mocker, pak):
         for r in custom_header.resources
     ]
 
+    assert raw_sizes == custom_sizes
+
     diff_sizes = [
         (custom, raw)
-        for custom, raw in zip(custom_sizes, raw_sizes)
+        for custom, raw in zip(custom_sizes, raw_sizes, strict=True)
         if (
             custom != raw
-            and not (
-                (custom.compressed != raw.compressed)
-                and custom.size <= raw.size
-            )
+            # and not (
+            #     (custom.compressed != raw.compressed)
+            #     and custom.size <= raw.size
+            # )
         )
     ]
     assert diff_sizes == []

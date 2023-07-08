@@ -236,7 +236,7 @@ class Mlvl(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         for area in self.areas:
-            area.build_mlvl_dependencies(True)
+            area.build_mlvl_dependencies(False)
             yield from area.dependencies_for()
 
         mlvl_deps = [

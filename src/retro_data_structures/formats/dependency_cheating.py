@@ -67,7 +67,10 @@ _frme = construct.FocusedSeq(
     construct.Int32ub,
     "deps" / construct.PrefixedArray(
         construct.Int32ub,
-        construct.Int32ub
+        construct.Struct(
+            type=FourCC,
+            id=construct.Int32ub
+        )
     )
 )
 
@@ -75,7 +78,7 @@ _frme = construct.FocusedSeq(
 def frme_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     for dep in _frme.parse(asset.data):
         try:
-            yield from asset_manager.get_dependencies_for_asset(dep)
+            yield from asset_manager.get_dependencies_for_asset(dep.id)
         except UnknownAssetId:
             raise UnableToCheatError()
 

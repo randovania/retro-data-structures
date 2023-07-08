@@ -34,6 +34,6 @@ class Mapu(BaseResource):
         return MAPU
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from self.asset_manager.get_dependencies_for_asset(self.raw.hexagon_mapa)
+        yield from self.asset_manager.get_dependencies_for_asset(self.raw.hexagon_mapa, must_exist=True)
         # for world in self.raw.worlds:
         #     yield from self.asset_manager.get_dependencies_for_asset(world.mlvl)
