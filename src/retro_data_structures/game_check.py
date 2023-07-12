@@ -93,14 +93,27 @@ class Game(Enum):
             return (0x7b2ea5b1,)
         return ()
 
+    def audio_group_dependencies(self):
+        if self == Game.ECHOES:
+            # audio_groups_single_player_DGRP
+            yield 0x31CB5ADB
+            # audio_groups_multi_player_DGRP
+            # yield 0xEE0CC360 # FIXME
+
     def special_ancs_dependencies(self, ancs: AssetId):
-        if self == Game.ECHOES and ancs == 0xC043D342:
-            # every gun animation needs these i guess
-            yield Dependency("TXTR", 0x9e6f9531, False)
-            yield Dependency("TXTR", 0xcea098fe, False)
-            yield Dependency("TXTR", 0x607638ea, False)
-            yield Dependency("TXTR", 0x578e51b8, False)
-            yield Dependency("TXTR", 0x1e7b6c64, False)
+        if self == Game.ECHOES:
+            if ancs == 0xC043D342:
+                # every gun animation needs these i guess
+                yield Dependency("TXTR", 0x9e6f9531, False)
+                yield Dependency("TXTR", 0xcea098fe, False)
+                yield Dependency("TXTR", 0x607638ea, False)
+                yield Dependency("TXTR", 0x578e51b8, False)
+                yield Dependency("TXTR", 0x1e7b6c64, False)
+
+            if ancs == 0x2E980BF2:
+                # samus ANCS from Hive Chamber A
+                yield Dependency("ANIM", 0x711A038F, True)
+                yield Dependency("ANIM", 0x1A9CCDD5, True)
 
 
 def get_current_game(ctx) -> Game:

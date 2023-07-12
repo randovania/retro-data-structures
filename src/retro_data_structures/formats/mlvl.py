@@ -235,7 +235,22 @@ class Mlvl(BaseResource):
         return MLVL
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        raise NotImplementedError()
+        for area in self.areas:
+            area.build_mlvl_dependencies(False)
+            yield from area.dependencies_for()
+
+        mlvl_deps = [
+            self._raw.world_name_id,
+            self._raw.world_save_info_id,
+            self._raw.default_skybox_id
+        ]
+        if self.asset_manager.target_game == Game.ECHOES:
+            mlvl_deps.append(self._raw.dark_world_name_id)
+        if self.asset_manager.target_game <= Game.CORRUPTION:
+            mlvl_deps.append(self._raw.world_map_id)
+
+        for dep in mlvl_deps:
+            yield from self.asset_manager.get_dependencies_for_asset(dep)
 
     def __repr__(self) -> str:
         try:

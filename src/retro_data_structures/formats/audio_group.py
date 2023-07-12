@@ -141,6 +141,9 @@ class Atbl(BaseResource):
     def resource_type(cls) -> AssetType:
         return "ATBL"
 
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
+        yield from []
+
 
 class Agsc(BaseResource):
     @classmethod

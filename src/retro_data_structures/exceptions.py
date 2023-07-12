@@ -1,5 +1,9 @@
+from __future__ import annotations
 
-from retro_data_structures.base_resource import AssetId
+import typing
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 def format_asset_id(asset_id: AssetId) -> str:
@@ -23,3 +27,7 @@ class InvalidAssetId(Exception):
         super().__init__(f"Unable to decode asset id {format_asset_id(asset_id)}: {reason}")
         self.asset_id = asset_id
         self.reason = reason
+
+
+class DependenciesHandledElsewhere(Exception):
+    pass

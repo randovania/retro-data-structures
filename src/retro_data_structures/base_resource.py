@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 import typing
 import uuid
 
 from construct import Construct, Container
+from typing_extensions import Self
+
+from retro_data_structures.exceptions import DependenciesHandledElsewhere
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
@@ -18,6 +22,13 @@ class Dependency(typing.NamedTuple):
     type: AssetType
     id: AssetId
     exclude_for_mlvl: bool = False
+    can_duplicate: bool = False
+
+    def __repr__(self):
+        s = f"Dep {self.type} 0x{self.id:08X}"
+        if self.exclude_for_mlvl:
+            s += " (non-MLVL)"
+        return s
 
 
 class BaseResource:
@@ -40,7 +51,7 @@ class BaseResource:
 
     @classmethod
     def parse(cls, data: bytes, target_game: Game,
-              asset_manager: AssetManager | None = None) -> BaseResource:
+              asset_manager: AssetManager | None = None) -> Self:
         return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
                    target_game, asset_manager)
 
@@ -58,6 +69,13 @@ class BaseResource:
         except (KeyError, AttributeError):
             return True
 
+        except DependenciesHandledElsewhere:
+            return False
+
+        except NotImplementedError:
+            logging.warning("Potential missing dependencies for %s", cls.resource_type())
+            return False
+
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         raise NotImplementedError()
 
@@ -66,12 +84,27 @@ class BaseResource:
         return self._raw
 
 
+class AssetId32(int):
+    def __repr__(self) -> str:
+        return f"{self:#010x}"
+
+
+class AssetId64(int):
+    def __repr__(self) -> str:
+        return f"{self:#018x}"
+
+
 def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
     if isinstance(value, str):
         value = game.hash_asset_id(value)
 
-    if game.uses_guid_as_asset_id and isinstance(value, int):
-        return uuid.UUID(int=value)
+    if isinstance(value, int):
+        if game.uses_guid_as_asset_id:
+            return uuid.UUID(int=value)
+        elif game.uses_asset_id_32:
+            return AssetId32(value)
+        elif game.uses_asset_id_64:
+            return AssetId64(value)
 
     return value
 
@@ -79,5 +112,6 @@ def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
 class RawResource(typing.NamedTuple):
     type: AssetType
     data: bytes
+    compressed: bool = False
 
 Resource = RawResource | BaseResource

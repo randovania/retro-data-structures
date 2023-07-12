@@ -213,12 +213,14 @@ class Ancs(BaseResource):
         return ANCS
 
     def ancs_dependencies_for(self, char_index: int | None) -> typing.Iterator[Dependency]:
+        def char_anims(char) -> typing.Iterator[tuple[int, str]]:
+            for anim_name in char.animation_names:
+                yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
+                                        if a.name == anim_name.name)
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager)
 
-            for anim_name in char.animation_names:
-                anim_index, anim = next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
-                                        if a.name == anim_name.name)
+            for anim_index, anim in char_anims(char):
                 yield from meta_animation.dependencies_for(anim.meta, self.asset_manager)
 
                 if self.raw.animation_set.animation_resources is not None:
