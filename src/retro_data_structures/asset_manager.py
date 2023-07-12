@@ -21,7 +21,7 @@ from retro_data_structures.base_resource import (
     Resource,
     resolve_asset_id,
 )
-from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
@@ -116,7 +116,7 @@ class AssetManager:
     _modified_resources: dict[AssetId, RawResource | None]
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
-    _audio_group_dependency: Dgrp | None = None
+    _audio_group_dependency: tuple[Dgrp, ...] | None = None
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
@@ -364,15 +364,9 @@ class AssetManager:
         if pak_name not in self._paks_for_asset_id[asset_id]:
             self._ensured_asset_ids[pak_name].add(asset_id)
 
-        # Ensure the asset's dependencies are present as well
-        for dep in self.get_dependencies_for_asset(asset_id):
-            if dep.id == asset_id:
-                continue
-            self.ensure_present(pak_name, dep.id)
-
     def get_pak(self, pak_name: str) -> Pak:
         if pak_name not in self._ensured_asset_ids:
-            raise ValueError(f"Unknown pak_name: {pak_name}")
+            raise ValueError(f"Unknown pak_name: {pak_name}. Known names: {tuple(self._ensured_asset_ids.keys())}")
 
         if pak_name not in self._in_memory_paks:
             logger.info("Reading %s", pak_name)
@@ -408,6 +402,10 @@ class AssetManager:
             elif formats.has_resource_type(asset_type):
                 if self.get_asset_format(asset_id).has_dependencies(self.target_game):
                     deps = tuple(self.get_parsed_asset(asset_id).dependencies_for())
+                deps += tuple(self.target_game.special_ancs_dependencies(asset_id))
+
+            else:
+                logger.warning(f"Potential missing assets for {asset_type} {asset_id}")
 
             logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             dep_cache[asset_id] = deps
@@ -417,7 +415,11 @@ class AssetManager:
 
     def get_dependencies_for_asset(self, asset_id: NameOrAssetId, *, must_exist: bool = False) -> Iterator[Dependency]:
         override = asset_id in self.target_game.mlvl_dependencies_to_ignore
-        for it in self._get_dependencies_for_asset(asset_id, must_exist):
+        try:
+            deps = self._get_dependencies_for_asset(asset_id, must_exist)
+        except DependenciesHandledElsewhere:
+            return
+        for it in deps:
             yield Dependency(it.type, it.id, it.exclude_for_mlvl or override)
 
     def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, char_index: int | None = None):
@@ -477,12 +479,17 @@ class AssetManager:
             return
 
         if self._audio_group_dependency is None:
-            # audio_groups_single_player_DGRP
-            self._audio_group_dependency = self.get_file(0x31CB5ADB)
+            self._audio_group_dependency = tuple(
+                self.get_file(asset, Dgrp)
+                for asset in self.target_game.audio_group_dependencies()
+            )
 
         dep = Dependency("AGSC", agsc, False)
-        if dep in self._audio_group_dependency.direct_dependencies:
-            yield Dependency("AGSC", agsc, True)
+        if any(
+            (dep in deps.direct_dependencies)
+            for deps in self._audio_group_dependency
+        ):
+            return
         else:
             yield dep
 

@@ -7,7 +7,7 @@ import pytest
 from retro_data_structures.formats.script_object import _try_quick_get_name
 from retro_data_structures.properties.base_property import BaseProperty
 
-_root = Path(__file__).parents[1]
+_root = Path(__file__).parents[1].joinpath("src")
 
 
 def perform_module_checks(path: Path):

@@ -188,7 +188,7 @@ STRG = Struct(
     "junk" / GreedyRange(Byte),
 )
 
-image_regex = re.compile(r"&image=(?:\S+?,)+?((?:[a-fA-F0-9]+,?)+);")
+image_regex = re.compile(r"&image=(?:.+?,)*?((?:[a-fA-F0-9]+,?)+);")
 font_regex = re.compile(r"&font=([a-fA-F0-9]+?);")
 
 class Strg(BaseResource):

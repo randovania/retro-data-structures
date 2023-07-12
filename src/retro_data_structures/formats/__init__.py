@@ -31,7 +31,8 @@ from retro_data_structures.formats.effect_script import (
 )
 from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.mapa import MAPA, Mapa
-from retro_data_structures.formats.mapw import Mapw
+from retro_data_structures.formats.mapu import MAPU, Mapu
+from retro_data_structures.formats.mapw import MAPW, Mapw
 from retro_data_structures.formats.mlvl import MLVL, Mlvl
 from retro_data_structures.formats.mrea import MREA, Mrea
 from retro_data_structures.formats.msbt import Msbt
@@ -54,6 +55,8 @@ ALL_FORMATS = {
     "DGRP": DGRP,
     "EVNT": EVNT,
     "MAPA": MAPA,
+    "MAPW": MAPW,
+    "MAPU": MAPU,
     "MLVL": MLVL,
     "MREA": MREA,
     "PART": PART,
@@ -84,6 +87,7 @@ ALL_RESOURCE_TYPES = {
     "DGRP": Dgrp,
     "EVNT": Evnt,
     "MAPA": Mapa,
+    "MAPU": Mapu,
     "MAPW": Mapw,
     "MLVL": Mlvl,
     "MREA": Mrea,
