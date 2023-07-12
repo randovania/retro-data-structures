@@ -257,7 +257,7 @@ _FORMATS_TO_CHEAT = {
     "RULE": rule_dependencies,
     "FONT": font_dependencies,
     "CMDL": cmdl_dependencies,
-    "PART": effect_dependencies,
+    # "PART": effect_dependencies,
 }
 
 

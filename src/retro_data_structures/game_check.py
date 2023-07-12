@@ -93,14 +93,87 @@ class Game(Enum):
             return (0x7b2ea5b1,)
         return ()
 
+    def audio_group_dependencies(self):
+        if self == Game.ECHOES:
+            # audio_groups_single_player_DGRP
+            yield 0x31CB5ADB
+            # audio_groups_multi_player_DGRP
+            # yield 0xEE0CC360 # FIXME
+
     def special_ancs_dependencies(self, ancs: AssetId):
-        if self == Game.ECHOES and ancs == 0xC043D342:
-            # every gun animation needs these i guess
-            yield Dependency("TXTR", 0x9e6f9531, False)
-            yield Dependency("TXTR", 0xcea098fe, False)
-            yield Dependency("TXTR", 0x607638ea, False)
-            yield Dependency("TXTR", 0x578e51b8, False)
-            yield Dependency("TXTR", 0x1e7b6c64, False)
+        if self == Game.ECHOES:
+            if ancs == 0xC043D342:
+                # every gun animation needs these i guess
+                yield Dependency("TXTR", 0x9e6f9531, False)
+                yield Dependency("TXTR", 0xcea098fe, False)
+                yield Dependency("TXTR", 0x607638ea, False)
+                yield Dependency("TXTR", 0x578e51b8, False)
+                yield Dependency("TXTR", 0x1e7b6c64, False)
+
+            if ancs == 0x2E980BF2:
+                # samus ANCS from Hive Chamber A
+                yield Dependency("ANIM", 0x711A038F, True)
+                yield Dependency("ANIM", 0x1A9CCDD5, True)
+
+    def special_pak_dependencies(self, pak_name: str):
+        pak = pak_name.split("/")[-1]
+
+        if self == Game.ECHOES:
+            if pak in {"GGuiSys.pak", "NoARAM.pak"}:
+                # seems to be an unused compass rose kinda thing
+                yield Dependency("CMDL", 0xa815ca29)
+                # Options_0.STRG (empty?)
+                yield Dependency("STRG", 0xd05d3465)
+
+            if pak == "Metroid3.pak":
+                # unknown
+                yield Dependency("PART", 0xa67cc564)
+
+                # for some reason, this ANCS uses different suit models
+                # than every other samus ANCS
+                yield Dependency("ANCS", 0x79F1A87C)
+
+            if pak in {"SamusGun.pak", "SamusGunLow.pak"}:
+                # gun effects woo
+                yield from self.special_ancs_dependencies(0xC043D342)
+
+            if pak in {"LogBook.pak", "Metroid1.pak"}:
+                # unknown where it's used
+                # txtr dependencies of Varia Ball CMDL
+                yield Dependency("TXTR", 0x0DACE198)
+                yield Dependency("TXTR", 0x1B1453FD)
+                yield Dependency("TXTR", 0x2F566CEC)
+                yield Dependency("TXTR", 0x33266C22)
+                yield Dependency("TXTR", 0x3AB7E06D)
+                yield Dependency("TXTR", 0x460CD146)
+                yield Dependency("TXTR", 0x7257EE09)
+                yield Dependency("TXTR", 0x738C5C2F)
+                yield Dependency("TXTR", 0x7889E695)
+                yield Dependency("TXTR", 0x9643B175)
+                yield Dependency("TXTR", 0xA29AEF93)
+
+            if pak == "LogBook.pak":
+                # both unknown
+                yield Dependency("TXTR", 0xE252E7F6)
+                yield Dependency("TXTR", 0xD5B9E5D1)
+
+            # include suit assets in single player world paks
+            if pak in {f"Metroid{i}.pak" for i in range(1, 6)}:
+                # Varia
+                yield Dependency("CMDL", 0xCDF1C541)
+                yield Dependency("CSKR", 0xA6DE6A97)
+                # Dark Suit
+                yield Dependency("CMDL", 0x379527C0)
+                yield Dependency("CSKR", 0x5CBA8816)
+                # Dark Suit Gravity
+                yield Dependency("CMDL", 0x3A93B6F2)
+                yield Dependency("CSKR", 0x51BC1924)
+                # Light Suit
+                yield Dependency("CMDL", 0x726FB01A)
+                yield Dependency("CSKR", 0x19401FCC)
+                # Light Suit Off
+                yield Dependency("CMDL", 0x17488EF5)
+                yield Dependency("CSKR", 0x7C672123)
 
 
 def get_current_game(ctx) -> Game:

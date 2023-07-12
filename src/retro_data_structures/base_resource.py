@@ -84,12 +84,27 @@ class BaseResource:
         return self._raw
 
 
+class AssetId32(int):
+    def __repr__(self) -> str:
+        return f"{self:#010x}"
+
+
+class AssetId64(int):
+    def __repr__(self) -> str:
+        return f"{self:#018x}"
+
+
 def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
     if isinstance(value, str):
         value = game.hash_asset_id(value)
 
-    if game.uses_guid_as_asset_id and isinstance(value, int):
-        return uuid.UUID(int=value)
+    if isinstance(value, int):
+        if game.uses_guid_as_asset_id:
+            return uuid.UUID(int=value)
+        elif game.uses_asset_id_32:
+            return AssetId32(value)
+        elif game.uses_asset_id_64:
+            return AssetId64(value)
 
     return value
 

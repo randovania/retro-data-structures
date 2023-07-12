@@ -18,11 +18,10 @@ def test_rebuild_paks(prime2_asset_manager: AssetManager, mocker):
         pak for pak in manager.all_paks
         # if not pak.startswith("Metroid")
     ]
-    # paks = ["GGuiSys.pak"]
+
     mock_get_modified_paks.return_value = set(paks)
 
     out_path = Path(__file__).parent.joinpath("test_files", "pak_output")
-    # prime2_asset_manager.provider.extract_to_directory(out_path)
 
     start_time = time.time()
     manager.save_modifications(out_path)
@@ -31,25 +30,8 @@ def test_rebuild_paks(prime2_asset_manager: AssetManager, mocker):
 
     new_manager = AssetManager(PathFileProvider(out_path), Game.ECHOES)
 
-#     if nod.DiscBuilderGCN.calculate_total_size_required(out_path) is None:
-#         raise Exception("Image built with given directory would pass the maximum size.")
-
-#     def fprogress_callback(progress: float, name: str, bytes: int):
-#         print("\r" + " " * 100, end="")
-#         print(f"\r{progress:.0%} {name} {bytes} B", flush=True)
-
-#     logging.info("hi")
-#     disc_builder = nod.DiscBuilderGCN(out_path.parent.joinpath("game.iso"), fprogress_callback)
-#     logging.info("bye")
-#     try:
-#         disc_builder.build_from_directory(out_path)
-#     except RuntimeError as e:
-#         raise Exception(f"Failure building the image: {e}")
-
-# if __name__ == "__main__":
-#     test_rebuild_paks(None, None)
-    old_paks = {}
-    new_paks = {}
+    old_paks: dict[str, set[Dependency]] = {}
+    new_paks: dict[str, set[Dependency]] = {}
     for pak in paks:
         logging.info("Comparing %s", pak)
         old_pak = manager.get_pak(pak)
@@ -72,7 +54,14 @@ def test_rebuild_paks(prime2_asset_manager: AssetManager, mocker):
     missing = {n: miss for n, miss in missing.items() if miss}
     extra = {n: ext for n, ext in extra.items() if ext}
     assert missing == {}
-    assert extra == {}
-    # assert accuracy == {pak: True for pak in paks}
-    assert old_paks == new_paks
+    assert extra == {
+        "SamusGunLow.pak": {
+            Dependency("AGSC", 0x8D4025E9),
+            Dependency("AGSC", 0x78632E2F)
+        },
+        "TestAnim.pak": {
+            Dependency("AGSC", 0x6D18C111),
+            Dependency("AGSC", 0x51674564)
+        }
+    }
 

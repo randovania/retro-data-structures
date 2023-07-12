@@ -213,12 +213,14 @@ class Ancs(BaseResource):
         return ANCS
 
     def ancs_dependencies_for(self, char_index: int | None) -> typing.Iterator[Dependency]:
+        def char_anims(char) -> typing.Iterator[tuple[int, str]]:
+            for anim_name in char.animation_names:
+                yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
+                                        if a.name == anim_name.name)
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager)
 
-            for anim_name in char.animation_names:
-                anim_index, anim = next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
-                                        if a.name == anim_name.name)
+            for anim_index, anim in char_anims(char):
                 yield from meta_animation.dependencies_for(anim.meta, self.asset_manager)
 
                 if self.raw.animation_set.animation_resources is not None:
@@ -235,17 +237,28 @@ class Ancs(BaseResource):
                     yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager,
                                                      char_index)
 
-        for i, char in enumerate(self.raw.character_set.characters):
-            if char_index is not None and i != char_index:
-                yield from (
-                    Dependency(dep.type, dep.id, True, dep.can_duplicate)
-                    for dep in char_deps(char)
-                )
-            else:
-                yield from char_deps(char)
+        anims_with_char = set()
+        if char_index is not None:
+            chars = [self.raw.character_set.characters[char_index]]
+        else:
+            chars = self.raw.character_set.characters
+
+        for char in chars:
+            yield from char_deps(char)
+            anims_with_char.update(i for i, _ in char_anims(char))
 
         for transition in self.raw.animation_set.transitions:
             yield from meta_transition.dependencies_for(transition.transition, self.asset_manager)
+
+        # some ANIMs seem to not be associated with any chars
+        # but their dependencies still need to show up in the PAKs
+        # anims_without_char = [
+        #     anim for i, anim in enumerate(self.raw.animation_set.animations)
+        #     if i not in anims_with_char
+        # ]
+        # for anim in anims_without_char:
+        #     for dep in meta_animation.dependencies_for(anim.meta, self.asset_manager):
+        #         yield Dependency(dep.type, dep.id, True)
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from self.ancs_dependencies_for(None)

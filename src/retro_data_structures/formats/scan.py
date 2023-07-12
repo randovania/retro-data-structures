@@ -78,8 +78,8 @@ class Scan(BaseResource):
             for image in self.raw.scan_images:
                 yield from self.asset_manager.get_dependencies_for_asset(image.texture)
         else:
-            for dep in self.raw.dependencies:
-                yield from self.asset_manager.get_dependencies_for_asset(dep.asset_id)
+            scan_info = self.scannable_object_info.get_properties()
+            yield from scan_info.dependencies_for(self.asset_manager)
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         for it in self._internal_dependencies_for():

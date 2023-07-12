@@ -127,7 +127,7 @@ class AssetManager:
     _modified_resources: dict[AssetId, RawResource | None]
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
-    _audio_group_dependency: Dgrp | None = None
+    _audio_group_dependency: tuple[Dgrp] | None = None
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
@@ -424,6 +424,10 @@ class AssetManager:
             elif formats.has_resource_type(asset_type):
                 if self.get_asset_format(asset_id).has_dependencies(self.target_game):
                     deps = tuple(self.get_parsed_asset(asset_id).dependencies_for())
+                deps += tuple(self.target_game.special_ancs_dependencies(asset_id))
+
+            elif asset_type not in {"AFSM", "DCLN", "STLC"}:
+                logger.warning(f"Potential missing assets for {asset_type} {asset_id}")
 
             logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             dep_cache[asset_id] = deps
@@ -449,7 +453,6 @@ class AssetManager:
 
         if char_index is None:
             yield from self.get_dependencies_for_asset(asset_id)
-            yield from self.target_game.special_ancs_dependencies(asset_id)
             return
 
         if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
@@ -503,13 +506,17 @@ class AssetManager:
             return
 
         if self._audio_group_dependency is None:
-            # audio_groups_single_player_DGRP
-            self._audio_group_dependency = self.get_file(0x31CB5ADB)
+            self._audio_group_dependency = tuple(
+                self.get_file(asset, Dgrp)
+                for asset in self.target_game.audio_group_dependencies()
+            )
 
         dep = Dependency("AGSC", agsc, False)
-        if dep in self._audio_group_dependency.direct_dependencies:
+        if any(
+            (dep in deps.direct_dependencies)
+            for deps in self._audio_group_dependency
+        ):
             return
-            yield Dependency("AGSC", agsc, True)
         else:
             yield dep
 
@@ -554,23 +561,6 @@ class AssetManager:
             ):
                 all_assets[asset_id] = self.get_raw_asset(asset_id, can_be_compressed=True)
 
-        # discovered_deps_for_pak: dict[str, set[AssetId]] = {}
-        # for pak_name in self.all_paks:
-        #     deps = set()
-        #     for asset in self.get_pak(pak_name).named_assets.values():
-        #         deps.update(dep.id for dep in self.get_dependencies_for_asset(asset.id))
-        #     discovered_deps_for_pak[pak_name] = deps
-
-        # asset_ids_for_pak: dict[str, set[AssetId]] = defaultdict(set)
-        # for asset_id, paks in self._paks_for_asset_id.items():
-        #     for pak in paks:
-        #         asset_ids_for_pak[pak].add(asset_id)
-
-        # orphaned_assets_for_pak = {
-        #     pak: asset_ids_for_pak[pak].difference(discovered_deps_for_pak[pak])
-        #     for pak in self.all_paks
-        # }
-
         # Update the PAKs
         for pak_name in sorted(modified_paks):
             logger.info("Updating %s", pak_name)
@@ -581,18 +571,21 @@ class AssetManager:
             # Rebuild pak dependencies
             pak.clear_assets()
 
-            # for asset in sorted(orphaned_assets_for_pak[pak_name]):
-            #     pak.add_asset(asset, all_assets[asset])
-
-            for name, asset in pak.named_assets.items():
-                logger.debug("Adding dependencies for %s", name)
-                for dep in self.get_dependencies_for_asset(asset.id):
+            def add_deps_from(deps: typing.Iterable[Dependency]):
+                for dep in deps:
                     if dep.id in named_assets[pak_name]:
                         cache = named_assets[pak_name]
                     else:
                         cache = all_assets
 
                     pak.add_asset(dep.id, cache[dep.id], dep.can_duplicate)
+
+            for name, asset in pak.named_assets.items():
+                logger.debug("Adding dependencies for %s", name)
+                add_deps_from(self.get_dependencies_for_asset(asset.id))
+
+            for dep in self.target_game.special_pak_dependencies(pak_name):
+                add_deps_from(self.get_dependencies_for_asset(dep.id))
 
             finish_time = time.time()
             logger.info("Finished %s in %fs", pak_name, finish_time-start_time)
