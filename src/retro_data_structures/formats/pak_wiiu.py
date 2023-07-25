@@ -49,7 +49,10 @@ TOCCChunkDescriptor = ChunkDescriptor(
 )
 
 TOCC = FormDescriptor(
-    "TOCC", 3, 3, construct.ExprAdapter(
+    "TOCC",
+    3,
+    3,
+    construct.ExprAdapter(
         UntilEof(TOCCChunkDescriptor),
         lambda obj, ctx: construct.Container((chunk.id, chunk) for chunk in obj),
         lambda obj, ctx: construct.ListContainer(obj.values()),
@@ -57,7 +60,10 @@ TOCC = FormDescriptor(
 )
 
 PakWiiU = FormDescriptor(
-    "PACK", 1, 0, Struct(
+    "PACK",
+    1,
+    0,
+    Struct(
         tocc=TOCC,
         remain=construct.GreedyBytes,
     ),
@@ -85,19 +91,21 @@ class ConstructPakWiiU(construct.Construct):
 
             construct.stream_seek(stream, resource.offset, 0, path)
             data = construct.stream_read(stream, resource.size, path)
-            files.append(PakFile(
-                resource.asset.id,
-                resource.asset.type,
-                False,
-                data,
-                None,
-                extra=construct.Container(
-                    version_a=resource.version_a,
-                    version_b=resource.version_b,
-                    offset=resource.offset,
-                    decompressed_size=resource.decompressed_size,
-                ),
-            ))
+            files.append(
+                PakFile(
+                    resource.asset.id,
+                    resource.asset.type,
+                    False,
+                    data,
+                    None,
+                    extra=construct.Container(
+                        version_a=resource.version_a,
+                        version_b=resource.version_b,
+                        offset=resource.offset,
+                        decompressed_size=resource.decompressed_size,
+                    ),
+                )
+            )
             last = max(last, construct.stream_tell(stream, path))
 
         construct.stream_seek(stream, last, 0, path)
@@ -129,14 +137,15 @@ class ConstructPakWiiU(construct.Construct):
                     size=len(file.get_decompressed(game)),
                 )
                 for file in sorted(files, key=lambda it: it.asset_id)
-            )
+            ),
         )
 
         header_start = construct.stream_tell(stream, path)
         PakWiiUNoData._build(obj.header, stream, context, f"{path} -> header")
 
-        for i, (adir, file) in enumerate(sorted(zip(tocc.ADIR.data, files),
-                                                key=lambda it: it[1].extra.offset or math.inf)):
+        for i, (adir, file) in enumerate(
+            sorted(zip(tocc.ADIR.data, files), key=lambda it: it[1].extra.offset or math.inf)
+        ):
             adir.offset = construct.stream_tell(stream, f"{path} -> file[{i}]")
             data = file.get_decompressed(game)
             construct.stream_write(stream, data, len(data), f"{path} -> file[{i}]")

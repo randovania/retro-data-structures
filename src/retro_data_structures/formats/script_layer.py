@@ -48,7 +48,8 @@ ScriptLayerPrime = Struct(
     Skip(1, Int32ub),
     "_layer_size_address" / Tell,
     Seek(lambda this: (this._layer_count or len(this.layers)) * Int32ub.sizeof(), 1),
-    "layers" / PrefixedArray(
+    "layers"
+    / PrefixedArray(
         Pointer(construct.this._._layer_count_address, Int32ub),
         Prefixed(
             Pointer(lambda this: this._._layer_size_address + this._index * Int32ub.sizeof(), Int32ub),
@@ -74,26 +75,26 @@ def ConstructScriptLayer(identifier):
 def new_layer(index: int | None, target_game: Game) -> Container:
     if target_game <= Game.PRIME:
         raise NotImplementedError
-    return Container({
-        "magic": "SCLY" if index is not None else "SCGN",
-        "unknown": 0,
-        "layer_index": index,
-        "version": 1,
-        "script_instances": []
-    })
+    return Container(
+        {
+            "magic": "SCLY" if index is not None else "SCGN",
+            "unknown": 0,
+            "layer_index": index,
+            "version": 1,
+            "script_instances": [],
+        }
+    )
 
 
 SCLY = IfThenElse(
-    game_check.current_game_at_least(game_check.Game.ECHOES),
-    ConstructScriptLayer("SCLY"),
-    ScriptLayerPrime
+    game_check.current_game_at_least(game_check.Game.ECHOES), ConstructScriptLayer("SCLY"), ScriptLayerPrime
 )
 SCGN = ConstructScriptLayer("SCGN")
 
 
-def dependencies_for_layer(asset_manager: AssetManager,
-                           instances: typing.Iterable[ScriptInstance]
-                          ) -> typing.Iterator[Dependency]:
+def dependencies_for_layer(
+    asset_manager: AssetManager, instances: typing.Iterable[ScriptInstance]
+) -> typing.Iterator[Dependency]:
     deps: list[Dependency] = []
     for instance in instances:
         deps.extend(instance.mlvl_dependencies_for(asset_manager))
@@ -189,10 +190,7 @@ class ScriptLayer:
             instance = self._get_instance_by_name(instance)
         instance = resolve_instance_id(instance)
 
-        matching_instances = [
-            i for i in self._raw.script_instances
-            if i.id == instance
-        ]
+        matching_instances = [i for i in self._raw.script_instances if i.id == instance]
 
         if not matching_instances:
             raise KeyError(instance)

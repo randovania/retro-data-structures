@@ -22,18 +22,26 @@ if typing.TYPE_CHECKING:
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 
-LoadUnit = FormDescriptor("LUNT", 0, 0, Struct(
-    header=SingleTypeChunkDescriptor("LUHD", Struct(
-        name=construct.PascalString(Int32ul, "utf8"),
-        guid=GUID,
-        idB=GUID,
-        unk1=construct.Int16ul,
-        unk2=Int32ul,
-        rest=GreedyBytes,
-    )),
-    load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
-    load_layers=SingleTypeChunkDescriptor("LLYR", construct.PrefixedArray(Int32ul, GUID)),
-))
+LoadUnit = FormDescriptor(
+    "LUNT",
+    0,
+    0,
+    Struct(
+        header=SingleTypeChunkDescriptor(
+            "LUHD",
+            Struct(
+                name=construct.PascalString(Int32ul, "utf8"),
+                guid=GUID,
+                idB=GUID,
+                unk1=construct.Int16ul,
+                unk2=Int32ul,
+                rest=GreedyBytes,
+            ),
+        ),
+        load_resources=SingleTypeChunkDescriptor("LRES", construct.PrefixedArray(Int32ul, GUID)),
+        load_layers=SingleTypeChunkDescriptor("LLYR", construct.PrefixedArray(Int32ul, GUID)),
+    ),
+)
 
 PerformanceGroups = construct.PrefixedArray(
     construct.Int16ul,
@@ -50,7 +58,7 @@ GeneratedObjectMap = construct.PrefixedArray(
     Struct(
         object_id=GUID,
         layer_id=GUID,
-    )
+    ),
 )
 
 Docks = construct.PrefixedArray(
@@ -83,24 +91,29 @@ GameAreaHeader = Struct(
     id_e=GUID,
     id_f=GUID,
     work_stages=Struct(
-        items=construct.PrefixedArray(construct.Int16ul, Struct(
-            type=Hex(construct.Int32ul),
-            data=construct.Prefixed(construct.Int16ul, construct.Switch(
-                construct.this.type,
-                {
-                    0x7B68B3A0: DataEnumValue,
-                    0xb9187c94: DataEnumValue,
-                    0xec5d9069: DataEnumValue,
-                    0x8333a604: DataEnumValue,
-                    0x5ca42b9d: DataEnumValue,
-
-                    # LdrToEnum_ProductionWorkStageEnu
-                    0x113F9CE1: Hex(Int32ul),
-                },
-                # TODO: should actually be GreedyBytes since the game skips over unknown ids
-                ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.type}"),
-            ))
-        )),
+        items=construct.PrefixedArray(
+            construct.Int16ul,
+            Struct(
+                type=Hex(construct.Int32ul),
+                data=construct.Prefixed(
+                    construct.Int16ul,
+                    construct.Switch(
+                        construct.this.type,
+                        {
+                            0x7B68B3A0: DataEnumValue,
+                            0xB9187C94: DataEnumValue,
+                            0xEC5D9069: DataEnumValue,
+                            0x8333A604: DataEnumValue,
+                            0x5CA42B9D: DataEnumValue,
+                            # LdrToEnum_ProductionWorkStageEnu
+                            0x113F9CE1: Hex(Int32ul),
+                        },
+                        # TODO: should actually be GreedyBytes since the game skips over unknown ids
+                        ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.type}"),
+                    ),
+                ),
+            ),
+        ),
     ),
 )
 
@@ -110,18 +123,19 @@ BakedLightning = construct.Struct(
     construct.Check(lambda ctx: ctx.unk1 == 3),
     "resource1" / GUID,
     "unk2" / construct.PrefixedArray(Int32ul, GUID),
-    "unk3" / construct.PrefixedArray(Int32ul, Struct(
-        "unk1" / Int32ul,
-        "unk2" / Int32ul,
-        "unk3" / Int32ul,
-        "unk4" / construct.Const(0, Int32ul)
-    )),
+    "unk3"
+    / construct.PrefixedArray(
+        Int32ul, Struct("unk1" / Int32ul, "unk2" / Int32ul, "unk3" / Int32ul, "unk4" / construct.Const(0, Int32ul))
+    ),
     "resource2" / GUID,
-    construct.Terminated
+    construct.Terminated,
 )
 
 RoomHeader = FormDescriptor(
-    "HEAD", 0, 0, Struct(
+    "HEAD",
+    0,
+    0,
+    Struct(
         game_area_header=SingleTypeChunkDescriptor("RMHD", GameAreaHeader),
         performance_groups=SingleTypeChunkDescriptor("PGRP", PerformanceGroups),
         generated_object_map=SingleTypeChunkDescriptor("LGEN", GeneratedObjectMap),
@@ -161,10 +175,13 @@ CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32 = Struct(
 
 SizeofAllocationsForEventCriteriaSLdrFromStream = Struct(
     a=Int32ul,
-    b=construct.If(construct.this.a != 0, Struct(
-        a=CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32,
-        b=construct.Prefixed(Int32ul, GreedyBytes),
-    )),
+    b=construct.If(
+        construct.this.a != 0,
+        Struct(
+            a=CalculateAllocatedMemoryForTypedefInterfaceSLdrFromCRC32,
+            b=construct.Prefixed(Int32ul, GreedyBytes),
+        ),
+    ),
 )
 SizeofAllocationsForActionPayloadSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
 SizeofAllocationsForLinkDataSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
@@ -208,40 +225,46 @@ Property = Struct(
 )
 
 ScriptData = Struct(
-    sdhr=SingleTypeChunkDescriptor("SDHR", Struct(
-        properties_count=Int32ul,
-        instance_data_count=Int32ul,
-        weird_count=Int32ul,
-        guids=construct.Array(construct.this.weird_count, GUID),
-        unk=construct.Array(construct.this.weird_count, Struct(
-            a=Int32ul,
-            b=Int32ul
-        ))
-    )),
+    sdhr=SingleTypeChunkDescriptor(
+        "SDHR",
+        Struct(
+            properties_count=Int32ul,
+            instance_data_count=Int32ul,
+            weird_count=Int32ul,
+            guids=construct.Array(construct.this.weird_count, GUID),
+            unk=construct.Array(construct.this.weird_count, Struct(a=Int32ul, b=Int32ul)),
+        ),
+    ),
     properties=construct.Array(construct.this.sdhr.properties_count, SingleTypeChunkDescriptor("SDEN", Property)),
-    instance_data=construct.Array(construct.this.sdhr.instance_data_count, SingleTypeChunkDescriptor("IDTA", Struct(
-        guid=GUID,
-        str=ConstructPooledString,
-        connections=construct.PrefixedArray(
-            construct.Int16ul,
+    instance_data=construct.Array(
+        construct.this.sdhr.instance_data_count,
+        SingleTypeChunkDescriptor(
+            "IDTA",
             Struct(
-                skip1=construct.Bytes(0x1a),
-                event_criteria_sldr=SizeofAllocationsForEventCriteriaSLdrFromStream,
-                action_payload_sldr=SizeofAllocationsForActionPayloadSLdrFromStream,
-                skip2=construct.Bytes(0x13),
+                guid=GUID,
+                str=ConstructPooledString,
+                connections=construct.PrefixedArray(
+                    construct.Int16ul,
+                    Struct(
+                        skip1=construct.Bytes(0x1A),
+                        event_criteria_sldr=SizeofAllocationsForEventCriteriaSLdrFromStream,
+                        action_payload_sldr=SizeofAllocationsForActionPayloadSLdrFromStream,
+                        skip2=construct.Bytes(0x13),
+                    ),
+                ),
+                script_links=construct.PrefixedArray(
+                    construct.Int16ul,
+                    Struct(
+                        a=Int32ul,
+                        b=GUID,
+                        c=SizeofAllocationsForLinkDataSLdrFromStream,
+                        skip2=construct.Bytes(0x12),
+                    ),
+                ),
+                skip_the_rest=GreedyBytes,
             ),
         ),
-        script_links=construct.PrefixedArray(
-            construct.Int16ul,
-            Struct(
-                a=Int32ul,
-                b=GUID,
-                c=SizeofAllocationsForLinkDataSLdrFromStream,
-                skip2=construct.Bytes(0x12),
-            )
-        ),
-        skip_the_rest=GreedyBytes,
-    ))),
+    ),
 )
 
 GameObjectComponent = Struct(
@@ -249,32 +272,47 @@ GameObjectComponent = Struct(
     property_idx=Int32ul,
     instance_idx=Int32ul,
 )
-GeneratedGameObject = SingleTypeChunkDescriptor("GGOB", Struct(
-    generated_game_object_id=GUID,
-    components=PrefixedArray(Int16ul, GameObjectComponent)
-))
+GeneratedGameObject = SingleTypeChunkDescriptor(
+    "GGOB", Struct(generated_game_object_id=GUID, components=PrefixedArray(Int16ul, GameObjectComponent))
+)
 
-Layer = FormDescriptor("LAYR", 0, 0, Struct(
-    header=SingleTypeChunkDescriptor("LHED", Struct(
-        name=construct.PascalString(Int32ul, "utf8"),
-        id=GUID,
-        unk=Int32ul,
-        id2=GUID,
-        rest=GreedyBytes,
-    )),
-    generated_script_object=FormDescriptor("GSRP", 0, 0, UntilEof(GeneratedGameObject)),
-    components=FormDescriptor("SRIP", 0, 0, SingleTypeChunkDescriptor("COMP", UntilEof(GameObjectComponent))),
-))
+Layer = FormDescriptor(
+    "LAYR",
+    0,
+    0,
+    Struct(
+        header=SingleTypeChunkDescriptor(
+            "LHED",
+            Struct(
+                name=construct.PascalString(Int32ul, "utf8"),
+                id=GUID,
+                unk=Int32ul,
+                id2=GUID,
+                rest=GreedyBytes,
+            ),
+        ),
+        generated_script_object=FormDescriptor("GSRP", 0, 0, UntilEof(GeneratedGameObject)),
+        components=FormDescriptor("SRIP", 0, 0, SingleTypeChunkDescriptor("COMP", UntilEof(GameObjectComponent))),
+    ),
+)
 
 ROOM = FormDescriptor(
-    "ROOM", 147, 160, Struct(
+    "ROOM",
+    147,
+    160,
+    Struct(
         header=RoomHeader,
         strp=SingleTypeChunkDescriptor("STRP", STRP),
         script_data=FormDescriptor("SDTA", 0, 0, ScriptData),
-        layers=FormDescriptor("LYRS", 0, 0, construct.Array(
-            lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
-            Layer,
-        )),
+        layers=FormDescriptor(
+            "LYRS",
+            0,
+            0,
+            construct.Array(
+                lambda ctx: len(ctx._._.header.performance_groups[0].layer_guids),
+                Layer,
+            ),
+        ),
     ),
 )
 
@@ -303,7 +341,7 @@ class Room(BaseResource):
         if pooled_string.index == -1:
             return pooled_string.size_or_str
         else:
-            return self.raw.strp.pools[0][pooled_string.index:pooled_string.index + pooled_string.size_or_str]
+            return self.raw.strp.pools[0][pooled_string.index : pooled_string.index + pooled_string.size_or_str]
 
     def properties_of_type(self, t: type[T]) -> typing.Iterator[T]:
         for prop in self.raw.script_data.properties:
@@ -321,8 +359,9 @@ class Room(BaseResource):
         instances: dict[int, Instance] = {}
 
         def _add_inst(inst):
-            instances[inst.instance_idx] = Instance(instance_data[inst.instance_idx].guid,
-                                                    properties[inst.property_idx])
+            instances[inst.instance_idx] = Instance(
+                instance_data[inst.instance_idx].guid, properties[inst.property_idx]
+            )
 
         for layer in self.raw.layers:
             for comp in layer.components:
@@ -336,8 +375,10 @@ class Room(BaseResource):
         for i in range(weird_count):
             guids[i]
             unk = weird[i]
-            if type(instances[unk.a].properties.data).__name__ != "EntityProperties" and type(
-                    instances[unk.b].properties.data).__name__ != "EntityProperties":
+            if (
+                type(instances[unk.a].properties.data).__name__ != "EntityProperties"
+                and type(instances[unk.b].properties.data).__name__ != "EntityProperties"
+            ):
                 print(f"i: {i}")
                 print(f"a: {instances[unk.a]}")
                 print(f"b: {instances[unk.b]}")

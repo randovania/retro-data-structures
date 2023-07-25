@@ -195,6 +195,7 @@ STRG = Struct(
 image_regex = re.compile(r"&image=(?:.+?,)*?((?:[a-fA-F0-9]+,?)+);")
 font_regex = re.compile(r"&font=([a-fA-F0-9]+?);")
 
+
 class Strg(BaseResource):
     @classmethod
     def resource_type(cls) -> AssetType:
@@ -207,6 +208,7 @@ class Strg(BaseResource):
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         def _str_to_deps(id_str: str):
             yield from self.asset_manager.get_dependencies_for_asset(int(id_str, 16))
+
         for lang in self.languages:
             for string in self.get_strings(lang):
                 for match in image_regex.finditer(string):
@@ -215,7 +217,6 @@ class Strg(BaseResource):
                         yield from _str_to_deps(asset_id)
                 for match in font_regex.finditer(string):
                     yield from _str_to_deps(match.group(1))
-
 
     @property
     def languages(self) -> typing.Iterator[str]:

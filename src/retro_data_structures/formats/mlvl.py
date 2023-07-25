@@ -45,6 +45,7 @@ from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
+
     pass
 
 MLVLConnectingDock = Struct(
@@ -67,21 +68,20 @@ MLVLMemoryRelay = Struct(
 
 class LayerFlags(Adapter):
     def __init__(self):
-        super().__init__(Struct(
-            layer_count=Int32ub,
-            layer_flags=Bitwise(Array(64, Flag)),
-        ))
+        super().__init__(
+            Struct(
+                layer_count=Int32ub,
+                layer_flags=Bitwise(Array(64, Flag)),
+            )
+        )
 
     def _decode(self, obj, context, path):
-        return ListContainer(reversed(obj.layer_flags))[:obj.layer_count]
+        return ListContainer(reversed(obj.layer_flags))[: obj.layer_count]
 
     def _encode(self, obj, context, path):
         flags = [True for i in range(64)]
-        flags[:len(obj)] = obj
-        return Container({
-            "layer_count": len(obj),
-            "layer_flags": list(reversed(flags))
-        })
+        flags[: len(obj)] = obj
+        return Container({"layer_count": len(obj), "layer_flags": list(reversed(flags))})
 
 
 def create_area(version: int, asset_id):
@@ -105,9 +105,7 @@ def create_area(version: int, asset_id):
 
     # Echoes
     if version == 0x17:
-        area_fields.append(
-            "module_dependencies" / AreaModuleDependencyAdapter()
-        )
+        area_fields.append("module_dependencies" / AreaModuleDependencyAdapter())
 
     # DKCR
     if version >= 0x1B:
@@ -239,11 +237,7 @@ class Mlvl(BaseResource):
             area.build_mlvl_dependencies(False)
             yield from area.dependencies_for()
 
-        mlvl_deps = [
-            self._raw.world_name_id,
-            self._raw.world_save_info_id,
-            self._raw.default_skybox_id
-        ]
+        mlvl_deps = [self._raw.world_name_id, self._raw.world_save_info_id, self._raw.default_skybox_id]
         if self.asset_manager.target_game == Game.ECHOES:
             mlvl_deps.append(self._raw.dark_world_name_id)
         if self.asset_manager.target_game <= Game.CORRUPTION:
@@ -265,7 +259,9 @@ class Mlvl(BaseResource):
         offsets = self._raw.area_layer_name_offset
         names = self._raw.layer_names
         for i, area in enumerate(self._raw.areas):
-            area_layer_names = names[offsets[i]:] if i == len(self._raw.areas) - 1 else names[offsets[i]:offsets[i+1]]
+            area_layer_names = (
+                names[offsets[i] :] if i == len(self._raw.areas) - 1 else names[offsets[i] : offsets[i + 1]]
+            )
             yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:

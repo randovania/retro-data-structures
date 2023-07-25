@@ -16,11 +16,14 @@ from retro_data_structures.properties.prime import objects as prime_objects
 
 SerializedData = construct.Struct(
     game=construct.VarInt,
-    header=construct.PrefixedArray(construct.VarInt, construct.Struct(
-        identifier=construct.PascalString(construct.VarInt, "utf-8"),
-        instance_id=construct.VarInt,
-        size=construct.VarInt,
-    )),
+    header=construct.PrefixedArray(
+        construct.VarInt,
+        construct.Struct(
+            identifier=construct.PascalString(construct.VarInt, "utf-8"),
+            instance_id=construct.VarInt,
+            size=construct.VarInt,
+        ),
+    ),
     data=construct.GreedyBytes,
 )
 
@@ -43,11 +46,13 @@ def do_dump_properties_mrea(game: Game, args):
 
         for layer in mrea.script_layers:
             for instance in layer.instances:
-                header.append({
-                    "identifier": f"{instance.name} of mrea 0x{asset_id:08x}",
-                    "instance_id": instance.id,
-                    "size": len(instance.raw_properties),
-                })
+                header.append(
+                    {
+                        "identifier": f"{instance.name} of mrea 0x{asset_id:08x}",
+                        "instance_id": instance.id,
+                        "size": len(instance.raw_properties),
+                    }
+                )
                 if game == Game.PRIME:
                     name = prime_objects.get_object(instance.type_name).__name__
                 else:
@@ -90,11 +95,13 @@ def do_dump_properties_room(game: Game, args):
                 continue
 
             body = instance.data.to_bytes()
-            header.append({
-                "identifier": f"{i} property of room {asset_id} ({instance.data.__class__.__name__})",
-                "instance_id": instance.type_id,
-                "size": len(body),
-            })
+            header.append(
+                {
+                    "identifier": f"{i} property of room {asset_id} ({instance.data.__class__.__name__})",
+                    "instance_id": instance.type_id,
+                    "size": len(body),
+                }
+            )
             data.append(body)
 
         print(f"Wrote properties for {asset_id}")
@@ -112,8 +119,8 @@ def do_dump_properties_room(game: Game, args):
 
 
 def _parse_properties(  # noqa: PLR0912 Too many branches
-        game: Game, property_data: construct.Container, build: bool, compare: bool
-    ):
+    game: Game, property_data: construct.Container, build: bool, compare: bool
+):
     start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
@@ -138,8 +145,10 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
 
         after = data.tell()
         if after - before != instance.size:
-            print(f"Instance {instance.identifier} of type {type_name} read {after - before} bytes, "
-                  f"expected {instance.size}")
+            print(
+                f"Instance {instance.identifier} of type {type_name} read {after - before} bytes, "
+                f"expected {instance.size}"
+            )
 
         if build:
             new_encoded = the_property.to_bytes()
@@ -191,5 +200,5 @@ def main():
         do_parse_properties(game, args)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

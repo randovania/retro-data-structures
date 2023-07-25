@@ -92,7 +92,7 @@ class Game(Enum):
     def mlvl_dependencies_to_ignore(self) -> tuple[AssetId]:
         if self == Game.ECHOES:
             # Textures/Misc/VisorSteamQtr.TXTR
-            return (0x7b2ea5b1,)
+            return (0x7B2EA5B1,)
         return ()
 
     def audio_group_dependencies(self):
@@ -106,11 +106,11 @@ class Game(Enum):
         if self == Game.ECHOES:
             if ancs == 0xC043D342:
                 # every gun animation needs these i guess
-                yield Dependency("TXTR", 0x9e6f9531, False)
-                yield Dependency("TXTR", 0xcea098fe, False)
-                yield Dependency("TXTR", 0x607638ea, False)
-                yield Dependency("TXTR", 0x578e51b8, False)
-                yield Dependency("TXTR", 0x1e7b6c64, False)
+                yield Dependency("TXTR", 0x9E6F9531, False)
+                yield Dependency("TXTR", 0xCEA098FE, False)
+                yield Dependency("TXTR", 0x607638EA, False)
+                yield Dependency("TXTR", 0x578E51B8, False)
+                yield Dependency("TXTR", 0x1E7B6C64, False)
 
             if ancs == 0x2E980BF2:
                 # samus ANCS from Hive Chamber A
@@ -167,9 +167,11 @@ class CurrentGameCheck(IfThenElse):
 
     def _emitbuild(self, code: construct.CodeGen):
         code.append("from retro_data_structures import game_check")
-        return (f"(({self.thensubcon._compilebuild(code)})"
-                f" if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name})"
-                f" else ({self.elsesubcon._compilebuild(code)}))")
+        return (
+            f"(({self.thensubcon._compilebuild(code)})"
+            f" if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name})"
+            f" else ({self.elsesubcon._compilebuild(code)}))"
+        )
 
 
 def current_game_at_least_else(target: Game, subcon1, subcon2) -> IfThenElse:

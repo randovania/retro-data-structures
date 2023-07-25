@@ -35,10 +35,7 @@ def _cheat(stream: bytes, asset_manager: AssetManager) -> typing.Iterator[Depend
 
 
 _csng = construct.FocusedSeq(
-    "agsc_id",
-    construct.Const(2, construct.Int32ub),
-    construct.Seek(0xC),
-    "agsc_id" / construct.Int32ub
+    "agsc_id", construct.Const(2, construct.Int32ub), construct.Seek(0xC), "agsc_id" / construct.Int32ub
 )
 
 
@@ -65,13 +62,7 @@ def dumb_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
 _frme = construct.FocusedSeq(
     "deps",
     construct.Int32ub,
-    "deps" / construct.PrefixedArray(
-        construct.Int32ub,
-        construct.Struct(
-            type=FourCC,
-            id=construct.Int32ub
-        )
-    )
+    "deps" / construct.PrefixedArray(construct.Int32ub, construct.Struct(type=FourCC, id=construct.Int32ub)),
 )
 
 
@@ -90,37 +81,45 @@ _fsm2 = construct.Struct(
     "num_unk1" / construct.Int32ub,
     "num_unk2" / construct.Int32ub,
     "num_unk3" / construct.Int32ub,
-    "states" / construct.Array(lambda ctx: ctx.num_states, construct.Sequence(
-        String,
-        construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
-        construct.PrefixedArray(construct.Int32ub, construct.Sequence(
-            String, construct.Seek(0x4, 1)
-        ))
-    )),
-    "unk1" / construct.Array(lambda ctx: ctx.num_unk1, construct.Sequence(
-        String,
-        construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
-        construct.Seek(0x4, 1),
-        construct.PrefixedArray(construct.Int32ub, construct.Sequence(
-            String, construct.Seek(0x4, 1)
-        )),
-        construct.Seek(0x1, 1)
-    )),
-    "unk2" / construct.Array(lambda ctx: ctx.num_unk2, construct.Sequence(
-        String,
-        construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
-        construct.PrefixedArray(construct.Int32ub, construct.Sequence(
-            String, construct.Seek(0x4, 1)
-        ))
-    )),
-    "unk3" / construct.Array(lambda ctx: ctx.num_unk3, construct.Struct(
-        "str" / String,
-        construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
-        "unk" / construct.PrefixedArray(construct.Int32ub, construct.Sequence(
-            String, construct.Seek(0x4, 1)
-        )),
-        "dep" / construct.Int32ub,
-    ))
+    "states"
+    / construct.Array(
+        lambda ctx: ctx.num_states,
+        construct.Sequence(
+            String,
+            construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
+            construct.PrefixedArray(construct.Int32ub, construct.Sequence(String, construct.Seek(0x4, 1))),
+        ),
+    ),
+    "unk1"
+    / construct.Array(
+        lambda ctx: ctx.num_unk1,
+        construct.Sequence(
+            String,
+            construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
+            construct.Seek(0x4, 1),
+            construct.PrefixedArray(construct.Int32ub, construct.Sequence(String, construct.Seek(0x4, 1))),
+            construct.Seek(0x1, 1),
+        ),
+    ),
+    "unk2"
+    / construct.Array(
+        lambda ctx: ctx.num_unk2,
+        construct.Sequence(
+            String,
+            construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
+            construct.PrefixedArray(construct.Int32ub, construct.Sequence(String, construct.Seek(0x4, 1))),
+        ),
+    ),
+    "unk3"
+    / construct.Array(
+        lambda ctx: ctx.num_unk3,
+        construct.Struct(
+            "str" / String,
+            construct.If(lambda ctx: ctx._.version >= 2, construct.Seek(0x10, 1)),
+            "unk" / construct.PrefixedArray(construct.Int32ub, construct.Sequence(String, construct.Seek(0x4, 1))),
+            "dep" / construct.Int32ub,
+        ),
+    ),
 )
 
 
@@ -133,19 +132,27 @@ def fsm2_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
 _hint = construct.Struct(
     construct.Const(0x00BADBAD, construct.Int32ub),
     "version" / construct.Int32ub,
-    "hints" / construct.PrefixedArray(construct.Int32ub, construct.Struct(
-        "name" / String,
-        "immediate_time" / construct.Float32b,
-        "normal_time" / construct.Float32b,
-        "popup_strg" / construct.Int32ub,
-        "text_time" / construct.Float32b,
-        "locations" / construct.PrefixedArray(construct.Int32ub, construct.Struct(
-            "mlvl" / construct.Int32ub,
-            "mrea" / construct.Int32ub,
-            "index" / construct.Int32ub,
-            "map_text_strg" / construct.Int32ub,
-        ))
-    ))
+    "hints"
+    / construct.PrefixedArray(
+        construct.Int32ub,
+        construct.Struct(
+            "name" / String,
+            "immediate_time" / construct.Float32b,
+            "normal_time" / construct.Float32b,
+            "popup_strg" / construct.Int32ub,
+            "text_time" / construct.Float32b,
+            "locations"
+            / construct.PrefixedArray(
+                construct.Int32ub,
+                construct.Struct(
+                    "mlvl" / construct.Int32ub,
+                    "mrea" / construct.Int32ub,
+                    "index" / construct.Int32ub,
+                    "map_text_strg" / construct.Int32ub,
+                ),
+            ),
+        ),
+    ),
 )
 
 
@@ -168,12 +175,7 @@ def rule_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
     yield from asset_manager.get_dependencies_for_asset(_rule.parse(asset.data))
 
 
-_font = construct.FocusedSeq(
-    "txtr",
-    construct.Seek(0x22),
-    String,
-    "txtr" / construct.Int32ub
-)
+_font = construct.FocusedSeq("txtr", construct.Seek(0x22), String, "txtr" / construct.Int32ub)
 
 
 def font_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
@@ -189,11 +191,14 @@ _cmdl = construct.Struct(
     material_set_count=construct.Int32ub,
     data_section_sizes=construct.Array(construct.this.data_section_count, construct.Int32ub),
     _=AlignTo(32),
-    material_sets=construct.Array(construct.this.material_set_count, DataSection(
-        # Assumes Prime 1/2
-        construct.PrefixedArray(construct.Int32ub, AssetId32),
-        size=lambda: construct.Computed(lambda ctx: ctx.data_section_sizes[ctx._index])
-    )),
+    material_sets=construct.Array(
+        construct.this.material_set_count,
+        DataSection(
+            # Assumes Prime 1/2
+            construct.PrefixedArray(construct.Int32ub, AssetId32),
+            size=lambda: construct.Computed(lambda ctx: ctx.data_section_sizes[ctx._index]),
+        ),
+    ),
 )
 
 
@@ -219,9 +224,9 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typi
         effect_type = next(c for c in ALL_EFFECTS if c.resource_type() == asset.type)
 
         for match in _make_re(effect_type.texture_keys()).finditer(asset.data):
-            k = asset.data[match.end():match.end() + 4]
+            k = asset.data[match.end() : match.end() + 4]
             element = effect_script.TEXTURE_ELEMENT_TYPES[k.decode()].parse(
-                asset.data[match.end() + 4:],
+                asset.data[match.end() + 4 :],
                 target_game=asset_manager.target_game,
             )
             if element is not None:
@@ -229,7 +234,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typi
 
         for match in _make_re(effect_type.spawn_system_keys()).finditer(asset.data):
             element = effect_script.SpawnSystemKeyframeData.parse(
-                asset.data[match.end():],
+                asset.data[match.end() :],
                 target_game=asset_manager.target_game,
             )
             if element.magic != "NONE":
@@ -239,7 +244,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typi
 
         for match in _make_re(effect_type.asset_id_keys()).finditer(asset.data):
             element = effect_script.GetAssetId.parse(
-                asset.data[match.end():],
+                asset.data[match.end() :],
                 target_game=asset_manager.target_game,
             )
             if element is not None and element.body is not None:

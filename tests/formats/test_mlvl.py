@@ -26,40 +26,13 @@ _MLVLS = (
 _EXPECTED_DEPENDENCY = {
     "Great Temple": {},
     "Torvus Bog": {
-        "Torvus Lagoon": {
-            "missing": {},
-            "extra": {
-                "1st Pass": {("PART", "0x28747f78")}
-            }
-        },
-        "Ruined Alcove": {
-            "missing": {},
-            "extra": {
-                "1st Pass": {("PART", "0x28747f78")}
-            }
-        },
-        "Undertemple": {
-            "missing": {},
-            "extra": {
-                "Ingsporb battle": {("AGSC", "0xfa61924c")}
-            }
-        }
+        "Torvus Lagoon": {"missing": {}, "extra": {"1st Pass": {("PART", "0x28747f78")}}},
+        "Ruined Alcove": {"missing": {}, "extra": {"1st Pass": {("PART", "0x28747f78")}}},
+        "Undertemple": {"missing": {}, "extra": {"Ingsporb battle": {("AGSC", "0xfa61924c")}}},
     },
-    "Sanctuary Fortress": {
-        "Entrance Defense Hall": {
-            "missing": {},
-            "extra": {
-                "1st pass": {("AGSC", "0xc8739bec")}
-            }
-        }
-    },
+    "Sanctuary Fortress": {"Entrance Defense Hall": {"missing": {}, "extra": {"1st pass": {("AGSC", "0xc8739bec")}}}},
     "Temple Grounds": {
-        "Hive Chamber A": {
-            "missing": {},
-            "extra": {
-                "Default": {("TXTR", "0xbf916e5a")}
-            }
-        },
+        "Hive Chamber A": {"missing": {}, "extra": {"Default": {("TXTR", "0xbf916e5a")}}},
         "Trooper Security Station": {
             "missing": {},
             "extra": {
@@ -68,8 +41,8 @@ _EXPECTED_DEPENDENCY = {
                     ("TXTR", "0x286d4e4a"),
                     ("TXTR", "0x5a7f9d53"),
                 }
-            }
-        }
+            },
+        },
     },
     "Agon Wastes": {
         "Agon Temple": {
@@ -79,9 +52,9 @@ _EXPECTED_DEPENDENCY = {
                     ("CMDL", "0x792f1949"),
                     ("CMDL", "0x952eae59"),
                 }
-            }
+            },
         }
-    }
+    },
 }
 
 
@@ -121,13 +94,11 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
             missing = {
                 layer_name: old_layer.difference(new_layer)
-                for (layer_name, old_layer), new_layer
-                in zip(old.items(), new.values())
+                for (layer_name, old_layer), new_layer in zip(old.items(), new.values())
             }
             extra = {
                 layer_name: new_layer.difference(old_layer)
-                for (layer_name, old_layer), new_layer
-                in zip(old.items(), new.values())
+                for (layer_name, old_layer), new_layer in zip(old.items(), new.values())
             }
             missing = {n: miss for n, miss in missing.items() if miss}
             extra = {n: ext for n, ext in extra.items() if ext}
@@ -143,9 +114,12 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
                 world_reports[mlvl.world_name][area.name] = {"missing": missing, "extra": extra}
                 if write_reports:
                     _write_to_file(
-                        {"missing": {n: list(miss) for n, miss in missing.items() if miss},
-                         "extra": {n: list(ext) for n, ext in extra.items() if ext}},
-                        f)
+                        {
+                            "missing": {n: list(miss) for n, miss in missing.items() if miss},
+                            "extra": {n: list(ext) for n, ext in extra.items() if ext},
+                        },
+                        f,
+                    )
             else:
                 logging.info(msg)
                 if write_reports:
@@ -160,8 +134,9 @@ _EXPECTED_MODULES = {
     "Great Temple": {},
     "Agon Wastes": {},
     "Torvus Bog": {},
-    "Sanctuary Fortress": {}
+    "Sanctuary Fortress": {},
 }
+
 
 @pytest.mark.skip_dependency_tests
 def test_module_dependencies(prime2_asset_manager: AssetManager):

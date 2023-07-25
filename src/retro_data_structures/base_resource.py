@@ -51,10 +51,8 @@ class BaseResource:
         raise NotImplementedError
 
     @classmethod
-    def parse(cls, data: bytes, target_game: Game,
-              asset_manager: AssetManager | None = None) -> Self:
-        return cls(cls.construct_class(target_game).parse(data, target_game=target_game),
-                   target_game, asset_manager)
+    def parse(cls, data: bytes, target_game: Game, asset_manager: AssetManager | None = None) -> Self:
+        return cls(cls.construct_class(target_game).parse(data, target_game=target_game), target_game, asset_manager)
 
     def build(self) -> bytes:
         return self.construct_class(self.target_game).build(self._raw, target_game=self.target_game)
@@ -114,5 +112,6 @@ class RawResource(typing.NamedTuple):
     type: AssetType
     data: bytes
     compressed: bool = False
+
 
 Resource = RawResource | BaseResource

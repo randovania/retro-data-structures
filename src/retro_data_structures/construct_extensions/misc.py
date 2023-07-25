@@ -40,8 +40,12 @@ def PrefixedArrayWithExtra(countfield, extrafield, subcon):
         return [
             {"id": "countfield", "type": countfield._compileprimitivetype(ksy, bitwise)},
             {"id": "extra", "type": extrafield._compileprimitivetype(ksy, bitwise)},
-            {"id": "data", "type": subcon._compileprimitivetype(ksy, bitwise),
-             "repeat": "expr", "repeat_expr": "countfield"},
+            {
+                "id": "data",
+                "type": subcon._compileprimitivetype(ksy, bitwise),
+                "repeat": "expr",
+                "repeat_expr": "countfield",
+            },
         ]
 
     macro._emitseq = _emitseq

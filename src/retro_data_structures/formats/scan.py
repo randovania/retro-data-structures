@@ -41,14 +41,18 @@ Prime1SCAN = Struct(
     "junk" / GreedyRange(Byte),
 )
 
-Prime23SCAN = Aligned(32, Struct(
-    "magic" / Const("SCAN", FourCC),
-    "unknown1" / Const(2, Int32ub),
-    "unknown2" / Byte,
-    "instance_count" / Const(1, Int32ub),
-    "scannable_object_info" / ConstructScriptInstance,
-    "dependencies" / DGRP,
-), b"\xff")
+Prime23SCAN = Aligned(
+    32,
+    Struct(
+        "magic" / Const("SCAN", FourCC),
+        "unknown1" / Const(2, Int32ub),
+        "unknown2" / Byte,
+        "instance_count" / Const(1, Int32ub),
+        "scannable_object_info" / ConstructScriptInstance,
+        "dependencies" / DGRP,
+    ),
+    b"\xff",
+)
 
 SCAN = IfThenElse(game_check.is_prime1, Prime1SCAN, Prime23SCAN)
 
@@ -87,12 +91,14 @@ class Scan(BaseResource):
             yield Dependency(it.type, it.id, True)
 
     _scannable_object_info: ScriptInstance | None = None
+
     @property
     def scannable_object_info(self) -> ScriptInstance:
         assert self.target_game != Game.PRIME
         if self._scannable_object_info is None:
-            self._scannable_object_info = ScriptInstance(self._raw.scannable_object_info, self.target_game,
-                                                               on_modify=self.rebuild_dependencies)
+            self._scannable_object_info = ScriptInstance(
+                self._raw.scannable_object_info, self.target_game, on_modify=self.rebuild_dependencies
+            )
         return self._scannable_object_info
 
     def rebuild_dependencies(self):
@@ -101,7 +107,5 @@ class Scan(BaseResource):
             return
         scan_info = self.scannable_object_info.get_properties()
         self._raw.dependencies = [
-            {"asset_type": dep.type, "asset_id": dep.id}
-            for dep in scan_info.dependencies_for(self.asset_manager)
+            {"asset_type": dep.type, "asset_id": dep.id} for dep in scan_info.dependencies_for(self.asset_manager)
         ]
-

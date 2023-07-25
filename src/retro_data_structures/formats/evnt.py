@@ -61,13 +61,14 @@ Int32POINode = Struct(
     base=BasePOINode,
     value=If(game_check.current_game_at_most(Game.ECHOES), Int32sb),
     locator_name=If(game_check.current_game_at_most(Game.ECHOES), String),
-    corruption=If(game_check.is_prime3,
-                  Struct(
-                      unk_a=Int8ub,
-                      unk_b=Int16ub,
-                      unk_c=Int16ub,
-                  ),
-                  ),
+    corruption=If(
+        game_check.is_prime3,
+        Struct(
+            unk_a=Int8ub,
+            unk_b=Int16ub,
+            unk_c=Int16ub,
+        ),
+    ),
 )
 
 ParticlePOINode = Struct(
@@ -105,17 +106,19 @@ SoundPOINode = Struct(
         Struct(
             unk_a=Int32ub,
             unk_b=Int32ub,
-            data=Array(2,
-                       Struct(
-                           type=Int32ub,
-                           data=Switch(construct.this.type,
-                                       {
-                                           1: Int32ub,
-                                           2: MayaSpline,
-                                       }
-                                       ),
-                       ),
-                       ),
+            data=Array(
+                2,
+                Struct(
+                    type=Int32ub,
+                    data=Switch(
+                        construct.this.type,
+                        {
+                            1: Int32ub,
+                            2: MayaSpline,
+                        },
+                    ),
+                ),
+            ),
         ),
     ),
 )

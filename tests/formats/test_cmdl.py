@@ -22,7 +22,7 @@ CMDLHeader = construct.Struct(
 def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
-        yield lst[i: i + n]
+        yield lst[i : i + n]
 
 
 def test_compare(prime2_asset_manager):
@@ -44,10 +44,10 @@ def test_compare(prime2_asset_manager):
 def test_dependencies_p2(prime2_asset_manager):
     result = list(prime2_asset_manager.get_dependencies_for_asset(0x6FE2E8A0))
     assert result == [
-        Dependency(type='TXTR', id=326302585),
-        Dependency(type='TXTR', id=1583844215),
-        Dependency(type='TXTR', id=2998183659),
-        Dependency(type='TXTR', id=3392247412),
-        Dependency(type='TXTR', id=3714447378),
-        Dependency(type='CMDL', id=1877141664)
+        Dependency(type="TXTR", id=326302585),
+        Dependency(type="TXTR", id=1583844215),
+        Dependency(type="TXTR", id=2998183659),
+        Dependency(type="TXTR", id=3392247412),
+        Dependency(type="TXTR", id=3714447378),
+        Dependency(type="CMDL", id=1877141664),
     ]

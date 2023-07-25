@@ -8,14 +8,18 @@ from retro_data_structures.formats.ancs import Ancs
 def test_compare_p1(prime1_asset_manager):
     # Resources/Uncategorized/alpha_metaree.ANCS
     test_lib.parse_and_build_compare(
-        prime1_asset_manager, 0xBBEE2818, Ancs,
+        prime1_asset_manager,
+        0xBBEE2818,
+        Ancs,
     )
 
 
 def test_compare_p2(prime2_asset_manager):
     # Resources/Uncategorized/annihilatorBeam.ANCS
     test_lib.parse_and_build_compare(
-        prime2_asset_manager, 0x4C4B3D9D, Ancs,
+        prime2_asset_manager,
+        0x4C4B3D9D,
+        Ancs,
     )
 
 

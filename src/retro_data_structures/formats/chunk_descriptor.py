@@ -25,8 +25,9 @@ def ChunkDescriptor(data_types: dict[str, construct.Construct]):
                     ErrorWithMessage(lambda ctx: f"Unknown type: {ctx.id}"),
                 ),
                 terminate=construct.Terminated,
-            )),
-        )
+            ),
+        ),
+    )
 
 
 def SingleTypeChunkDescriptor(type_name: str, contents: construct.Construct, *, add_terminated: bool = True):

@@ -54,8 +54,8 @@ OtherFooter = Struct(
 )
 
 CSKR = Struct(
-    _magic=If(game_check.current_game_at_least(Game.CORRUPTION),Const(0x534B494E, Int32ub)),
-    unk=If(game_check.current_game_at_least(Game.CORRUPTION),Int32ub), # Version ?
+    _magic=If(game_check.current_game_at_least(Game.CORRUPTION), Const(0x534B494E, Int32ub)),
+    unk=If(game_check.current_game_at_least(Game.CORRUPTION), Int32ub),  # Version ?
     vertex_groups=PrefixedArray(Int32ub, VertexGroup),
     footer=IfThenElse(
         game_check.is_prime1,

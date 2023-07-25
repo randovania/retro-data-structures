@@ -10,10 +10,7 @@ from setuptools.command.egg_info import egg_info
 
 
 def generate_property_templates():
-    subprocess.run([
-        sys.executable,
-        os.fspath(Path(__file__).parent.joinpath("parse_pwe_templates.py"))
-    ], check=True)
+    subprocess.run([sys.executable, os.fspath(Path(__file__).parent.joinpath("parse_pwe_templates.py"))], check=True)
 
 
 class GenerateTemplateCommand(egg_info):
@@ -29,6 +26,6 @@ class GenerateTemplateCommand(egg_info):
 
 setup(
     cmdclass={
-        'egg_info': GenerateTemplateCommand,
+        "egg_info": GenerateTemplateCommand,
     },
 )

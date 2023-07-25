@@ -23,10 +23,8 @@ from retro_data_structures.formats.cmdl import MaterialSet
 
 
 def lazy_world_geometry():
-    return Optional(Struct(
-        "materials" / MaterialSet,
-        "data" / GreedyBytes
-    ))
+    return Optional(Struct("materials" / MaterialSet, "data" / GreedyBytes))
+
 
 # # TODO: FlagEnum
 # WorldModelHeader = Struct("visor_flags" / Int32ub, "transform" / Transform4f, "bounding_box" / AABox)

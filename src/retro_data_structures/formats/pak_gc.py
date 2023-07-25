@@ -106,18 +106,19 @@ class ConstructPakGc(construct.Construct):
                 uncompressed_data = data
                 compressed_data = None
 
-            files.append(PakFile(
-                resource.asset.id,
-                resource.asset.type,
-                resource.compressed > 0,
-                uncompressed_data,
-                compressed_data,
-            ))
+            files.append(
+                PakFile(
+                    resource.asset.id,
+                    resource.asset.type,
+                    resource.compressed > 0,
+                    uncompressed_data,
+                    compressed_data,
+                )
+            )
 
         return PakBody(
             named_resources={
-                named.name: Dependency(type=named.asset.type, id=named.asset.id)
-                for named in header.named_resources
+                named.name: Dependency(type=named.asset.type, id=named.asset.id) for named in header.named_resources
             },
             files=files,
         )
