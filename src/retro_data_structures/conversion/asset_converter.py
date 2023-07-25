@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import copy
 import dataclasses
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource
 from retro_data_structures.exceptions import InvalidAssetId, UnknownAssetId
-from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.game_check import Game
 
 
 @dataclasses.dataclass(frozen=True)

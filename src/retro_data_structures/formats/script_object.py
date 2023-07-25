@@ -11,7 +11,6 @@ import io
 import logging
 import struct
 import typing
-from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import construct
@@ -25,14 +24,16 @@ from construct.core import (
 )
 
 from retro_data_structures import game_check, properties
-from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.enums import helper as enum_helper
-from retro_data_structures.enums.shared_enums import Message, State
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
+    from retro_data_structures.enums.shared_enums import Message, State
     from retro_data_structures.formats.script_layer import ScriptLayer
     from retro_data_structures.properties.base_property import BaseObjectType
 

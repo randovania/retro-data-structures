@@ -1,12 +1,17 @@
+from __future__ import annotations
+
 import argparse
 import collections
 import dataclasses
 import pprint
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats import Pak
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 @dataclasses.dataclass()

@@ -1,6 +1,8 @@
 """
 Wiki: https://wiki.axiodl.com/w/SAND_(File_Format)
 """
+from __future__ import annotations
+
 import typing
 
 import construct
@@ -10,7 +12,9 @@ from retro_data_structures.base_resource import AssetType, BaseResource, Depende
 from retro_data_structures.common_types import AssetId64
 from retro_data_structures.formats.evnt import Int32POINode, ParticlePOINode, SoundPOINode
 from retro_data_structures.formats.meta_transition import MetaTransition_v2
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 # This format is only for Prime 3, so AssetId is always 64-bit
 ConstructAssetId = AssetId64

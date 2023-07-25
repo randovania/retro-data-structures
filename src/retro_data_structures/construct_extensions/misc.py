@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import itertools
 
 import construct
@@ -36,9 +38,10 @@ def PrefixedArrayWithExtra(countfield, extrafield, subcon):
 
     def _emitseq(ksy, bitwise):
         return [
-            dict(id="countfield", type=countfield._compileprimitivetype(ksy, bitwise)),
-            dict(id="extra", type=extrafield._compileprimitivetype(ksy, bitwise)),
-            dict(id="data", type=subcon._compileprimitivetype(ksy, bitwise), repeat="expr", repeat_expr="countfield"),
+            {"id": "countfield", "type": countfield._compileprimitivetype(ksy, bitwise)},
+            {"id": "extra", "type": extrafield._compileprimitivetype(ksy, bitwise)},
+            {"id": "data", "type": subcon._compileprimitivetype(ksy, bitwise),
+             "repeat": "expr", "repeat_expr": "countfield"},
         ]
 
     macro._emitseq = _emitseq

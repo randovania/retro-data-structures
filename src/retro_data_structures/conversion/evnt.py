@@ -1,6 +1,12 @@
-from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 
 _BONE_NAME_MAPPING = {
     "Skeleton_Root": 1,

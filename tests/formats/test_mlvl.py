@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import json
 import logging
 import os
 import pathlib
 import time
+from typing import TYPE_CHECKING
 
 import pytest
 
-from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.formats.mlvl import Mlvl
 from retro_data_structures.formats.mrea import AreaDependencies
+
+if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 _MLVLS = (
     0x3BFA3EFF,  # Temple Grounds
@@ -104,7 +109,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
 
         for area in mlvl.areas:
             old = area.dependencies_by_layer
-            old = {layer_name: set((dep.type, hex(dep.id)) for dep in layer) for layer_name, layer in old.items()}
+            old = {layer_name: {(dep.type, hex(dep.id)) for dep in layer} for layer_name, layer in old.items()}
 
             start = time.time()
             area.build_mlvl_dependencies()
@@ -112,7 +117,7 @@ def test_mlvl_dependencies(prime2_asset_manager: AssetManager):
             total_elapsed += elapsed
 
             new = area.dependencies_by_layer
-            new = {layer_name: set((dep.type, hex(dep.id)) for dep in layer) for layer_name, layer in new.items()}
+            new = {layer_name: {(dep.type, hex(dep.id)) for dep in layer} for layer_name, layer in new.items()}
 
             missing = {
                 layer_name: old_layer.difference(new_layer)

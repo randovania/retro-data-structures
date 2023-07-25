@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from construct.lib import Container, ListContainer
 
 from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource

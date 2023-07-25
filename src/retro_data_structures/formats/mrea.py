@@ -8,7 +8,6 @@ import dataclasses
 import io
 import itertools
 import typing
-from collections.abc import Iterator
 from enum import IntEnum
 
 import construct
@@ -37,18 +36,20 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
-from retro_data_structures.formats.script_object import (
-    InstanceRef,
-    ScriptInstance,
-)
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.formats.mlvl import Mlvl
+    from retro_data_structures.formats.script_object import (
+        InstanceRef,
+        ScriptInstance,
+    )
 
 
 class MREAVersion(IntEnum):
@@ -363,7 +364,7 @@ class MREAConstruct(construct.Construct):
     def _encode_compressed_blocks(self, data_sections: list[bytes],
                                   category_starts: dict[str, int | None],
                                   context, path):
-        def _start_new_group(group_size, section_size, curr_label, prev_label):
+        def _start_new_group(group_size, section_size, curr_label, prev_label):  # noqa: PLR0911
             if group_size == 0:
                 return False, ""
 
@@ -522,7 +523,7 @@ class Mrea(BaseResource):
         return MREA
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        raise DependenciesHandledElsewhere()
+        raise DependenciesHandledElsewhere
 
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
         if section_name not in self._raw.sections:

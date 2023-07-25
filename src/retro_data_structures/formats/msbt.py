@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import typing
 
@@ -7,7 +9,9 @@ from construct import Const, Struct
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.formats.form_descriptor import FormDescriptor
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 MSBTHeader = construct.Aligned(16, Struct(
     magic=construct.Const(b"MsgStdBn"),

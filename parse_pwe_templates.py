@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import collections
 import dataclasses
 import keyword
@@ -13,6 +15,9 @@ import inflection
 
 # ruff: noqa: E501
 # ruff: noqa: C901
+# ruff: noqa: PLR0912  lots of branches
+# ruff: noqa: PLR0915  lots of statements
+# ruff: noqa: PLW0603  we use globals here
 
 rds_root = Path(__file__).parent.joinpath("src", "retro_data_structures")
 
@@ -1008,10 +1013,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             enum_base=enum_base,
         ))
 
-    script_objects_paths = {
-        four_cc: path
-        for four_cc, path in get_paths(root.find("ScriptObjects")).items()
-    }
+    script_objects_paths = dict(get_paths(root.find("ScriptObjects")).items())
     script_objects = {
         four_cc: parse_script_object_file(base_path / path, game_id)
         for four_cc, path in script_objects_paths.items()
@@ -1327,10 +1329,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             cls.modules.extend(this["modules"])
 
         for prop, prop_name in zip(this["properties"], all_names):
+            final_prop_name = prop_name
             if all_names.count(prop_name) > 1:
-                prop_name += "_0x{:08x}".format(prop["id"])
+                final_prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(get_prop_details(prop), prop_name)
+            cls.add_prop(get_prop_details(prop), final_prop_name)
         cls.finalize_props()
 
         cls.class_code += "\n    @classmethod\n"
@@ -1344,11 +1347,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     name_field = "self.name"
                 else:
                     name_field = "None"
+            elif "editor_properties" in cls.all_props:
+                name_field = "self.editor_properties.name"
             else:
-                if "editor_properties" in cls.all_props:
-                    name_field = "self.editor_properties.name"
-                else:
-                    name_field = "None"
+                name_field = "None"
+
             cls.class_code += f"        return {name_field}\n"
 
             cls.class_code += "\n    def set_name(self, name: str) -> None:\n"

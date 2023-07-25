@@ -3,18 +3,22 @@ Wiki: https://wiki.axiodl.com/w/CHAR_(Metroid_Prime_3)
 
 To Do: DKCR CHAR Format
 """
+from __future__ import annotations
+
 import typing
 
 import construct
 from construct import Array, Const, Float32b, Int8ub, Int32ub, PrefixedArray, Struct
 
-from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import AABox, AssetId64, FourCC, String
 from retro_data_structures.formats import AssetType, BaseResource
 from retro_data_structures.formats.evnt import ParticlePOINode, SoundPOINode
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId64
 from retro_data_structures.formats.pas_database import PASDatabase
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.base_resource import Dependency
+    from retro_data_structures.game_check import Game
 
 # This format is only for Prime 3/DKCR, so AssetId is always 64-bit
 ConstructAssetId = AssetId64

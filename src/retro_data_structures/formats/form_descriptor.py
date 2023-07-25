@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import construct
 from construct import Const, Int32ul, Int64ul, Struct
 

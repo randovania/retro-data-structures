@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from tests import test_lib
 
-from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats.strg import Strg
+
+if TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 def test_compare_p1(prime1_asset_manager, strg_asset_id: AssetId):

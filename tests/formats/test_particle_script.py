@@ -1,7 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from tests import test_lib
 
-from retro_data_structures.asset_manager import AssetManager
+if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
 
 
 def test_particles_elsc(prime2_asset_manager: AssetManager, elsc_asset_id):

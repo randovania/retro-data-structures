@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 import construct
@@ -27,7 +29,9 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import CharAnimTime
 from retro_data_structures.construct_extensions.misc import BitwiseWith32Blocks
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 UncompressedAnimation = Struct(
     duration=CharAnimTime,

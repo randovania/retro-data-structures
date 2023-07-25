@@ -5,11 +5,9 @@ from __future__ import annotations
 
 import typing
 import uuid
-from collections.abc import Callable
 from enum import Enum
 from typing import Any
 
-import construct
 from construct.core import IfThenElse
 
 from retro_data_structures import common_types
@@ -17,6 +15,10 @@ from retro_data_structures.base_resource import Dependency
 from retro_data_structures.crc import crc32, crc64
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Callable
+
+    import construct
+
     from retro_data_structures.base_resource import AssetId
 
 
@@ -71,11 +73,11 @@ class Game(Enum):
         elif self.uses_guid_as_asset_id:
             return uuid.UUID(int=0)
         else:
-            raise NotImplementedError()
+            raise NotImplementedError
 
     def hash_asset_id(self, asset_name: str) -> AssetId:
         if self.uses_guid_as_asset_id:
-            raise NotImplementedError()
+            raise NotImplementedError
         if self.uses_asset_id_64:
             return crc64(asset_name)
         if self.uses_asset_id_32:

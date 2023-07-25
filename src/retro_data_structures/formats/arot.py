@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import math
 
 from construct import Aligned, Array, Const, FlagsEnum, Int16ub, Int32ub, Struct, this

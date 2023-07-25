@@ -74,6 +74,11 @@ select = [
     "PLR",
     "PLW",
 ]
+extend-ignore = [
+    "PLR0913",  # Too many arguments to function call
+    "PLR2004",  # Magic values show up everywhere in construct defs
+]
+
 src = ["src"]
 
 # Version to target for generated code.

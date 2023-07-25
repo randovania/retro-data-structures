@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from construct import Adapter, PrefixedArray, Struct, VarInt
 
 from retro_data_structures.common_types import String
@@ -23,11 +25,12 @@ class DictAdapter(Adapter):
     def _encode(self, obj, context, path):
         L = []
         for k, v in obj.items():
+            new_item = v
             if self.objisdict:
                 v["*Key"] = k
             else:
-                v = {"*Key": k, "Value": v}
-            L.append(v)
+                new_item = {"*Key": k, "Value": v}
+            L.append(new_item)
         return L
 
 

@@ -1,13 +1,11 @@
+from __future__ import annotations
+
 import fnmatch
 import json
 import logging
 import typing
-import uuid
 from collections import defaultdict
-from collections.abc import Iterator
-from pathlib import Path
 
-import construct
 import nod
 
 from retro_data_structures import formats
@@ -27,22 +25,31 @@ from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.game_check import Game
 
+if typing.TYPE_CHECKING:
+    import uuid
+    from collections.abc import Iterator
+    from pathlib import Path
+
+    import construct
+
+    from retro_data_structures.formats.ancs import Ancs
+
 T = typing.TypeVar("T")
 logger = logging.getLogger(__name__)
 
 
 class FileProvider:
     def is_file(self, name: str) -> bool:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def rglob(self, pattern: str) -> Iterator[str]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def open_binary(self, name: str) -> typing.BinaryIO:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def get_dol(self) -> bytes:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class PathFileProvider(FileProvider):
@@ -156,10 +163,7 @@ class AssetManager:
             with self.provider.open_binary("custom_names.json") as f:
                 custom_names_text = f.read().decode("utf-8")
 
-            self._custom_asset_ids.update({
-                name: asset_id
-                for name, asset_id in json.loads(custom_names_text).items()
-            })
+            self._custom_asset_ids.update(dict(json.loads(custom_names_text).items()))
 
         self.all_paks = list(
             self.provider.rglob("*.pak")
@@ -437,7 +441,6 @@ class AssetManager:
             logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
         else:
-            from retro_data_structures.formats.ancs import Ancs
             deps = list(self.target_game.special_ancs_dependencies(asset_id))
             ancs: Ancs = self.get_parsed_asset(asset_id)
             deps.extend(ancs.ancs_dependencies_for(char_index=char_index))
@@ -497,10 +500,7 @@ class AssetManager:
         custom_names = output_path.joinpath("custom_names.json")
         with custom_names.open("w") as f:
             json.dump(
-                {
-                    name: asset_id
-                    for name, asset_id in self._custom_asset_ids.items()
-                },
+                dict(self._custom_asset_ids.items()),
                 f,
                 indent=4,
             )

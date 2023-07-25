@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import construct
 
 from retro_data_structures.base_resource import Dependency

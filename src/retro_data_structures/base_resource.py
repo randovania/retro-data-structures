@@ -5,11 +5,12 @@ import typing
 import uuid
 
 from construct import Construct, Container
-from typing_extensions import Self
 
 from retro_data_structures.exceptions import DependenciesHandledElsewhere
 
 if typing.TYPE_CHECKING:
+    from typing_extensions import Self
+
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.game_check import Game
 
@@ -43,11 +44,11 @@ class BaseResource:
 
     @classmethod
     def construct_class(cls, target_game: Game) -> Construct:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def resource_type(cls) -> AssetType:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def parse(cls, data: bytes, target_game: Game,
@@ -77,7 +78,7 @@ class BaseResource:
             return False
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @property
     def raw(self) -> Container:

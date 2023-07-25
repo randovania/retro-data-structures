@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import typing
-import uuid
 from dataclasses import dataclass
 
 import construct
@@ -11,9 +12,13 @@ from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor
-from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
-from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
+
+if typing.TYPE_CHECKING:
+    import uuid
+
+    from retro_data_structures.game_check import Game
+    from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
 
 GreedyBytes = typing.cast(construct.Construct, construct.GreedyBytes)
 

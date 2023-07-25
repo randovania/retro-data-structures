@@ -1,6 +1,8 @@
 """
 https://wiki.axiodl.com/w/TXTR_(File_Format)
 """
+from __future__ import annotations
+
 import enum
 import typing
 
@@ -9,7 +11,9 @@ from construct import GreedyBytes, Int16ub, Int32ub, Struct
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 
 class ImageFormat(enum.IntEnum):
