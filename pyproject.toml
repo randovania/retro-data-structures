@@ -60,7 +60,20 @@ markers = [
 
 [tool.ruff]
 line-length = 120
-select = ["E", "F", "W", "C90", "I", "UP"]
+select = [
+    "E", "F", "W", "C90", "I", "UP", "C4",
+    "RSE",
+    "TCH",
+    "PTH",
+    "COM818", "COM819",
+    "ISC",
+    "PIE",
+
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+]
 src = ["src"]
 
 # Version to target for generated code.
@@ -70,3 +83,10 @@ target-version = "py310"
 # Flag errors (`C901`) whenever the complexity level exceeds 25.
 # Defaults to 10, but we're being very flexible right now
 max-complexity = 25
+
+[tool.ruff.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311']
