@@ -97,6 +97,11 @@ def create_parser():
     add_provider_argument(decode_from_paks)
     decode_from_paks.add_argument("asset_id", type=asset_id_conversion, help="Asset id to print")
 
+    find_in_paks = subparser.add_parser("find-in-paks")
+    add_game_argument(find_in_paks)
+    add_provider_argument(find_in_paks)
+    find_in_paks.add_argument("asset_id", type=asset_id_conversion, help="Asset id to find")
+
     extract = subparser.add_parser("extract")
     add_game_argument(extract)
     add_provider_argument(extract)
@@ -170,6 +175,15 @@ def do_decode_from_pak(args):
 
     asset_manager = AssetManager(get_provider_from_argument(args), game)
     print(asset_manager.get_parsed_asset(asset_id).raw)
+
+
+
+def do_find_in_paks(args):
+    game: Game = args.game
+    asset_id: int = args.asset_id
+
+    asset_manager = AssetManager(get_provider_from_argument(args), game)
+    print(list(asset_manager.find_paks(asset_id)))
 
 
 def do_extract(args):
@@ -339,6 +353,8 @@ def main():
         do_decode(args)
     elif args.command == "decode-from-pak":
         do_decode_from_pak(args)
+    elif args.command == "find-in-paks":
+        do_find_in_paks(args)
     elif args.command == "extract":
         do_extract(args)
     elif args.command == "list-dependencies":
