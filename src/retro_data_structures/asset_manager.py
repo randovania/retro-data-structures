@@ -290,10 +290,11 @@ class AssetManager:
     def get_custom_asset(self, name: str) -> AssetId | None:
         return self._custom_asset_ids.get(name)
 
-    def add_new_asset(self, name: str | uuid.UUID, new_data: Resource,
-                      in_paks: typing.Iterable[str]):
+    def add_new_asset(self, name: str, new_data: Resource,
+                      in_paks: typing.Iterable[str] = ()) -> AssetId:
         """
         Adds an asset that doesn't already exist.
+        :return: Asset id of the new asset.
         """
         asset_id = self._resolve_asset_id(name)
 
@@ -308,6 +309,15 @@ class AssetManager:
         self.replace_asset(name, new_data)
         for pak_name in in_paks:
             self.ensure_present(pak_name, asset_id)
+
+        return asset_id
+
+    def duplicate_asset(self, asset_id: AssetId, new_name: str) -> AssetId:
+        """
+        Creates a new asset named `new_name` with the contents of `asset_id`
+        :return: Asset id of the new asset.
+        """
+        return self.add_new_asset(new_name, self.get_parsed_asset(asset_id), ())
 
     def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource):
         """
@@ -334,6 +344,13 @@ class AssetManager:
         self._modified_resources[asset_id] = raw_asset
 
         return asset_id
+
+    def add_or_replace_custom_asset(self, name: str, new_data: Resource) -> AssetId:
+        """Adds a new asset named `name`, or replaces an existing one if it already exists."""
+        if self.does_asset_exists(name):
+            return self.replace_asset(name, new_data)
+        else:
+            return self.add_new_asset(name, new_data)
 
     def delete_asset(self, asset_id: NameOrAssetId):
         original_name = asset_id
@@ -397,7 +414,7 @@ class AssetManager:
         deps: tuple[Dependency, ...] = ()
 
         if asset_id in dep_cache:
-            logger.debug(f"Fetching cached asset {asset_id:#8x}...")
+            # logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = dep_cache[asset_id]
         else:
             if dependency_cheating.should_cheat_asset(asset_type):
@@ -411,7 +428,7 @@ class AssetManager:
             else:
                 logger.warning(f"Potential missing assets for {asset_type} {asset_id}")
 
-            logger.debug(f"Adding {asset_id:#8x} deps to cache...")
+            # logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             dep_cache[asset_id] = deps
 
         yield from deps
@@ -438,7 +455,7 @@ class AssetManager:
             return
 
         if char_index in self._cached_ancs_per_char_dependencies[asset_id]:
-            logger.debug(f"Fetching cached asset {asset_id:#8x}...")
+            # logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
         else:
             deps = list(self.target_game.special_ancs_dependencies(asset_id))
