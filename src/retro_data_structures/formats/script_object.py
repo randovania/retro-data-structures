@@ -70,11 +70,11 @@ class InstanceId(int):
 
     @property
     def area(self) -> int:
-        return (self >> 16) & 0x3ff
+        return (self >> 16) & 0x3FF
 
     @property
     def instance(self) -> int:
-        return self & 0xffff
+        return self & 0xFFFF
 
 
 @dataclasses.dataclass(frozen=True)
@@ -167,16 +167,26 @@ class _ConstructScriptInstance(construct.Construct):
             header_construct, body_construct = _PrimeRawScript
 
         sub_stream = io.BytesIO()
-        body_construct._build(construct.Container(
-            instance_id=obj.id,
-            connections=[conn.as_construct() for conn in obj.connections],
-            base_property=obj.base_property,
-        ), sub_stream, context, path)
+        body_construct._build(
+            construct.Container(
+                instance_id=obj.id,
+                connections=[conn.as_construct() for conn in obj.connections],
+                base_property=obj.base_property,
+            ),
+            sub_stream,
+            context,
+            path,
+        )
 
-        header_construct._build(construct.Container(
-            type=obj.type,
-            raw_data=sub_stream.getvalue(),
-        ), stream, context, path)
+        header_construct._build(
+            construct.Container(
+                type=obj.type,
+                raw_data=sub_stream.getvalue(),
+            ),
+            stream,
+            context,
+            path,
+        )
 
 
 ConstructScriptInstance = _ConstructScriptInstance()
@@ -200,15 +210,15 @@ def _resolve_to_enum(correct_type: type[E], value: str | enum.Enum) -> E:
 def _try_quick_get_name(data: bytes) -> str | None:
     try:
         # Is first property EditorProperties?
-        if data[8:12] != b'%ZE\x80':
+        if data[8:12] != b"%ZE\x80":
             return None
         # 12:14  (first prop size)
         # 14:16  (EditorProperties, prop count)
-        if data[16:20] != b'INAM':
+        if data[16:20] != b"INAM":
             return None
 
         string_size = struct.unpack_from(">H", data, 20)[0]
-        return data[22:22 + string_size - 1].decode("ascii")
+        return data[22 : 22 + string_size - 1].decode("ascii")
 
     except IndexError:
         return None
@@ -330,11 +340,13 @@ class ScriptInstance:
 
         target = resolve_instance_id(target)
 
-        self.connections = self.connections + (Connection(
-            state=_resolve_to_enum(correct_state, state),
-            message=_resolve_to_enum(correct_message, message),
-            target=target
-        ),)
+        self.connections = self.connections + (
+            Connection(
+                state=_resolve_to_enum(correct_state, state),
+                message=_resolve_to_enum(correct_message, message),
+                target=target,
+            ),
+        )
 
     def remove_connection(self, connection: Connection):
         self.connections = [c for c in self.connections if c != connection]
@@ -349,6 +361,7 @@ class ScriptInstance:
 
 InstanceIdRef = InstanceId | int | ScriptInstance
 InstanceRef = InstanceIdRef | str
+
 
 def resolve_instance_id(inst: InstanceIdRef) -> InstanceId:
     if isinstance(inst, InstanceId):

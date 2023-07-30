@@ -181,7 +181,6 @@ def do_decode_from_pak(args):
     print(asset_manager.get_parsed_asset(asset_id).raw)
 
 
-
 def do_find_in_paks(args):
     game: Game = args.game
     asset_id: int = args.asset_id
@@ -199,9 +198,7 @@ def do_extract(args):
     target_asset = asset_manager.get_raw_asset(asset_id)
 
     destination.mkdir(parents=True, exist_ok=True)
-    destination.joinpath(f"{asset_id}.{target_asset.type.lower()}").write_bytes(
-        target_asset.data
-    )
+    destination.joinpath(f"{asset_id}.{target_asset.type.lower()}").write_bytes(target_asset.data)
 
 
 def list_dependencies(args):
@@ -264,9 +261,7 @@ def do_convert(args):
             print(f"* Dependency: {dependency[1]:08x} ({dependency[0]})")
 
     print("==================\n>> All converted assets")
-    reverse_converted_ids: dict[AssetId, tuple[Game, AssetId]] = {
-        v: k for k, v in converter.converted_ids.items()
-    }
+    reverse_converted_ids: dict[AssetId, tuple[Game, AssetId]] = {v: k for k, v in converter.converted_ids.items()}
 
     for converted_asset in converter.converted_assets.values():
         print(

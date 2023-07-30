@@ -32,7 +32,7 @@ AROT = Struct(
             "bitmap_index" / Int16ub,
             "subdivision_flags" / FlagsEnum(Int16ub, x=1, y=2, z=4),
             "subdivisions" / Computed(this.subdivision_flags.z + this.subdivision_flags.y + this.subdivision_flags.x),
-            "children" / If(this.subdivisions, Array(2 ** this.subdivisions, Int16ub)),
+            "children" / If(this.subdivisions, Array(2**this.subdivisions, Int16ub)),
         ),
     ),
 )

@@ -17,7 +17,7 @@ def construct_dep(asset_id_format):
 DGRP = CurrentGameCheck(
     Game.CORRUPTION,
     PrefixedArray(Int32ub, construct_dep(common_types.AssetId64)),
-    PrefixedArray(Int32ub, construct_dep(common_types.AssetId32))
+    PrefixedArray(Int32ub, construct_dep(common_types.AssetId32)),
 ).compile()
 
 

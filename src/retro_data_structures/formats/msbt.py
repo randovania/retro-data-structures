@@ -13,23 +13,29 @@ from retro_data_structures.formats.form_descriptor import FormDescriptor
 if typing.TYPE_CHECKING:
     from retro_data_structures.game_check import Game
 
-MSBTHeader = construct.Aligned(16, Struct(
-    magic=construct.Const(b"MsgStdBn"),
-    bom=construct.Const(0xFEFF, construct.Int16ul),
-    unk1=construct.Int16ul,
-    maybe_major_version=construct.Int8ul,
-    maybe_minor_version=construct.Int8ul,
-    section_count=construct.Int16ul,
-    unk3=construct.Int16ul,
-    file_size=construct.Int32ul,
-))
+MSBTHeader = construct.Aligned(
+    16,
+    Struct(
+        magic=construct.Const(b"MsgStdBn"),
+        bom=construct.Const(0xFEFF, construct.Int16ul),
+        unk1=construct.Int16ul,
+        maybe_major_version=construct.Int8ul,
+        maybe_minor_version=construct.Int8ul,
+        section_count=construct.Int16ul,
+        unk3=construct.Int16ul,
+        file_size=construct.Int32ul,
+    ),
+)
 
 
 def TableHeader(magic: str):
-    return construct.Aligned(16, Struct(
-        magic=construct.Const(magic, FourCC),
-        table_size=construct.Int32ul,
-    ))
+    return construct.Aligned(
+        16,
+        Struct(
+            magic=construct.Const(magic, FourCC),
+            table_size=construct.Int32ul,
+        ),
+    )
 
 
 class SectionBody(construct.Construct):
@@ -61,10 +67,7 @@ class SectionBody(construct.Construct):
 
         entry_headers = construct.Array(count, self.entry_header)._parsereport(stream, context, path)
 
-        all_offsets = [
-            self.get_offset_from_header(entry_header)
-            for entry_header in entry_headers
-        ]
+        all_offsets = [self.get_offset_from_header(entry_header) for entry_header in entry_headers]
         all_offsets.append(table_size)
 
         result = construct.ListContainer()
@@ -98,9 +101,12 @@ class SectionBody(construct.Construct):
             stream2 = io.BytesIO()
             self.entry._build(item, stream2, new_context, path)
             items.append(stream2.getvalue())
-            entry_headers.append(self._header_for_entry(
-                offset, item,
-            ))
+            entry_headers.append(
+                self._header_for_entry(
+                    offset,
+                    item,
+                )
+            )
             offset += len(items[-1])
 
         # Build!
@@ -108,7 +114,9 @@ class SectionBody(construct.Construct):
             construct.Container(
                 table_size=offset,
             ),
-            stream, context, path,
+            stream,
+            context,
+            path,
         )
         table_start = construct.stream_tell(stream, path)
         self.int_type._build(count, stream, context, path)
@@ -157,9 +165,14 @@ class LabelsSectionBody(SectionBody):
 
     def _context_for_entry(self, context, entry_or_header):
         new_context = construct.Container(
-            _=context, _params=context._params, _root=None, _parsing=context._parsing,
-            _building=context._building, _sizing=context._sizing,
-            _io=context._io, _index=context.get("_index", None),
+            _=context,
+            _params=context._params,
+            _root=None,
+            _parsing=context._parsing,
+            _building=context._building,
+            _sizing=context._sizing,
+            _io=context._io,
+            _index=context.get("_index", None),
         )
         new_context._root = new_context._.get("_root", context)
 
@@ -173,17 +186,25 @@ class LabelsSectionBody(SectionBody):
 
 LabelsSection = construct.Aligned(16, LabelsSectionBody(), b"\xAB")
 
-AttributesSection = construct.Aligned(16, SectionBody(
-    header_magic="ATR1",
-    entry=construct.CString("utf_16_le"),
-    has_entry_size=True,
-), b"\xAB")
+AttributesSection = construct.Aligned(
+    16,
+    SectionBody(
+        header_magic="ATR1",
+        entry=construct.CString("utf_16_le"),
+        has_entry_size=True,
+    ),
+    b"\xAB",
+)
 
-TextsSection = construct.Aligned(16, SectionBody(
-    header_magic="TXT2",
-    entry=construct.StringEncoded(construct.GreedyBytes, "utf_16_le"),
-    has_entry_size=False,
-), b"\xAB")
+TextsSection = construct.Aligned(
+    16,
+    SectionBody(
+        header_magic="TXT2",
+        entry=construct.StringEncoded(construct.GreedyBytes, "utf_16_le"),
+        has_entry_size=False,
+    ),
+    b"\xAB",
+)
 
 
 def Language(language_code: str):
@@ -202,21 +223,26 @@ def Language(language_code: str):
     )
 
 
-MSBT = FormDescriptor("MSBT", 10, 10, Struct(
-    us_english=Language("USEN"),
-    eu_english=Language("EUEN"),
-    eu_french=Language("EUFR"),
-    us_french=Language("USFR"),
-    eu_spanish=Language("EUSP"),
-    eu_german=Language("EUGE"),
-    eu_italian=Language("EUIT"),
-    eu_dutch=Language("EUDU"),
-    jp_japanese=Language("JPJP"),
-    ko_korean=Language("KOKO"),
-    ch_traditionalchinese=Language("CHTC"),
-    ch_simplifiedchinese=Language("CHSC"),
-    us_spanish=Language("USSP"),
-))
+MSBT = FormDescriptor(
+    "MSBT",
+    10,
+    10,
+    Struct(
+        us_english=Language("USEN"),
+        eu_english=Language("EUEN"),
+        eu_french=Language("EUFR"),
+        us_french=Language("USFR"),
+        eu_spanish=Language("EUSP"),
+        eu_german=Language("EUGE"),
+        eu_italian=Language("EUIT"),
+        eu_dutch=Language("EUDU"),
+        jp_japanese=Language("JPJP"),
+        ko_korean=Language("KOKO"),
+        ch_traditionalchinese=Language("CHTC"),
+        ch_simplifiedchinese=Language("CHSC"),
+        us_spanish=Language("USSP"),
+    ),
+)
 
 
 class Msbt(BaseResource):

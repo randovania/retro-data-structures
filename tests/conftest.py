@@ -53,11 +53,9 @@ def prime3_asset_manager(prime3_iso_provider):
 
 def pytest_generate_tests(metafunc):
     fixture_names: list[str] = list(metafunc.fixturenames)
-    asset_manager_fixtures = [fixture for fixture in metafunc.fixturenames
-                              if fixture.endswith("_asset_manager")]
+    asset_manager_fixtures = [fixture for fixture in metafunc.fixturenames if fixture.endswith("_asset_manager")]
     if asset_manager_fixtures:
-        asset_id_fixtures = [fixture_name for fixture_name in fixture_names
-                             if fixture_name.endswith("_asset_id")]
+        asset_id_fixtures = [fixture_name for fixture_name in fixture_names if fixture_name.endswith("_asset_id")]
         if asset_id_fixtures:
             if len(asset_manager_fixtures) > 1:
                 raise ValueError("Test has more than one asset_manager")
@@ -71,7 +69,7 @@ def pytest_generate_tests(metafunc):
                 raise RuntimeError(f"Unsupported {game_name} for id list")
 
             for fixture_name in asset_id_fixtures:
-                asset_type = fixture_name[:-len("_asset_id")]
+                asset_type = fixture_name[: -len("_asset_id")]
                 asset_ids = [
                     pytest.param(asset.id, id=f"0x{asset.id:08x}")
                     for asset in asset_ids
@@ -82,10 +80,20 @@ def pytest_generate_tests(metafunc):
 
 
 def pytest_addoption(parser):
-    parser.addoption('--fail-if-missing', action='store_true', dest="fail_if_missing",
-                     default=False, help="Fails tests instead of skipping, in case any asset is missing")
-    parser.addoption('--skip-dependency-tests', action='store_true', dest="skip_dependency_tests",
-                     default=False, help="Skips tests that involves calculating dependencies")
+    parser.addoption(
+        "--fail-if-missing",
+        action="store_true",
+        dest="fail_if_missing",
+        default=False,
+        help="Fails tests instead of skipping, in case any asset is missing",
+    )
+    parser.addoption(
+        "--skip-dependency-tests",
+        action="store_true",
+        dest="skip_dependency_tests",
+        default=False,
+        help="Skips tests that involves calculating dependencies",
+    )
 
 
 def pytest_configure(config: pytest.Config):
@@ -95,6 +103,6 @@ def pytest_configure(config: pytest.Config):
     markers = []
 
     if config.option.skip_dependency_tests:
-        markers.append('not skip_dependency_tests')
+        markers.append("not skip_dependency_tests")
 
     config.option.markexpr = " and ".join(markers)

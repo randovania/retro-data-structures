@@ -13,24 +13,30 @@ if TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import Area, Mlvl
 
 
-@pytest.mark.parametrize(["layer", "area", "instance", "expected"], [
-    (0, 0, 0, 0x00000000),
-    (1, 0, 0, 0x04000000),
-    (0, 1, 0, 0x00010000),
-    (0, 0, 1, 0x00000001),
-    (5, 2, 1, 0x14020001),
-])
+@pytest.mark.parametrize(
+    ["layer", "area", "instance", "expected"],
+    [
+        (0, 0, 0, 0x00000000),
+        (1, 0, 0, 0x04000000),
+        (0, 1, 0, 0x00010000),
+        (0, 0, 1, 0x00000001),
+        (5, 2, 1, 0x14020001),
+    ],
+)
 def test_instance_id_new(layer, area, instance, expected):
     assert InstanceId.new(layer, area, instance) == expected
 
 
-@pytest.mark.parametrize(["correct_type", "value", "expected"], [
-    (_prime_enums.State, _prime_enums.State.Exited, _prime_enums.State.Exited),
-    (_prime_enums.State, _echoes_enums.State.Exited, _prime_enums.State.Exited),
-    (_echoes_enums.State, _prime_enums.State.Exited, _echoes_enums.State.Exited),
-    (_echoes_enums.State, 'EXIT', _echoes_enums.State.Exited),
-    (_echoes_enums.State, _echoes_enums.State.Exited, _echoes_enums.State.Exited),
-])
+@pytest.mark.parametrize(
+    ["correct_type", "value", "expected"],
+    [
+        (_prime_enums.State, _prime_enums.State.Exited, _prime_enums.State.Exited),
+        (_prime_enums.State, _echoes_enums.State.Exited, _prime_enums.State.Exited),
+        (_echoes_enums.State, _prime_enums.State.Exited, _echoes_enums.State.Exited),
+        (_echoes_enums.State, "EXIT", _echoes_enums.State.Exited),
+        (_echoes_enums.State, _echoes_enums.State.Exited, _echoes_enums.State.Exited),
+    ],
+)
 def test_resolve_to_enum(correct_type, value, expected):
     assert script_object._resolve_to_enum(correct_type, value) == expected
 
@@ -38,7 +44,8 @@ def test_resolve_to_enum(correct_type, value, expected):
 @pytest.fixture
 def prime2_mlvl(prime2_asset_manager) -> Mlvl:
     # Agon Wastes
-    return prime2_asset_manager.get_parsed_asset(0x42b935e4)
+    return prime2_asset_manager.get_parsed_asset(0x42B935E4)
+
 
 @pytest.fixture
 def prime2_area(prime2_mlvl: Mlvl) -> Area:
@@ -54,6 +61,7 @@ def test_add_layer(prime2_area: Area, active: bool):
     assert layer.active == active
     assert layer.index == 2
 
+
 def test_get_instance(prime2_area: Area):
     idx, name = 0x0045006B, "Pickup Object"
     inst = prime2_area.get_instance(idx)
@@ -61,6 +69,7 @@ def test_get_instance(prime2_area: Area):
 
     inst = prime2_area.get_instance(name)
     assert inst.id == idx
+
 
 def test_remove_instance(prime2_area: Area):
     old_len = len(list(prime2_area.all_instances))
@@ -73,17 +82,21 @@ def test_add_instance(prime2_area: Area):
     from retro_data_structures.enums import echoes
     from retro_data_structures.properties.echoes.objects.SpecialFunction import SpecialFunction
 
-    inst = prime2_area.get_layer("Default").add_instance_with(SpecialFunction(
-        function=echoes.Function.Darkworld,
-    ))
+    inst = prime2_area.get_layer("Default").add_instance_with(
+        SpecialFunction(
+            function=echoes.Function.Darkworld,
+        )
+    )
     assert inst.type == SpecialFunction
     assert prime2_area.mrea.build() is not None
+
 
 def test_add_memory_relay(prime2_area: Area):
     relay = prime2_area.get_layer("Default").add_memory_relay("Test")
     save = prime2_area._parent_mlvl.savw
 
     assert any(state["instance_id"] == relay.id for state in save.raw.memory_relays)
+
 
 @pytest.mark.parametrize("name", ("Test1", "Test2"))
 @pytest.mark.parametrize("active", (False, True))

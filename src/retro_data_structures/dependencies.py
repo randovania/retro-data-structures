@@ -53,11 +53,11 @@ def direct_dependencies_for(obj, obj_type: AssetType, target_game: Game) -> Iter
 
 
 def _internal_dependencies_for(
-        get_asset: Callable[[AssetId], Any],
-        target_game: Game,
-        asset_id: AssetId,
-        obj_type: AssetType,
-        deps_by_asset_id: dict[AssetId, set[Dependency]],
+    get_asset: Callable[[AssetId], Any],
+    target_game: Game,
+    asset_id: AssetId,
+    obj_type: AssetType,
+    deps_by_asset_id: dict[AssetId, set[Dependency]],
 ):
     if asset_id in deps_by_asset_id:
         return
@@ -79,9 +79,10 @@ def _internal_dependencies_for(
             raise InvalidDependency(asset_id, new_asset_id, new_type)
 
 
-def recursive_dependencies_for(asset_manager: AssetManager,
-                               asset_ids: list[AssetId],
-                               ) -> set[Dependency]:
+def recursive_dependencies_for(
+    asset_manager: AssetManager,
+    asset_ids: list[AssetId],
+) -> set[Dependency]:
     deps_by_asset_id: dict[AssetId, set[Dependency]] = {}
 
     def get_asset(aid: AssetId):
@@ -116,9 +117,10 @@ def all_converted_dependencies(asset_converter: AssetConverter) -> dict[AssetId,
     return deps_by_asset_id
 
 
-def recursive_dependencies_for_editor(editor: AssetManager,
-                                      asset_ids: list[AssetId],
-                                      ) -> set[Dependency]:
+def recursive_dependencies_for_editor(
+    editor: AssetManager,
+    asset_ids: list[AssetId],
+) -> set[Dependency]:
     deps_by_asset_id: dict[AssetId, set[Dependency]] = {}
 
     def _recursive(asset_id: AssetId):

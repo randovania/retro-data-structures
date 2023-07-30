@@ -19,10 +19,7 @@ def upgrade(data, converter: AssetConverter, source_game: Game):
 
 
 def _downgrade_color_mdao(element):
-    if (
-            element["body"]["body"]["a"]["type"] == "KEYE"
-            and element["body"]["body"]["b"]["type"] == "KEYP"
-    ):
+    if element["body"]["body"]["a"]["type"] == "KEYE" and element["body"]["body"]["b"]["type"] == "KEYP":
         org_colr_mado_a_keye = element["body"]["body"]["a"]["body"]["keys"]
         new_colr_cnst_a_keyp_a = copy.deepcopy(element["body"]["body"]["a"])
         new_colr_cnst_a_keyp_b = copy.deepcopy(element["body"]["body"]["a"])
@@ -54,10 +51,7 @@ def _downgrade_color_mdao(element):
 
 
 def _downgrade_color_mult(element):  # noqa: PLR0915 Too many statements
-    if (
-            element["body"]["body"]["a"]["type"] == "PULS"
-            and element["body"]["body"]["b"]["type"] == "KEYP"
-    ):
+    if element["body"]["body"]["a"]["type"] == "PULS" and element["body"]["body"]["b"]["type"] == "KEYP":
         org_colr_mult_b_keyp = element["body"]["body"]["b"]["body"]["keys"]
         new_colr_a_c_mult_b_keyp_a = copy.deepcopy(element["body"]["body"]["b"])
         new_colr_a_c_mult_b_keyp_b = copy.deepcopy(element["body"]["body"]["b"])
@@ -75,8 +69,8 @@ def _downgrade_color_mult(element):  # noqa: PLR0915 Too many statements
             new_colr_a_c_mult_b_keyp_d["body"]["keys"][i] = key[3]
 
         if (
-                element["body"]["body"]["a"]["body"]["c"]["type"] == "KEYP"
-                and element["body"]["body"]["a"]["body"]["d"]["type"] == "KEYP"
+            element["body"]["body"]["a"]["body"]["c"]["type"] == "KEYP"
+            and element["body"]["body"]["a"]["body"]["d"]["type"] == "KEYP"
         ):
             org_colr_mult_a_c_keyp = element["body"]["body"]["a"]["body"]["c"]["body"]["keys"]
             new_colr_a_c_mult_a_keyp_c_a = copy.deepcopy(element["body"]["body"]["a"]["body"]["c"])
@@ -294,8 +288,8 @@ def downgrade(data, converter: AssetConverter, source_game: Game):  # noqa: PLR0
             if element["type"] == "EMTR":
                 if element["body"]["type"] == "SEMR":
                     if (
-                            element["body"]["body"]["a"]["type"] == "RNDV"
-                            and element["body"]["body"]["b"]["type"] == "RNDV"
+                        element["body"]["body"]["a"]["type"] == "RNDV"
+                        and element["body"]["body"]["b"]["type"] == "RNDV"
                     ):
                         element["body"]["type"] = "SPHE"
                         element["body"]["body"] = {
@@ -319,29 +313,20 @@ def downgrade(data, converter: AssetConverter, source_game: Game):  # noqa: PLR0
                             },
                         }
                     if (
-                            element["body"]["body"]["a"]["type"] == "RNDV"
-                            and element["body"]["body"]["b"]["type"] == "CNST"
+                        element["body"]["body"]["a"]["type"] == "RNDV"
+                        and element["body"]["body"]["b"]["type"] == "CNST"
                     ):
                         element["body"]["type"] = "SPHE"
                         element["body"]["body"] = {
-                            "a": {
-                                "type": "RTOV",
-                                "body": {
-                                    "type": "CNST",
-                                    "body": 0
-                                }
-                            },
+                            "a": {"type": "RTOV", "body": {"type": "CNST", "body": 0}},
                             "b": element["body"]["body"]["a"]["body"],
                             "c": {
                                 "type": "RAND",
                                 "body": {
-                                    "a": {
-                                        "type": "CNST",
-                                        "body": 0
-                                    },
-                                    "b": element["body"]["body"]["b"]["body"]["a"]
-                                }
-                            }
+                                    "a": {"type": "CNST", "body": 0},
+                                    "b": element["body"]["body"]["b"]["body"]["a"],
+                                },
+                            },
                         }
                 if element["body"]["type"] == "ELPS":
                     element["body"]["type"] = "SPHE"

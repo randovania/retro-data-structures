@@ -69,13 +69,15 @@ class Pak:
             raise ValueError(f"Unknown asset id: {asset_id}")
 
     def add_asset(self, asset_id: AssetId, asset: RawResource):
-        self._raw.files.append(PakFile(
-            asset_id=asset_id,
-            asset_type=asset.type,
-            should_compress=False,
-            uncompressed_data=asset.data,
-            compressed_data=None,
-        ))
+        self._raw.files.append(
+            PakFile(
+                asset_id=asset_id,
+                asset_type=asset.type,
+                should_compress=False,
+                uncompressed_data=asset.data,
+                compressed_data=None,
+            )
+        )
 
     def remove_asset(self, asset_id: AssetId):
         for name, file in self._raw.named_resources.items():

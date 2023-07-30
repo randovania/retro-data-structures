@@ -110,7 +110,7 @@ MappableObject = construct.Struct(
             Game.PRIME: construct.Enum(construct.Int32sb, ObjectTypeMP1),
             Game.ECHOES: construct.Enum(construct.Int32sb, ObjectTypeMP2),
         },
-        default=construct.Int32sb
+        default=construct.Int32sb,
     ),
     visibility_mode=construct.Enum(construct.Int32ub, ObjectVisibility),
     editor_id=construct.Int32ub,
@@ -119,54 +119,70 @@ MappableObject = construct.Struct(
     unk2=construct.Int32ub[4],
 )
 
-Primitive = construct.Aligned(4, construct.Struct(
-    type=EnumAdapter(GXPrimitive),
-    indices=construct.PrefixedArray(construct.Int32ub, construct.Int8ub),
-))
-
-Border = construct.Aligned(4, construct.Struct(
-    indices=construct.PrefixedArray(construct.Int32ub, construct.Int8ub),
-))
-
-MAPA = construct.Aligned(32, construct.Struct(
-    header=construct.Struct(
-        _magic=_const(0xDEADD00D),
-        version=construct.Switch(
-            get_current_game,
-            {
-                Game.PRIME: _const(2),
-                Game.ECHOES: _const(3),
-                Game.CORRUPTION: _const(5),
-            },
-            default=ErrorWithMessage("Unknown game"),
-        ),
-        type=construct.Int32ub,  # Light/Dark world for Echoes
-        visibility_mode=construct.Enum(construct.Int32ub, AreaVisibilty),
-        bounding_box=AABox,
-        map_adjustment=current_game_at_least_else(Game.ECHOES, Vector3, construct.Pass),
-        mappable_object_count=construct.Int32ub,
-        vertex_count=construct.Int32ub,
-        primitive_count=construct.Int32ub,
+Primitive = construct.Aligned(
+    4,
+    construct.Struct(
+        type=EnumAdapter(GXPrimitive),
+        indices=construct.PrefixedArray(construct.Int32ub, construct.Int8ub),
     ),
-    mappable_objects=construct.Array(construct.this.header.mappable_object_count, MappableObject),
-    vertices=construct.Array(construct.this.header.vertex_count, Vector3),
-    primitive_headers=construct.Array(construct.this.header.primitive_count, construct.Struct(
-        normal=Vector3,
-        center_of_mass=Vector3,
-        primitive_table_start=construct.Int32ub,
-        border_table_start=construct.Int32ub,
-    )),
-    primitive_tables=construct.Array(construct.this.header.primitive_count, construct.Struct(
-        primitives=construct.PrefixedArray(
-            construct.Int32ub,
-            Primitive,
+)
+
+Border = construct.Aligned(
+    4,
+    construct.Struct(
+        indices=construct.PrefixedArray(construct.Int32ub, construct.Int8ub),
+    ),
+)
+
+MAPA = construct.Aligned(
+    32,
+    construct.Struct(
+        header=construct.Struct(
+            _magic=_const(0xDEADD00D),
+            version=construct.Switch(
+                get_current_game,
+                {
+                    Game.PRIME: _const(2),
+                    Game.ECHOES: _const(3),
+                    Game.CORRUPTION: _const(5),
+                },
+                default=ErrorWithMessage("Unknown game"),
+            ),
+            type=construct.Int32ub,  # Light/Dark world for Echoes
+            visibility_mode=construct.Enum(construct.Int32ub, AreaVisibilty),
+            bounding_box=AABox,
+            map_adjustment=current_game_at_least_else(Game.ECHOES, Vector3, construct.Pass),
+            mappable_object_count=construct.Int32ub,
+            vertex_count=construct.Int32ub,
+            primitive_count=construct.Int32ub,
         ),
-        borders=construct.PrefixedArray(
-            construct.Int32ub,
-            Border,
+        mappable_objects=construct.Array(construct.this.header.mappable_object_count, MappableObject),
+        vertices=construct.Array(construct.this.header.vertex_count, Vector3),
+        primitive_headers=construct.Array(
+            construct.this.header.primitive_count,
+            construct.Struct(
+                normal=Vector3,
+                center_of_mass=Vector3,
+                primitive_table_start=construct.Int32ub,
+                border_table_start=construct.Int32ub,
+            ),
         ),
-    )),
-), b"\xFF")
+        primitive_tables=construct.Array(
+            construct.this.header.primitive_count,
+            construct.Struct(
+                primitives=construct.PrefixedArray(
+                    construct.Int32ub,
+                    Primitive,
+                ),
+                borders=construct.PrefixedArray(
+                    construct.Int32ub,
+                    Border,
+                ),
+            ),
+        ),
+    ),
+    b"\xFF",
+)
 
 
 class Mapa(BaseResource):

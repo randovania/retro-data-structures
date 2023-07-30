@@ -24,10 +24,7 @@ def _parse_assets_file(name: str) -> list[TypedAsset]:
     with Path(__file__).parent.joinpath("test_files", name).open() as f:
         data = json.load(f)
 
-    return [
-        TypedAsset(item["id"], item["type"])
-        for item in data
-    ]
+    return [TypedAsset(item["id"], item["type"]) for item in data]
 
 
 PRIME_ASSET_IDS = _parse_assets_file("assets_prime.json")
@@ -62,8 +59,8 @@ def parse_and_build_compare_auto_manager(asset_manager: AssetManager, asset_id: 
 
 
 def parse_and_build_compare(
-        asset_manager: AssetManager, asset_id: AssetId, resource_class: type[BaseResource],
-        print_data=False) -> tuple[RawResource, BaseResource, bytes]:
+    asset_manager: AssetManager, asset_id: AssetId, resource_class: type[BaseResource], print_data=False
+) -> tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
     assert resource.type == resource_class.resource_type()
 
@@ -80,8 +77,8 @@ def parse_and_build_compare(
 
 
 def parse_and_build_compare_construct(
-        asset_manager: AssetManager, asset_id: AssetId, con: construct.Construct,
-        print_data=False) -> tuple[RawResource, BaseResource, bytes]:
+    asset_manager: AssetManager, asset_id: AssetId, con: construct.Construct, print_data=False
+) -> tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
 
     decoded = con.parse(resource.data, target_game=asset_manager.target_game)

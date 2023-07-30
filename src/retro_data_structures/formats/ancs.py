@@ -158,14 +158,16 @@ def char_dependencies_for(character, asset_manager: AssetManager):
             for asset_id in asset_ids:
                 yield from asset_manager.get_dependencies_for_asset(asset_id, must_exist=False)
 
-    yield from _array((
-        character.model_id,
-        character.skin_id,
-        character.skeleton_id,
-        character.frozen_model,
-        character.frozen_skin,
-        character.spatial_primitives_id
-    ))
+    yield from _array(
+        (
+            character.model_id,
+            character.skin_id,
+            character.skeleton_id,
+            character.frozen_model,
+            character.frozen_skin,
+            character.spatial_primitives_id,
+        )
+    )
 
     # ParticleResourceData
     psd = character.particle_resource_data
@@ -216,8 +218,8 @@ class Ancs(BaseResource):
     def ancs_dependencies_for(self, char_index: int | None) -> typing.Iterator[Dependency]:
         def char_anims(char) -> typing.Iterator[tuple[int, str]]:
             for anim_name in char.animation_names:
-                yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations)
-                                        if a.name == anim_name.name)
+                yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
+
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager)
 
@@ -235,8 +237,9 @@ class Ancs(BaseResource):
                     yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
 
                 elif self.raw.animation_set.event_sets is not None:
-                    yield from evnt.dependencies_for(self.raw.animation_set.event_sets[anim_index], self.asset_manager,
-                                                     char_index)
+                    yield from evnt.dependencies_for(
+                        self.raw.animation_set.event_sets[anim_index], self.asset_manager, char_index
+                    )
 
         if char_index is not None:
             chars = [self.raw.character_set.characters[char_index]]

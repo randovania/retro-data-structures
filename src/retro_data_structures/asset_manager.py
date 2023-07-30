@@ -26,7 +26,6 @@ from retro_data_structures.formats.pak import Pak
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
-    import uuid
     from collections.abc import Iterator
     from pathlib import Path
 
@@ -116,6 +115,7 @@ class AssetManager:
     _ensured_asset_ids: mapping of pak name to assets we'll copy into it when saving
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
+
     headers: dict[str, construct.Container]
     _paks_for_asset_id: dict[AssetId, set[str]]
     _types_for_asset_id: dict[AssetId, AssetType]
@@ -165,9 +165,7 @@ class AssetManager:
 
             self._custom_asset_ids.update(dict(json.loads(custom_names_text).items()))
 
-        self.all_paks = list(
-            self.provider.rglob("*.pak")
-        )
+        self.all_paks = list(self.provider.rglob("*.pak"))
 
         for name in self.all_paks:
             with self.provider.open_binary(name) as f:
@@ -252,8 +250,7 @@ class AssetManager:
         asset_type = self.get_asset_type(asset_id)
         return formats.resource_type_for(asset_type)
 
-    def get_parsed_asset(self, asset_id: NameOrAssetId, *,
-                         type_hint: type[T] = BaseResource) -> T:
+    def get_parsed_asset(self, asset_id: NameOrAssetId, *, type_hint: type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
         """
@@ -261,8 +258,7 @@ class AssetManager:
         if type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
-        return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game,
-                                  asset_manager=self)
+        return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game, asset_manager=self)
 
     def get_file(self, path: NameOrAssetId, type_hint: type[T] = BaseResource) -> T:
         """
@@ -290,8 +286,7 @@ class AssetManager:
     def get_custom_asset(self, name: str) -> AssetId | None:
         return self._custom_asset_ids.get(name)
 
-    def add_new_asset(self, name: str, new_data: Resource,
-                      in_paks: typing.Iterable[str] = ()) -> AssetId:
+    def add_new_asset(self, name: str, new_data: Resource, in_paks: typing.Iterable[str] = ()) -> AssetId:
         """
         Adds an asset that doesn't already exist.
         :return: Asset id of the new asset.
@@ -398,8 +393,11 @@ class AssetManager:
 
         return self._in_memory_paks[pak_name]
 
-    def _get_dependencies_for_asset(self, asset_id: NameOrAssetId, must_exist: bool,
-                                    ) -> Iterator[Dependency]:
+    def _get_dependencies_for_asset(
+        self,
+        asset_id: NameOrAssetId,
+        must_exist: bool,
+    ) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
 
@@ -500,15 +498,11 @@ class AssetManager:
 
         if self._audio_group_dependency is None:
             self._audio_group_dependency = tuple(
-                self.get_file(asset, Dgrp)
-                for asset in self.target_game.audio_group_dependencies()
+                self.get_file(asset, Dgrp) for asset in self.target_game.audio_group_dependencies()
             )
 
         dep = Dependency("AGSC", agsc, False)
-        if any(
-            (dep in deps.direct_dependencies)
-            for deps in self._audio_group_dependency
-        ):
+        if any((dep in deps.direct_dependencies) for deps in self._audio_group_dependency):
             return
         else:
             yield dep

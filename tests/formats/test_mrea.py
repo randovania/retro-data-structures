@@ -18,11 +18,7 @@ def test_compare_p1(prime1_asset_manager):
     # are not multiples of 32; building always pads to 32
 
     # Resources/Worlds/EndCinema/!EndCinema_Master/01_endcinema.MREA
-    test_lib.parse_and_build_compare(
-        prime1_asset_manager,
-        0xB4B41C48,
-        Mrea
-    )
+    test_lib.parse_and_build_compare(prime1_asset_manager, 0xB4B41C48, Mrea)
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):

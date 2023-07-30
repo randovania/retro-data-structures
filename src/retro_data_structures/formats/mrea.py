@@ -64,26 +64,30 @@ class MREAVersion(IntEnum):
 
 class AreaDependencyAdapter(Adapter):
     def __init__(self, asset_id):
-        super().__init__(Struct(
-            Const(0, Int32ub),
-            "dependencies" / PrefixedArray(Int32ub, Struct(
-                asset_id=asset_id,
-                asset_type=construct.Bytes(4),
-            )),
-            "offsets" / PrefixedArray(Int32ub, Int32ub),
-        ).compile())
+        super().__init__(
+            Struct(
+                Const(0, Int32ub),
+                "dependencies"
+                / PrefixedArray(
+                    Int32ub,
+                    Struct(
+                        asset_id=asset_id,
+                        asset_type=construct.Bytes(4),
+                    ),
+                ),
+                "offsets" / PrefixedArray(Int32ub, Int32ub),
+            ).compile()
+        )
 
     def _decode(self, obj, context, path) -> AreaDependencies:
         layers = []
         for start, finish in zip(obj.offsets, obj.offsets[1:]):
-            layers.append([
-                Dependency(dep.asset_type.decode("ascii"), dep.asset_id)
-                for dep in obj.dependencies[start:finish]
-            ])
+            layers.append(
+                [Dependency(dep.asset_type.decode("ascii"), dep.asset_id) for dep in obj.dependencies[start:finish]]
+            )
 
         non_layer = [
-            Dependency(dep.asset_type.decode("ascii"), dep.asset_id)
-            for dep in obj.dependencies[obj.offsets[-1]:]
+            Dependency(dep.asset_type.decode("ascii"), dep.asset_id) for dep in obj.dependencies[obj.offsets[-1] :]
         ]
 
         return AreaDependencies(layers, non_layer)
@@ -102,25 +106,21 @@ class AreaDependencyAdapter(Adapter):
                 if not dep.exclude_for_mlvl
             )
 
-        return {
-            "dependencies": deps,
-            "offsets": offsets
-        }
+        return {"dependencies": deps, "offsets": offsets}
 
 
 class AreaModuleDependencyAdapter(Adapter):
     def __init__(self):
-        super().__init__(Struct(
-            rel_module=PrefixedArray(Int32ub, String),
-            rel_offset=PrefixedArray(Int32ub, Int32ub),
-        ))
+        super().__init__(
+            Struct(
+                rel_module=PrefixedArray(Int32ub, String),
+                rel_offset=PrefixedArray(Int32ub, Int32ub),
+            )
+        )
 
     def _decode(self, obj, context, path) -> list[list[str]]:
         offset_iter = iter(obj.rel_offset)
-        return [
-            obj.rel_module[start:finish]
-            for start, finish in zip(offset_iter, offset_iter)
-        ]
+        return [obj.rel_module[start:finish] for start, finish in zip(offset_iter, offset_iter)]
 
     def _encode(self, obj: list[list[str]], context, path):
         offset = 0
@@ -130,10 +130,7 @@ class AreaModuleDependencyAdapter(Adapter):
             offset += len(layer)
             offsets.append(offset)
 
-        return {
-            "rel_module": list(itertools.chain(*obj)),
-            "rel_offset": offsets
-        }
+        return {"rel_module": list(itertools.chain(*obj)), "rel_offset": offsets}
 
 
 _all_categories = [
@@ -162,10 +159,7 @@ _CATEGORY_ENCODINGS = {
     "path_section": AssetIdCorrect,
     "portal_area_section": AssetIdCorrect,
     "static_geometry_map_section": AssetIdCorrect,
-    "unknown_section_1": Struct(
-        magic=If(game_check.is_prime3, Const("LLTE", FourCC)),
-        data=Const(1, Int32ub)
-    ),
+    "unknown_section_1": Struct(magic=If(game_check.is_prime3, Const("LLTE", FourCC)), data=Const(1, Int32ub)),
     "unknown_section_2": Struct(
         unk1=PrefixedArray(Int32ub, Int32ub),
         # TODO: rebuild according to surface group count
@@ -173,62 +167,48 @@ _CATEGORY_ENCODINGS = {
     ),
 }
 
-MREAHeader = Aligned(32, Struct(
-    "magic" / Const(0xDEADBEEF, Int32ub),
-    "version" / Enum(Int32ub, MREAVersion),
-
-    # Matrix that represents the area's transform from the origin.
-    # Most area data is pre-transformed, so this matrix is only used occasionally.
-    "area_transform" / Transform4f,
-
-    # Number of world models in this area.
-    "world_model_count" / Int32ub,
-
-    # Number of script layers in this area.
-    "script_layer_count" / WithVersion(MREAVersion.Echoes, Int32ub),
-
-    # Number of data sections in the file.
-    "data_section_count" / Int32ub,
-
-    # Section index for world geometry data. Always 0; starts on materials.
-    "geometry_section" / Int32ub,
-
-    # Section index for script layer data.
-    "script_layers_section" / Int32ub,
-
-    # Section index for generated script object data.
-    "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-
-    # Section index for collision data.
-    "collision_section" / Int32ub,
-
-    # Section index for first unknown section.
-    "unknown_section_1" / Int32ub,
-
-    # Section index for light data.
-    "lights_section" / Int32ub,
-
-    # Section index for visibility tree data.
-    "visibility_tree_section" / Int32ub,
-
-    # Section index for path data.
-    "path_section" / Int32ub,
-
-    # Section index for area octree data.
-    "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
-
-    # Section index for second unknown section.
-    "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
-
-    # Section index for portal area data.
-    "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-
-    # Section index for static geometry map data.
-    "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-
-    # Number of compressed data blocks in the file.
-    "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
-))
+MREAHeader = Aligned(
+    32,
+    Struct(
+        "magic" / Const(0xDEADBEEF, Int32ub),
+        "version" / Enum(Int32ub, MREAVersion),
+        # Matrix that represents the area's transform from the origin.
+        # Most area data is pre-transformed, so this matrix is only used occasionally.
+        "area_transform" / Transform4f,
+        # Number of world models in this area.
+        "world_model_count" / Int32ub,
+        # Number of script layers in this area.
+        "script_layer_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Number of data sections in the file.
+        "data_section_count" / Int32ub,
+        # Section index for world geometry data. Always 0; starts on materials.
+        "geometry_section" / Int32ub,
+        # Section index for script layer data.
+        "script_layers_section" / Int32ub,
+        # Section index for generated script object data.
+        "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Section index for collision data.
+        "collision_section" / Int32ub,
+        # Section index for first unknown section.
+        "unknown_section_1" / Int32ub,
+        # Section index for light data.
+        "lights_section" / Int32ub,
+        # Section index for visibility tree data.
+        "visibility_tree_section" / Int32ub,
+        # Section index for path data.
+        "path_section" / Int32ub,
+        # Section index for area octree data.
+        "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
+        # Section index for second unknown section.
+        "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Section index for portal area data.
+        "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Section index for static geometry map data.
+        "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Number of compressed data blocks in the file.
+        "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+    ),
+)
 
 CompressedBlockHeader = Struct(
     buffer_size=Int32ub,
@@ -291,15 +271,16 @@ class MREAConstruct(construct.Construct):
 
     def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> list[bytes]:
         compressed_block_headers = self._aligned_parse(
-            Array(mrea_header.compressed_block_count, CompressedBlockHeader),
-            stream, context, path
+            Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
         )
 
         # Read compressed blocks from stream
         compressed_blocks = construct.ListContainer(
             self._aligned_parse(
                 FixedSized(_get_compressed_block_size(header), GreedyBytes),
-                stream, context, path,
+                stream,
+                context,
+                path,
             )
             for header in compressed_block_headers
         )
@@ -307,8 +288,9 @@ class MREAConstruct(construct.Construct):
         # Decompress blocks into the data sections
         data_sections = ListContainer()
         for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
-            subcon = _get_compressed_block_subcon(compressed_header.compressed_size,
-                                                  compressed_header.uncompressed_size)
+            subcon = _get_compressed_block_subcon(
+                compressed_header.compressed_size, compressed_header.uncompressed_size
+            )
             decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)
             if len(decompressed_block) != compressed_header.uncompressed_size:
                 raise construct.ConstructError(
@@ -319,7 +301,7 @@ class MREAConstruct(construct.Construct):
 
             for i in range(compressed_header.data_section_count):
                 section_size = data_section_sizes[len(data_sections)]
-                data = decompressed_block[offset: offset + section_size]
+                data = decompressed_block[offset : offset + section_size]
                 data_sections.append(data)
                 offset += section_size
 
@@ -339,9 +321,7 @@ class MREAConstruct(construct.Construct):
 
         # Split data sections into the named sections
         categories = [
-            {"label": label, "value": mrea_header[label]}
-            for label in _all_categories
-            if mrea_header[label] is not None
+            {"label": label, "value": mrea_header[label]} for label in _all_categories if mrea_header[label] is not None
         ]
         categories.sort(key=lambda c: c["value"])
 
@@ -361,9 +341,9 @@ class MREAConstruct(construct.Construct):
             sections=construct.Container(),
         )
 
-    def _encode_compressed_blocks(self, data_sections: list[bytes],
-                                  category_starts: dict[str, int | None],
-                                  context, path):
+    def _encode_compressed_blocks(
+        self, data_sections: list[bytes], category_starts: dict[str, int | None], context, path
+    ):
         def _start_new_group(group_size, section_size, curr_label, prev_label):  # noqa: PLR0911
             if group_size == 0:
                 return False, ""
@@ -400,14 +380,13 @@ class MREAConstruct(construct.Construct):
 
             # The padding is not included in the block's uncompressed size
             merged_and_padded_group = b"".join(
-                item.ljust(len(item) + (-len(item) % 32), b"\x00")
-                for item in current_group
+                item.ljust(len(item) + (-len(item) % 32), b"\x00") for item in current_group
             )
             header = Container(
                 buffer_size=current_group_size,
                 uncompressed_size=current_group_size,
                 compressed_size=0,
-                data_section_count=len(current_group)
+                data_section_count=len(current_group),
             )
 
             substream = io.BytesIO()
@@ -421,10 +400,12 @@ class MREAConstruct(construct.Construct):
             else:
                 data = merged_and_padded_group
 
-            compressed_blocks.append(Container(
-                header=header,
-                data=data,
-            ))
+            compressed_blocks.append(
+                Container(
+                    header=header,
+                    data=data,
+                )
+            )
             current_group = ListContainer()
             current_group_size = 0
 
@@ -432,10 +413,7 @@ class MREAConstruct(construct.Construct):
             all_garbage = [cat for cat, start in category_starts.items() if i >= start]
             cat_label = all_garbage[-1]
 
-            start_new, reason = _start_new_group(
-                current_group_size, len(section),
-                previous_label, cat_label
-            )
+            start_new, reason = _start_new_group(current_group_size, len(section), previous_label, cat_label)
             if start_new:
                 add_group(reason)
 
@@ -454,8 +432,9 @@ class MREAConstruct(construct.Construct):
 
         # Encode each category
         for category, values in obj.sections.items():
-            raw_sections[category] = _encode_category(values, _CATEGORY_ENCODINGS.get(category),
-                                                      context, f"{path} -> {category}")
+            raw_sections[category] = _encode_category(
+                values, _CATEGORY_ENCODINGS.get(category), context, f"{path} -> {category}"
+            )
 
         # Combine all sections into the data sections array
         data_sections = ListContainer()
@@ -469,12 +448,7 @@ class MREAConstruct(construct.Construct):
 
         # Compress the data sections
         if int(obj.version) >= MREAVersion.Echoes.value:
-            compressed_blocks = self._encode_compressed_blocks(
-                data_sections,
-                mrea_header,
-                context,
-                path
-            )
+            compressed_blocks = self._encode_compressed_blocks(data_sections, mrea_header, context, path)
             mrea_header.compressed_block_count = len(compressed_blocks)
         else:
             compressed_blocks = None
@@ -489,12 +463,16 @@ class MREAConstruct(construct.Construct):
         MREAHeader._build(mrea_header, stream, context, path)
         Aligned(32, Array(mrea_header.data_section_count, Int32ub))._build(
             [len(section) for section in data_sections],
-            stream, context, path,
+            stream,
+            context,
+            path,
         )
         if compressed_blocks is not None:
             Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader))._build(
                 [block.header for block in compressed_blocks],
-                stream, context, path,
+                stream,
+                context,
+                path,
             )
             for compressed_block in compressed_blocks:
                 block_header = compressed_block.header
@@ -536,7 +514,8 @@ class Mrea(BaseResource):
             self._raw.sections[section_name] = _decode_category(
                 self._raw.raw_sections[section_name],
                 GreedyBytes if lazy_load else _CATEGORY_ENCODINGS[section_name],
-                context, "",
+                context,
+                "",
             )
 
     def get_section(self, section_name: str, lazy_load: bool = False):
@@ -579,24 +558,21 @@ class Mrea(BaseResource):
             for i, section in enumerate(self._raw.sections.script_layers_section):
                 if i not in self._script_layer_helpers:
                     self._script_layer_helpers[i] = ScriptLayer(
-                        _CATEGORY_ENCODINGS["script_layers_section"].parse(
-                            section, target_game=self.target_game
-                        ),
+                        _CATEGORY_ENCODINGS["script_layers_section"].parse(section, target_game=self.target_game),
                         i,
-                        self.target_game
+                        self.target_game,
                     )
 
             yield from self._script_layer_helpers.values()
 
     _generated_objects_layer: ScriptLayer | None = None
+
     @property
     def generated_objects_layer(self) -> ScriptLayer:
         assert self.target_game >= Game.ECHOES
         if self._generated_objects_layer is None:
             self._generated_objects_layer = ScriptLayer(
-                self.get_section("generated_script_objects_section")[0],
-                None,
-                self.target_game
+                self.get_section("generated_script_objects_section")[0], None, self.target_game
             )
         return self._generated_objects_layer
 
@@ -631,8 +607,15 @@ class Area:
 
     # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
     # FIXME: also every time i've tried to do this it breaks mlvl dependencies. good luck!
-    def __init__(self, raw: Container, asset_manager: AssetManager, flags: Container, names: Container,
-                 index: int, parent_mlvl: Mlvl):
+    def __init__(
+        self,
+        raw: Container,
+        asset_manager: AssetManager,
+        flags: Container,
+        names: Container,
+        index: int,
+        parent_mlvl: Mlvl,
+    ):
         self._raw = raw
         self.asset_manager = asset_manager
         self._flags = flags
@@ -784,9 +767,10 @@ class Area:
         layer_deps = [
             list(
                 layer.build_mlvl_dependencies(self.asset_manager)
-                if (not only_modified) or layer.is_modified() else
-                layer.dependencies
-            ) for layer in self.layers
+                if (not only_modified) or layer.is_modified()
+                else layer.dependencies
+            )
+            for layer in self.layers
         ]
 
         layer_deps = self.build_scgn_dependencies(layer_deps, only_modified)
@@ -832,23 +816,18 @@ class Area:
         layer_rels = [
             list(
                 layer.build_module_dependencies()
-                if (not only_modified) or layer.is_modified() else
-                layer.module_dependencies
-            ) for layer in layers
+                if (not only_modified) or layer.is_modified()
+                else layer.module_dependencies
+            )
+            for layer in layers
         ]
 
         for instance in self.generated_objects_layer.instances:
             layer = instance.id.layer
-            if (
-                (not only_modified)
-                or layers[layer].is_modified()
-            ):
+            if (not only_modified) or layers[layer].is_modified():
                 layer_rels[layer].extend(instance.type.modules())
 
-        layer_rels = [
-            list(dict.fromkeys(layer))
-            for layer in layer_rels
-        ]
+        layer_rels = [list(dict.fromkeys(layer)) for layer in layer_rels]
         self.module_dependencies = layer_rels
 
     @property
@@ -861,10 +840,7 @@ class Area:
 
     @property
     def dependencies_by_layer(self) -> dict[str, list[Dependency]]:
-        deps = {
-            layer.name: [dep for dep in layer.dependencies if not dep.exclude_for_mlvl]
-            for layer in self.layers
-        }
+        deps = {layer.name: [dep for dep in layer.dependencies if not dep.exclude_for_mlvl] for layer in self.layers}
         deps["!!non_layer!!"] = list(self.dependencies.non_layer)
         return deps
 
@@ -878,10 +854,7 @@ class Area:
 
     @property
     def module_dependencies_by_layer(self) -> dict[str, list[str]]:
-        return {
-            layer.name: list(layer.module_dependencies)
-            for layer in self.layers
-        }
+        return {layer.name: list(layer.module_dependencies) for layer in self.layers}
 
     def update_all_dependencies(self, only_modified: bool = False):
         self.build_mlvl_dependencies(only_modified)
@@ -892,87 +865,87 @@ class Area:
 _hardcoded_dependencies: dict[int, dict[str, list[Dependency]]] = {
     0xD7C3B839: {
         # Sanctum
-        "Default": [Dependency("TXTR", 0xd5b9e5d1)],
-        "Emperor Ing Stage 1": [Dependency("TXTR", 0x52c7d438)],
-        "Emperor Ing Stage 3": [Dependency("TXTR", 0xd5b9e5d1)],
-        "Emperor Ing Stage 1 Intro Cine": [Dependency("TXTR", 0x52c7d438)],
-        "Emperor Ing Stage 3 Death Cine": [Dependency("TXTR", 0xd5b9e5d1)],
+        "Default": [Dependency("TXTR", 0xD5B9E5D1)],
+        "Emperor Ing Stage 1": [Dependency("TXTR", 0x52C7D438)],
+        "Emperor Ing Stage 3": [Dependency("TXTR", 0xD5B9E5D1)],
+        "Emperor Ing Stage 1 Intro Cine": [Dependency("TXTR", 0x52C7D438)],
+        "Emperor Ing Stage 3 Death Cine": [Dependency("TXTR", 0xD5B9E5D1)],
     },
     0xA92F00B3: {
         # Hive Temple
         "CliffsideBoss": [
-            Dependency("TXTR", 0x24149e16),
-            Dependency("TXTR", 0xbdb8a88a),
-            Dependency("FSM2", 0x3d31822b),
+            Dependency("TXTR", 0x24149E16),
+            Dependency("TXTR", 0xBDB8A88A),
+            Dependency("FSM2", 0x3D31822B),
         ]
     },
     0xC0113CE8: {
         # Dynamo Works
-        "3rd Pass": [Dependency("RULE", 0x393ca543)]
+        "3rd Pass": [Dependency("RULE", 0x393CA543)]
     },
     0x5571E89E: {
         # Hall of Combat Mastery
-        "2nd Pass Enemies": [Dependency("RULE", 0x393ca543)]
+        "2nd Pass Enemies": [Dependency("RULE", 0x393CA543)]
     },
     0x7B94B06B: {
         # Hive Portal Chamber
-        "1st Pass": [Dependency("RULE", 0x393ca543)],
-        "2nd Pass": [Dependency("RULE", 0x393ca543)]
+        "1st Pass": [Dependency("RULE", 0x393CA543)],
+        "2nd Pass": [Dependency("RULE", 0x393CA543)],
     },
     0xF8DBC03D: {
         # Hive Reactor
-        "2nd Pass": [Dependency("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393CA543)]
     },
     0xB666B655: {
         # Reactor Access
-        "2nd Pass": [Dependency("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393CA543)]
     },
     0xE79AAFAE: {
         # Transport A Access
-        "2nd Pass": [Dependency("RULE", 0x393ca543)]
+        "2nd Pass": [Dependency("RULE", 0x393CA543)]
     },
     0xFEB7BD27: {
         # Transport B Access
-        "Default": [Dependency("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393CA543)]
     },
     0x89D246FD: {
         # Portal Access
-        "Default": [Dependency("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393CA543)]
     },
     0x0253782D: {
         # Dark Forgotten Bridge
-        "Default": [Dependency("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393CA543)]
     },
     0x09DECF21: {
         # Forgotten Bridge
-        "Default": [Dependency("RULE", 0x393ca543)]
+        "Default": [Dependency("RULE", 0x393CA543)]
     },
     0x629790F4: {
         # Sacrificial Chamber
-        "1st Pass": [Dependency("RULE", 0x393ca543)]
+        "1st Pass": [Dependency("RULE", 0x393CA543)]
     },
     0xBBE4B3AE: {
         # Dungeon
-        "Default": [Dependency("TXTR", 0xe252e7f6)]
+        "Default": [Dependency("TXTR", 0xE252E7F6)]
     },
     0x2BCD44A7: {
         # Portal Terminal
-        "Default": [Dependency("TXTR", 0xb6fa5023)]
+        "Default": [Dependency("TXTR", 0xB6FA5023)]
     },
     0xC68B5B51: {
         # Transport to Sanctuary Fortress
-        "!!non_layer!!": [Dependency("TXTR", 0x75a219a8)]
+        "!!non_layer!!": [Dependency("TXTR", 0x75A219A8)]
     },
     0x625A2692: {
         # Temple Transport Access
-        "!!non_layer!!": [Dependency("TXTR", 0x581c56ea)]
+        "!!non_layer!!": [Dependency("TXTR", 0x581C56EA)]
     },
     0x96F4CA1E: {
         # Minigyro Chamber
-        "Default": [Dependency("TXTR", 0xac080dfb)]
+        "Default": [Dependency("TXTR", 0xAC080DFB)]
     },
     0x5BBF334F: {
         # Staging Area
-        "!!non_layer!!": [Dependency("TXTR", 0x738feb19)]
-    }
+        "!!non_layer!!": [Dependency("TXTR", 0x738FEB19)]
+    },
 }

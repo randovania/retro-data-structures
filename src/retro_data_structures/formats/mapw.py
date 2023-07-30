@@ -10,7 +10,7 @@ from retro_data_structures.game_check import AssetIdCorrect, Game
 MAPW = construct.Struct(
     _magic=construct.Const(0xDEADF00D, construct.Int32ub),
     _version=construct.Const(1, construct.Int32ub),
-    area_map=construct.PrefixedArray(construct.Int32ub, AssetIdCorrect)
+    area_map=construct.PrefixedArray(construct.Int32ub, AssetIdCorrect),
 )
 
 

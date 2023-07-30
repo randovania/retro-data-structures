@@ -37,27 +37,20 @@ Pool = GreedyBytes
 
 
 def project_table(offset: int, subcon, group_type: int | None = None):
-    table = FocusedSeq("table",
+    table = FocusedSeq(
+        "table",
         "pos" / Tell,
-        "offset" / Pointer(
-            lambda ctx: ctx._._offsets + offset,
-            Rebuild(Int32ub, lambda ctx: ctx.pos - ctx._._start)
-        ),
+        "offset" / Pointer(lambda ctx: ctx._._offsets + offset, Rebuild(Int32ub, lambda ctx: ctx.pos - ctx._._start)),
         Seek(lambda ctx: ctx._._start + ctx.offset),
         # Check(lambda ctx: (ctx.pos - ctx._._start) == ctx.offset),
-        "table" / subcon
+        "table" / subcon,
     )
     if group_type is None:
         return table
-    return If(
-        lambda ctx: ctx.group_type == group_type,
-        table
-    )
+    return If(lambda ctx: ctx.group_type == group_type, table)
 
-StandardTable = RepeatUntil(
-    lambda obj, lst, ctx: obj == 0xFFFF,
-    Int16ub
-)
+
+StandardTable = RepeatUntil(lambda obj, lst, ctx: obj == 0xFFFF, Int16ub)
 
 Project = Struct(
     "_start" / Tell,
@@ -73,22 +66,26 @@ Project = Struct(
     "tables_table" / project_table(0x8, StandardTable),
     "keymaps_table" / project_table(0xC, StandardTable),
     "layers_table" / project_table(0x10, StandardTable),
-    "song_group_stuff" / If(
-        lambda ctx: ctx.group_type == 1,
-        GreedyBytes
+    "song_group_stuff" / If(lambda ctx: ctx.group_type == 1, GreedyBytes),
+    "sfx_table"
+    / project_table(
+        0x14,
+        PrefixedArray(
+            Padded(4, Int16ub),
+            Padded(
+                10,
+                Struct(
+                    "define_id" / Int16ub,
+                    "object_id" / Int16ub,
+                    "priority" / Int8ub,
+                    "max_voices" / Int8ub,
+                    "definite_velocity" / Int8ub,
+                    "panning" / Int8sb,
+                    "definite_key" / Int8ub,
+                ),
+            ),
+        ),
     ),
-    "sfx_table" / project_table(0x14, PrefixedArray(
-        Padded(4, Int16ub),
-        Padded(10, Struct(
-            "define_id" / Int16ub,
-            "object_id" / Int16ub,
-            "priority" / Int8ub,
-            "max_voices" / Int8ub,
-            "definite_velocity" / Int8ub,
-            "panning" / Int8sb,
-            "definite_key" / Int8ub,
-        ))
-    ))
 )
 
 Sample = GreedyBytes
@@ -99,13 +96,10 @@ SampleDirectory = GreedyBytes
 def mp1_sized_chunk(subcon):
     return Prefixed(Int32ub, subcon)
 
+
 def mp2_sized_chunk(offset: int, subcon):
-    return Prefixed(
-        Pointer(
-            lambda ctx: ctx._size_offsets + offset,
-            Int32ub
-        ), subcon
-    )
+    return Prefixed(Pointer(lambda ctx: ctx._size_offsets + offset, Int32ub), subcon)
+
 
 DataMP1 = Struct(
     "audio_directory" / String,
@@ -113,7 +107,7 @@ DataMP1 = Struct(
     "pool" / mp1_sized_chunk(Pool),
     "project" / mp1_sized_chunk(Project),
     "sample" / mp1_sized_chunk(Sample),
-    "sample_directory" / mp1_sized_chunk(SampleDirectory)
+    "sample_directory" / mp1_sized_chunk(SampleDirectory),
 )
 
 DataMP2 = Struct(
@@ -128,13 +122,10 @@ DataMP2 = Struct(
     "sample" / mp2_sized_chunk(12, Sample),
 )
 
-AGSC = game_check.current_game_at_least_else(
-    game_check.Game.ECHOES,
-    DataMP2,
-    DataMP1
-)
+AGSC = game_check.current_game_at_least_else(game_check.Game.ECHOES, DataMP2, DataMP1)
 
 ATBL = PrefixedArray(Int32ub, Int16ub)
+
 
 class Atbl(BaseResource):
     @classmethod

@@ -78,8 +78,10 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
 
 
 def convert_from_echoes(  # noqa: PLR0912 Too many branches
-        data: Resource, details: AssetDetails, converter: AssetConverter,
-                        ):
+    data: Resource,
+    details: AssetDetails,
+    converter: AssetConverter,
+):
     if converter.target_game != Game.PRIME:
         raise UnsupportedTargetGame(Game.ECHOES, converter.target_game)
 

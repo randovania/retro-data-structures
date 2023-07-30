@@ -45,6 +45,7 @@ if typing.TYPE_CHECKING:
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"]), ErrorWithMessage("Unknown type"))
 
+
 def FourCCSwitch(element_types):
     return Struct(type=FourCC, body=Switch(construct.this.type, element_types, UnknownType))
 
@@ -56,10 +57,11 @@ GetPass = Struct(
     flags=Int32ub,
     id=AssetId64 * "TXTR",
     uv_source=Int32ub,
-    uv_animation=PrefixedArray(Int32ub,Byte),
+    uv_animation=PrefixedArray(Int32ub, Byte),
     _end=Tell,
-    _update_pass_size=Pointer(construct.this._start - Int32ub.length,
-                              Rebuild(Int32ub, construct.this._end - construct.this._start)),
+    _update_pass_size=Pointer(
+        construct.this._start - Int32ub.length, Rebuild(Int32ub, construct.this._end - construct.this._start)
+    ),
 )
 
 GetClr = Struct(subtype=FourCC, value=Int32ub)
@@ -109,7 +111,20 @@ param_count_per_uv_animtion_type = {
 }
 
 PASS_TYPES = {
-    "DIFF", "RIML", "BLOL", "BLOD", "CLR ", "TRAN", "INCA", "RFLV", "RFLD", "LRLD", "LURD", "BLOI", "XRAY", "TOON"
+    "DIFF",
+    "RIML",
+    "BLOL",
+    "BLOD",
+    "CLR ",
+    "TRAN",
+    "INCA",
+    "RFLV",
+    "RFLD",
+    "LRLD",
+    "LURD",
+    "BLOI",
+    "XRAY",
+    "TOON",
 }
 
 MATERIAL_PARAMETERS = {
@@ -167,11 +182,12 @@ Material = IfThenElse(
 )
 
 MaterialSet = Struct(
-    texture_file_ids=If(game_check.current_game_at_most(Game.ECHOES),PrefixedArray(Int32ub, AssetId32)),
+    texture_file_ids=If(game_check.current_game_at_most(Game.ECHOES), PrefixedArray(Int32ub, AssetId32)),
     _material_count=Rebuild(Int32ub, construct.len_(construct.this.materials)),
     _material_end_offsets_address=Tell,
-    _material_end_offsets=If(game_check.current_game_at_most(Game.ECHOES),
-                             Seek(construct.this["_material_count"] * Int32ub.length, 1)),
+    _material_end_offsets=If(
+        game_check.current_game_at_most(Game.ECHOES), Seek(construct.this["_material_count"] * Int32ub.length, 1)
+    ),
     _materials_start=Tell,
     materials=Array(
         construct.this["_material_count"],
@@ -179,7 +195,8 @@ MaterialSet = Struct(
             "material",
             material=Material,
             _end=Tell,
-            update_end_offset=If(game_check.current_game_at_most(Game.ECHOES),
+            update_end_offset=If(
+                game_check.current_game_at_most(Game.ECHOES),
                 Pointer(
                     lambda ctx: ctx["_"]["_material_end_offsets_address"] + Int32ub.length * ctx["_index"],
                     Rebuild(Int32ub, lambda ctx: ctx["_end"] - ctx["_"]["_materials_start"]),
@@ -292,10 +309,10 @@ CMDL = Struct(
     _data_section_count=Rebuild(
         Int32ub,
         lambda context: (
-                len(context.material_sets)
-                + sum(1 for k, v in context.attrib_arrays.items() if not k.startswith("_") and v is not None)
-                + 1
-                + len(context.surfaces)
+            len(context.material_sets)
+            + sum(1 for k, v in context.attrib_arrays.items() if not k.startswith("_") and v is not None)
+            + 1
+            + len(context.surfaces)
         ),
     ),
     _material_set_count=Rebuild(Int32ub, construct.len_(construct.this.material_sets)),
@@ -364,6 +381,7 @@ def legacy_dependencies(obj, target_game: Game):
                 for element in material.element:
                     if element.type == "PASS":
                         yield "TXTR", element.body.id
+
 
 class Cmdl(BaseResource):
     @classmethod

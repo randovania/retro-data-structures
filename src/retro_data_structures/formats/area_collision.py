@@ -37,6 +37,7 @@ class AreaCollisionVersion(enum.IntEnum):
     prime23 = 4
     dkcr = 5
 
+
 VersionEnum = Enum(Int32ub, AreaCollisionVersion)
 
 _shared_materials = {
@@ -77,7 +78,7 @@ _prime1_materials = dict(
         "unknown_2": 0x00100000,
         "unknown_3": 0x01000000,
         "Redundant Edge/Flipped Tri": 0x02000000,
-    }
+    },
 )
 
 _prime23_materials = dict(
@@ -96,7 +97,7 @@ _prime23_materials = dict(
         "Jump Not Allowed": 0x0400000000000000,
         "Spider Ball": 0x2000000000000000,
         "Screw Attack Wall Jump": 0x4000000000000000,
-    }
+    },
 )
 
 _internal_materials = {
@@ -178,8 +179,10 @@ CollisionIndex = Struct(
     "triangle_indices" / PrefixedArray(Int32ub, Int8ub),
     "edges" / PrefixedArray(Int32ub, Struct(vertexA=Int16ub, vertexB=Int16ub)),
     "triangles" / TriangleAdapter(PrefixedArray(Int32ub, Int16ub)),
-    "unknowns" / If(lambda this: AreaCollisionVersion[this._.version] > AreaCollisionVersion.prime1,
-                    PrefixedArray(Int32ub, Int16ub)),
+    "unknowns"
+    / If(
+        lambda this: AreaCollisionVersion[this._.version] > AreaCollisionVersion.prime1, PrefixedArray(Int32ub, Int16ub)
+    ),
     "vertices" / PrefixedArray(Int32ub, Vector3),
 )
 
@@ -192,9 +195,18 @@ AreaCollision = Struct(
     "version" / VersionEnum,
     "bounding_box" / AABox,
     "root_node_type" / NodeTypeEnum(Int32ub),
-    "octree" / Prefixed(Int32ub, Switch(this.root_node_type, {
-        "none": Pass, "branch": CollisionBranch, "leaf": CollisionLeaf,
-    })),
+    "octree"
+    / Prefixed(
+        Int32ub,
+        Switch(
+            this.root_node_type,
+            {
+                "none": Pass,
+                "branch": CollisionBranch,
+                "leaf": CollisionLeaf,
+            },
+        ),
+    ),
     "collision_indices" / CollisionIndex,
     "_size_end" / Tell,
     "size" / Pointer(this._size_addr, Rebuild(Int32ub, this._size_end - this._size_start)),

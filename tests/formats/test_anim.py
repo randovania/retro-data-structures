@@ -10,7 +10,9 @@ from retro_data_structures.formats.anim import Anim
 def test_compare_p2(prime2_asset_manager):
     # Resources/Uncategorized/01_gate_open.ANIM
     test_lib.parse_and_build_compare(
-        prime2_asset_manager, 0x101367C6, Anim,
+        prime2_asset_manager,
+        0x101367C6,
+        Anim,
     )
 
 
@@ -57,6 +59,4 @@ def test_missile_launcher(prime1_asset_manager, prime2_asset_manager):
 
 def test_no_dependencies(prime2_asset_manager):
     result = list(prime2_asset_manager.get_dependencies_for_asset(0x5E2F550E))
-    assert result == [
-        Dependency(type='ANIM', id=0x5E2F550E)
-    ]
+    assert result == [Dependency(type="ANIM", id=0x5E2F550E)]
