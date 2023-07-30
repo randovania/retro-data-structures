@@ -6,7 +6,6 @@ import typing
 
 import construct
 
-from retro_data_structures.base_resource import AssetType, Dependency, RawResource
 from retro_data_structures.common_types import AssetId32, FourCC, String
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.data_section import DataSection
@@ -18,6 +17,7 @@ from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import AssetType, Dependency, RawResource
 
 
 class UnableToCheatError(Exception):
@@ -50,7 +50,7 @@ def dumb_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
     try:
         magic = FourCC.parse(asset.data)
     except Exception:
-        raise UnableToCheatError()
+        raise UnableToCheatError
 
     if magic == "HIER":
         hier = Hier.parse(asset.data, asset_manager.target_game, asset_manager)
@@ -59,7 +59,7 @@ def dumb_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
         tree = Tree.parse(asset.data, asset_manager.target_game, asset_manager)
         yield from tree.dependencies_for()
     else:
-        raise UnableToCheatError()
+        raise UnableToCheatError
 
 
 _frme = construct.FocusedSeq(
@@ -80,7 +80,7 @@ def frme_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing
         try:
             yield from asset_manager.get_dependencies_for_asset(dep.id)
         except UnknownAssetId:
-            raise UnableToCheatError()
+            raise UnableToCheatError
 
 
 _fsm2 = construct.Struct(
@@ -199,7 +199,7 @@ _cmdl = construct.Struct(
 
 def cmdl_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     if asset_manager.target_game >= Game.CORRUPTION:
-        raise UnableToCheatError()
+        raise UnableToCheatError
 
     decoded = _cmdl.parse(asset.data)
     for material_set in decoded.material_sets:
@@ -245,7 +245,7 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typi
             if element is not None and element.body is not None:
                 yield from asset_manager.get_dependencies_for_asset(element.body, must_exist=False)
     except Exception:
-        raise UnableToCheatError()
+        raise UnableToCheatError
 
 
 def no_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:

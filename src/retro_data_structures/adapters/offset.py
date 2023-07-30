@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from construct import AdaptationError, Adapter
 
 
@@ -5,10 +7,10 @@ class OffsetAdapter(Adapter):
     # stores offsets as indices
 
     def _get_table(self, context):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _get_table_length(self, context):
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _get_base_offset(self, context):
         return 0

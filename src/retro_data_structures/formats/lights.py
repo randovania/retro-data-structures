@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from construct import Array, Const, Enum, Flag, Float32b, If, Int32ub, StopIf, Struct
 from construct.core import IfThenElse, PrefixedArray
 

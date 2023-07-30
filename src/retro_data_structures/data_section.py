@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from construct import Array, If, Int32ub, Pointer, Rebuild, Struct, Tell
 
 from retro_data_structures.construct_extensions.alignment import AlignedPrefixed

@@ -22,7 +22,6 @@ from construct.core import (
 from construct.lib.containers import Container
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.script_object import (
@@ -34,11 +33,12 @@ from retro_data_structures.formats.script_object import (
     resolve_instance_id,
 )
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties import BaseObjectType
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
     from retro_data_structures.formats.mlvl import Area
+    from retro_data_structures.properties import BaseObjectType
 
 ScriptLayerPrime = Struct(
     "magic" / Const("SCLY", FourCC),
@@ -73,7 +73,7 @@ def ConstructScriptLayer(identifier):
 
 def new_layer(index: int | None, target_game: Game) -> Container:
     if target_game <= Game.PRIME:
-        raise NotImplementedError()
+        raise NotImplementedError
     return Container({
         "magic": "SCLY" if index is not None else "SCGN",
         "unknown": 0,

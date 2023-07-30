@@ -4,7 +4,6 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 from __future__ import annotations
 
 import typing
-from collections.abc import Iterator
 
 import construct
 from construct import (
@@ -45,6 +44,7 @@ from retro_data_structures.formats.strg import Strg
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Iterator
     pass
 
 MLVLConnectingDock = Struct(

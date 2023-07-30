@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class UnsupportedTargetGame(Exception):
     def __init__(self, source_game, target_game):
         super().__init__(f"Unable to convert to {target_game} with {source_game} as source")

@@ -1,7 +1,7 @@
+from __future__ import annotations
 
-from construct import Construct
+from typing import TYPE_CHECKING
 
-from retro_data_structures.base_resource import AssetType, BaseResource
 from retro_data_structures.formats.ancs import ANCS, Ancs
 from retro_data_structures.formats.anim import ANIM, Anim
 from retro_data_structures.formats.audio_group import AGSC, ATBL, Agsc, Atbl
@@ -43,6 +43,11 @@ from retro_data_structures.formats.savw import SAVW, Savw
 from retro_data_structures.formats.scan import SCAN, Scan
 from retro_data_structures.formats.strg import STRG, Strg
 from retro_data_structures.formats.txtr import TXTR, Txtr
+
+if TYPE_CHECKING:
+    from construct import Construct
+
+    from retro_data_structures.base_resource import AssetType, BaseResource
 
 ALL_FORMATS = {
     "ANCS": ANCS,

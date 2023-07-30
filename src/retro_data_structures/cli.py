@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import argparse
 import asyncio
 import itertools
@@ -10,12 +12,14 @@ from pathlib import Path
 
 from retro_data_structures import dependencies, formats
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
-from retro_data_structures.base_resource import AssetId
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.formats import mlvl
 from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 types_per_game = {
     "metroid_prime_1": {

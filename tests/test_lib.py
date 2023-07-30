@@ -1,13 +1,17 @@
+from __future__ import annotations
+
 import dataclasses
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import construct
 from construct.lib.containers import Container
 
-from retro_data_structures.asset_manager import AssetManager
-from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, RawResource
-from retro_data_structures.game_check import Game
+if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, RawResource
+    from retro_data_structures.game_check import Game
 
 
 @dataclasses.dataclass(frozen=True)

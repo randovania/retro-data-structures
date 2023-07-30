@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+from typing import TYPE_CHECKING
 
 import construct
 from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalString, PrefixedArray, Rebuild, Struct
@@ -10,7 +11,9 @@ from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.common_types import ObjectTag_32
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
-from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),

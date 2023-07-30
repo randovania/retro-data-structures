@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 from construct import (
@@ -27,7 +29,9 @@ from construct import (
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import String
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 Pool = GreedyBytes
 

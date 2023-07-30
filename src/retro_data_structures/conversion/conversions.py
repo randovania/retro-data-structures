@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from retro_data_structures.conversion import ancs, anim, cinf, cmdl, cskr, evnt, part, txtr
-from retro_data_structures.conversion.asset_converter import AssetDetails, ResourceConverter
+
+if TYPE_CHECKING:
+    from retro_data_structures.conversion.asset_converter import AssetDetails, ResourceConverter
 
 ALL_FORMATS = {
     "ANCS": ancs.CONVERTERS,

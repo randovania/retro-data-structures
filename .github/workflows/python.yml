@@ -1,17 +1,22 @@
-name: Python Package
+
+name: Python package
 
 on:
-  pull_request:
   push:
     branches:
-      - '*'
+     - main
     tags:
       - '*'
+
+  merge_group:
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    name: Wheel
+    name: Build Wheel
 
     steps:
       - name: Checkout
@@ -23,13 +28,13 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.11"
 
       - name: Install Python packages
-        run: python -m pip install --upgrade build pip
+        run: python -m pip install --upgrade build
 
       - name: build
-        run: python -m build
+        run: PYTHONWARNINGS=error python -m build
 
       - name: Store the packages
         uses: actions/upload-artifact@v3
@@ -41,14 +46,15 @@ jobs:
     needs:
       - build
 
-    runs-on: ubuntu-latest
     name: Test Python ${{ matrix.python.version }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python:
-          - { version: '3.10', wheel: 'cp310-cp310' }
-          - { version: '3.11', wheel: 'cp311-cp311' }
+          - { version: "3.10" }
+          - { version: "3.11" }
+          - { version: "3.12.0-beta - 3.12.0" }
 
     steps:
       - name: Checkout
@@ -72,15 +78,12 @@ jobs:
           name: python-package-distributions
           path: dist/
 
-      - name: Install Python packages
-        run: python -m pip install --upgrade pip pytest
-
-      - name: install built wheel
-        run: python -m pip install dist/*.whl
+      - name: Install built wheel
+        run: python -m pip install "$(ls dist/*.whl)[test]"
         shell: bash
 
       - name: test
-        run: python -m pytest
+        run: python -m pytest  # don't include coverage, since we've deleted the source dir
 
   pypi:
     runs-on: 'ubuntu-latest'
@@ -121,10 +124,10 @@ jobs:
         run: python -m venv venv
 
       - name: Install Python packages
-        run: venv/bin/python -m pip install --upgrade pip pytest pytest-cov pytest-xdist
+        run: venv/bin/python -m pip install --upgrade pip pytest-xdist
 
       - name: install built wheel
-        run: venv/bin/python -m pip install -e .
+        run: venv/bin/python -m pip install -e ".[test]"
 
       - name: Run Tests
         run:
@@ -133,7 +136,6 @@ jobs:
       - name: codecov
         uses: codecov/codecov-action@v3
         with:
-          fail_ci_if_error: false
           files: ./coverage.xml
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

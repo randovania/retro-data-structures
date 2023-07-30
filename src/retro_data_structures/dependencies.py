@@ -1,14 +1,19 @@
+from __future__ import annotations
+
 import logging
-from collections.abc import Callable, Iterator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from retro_data_structures import formats
-from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
-from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.exceptions import InvalidAssetId, UnknownAssetId
 from retro_data_structures.formats import ancs, cmdl, dgrp, effect_script, evnt, scan
-from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.conversion.asset_converter import AssetConverter
+    from retro_data_structures.game_check import Game
 
 
 class InvalidDependency(Exception):
@@ -68,7 +73,7 @@ def _internal_dependencies_for(
             _internal_dependencies_for(get_asset, target_game, new_asset_id, new_type, deps_by_asset_id)
         except UnknownAssetId:
             logging.warning(
-                f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) " f"that doesn't exist."
+                f"Asset id 0x{asset_id:08X} has dependency 0x{new_asset_id:08X} ({new_type}) that doesn't exist."
             )
         except InvalidAssetId:
             raise InvalidDependency(asset_id, new_asset_id, new_type)

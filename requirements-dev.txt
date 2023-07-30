@@ -1,4 +1,0 @@
--e .
-ruff
-pre-commit
-pytest

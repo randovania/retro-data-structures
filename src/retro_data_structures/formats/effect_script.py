@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import typing
-from collections.abc import Iterable
 
 import construct
 from construct import (
@@ -27,6 +28,9 @@ from retro_data_structures.base_resource import AssetType, BaseResource, Depende
 from retro_data_structures.common_types import Color4f, FourCC, Vector3
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 from retro_data_structures.game_check import AssetIdCorrect, Game
+
+if typing.TYPE_CHECKING:
+    from collections.abc import Iterable
 
 UnknownType = Sequence(Probe(into=lambda ctx: ctx["_"], lookahead=80), ErrorWithMessage("Unknown type"))
 
@@ -1302,7 +1306,7 @@ def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
-def legacy_dependencies(obj, target_game: Game):
+def legacy_dependencies(obj, target_game: Game):  # noqa: PLR0912 Too many branches
     for element in obj.elements:
         if element.type in ("TEXR", "TIND"):
             if element.body.body is not None:

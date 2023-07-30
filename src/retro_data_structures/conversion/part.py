@@ -1,7 +1,12 @@
-import copy
+from __future__ import annotations
 
-from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
+import copy
+from typing import TYPE_CHECKING
+
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 
 
 def upgrade(data, converter: AssetConverter, source_game: Game):
@@ -48,7 +53,7 @@ def _downgrade_color_mdao(element):
     element["body"] = element["body"]["body"]["a"]
 
 
-def _downgrade_color_mult(element):
+def _downgrade_color_mult(element):  # noqa: PLR0915 Too many statements
     if (
             element["body"]["body"]["a"]["type"] == "PULS"
             and element["body"]["body"]["b"]["type"] == "KEYP"
@@ -266,7 +271,7 @@ def _downgrade_color(element):
         _downgrade_color_mult(element)
 
 
-def downgrade(data, converter: AssetConverter, source_game: Game):
+def downgrade(data, converter: AssetConverter, source_game: Game):  # noqa: PLR0912 Too many branches
     if converter.target_game <= Game.PRIME < source_game:
         for element in data["elements"][:]:
             if element["type"] == "KSSM" and element["body"]["magic"] != "NONE":

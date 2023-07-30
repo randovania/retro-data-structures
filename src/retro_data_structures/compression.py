@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import io
 import math
 
@@ -67,7 +69,7 @@ class LZOCompressedBlock(Adapter):
         previous_segments = context._index * segment_size
         if previous_segments > decompressed_size:
             # This segment is redundant!
-            raise construct.StopFieldError()
+            raise construct.StopFieldError
 
         elif previous_segments + segment_size > decompressed_size:
             # Last segment

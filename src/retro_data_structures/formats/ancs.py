@@ -4,7 +4,6 @@ Wiki: https://wiki.axiodl.com/w/ANCS_(File_Format)
 from __future__ import annotations
 
 import typing
-from collections.abc import Iterable
 
 import construct
 from construct import Const, Float32b, If, Int8ub, Int16ub, Int32ub, PrefixedArray, Struct
@@ -18,10 +17,12 @@ from retro_data_structures.formats.evnt import EVNT
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
-from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.game_check import Game
 
 # This format is only for Prime 1 and 2, so AssetId is always 32-bit
 ConstructAssetId = AssetId32

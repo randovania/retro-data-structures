@@ -33,14 +33,52 @@ content-type = "text/markdown"
 [project.urls]
 Homepage = "https://github.com/randovania/retro-data-structures"
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-cov",
+    # "pytest-asyncio",
+    # "pytest-mock",
+]
+
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
 write_to = "src/retro_data_structures/version.py"
 git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+# asyncio_mode = "auto"
+xfail_strict = true
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "skip_dependency_tests: Skips tests that involves calculating dependencies"
+]
+
 [tool.ruff]
 line-length = 120
-select = ["E", "F", "W", "C90", "I", "UP"]
+select = [
+    "E", "F", "W", "C90", "I", "UP", "C4",
+    "RSE",
+    "TCH",
+    "PTH",
+    "COM818", "COM819",
+    "ISC",
+    "PIE",
+
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+]
+extend-ignore = [
+    "PLR0913",  # Too many arguments to function call
+    "PLR2004",  # Magic values show up everywhere in construct defs
+]
+
 src = ["src"]
 
 # Version to target for generated code.
@@ -50,3 +88,10 @@ target-version = "py310"
 # Flag errors (`C901`) whenever the complexity level exceeds 25.
 # Defaults to 10, but we're being very flexible right now
 max-complexity = 25
+
+[tool.ruff.isort]
+required-imports = ["from __future__ import annotations"]
+
+[tool.black]
+line-length = 120
+target-version = ['py310', 'py311']

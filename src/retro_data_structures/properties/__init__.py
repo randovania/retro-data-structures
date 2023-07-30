@@ -1,6 +1,11 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseObjectType
+
+if TYPE_CHECKING:
+    from retro_data_structures.properties.base_property import BaseObjectType
 
 
 def get_game_object(game: Game, four_cc: str | int) -> type[BaseObjectType]:

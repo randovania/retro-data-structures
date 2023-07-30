@@ -1,13 +1,18 @@
+from __future__ import annotations
+
 import typing
 
-from construct import Construct
 from construct.core import Byte, Const, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.formats.script_layer import dependencies_for_layer
 from retro_data_structures.formats.script_object import ConstructScriptInstance, ScriptInstance
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from construct import Construct
+
+    from retro_data_structures.game_check import Game
 
 TREE = Struct(
     "magic" / Const("TREE", FourCC),

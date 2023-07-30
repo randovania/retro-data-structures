@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from tests import test_lib
 
 from retro_data_structures.formats.cinf import Cinf

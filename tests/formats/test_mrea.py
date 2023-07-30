@@ -1,9 +1,15 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import pytest
 from tests import test_lib
 
-from retro_data_structures.base_resource import AssetId
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_object import ScriptInstance
+
+if TYPE_CHECKING:
+    from retro_data_structures.base_resource import AssetId
 
 
 @pytest.mark.xfail

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 from construct import Const, Construct, Int32ub, PrefixedArray, Struct

@@ -5,11 +5,10 @@ import io
 import typing
 from abc import ABC
 
-from retro_data_structures.base_resource import AssetId, Dependency
-from retro_data_structures.game_check import Game
-
 if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import AssetId, Dependency
+    from retro_data_structures.game_check import Game
 
 Self = typing.TypeVar("Self", bound="BaseProperty")
 
@@ -17,11 +16,11 @@ Self = typing.TypeVar("Self", bound="BaseProperty")
 class BaseProperty:
     @classmethod
     def game(cls) -> Game:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def from_stream(cls: type[Self], data: typing.BinaryIO, size: int | None = None) -> Self:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def from_bytes(cls: type[Self], data: bytes) -> Self:
@@ -29,7 +28,7 @@ class BaseProperty:
         return cls.from_stream(stream, len(data))
 
     def to_stream(self, data: typing.BinaryIO) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def to_bytes(self) -> bytes:
         stream = io.BytesIO()
@@ -38,10 +37,10 @@ class BaseProperty:
 
     @classmethod
     def from_json(cls: type[Self], data: typing.Any) -> Self:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def to_json(self) -> typing.Any:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def _is_property_mrea_or_mlvl(self, field: dataclasses.Field) -> bool:
         asset_types = field.metadata.get("asset_types", [])
@@ -76,14 +75,14 @@ class BaseProperty:
 class BaseObjectType(BaseProperty, ABC):
     @classmethod
     def object_type(cls) -> str | int:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     @classmethod
     def modules(cls) -> list[str]:
         return []
 
     def get_name(self) -> str | None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
     def set_name(self, name: str) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError

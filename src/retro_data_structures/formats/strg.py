@@ -1,6 +1,8 @@
 """
 https://wiki.axiodl.com/w/STRG_(File_Format)
 """
+from __future__ import annotations
+
 import re
 import typing
 
@@ -27,7 +29,9 @@ from construct import (
 from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import FourCC, String
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 
 class CorruptionLanguageOffsetAdapter(OffsetAdapter):

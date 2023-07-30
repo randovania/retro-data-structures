@@ -10,14 +10,13 @@
 #     PrefixedArray,
 #     Struct, Construct,
 # )
+from __future__ import annotations
 
 # from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
 # from retro_data_structures.construct_extensions.version import get_version
 # from retro_data_structures.formats.arot import AROT
 # from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
 # from retro_data_structures.formats.mrea import MREAVersion
-
-
 from construct import GreedyBytes, Optional, Struct
 
 from retro_data_structures.formats.cmdl import MaterialSet

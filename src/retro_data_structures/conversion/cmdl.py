@@ -1,8 +1,14 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from construct.lib import ListContainer
 
-from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 
 
 def _convert_textures(material_set, converter: AssetConverter, source_game: Game):

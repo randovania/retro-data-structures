@@ -1,8 +1,13 @@
-import copy
+from __future__ import annotations
 
-from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
+import copy
+from typing import TYPE_CHECKING
+
 from retro_data_structures.conversion.errors import UnsupportedSourceGame, UnsupportedTargetGame
 from retro_data_structures.game_check import Game
+
+if TYPE_CHECKING:
+    from retro_data_structures.conversion.asset_converter import AssetConverter, AssetDetails, Resource
 
 
 def find_missing(lst):
@@ -72,7 +77,9 @@ def convert_from_prime(data: Resource, details: AssetDetails, converter: AssetCo
     return data
 
 
-def convert_from_echoes(data: Resource, details: AssetDetails, converter: AssetConverter):
+def convert_from_echoes(  # noqa: PLR0912 Too many branches
+        data: Resource, details: AssetDetails, converter: AssetConverter,
+                        ):
     if converter.target_game != Game.PRIME:
         raise UnsupportedTargetGame(Game.ECHOES, converter.target_game)
 

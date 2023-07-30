@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import retro_data_structures.enums.corruption as _corruption_enums
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums

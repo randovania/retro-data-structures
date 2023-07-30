@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 
 import construct
@@ -5,7 +7,9 @@ from construct import Float32b, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import OBBox, Vector3
-from retro_data_structures.game_check import Game
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.game_check import Game
 
 SegId = Int32ub
 UnknownPair = Struct(
