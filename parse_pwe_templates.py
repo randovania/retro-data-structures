@@ -271,7 +271,7 @@ def parse_property_archetypes(path: Path, game_id: str) -> dict:
     _type = archetype.attrib["Type"]
     if _type == "Struct":
         return _parse_properties(archetype, game_id, path)
-    elif _type == "Choice" or _type == "Enum":
+    elif _type in {"Choice", "Enum"}:
         return _parse_choice(archetype, game_id, path)
     else:
         raise ValueError(f"Unknown Archetype format: {_type}")
