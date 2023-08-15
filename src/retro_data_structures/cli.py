@@ -246,15 +246,10 @@ def do_convert(args):
 
         print(
             "\n========================="
-            "\n* Original Id: {:08x}"
-            "\n* Target Id: {:08x}"
-            "\n* Asset Type: {}"
-            "\n\n{}".format(
-                asset_id,
-                converted.id,
-                converted.type,
-                converted.resource,
-            )
+            f"\n* Original Id: {asset_id:08x}"
+            f"\n* Target Id: {converted.id:08x}"
+            f"\n* Asset Type: {converted.type}"
+            f"\n\n{converted.resource}"
         )
 
         for dependency in dependencies.direct_dependencies_for(converted.resource, converted.type, target_game):
