@@ -5,6 +5,7 @@ import asyncio
 import itertools
 import json
 import logging
+import pprint
 import typing
 import uuid
 from concurrent.futures import ProcessPoolExecutor
@@ -15,11 +16,13 @@ from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, P
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
-from retro_data_structures.formats import mlvl
+from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.formats import Mlvl, mlvl
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.base_resource import AssetId
+    from retro_data_structures.formats.mrea import Area
 
 types_per_game = {
     "metroid_prime_1": {
@@ -124,6 +127,20 @@ def create_parser():
     add_game_argument(convert, "--target-game")
     add_provider_argument(convert)
     convert.add_argument("asset_ids", type=asset_id_conversion, nargs="+", help="Asset id to list dependencies for")
+
+    area_tool = subparser.add_parser("areas")
+    add_game_argument(area_tool)
+    add_provider_argument(area_tool)
+    area_sub = area_tool.add_subparsers(dest="area_command", required=True)
+    area_sub.add_parser("list-areas", help="List all areas").add_argument("--world", help="Only in the given world")
+
+    list_cmd = area_sub.add_parser("list-objects", help="List all objects in an area")
+    print_cmd = area_sub.add_parser("print-object", help="Print details about an object")
+    for c in [list_cmd, print_cmd]:
+        c.add_argument("world_id", type=lambda x: int(x, 0), help="Asset id of the world")
+        c.add_argument("area_id", type=lambda x: int(x, 0), help="Asset id of the area")
+    list_cmd.add_argument("--layer", help="Only in the given layer")
+    print_cmd.add_argument("instance_id", type=lambda x: int(x, 0), help="Instance id of the object to print")
 
     return parser
 
@@ -342,6 +359,59 @@ async def compare_all_files_in_path(args):
             print(m)
 
 
+def _list_areas_command(args, asset_manager: AssetManager):
+    if args.world:
+        ids = [args.world]
+    else:
+        ids = [i for i in asset_manager.all_asset_ids() if asset_manager.get_asset_type(i) == "MLVL"]
+
+    for mlvl_id in ids:
+        mlvl = asset_manager.get_file(mlvl_id, Mlvl)
+        try:
+            world_name = mlvl.world_name
+        except UnknownAssetId:
+            world_name = "~no name~"
+
+        for area in mlvl.areas:
+            print(f"{world_name} (0x{mlvl_id:08x}) - {area.name}: {area.mrea_asset_id}")
+
+
+def _list_objects_command(args, area: Area):
+    for layer in area.all_layers:
+        if not args.layer or args.layer == layer.name:
+            for obj in layer.instances:
+                print(f"{layer.name} - {obj} ({obj.name})")
+
+
+def _print_object_command(args, area: Area):
+    obj = area.get_instance(args.instance_id)
+    pprint.pp(obj.get_properties(), width=200)
+    print(f"Connections from: ({len(obj.connections)} total)")
+    for con in obj.connections:
+        print(con)
+
+
+def do_area_command(args):
+    game: Game = args.game
+    asset_manager = AssetManager(get_provider_from_argument(args), game)
+
+    if args.area_command == "list-areas":
+        _list_areas_command(args, asset_manager)
+        return
+
+    world = asset_manager.get_file(args.world_id, Mlvl)
+    area = world.get_area(args.area_id)
+
+    if args.area_command == "list-objects":
+        _list_objects_command(args, area)
+
+    elif args.area_command == "print-object":
+        _print_object_command(args, area)
+
+    else:
+        raise ValueError(f"Unknown command: {args.area_command}")
+
+
 def main():
     logging.basicConfig(level=logging.INFO)
     args = create_parser().parse_args()
@@ -362,5 +432,7 @@ def main():
         do_convert(args)
     elif args.command == "compare-files":
         asyncio.run(compare_all_files_in_path(args))
+    elif args.command == "areas":
+        do_area_command(args)
     else:
         raise ValueError(f"Unknown command: {args.command}")
