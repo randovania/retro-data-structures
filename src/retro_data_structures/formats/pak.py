@@ -3,7 +3,7 @@ from __future__ import annotations
 import typing
 
 from retro_data_structures.base_resource import AssetId, RawResource
-from retro_data_structures.formats import pak_gc, pak_wiiu
+from retro_data_structures.formats import pak_gc, pak_wii, pak_wiiu
 from retro_data_structures.formats.pak_gc import PakBody, PakFile
 from retro_data_structures.game_check import Game
 
@@ -11,6 +11,8 @@ from retro_data_structures.game_check import Game
 def _pak_for_game(game: Game):
     if game == Game.PRIME_REMASTER:
         return pak_wiiu.PAK_WIIU
+    elif game >= Game.CORRUPTION:
+        raise ValueError("Unsupported game")
     else:
         return pak_gc.PAK_GC
 
@@ -27,6 +29,8 @@ class Pak:
     def header_for_game(game: Game):
         if game == Game.PRIME_REMASTER:
             return pak_wiiu.PakWiiUNoData
+        elif game >= Game.CORRUPTION:
+            return pak_wii.PAKNoData
         else:
             return pak_gc.PAKNoData
 
