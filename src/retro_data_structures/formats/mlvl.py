@@ -3,6 +3,7 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
 
+import itertools
 import typing
 
 import construct
@@ -187,7 +188,11 @@ def create(version: int, asset_id):
     fields.extend(
         [
             "area_layer_flags" / PrefixedArray(Int32ub, LayerFlags()),
-            "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
+            "_layer_names"
+            / construct.Rebuild(
+                PrefixedArray(Int32ub, CString("utf-8")),
+                lambda ctx: list(itertools.chain.from_iterable(ctx.area_layer_names)),
+            ),
         ]
     )
 
@@ -195,7 +200,24 @@ def create(version: int, asset_id):
     if version >= 0x19:
         fields.append("layer_guid" / PrefixedArray(Int32ub, GUID))
 
-    fields.append("area_layer_name_offset" / PrefixedArray(Int32ub, Int32ub))
+    fields.append(
+        "_area_layer_name_offset"
+        / construct.Rebuild(
+            PrefixedArray(Int32ub, Int32ub),
+            lambda ctx: [0] + list(itertools.accumulate(len(it) for it in ctx.area_layer_names[:-1])),
+        )
+    )
+    fields.append(
+        "area_layer_names"
+        / construct.Computed(
+            lambda ctx: [
+                ctx._layer_names[start:end]
+                for start, end in zip(
+                    ctx._area_layer_name_offset, ctx._area_layer_name_offset[1:] + [len(ctx._layer_names)], strict=True
+                )
+            ]
+        )
+    )
 
     return Struct(*fields)
 
@@ -255,13 +277,9 @@ class Mlvl(BaseResource):
 
     @property
     def areas(self) -> Iterator[Area]:
-        offsets = self._raw.area_layer_name_offset
-        names = self._raw.layer_names
+        names = self._raw.area_layer_names
         for i, area in enumerate(self._raw.areas):
-            area_layer_names = (
-                names[offsets[i] :] if i == len(self._raw.areas) - 1 else names[offsets[i] : offsets[i + 1]]
-            )
-            yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
+            yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], names[i], i, self)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
@@ -289,16 +307,13 @@ class Mlvl(BaseResource):
             )
         )
         self._raw.area_layer_flags.append([])
-        area_layer_names = []
-
-        name_offsets: list = self._raw.area_layer_name_offset
-        name_offsets.append(len(self._raw.layer_names))
+        self._raw.area_layer_names.append([])
 
         return Area(
             self._raw.areas[area_index],
             self.asset_manager,
             self._raw.area_layer_flags[area_index],
-            area_layer_names,
+            self._raw.area_layer_names[area_index],
             area_index,
             self,
         )
