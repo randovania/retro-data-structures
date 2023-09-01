@@ -36,6 +36,7 @@ from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import (
     Area,
+    AreaDependencies,
     AreaDependencyAdapter,
     AreaModuleDependencyAdapter,
 )
@@ -45,8 +46,6 @@ from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
-
-    pass
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,
@@ -75,10 +74,10 @@ class LayerFlags(Adapter):
             )
         )
 
-    def _decode(self, obj, context, path):
+    def _decode(self, obj, context, path) -> ListContainer:
         return ListContainer(reversed(obj.layer_flags))[: obj.layer_count]
 
-    def _encode(self, obj, context, path):
+    def _encode(self, obj: ListContainer, context, path):
         flags = [True for i in range(64)]
         flags[: len(obj)] = obj
         return Container({"layer_count": len(obj), "layer_flags": list(reversed(flags))})
@@ -266,6 +265,43 @@ class Mlvl(BaseResource):
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
+
+    def add_area(self, mrea_id: NameOrAssetId, name_id: NameOrAssetId, internal_name: str = "") -> Area:
+        """
+        :param mrea_id:
+        :param name_id: TODO: will be changed into a string in the future
+        :param internal_name:
+        :return:
+        """
+        area_index = len(self._raw.areas)
+        self._raw.areas.append(
+            Container(
+                area_name_id=self.asset_manager._resolve_asset_id(name_id),
+                area_transform=[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                area_bounding_box=[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0],
+                area_mrea_id=self.asset_manager._resolve_asset_id(mrea_id),
+                internal_area_id=area_index,
+                attached_area_index=ListContainer(),
+                dependencies=AreaDependencies([], []),
+                docks=ListContainer(),
+                module_dependencies=ListContainer(),
+                internal_area_name=internal_name,
+            )
+        )
+        self._raw.area_layer_flags.append([])
+        area_layer_names = []
+
+        name_offsets: list = self._raw.area_layer_name_offset
+        name_offsets.append(len(self._raw.layer_names))
+
+        return Area(
+            self._raw.areas[area_index],
+            self.asset_manager,
+            self._raw.area_layer_flags[area_index],
+            area_layer_names,
+            area_index,
+            self,
+        )
 
     _name_strg_cached: Strg = None
     _dark_strg_cached: Strg = None

@@ -457,7 +457,7 @@ class MREAConstruct(construct.Construct):
         mrea_header.version = obj.version
         mrea_header.area_transform = obj.area_transform
         mrea_header.world_model_count = obj.world_model_count
-        mrea_header.script_layer_count = len(obj.raw_sections.script_layers_section)
+        mrea_header.script_layer_count = len(raw_sections.script_layers_section)
         mrea_header.data_section_count = len(data_sections)
 
         MREAHeader._build(mrea_header, stream, context, path)
