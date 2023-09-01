@@ -134,12 +134,13 @@ def create_parser():
     area_sub = area_tool.add_subparsers(dest="area_command", required=True)
     area_sub.add_parser("list-areas", help="List all areas").add_argument("--world", help="Only in the given world")
 
-    list_cmd = area_sub.add_parser("list-objects", help="List all objects in an area")
+    list_objs_cmd = area_sub.add_parser("list-objects", help="List all objects in an area")
+    list_docks_cmd = area_sub.add_parser("list-docks", help="List all docks in an area")
     print_cmd = area_sub.add_parser("print-object", help="Print details about an object")
-    for c in [list_cmd, print_cmd]:
+    for c in [list_objs_cmd, list_docks_cmd, print_cmd]:
         c.add_argument("world_id", type=lambda x: int(x, 0), help="Asset id of the world")
         c.add_argument("area_id", type=lambda x: int(x, 0), help="Asset id of the area")
-    list_cmd.add_argument("--layer", help="Only in the given layer")
+    list_objs_cmd.add_argument("--layer", help="Only in the given layer")
     print_cmd.add_argument("instance_id", type=lambda x: int(x, 0), help="Instance id of the object to print")
 
     return parser
@@ -378,6 +379,21 @@ def _list_objects_command(args, area: Area):
                 print(f"{layer.name} - {obj} ({obj.name})")
 
 
+def _list_docks_command(args, area: Area):
+    docks = area._raw.docks
+    print(f"{len(docks)} docks found")
+    for i, dock in enumerate(docks):
+        print(f"Dock {i}. {len(dock.connecting_dock)} connections, {len(dock.dock_coordinates)} coordinates.")
+
+        print("> Connections:")
+        for k, connection in enumerate(dock.connecting_dock):
+            print(f"{k:>2}: area {connection.area_index:>2}, dock index: {connection.dock_index}")
+
+        print("> Coordinates:")
+        for k, coordinates in enumerate(dock.dock_coordinates):
+            print(f"{k}: {list(coordinates)}")
+
+
 def _print_object_command(args, area: Area):
     obj = area.get_instance(args.instance_id)
     pprint.pp(obj.get_properties(), width=200)
@@ -400,6 +416,9 @@ def do_area_command(args):
     if args.area_command == "list-objects":
         _list_objects_command(args, area)
 
+    elif args.area_command == "list-docks":
+        _list_docks_command(args, area)
+
     elif args.area_command == "print-object":
         _print_object_command(args, area)
 
@@ -407,10 +426,7 @@ def do_area_command(args):
         raise ValueError(f"Unknown command: {args.area_command}")
 
 
-def main():
-    logging.basicConfig(level=logging.INFO)
-    args = create_parser().parse_args()
-
+def handle_args(args) -> None:
     if args.command == "ksy-export":
         do_ksy_export(args)
     elif args.command == "decode":
@@ -431,3 +447,8 @@ def main():
         do_area_command(args)
     else:
         raise ValueError(f"Unknown command: {args.command}")
+
+
+def main():
+    logging.basicConfig(level=logging.INFO)
+    handle_args(create_parser().parse_args())
