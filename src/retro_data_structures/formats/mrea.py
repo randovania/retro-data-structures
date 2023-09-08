@@ -685,7 +685,7 @@ class Area:
         self._layer_names.append(name)
         self._flags.append(active)
         raw = new_layer(index, self.asset_manager.target_game)
-        self.mrea._raw.sections.script_layer_section.append(raw)
+        self.mrea.get_section("script_layer_section").append(raw)
         return self.get_layer(name)
 
     @property
