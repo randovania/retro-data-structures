@@ -75,10 +75,10 @@ class LayerFlags(Adapter):
             )
         )
 
-    def _decode(self, obj, context, path) -> ListContainer:
+    def _decode(self, obj: Container, context, path) -> list[bool]:
         return ListContainer(reversed(obj.layer_flags))[: obj.layer_count]
 
-    def _encode(self, obj: ListContainer, context, path):
+    def _encode(self, obj: list[bool], context, path) -> Container:
         flags = [True for i in range(64)]
         flags[: len(obj)] = obj
         return Container({"layer_count": len(obj), "layer_flags": list(reversed(flags))})
@@ -277,9 +277,11 @@ class Mlvl(BaseResource):
 
     @property
     def areas(self) -> Iterator[Area]:
-        names = self._raw.area_layer_names
+        area_layer_flags: list[list[bool]] = self._raw.area_layer_flags
+        names: list[list[str]] = self._raw.area_layer_names
+
         for i, area in enumerate(self._raw.areas):
-            yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], names[i], i, self)
+            yield Area(area, self.asset_manager, area_layer_flags[i], names[i], i, self)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))

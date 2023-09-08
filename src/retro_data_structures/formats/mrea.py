@@ -598,8 +598,8 @@ class AreaDependencies:
 
 
 class Area:
-    _flags: Container
-    _layer_names: ListContainer
+    _flags: list[bool]
+    _layer_names: list[str]
     _index: int
 
     _mrea: Mrea = None
@@ -611,8 +611,8 @@ class Area:
         self,
         raw: Container,
         asset_manager: AssetManager,
-        flags: Container,
-        names: Container,
+        flags: list[bool],
+        names: list[str],
         index: int,
         parent_mlvl: Mlvl,
     ):
