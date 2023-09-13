@@ -8,7 +8,7 @@ from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalStr
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
-from retro_data_structures.common_types import ObjectTag_32
+from retro_data_structures.common_types import AssetId32, FourCC
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
 
@@ -20,23 +20,41 @@ PAKHeader = Struct(
     version_minor=Const(5, Int16ub),
     unused=Const(0, Int32ub),
 )
-ResourceHeader = Struct(
+ConstructResourceHeader = Struct(
     compressed=Int32ub,
-    asset=ObjectTag_32,
+    asset_type=FourCC,
+    asset_id=AssetId32,
     size=Int32ub,
     offset=Int32ub,
 )
+
+
+def _emitparse_header(code: construct.CodeGen) -> str:
+    code.append("ResourceHeader_Format = struct.Struct('>LLLLL')")
+    code.append(
+        """def _create_resource_header(compressed, asset_type, asset_id, size, offset):
+    return Container(compressed=compressed, asset_type=asset_type.to_bytes(4, "big").decode("ascii"),
+                     asset_id=asset_id, size=size, offset=offset)
+    """
+    )
+    return "_create_resource_header(*ResourceHeader_Format.unpack(io.read(20)))"
+
+
+ConstructResourceHeader._emitparse = _emitparse_header
+
 PAKNoData = Struct(
     _header=PAKHeader,
     named_resources=PrefixedArray(
         Int32ub,
         Struct(
-            asset=ObjectTag_32,
+            asset_type=FourCC,
+            asset_id=AssetId32,
             name=PascalString(Int32ub, "utf-8"),
         ),
     ),
-    resources=PrefixedArray(Int32ub, ResourceHeader),
+    resources=PrefixedArray(Int32ub, ConstructResourceHeader),
 ).compile()
+
 CompressedPakResource = FocusedSeq(
     "data",
     decompressed_size=Rebuild(Int32ub, construct.len_(construct.this.data)),
@@ -108,8 +126,8 @@ class ConstructPakGc(construct.Construct):
 
             files.append(
                 PakFile(
-                    resource.asset.id,
-                    resource.asset.type,
+                    resource.asset_id,
+                    resource.asset_type,
                     resource.compressed > 0,
                     uncompressed_data,
                     compressed_data,
@@ -118,7 +136,7 @@ class ConstructPakGc(construct.Construct):
 
         return PakBody(
             named_resources={
-                named.name: Dependency(type=named.asset.type, id=named.asset.id) for named in header.named_resources
+                named.name: Dependency(type=named.asset_type, id=named.asset_id) for named in header.named_resources
             },
             files=files,
         )
@@ -130,10 +148,8 @@ class ConstructPakGc(construct.Construct):
             _header=construct.Container(),
             named_resources=construct.ListContainer(
                 construct.Container(
-                    asset=construct.Container(
-                        type=dep.type,
-                        id=dep.id,
-                    ),
+                    asset_type=dep.type,
+                    asset_id=dep.id,
                     name=name,
                 )
                 for name, dep in obj.named_resources.items()
@@ -141,10 +157,8 @@ class ConstructPakGc(construct.Construct):
             resources=construct.ListContainer(
                 construct.Container(
                     compressed=0,
-                    asset=construct.Container(
-                        type=file.asset_type,
-                        id=file.asset_id,
-                    ),
+                    asset_type=file.asset_type,
+                    asset_id=file.asset_id,
                     size=0,
                     offset=0,
                 )
