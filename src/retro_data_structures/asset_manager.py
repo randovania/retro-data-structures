@@ -23,7 +23,6 @@ from retro_data_structures.exceptions import DependenciesHandledElsewhere, Unkno
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
@@ -32,6 +31,7 @@ if typing.TYPE_CHECKING:
     import construct
 
     from retro_data_structures.formats.ancs import Ancs
+    from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T")
 logger = logging.getLogger(__name__)
@@ -127,6 +127,7 @@ class AssetManager:
 
     _cached_dependencies: dict[AssetId, tuple[Dependency, ...]]
     _cached_ancs_per_char_dependencies: defaultdict[AssetId, dict[int, tuple[Dependency, ...]]]
+    _sound_id_to_agsc: dict[int, AssetId | None] | None = None
 
     def __init__(self, provider: FileProvider, target_game: Game):
         self.provider = provider
@@ -139,10 +140,6 @@ class AssetManager:
 
         self._cached_dependencies = {}
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
-
-        self._sound_id_to_agsc: dict[int, AssetId | None] = {}
-        if target_game == Game.ECHOES:
-            self.build_audio_group_dependency_table()
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if str(value) in self._custom_asset_ids:
@@ -465,9 +462,10 @@ class AssetManager:
         yield from deps
         yield Dependency("ANCS", asset_id)
 
-    def build_audio_group_dependency_table(self):
+    def _build_audio_group_dependency_table(self):
         atbl: Atbl | None = None
         agsc_ids: list[AssetId] = []
+
         for asset_id in self.all_asset_ids():
             asset_type = self.get_asset_type(asset_id)
             if asset_type == "ATBL":
@@ -492,6 +490,9 @@ class AssetManager:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
 
     def get_audio_group_dependency(self, sound_id: int) -> Iterator[Dependency]:
+        if self._sound_id_to_agsc is None:
+            self._build_audio_group_dependency_table()
+
         agsc = self._sound_id_to_agsc[sound_id]
         if agsc is None:
             return
