@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import fnmatch
 import json
 import logging
@@ -146,13 +147,9 @@ class AssetManager:
             return self._custom_asset_ids[str(value)]
         return resolve_asset_id(self.target_game, value)
 
-    def _add_pak_name_for_asset_id(self, asset_id: AssetId, pak_name: str):
-        self._paks_for_asset_id[asset_id] = self._paks_for_asset_id.get(asset_id, set())
-        self._paks_for_asset_id[asset_id].add(pak_name)
-
     def _update_headers(self):
         self._ensured_asset_ids = {}
-        self._paks_for_asset_id = {}
+        self._paks_for_asset_id = collections.defaultdict(set)
         self._types_for_asset_id = {}
 
         self._custom_asset_ids = {}
@@ -170,8 +167,8 @@ class AssetManager:
 
             self._ensured_asset_ids[name] = set()
             for entry in pak_no_data.resources:
-                self._add_pak_name_for_asset_id(entry.asset.id, name)
-                self._types_for_asset_id[entry.asset.id] = entry.asset.type
+                self._paks_for_asset_id[entry.asset_id].add(name)
+                self._types_for_asset_id[entry.asset_id] = entry.asset_type
 
     def all_asset_ids(self) -> Iterator[AssetId]:
         """

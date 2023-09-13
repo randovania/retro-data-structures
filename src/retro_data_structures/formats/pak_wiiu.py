@@ -13,10 +13,8 @@ from retro_data_structures.formats.form_descriptor import FormDescriptor, FormDe
 from retro_data_structures.formats.pak_gc import PakFile
 
 StringTableEntry = Struct(
-    asset=Struct(
-        type=FourCC,
-        id=GUID,
-    ),
+    asset_type=FourCC,
+    asset_id=GUID,
     name=construct.PascalString(Int32ul, "utf8"),
 )
 
@@ -26,10 +24,8 @@ MetadataEntry = Struct(
 )
 
 AssetDirectoryEntry = Struct(
-    asset=Struct(
-        type=FourCC,
-        id=GUID,
-    ),
+    asset_type=FourCC,
+    asset_id=GUID,
     version_a=Hex(Int32ul),
     version_b=Hex(Int32ul),
     offset=Hex(Int64ul),
@@ -87,14 +83,14 @@ class ConstructPakWiiU(construct.Construct):
         for i, resource in enumerate(header.tocc.ADIR.data):
             # if resource.decompressed_size != resource.size:
             #     raise construct.ConstructError(
-            #         f"Resource {i} ({resource.asset.id} {resource.asset.type}), is compressed", path)
+            #         f"Resource {i} ({resource.asset_id} {resource.asset_type}), is compressed", path)
 
             construct.stream_seek(stream, resource.offset, 0, path)
             data = construct.stream_read(stream, resource.size, path)
             files.append(
                 PakFile(
-                    resource.asset.id,
-                    resource.asset.type,
+                    resource.asset_id,
+                    resource.asset_type,
                     False,
                     data,
                     None,
@@ -126,10 +122,8 @@ class ConstructPakWiiU(construct.Construct):
             id="ADIR",
             data=construct.ListContainer(
                 construct.Container(
-                    asset=construct.Container(
-                        type=file.asset_type,
-                        id=file.asset_id,
-                    ),
+                    asset_type=file.asset_type,
+                    asset_id=file.asset_id,
                     version_a=file.extra.version_a,
                     version_b=file.extra.version_b,
                     offset=0,
