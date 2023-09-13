@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import construct
 from construct import Container, Hex, Int16ul, Int32ul, PrefixedArray, Struct
 
-import retro_data_structures.properties.prime_remastered.objects
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
@@ -193,6 +192,8 @@ class RDSPropertyAdapter(construct.Adapter):
         self.type_id = type_id
 
     def _decode(self, obj: bytes, context, path):
+        import retro_data_structures.properties.prime_remastered.objects
+
         type_id = self.type_id(context)
         try:
             property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
@@ -208,6 +209,8 @@ class RDSPropertyAdapter(construct.Adapter):
 
 class ComponentTypeName(int):
     def __str__(self) -> str:
+        import retro_data_structures.properties.prime_remastered.objects
+
         try:
             return retro_data_structures.properties.prime_remastered.objects.get_object(self).__name__
         except KeyError:
