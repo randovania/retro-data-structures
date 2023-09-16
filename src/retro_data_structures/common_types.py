@@ -9,7 +9,7 @@ from construct import (
     CString,
     Float32b,
     Hex,
-    Int16ub,
+    Int8ub,
     Int32ub,
     Int64ub,
     PaddedString,
@@ -67,9 +67,10 @@ ObjectTag_64 = Struct(
 )
 
 MayaSpline = Struct(
-    unk=Int16ub,
+    pre_infinity=Int8ub,
+    pos_infinity=Int8ub,
     knots=PrefixedArray(Int32ub, Knot),
-    clampMode=Byte,
-    minAmplitude=Float32b,
-    maxAmplitude=Float32b,
+    clamp_mode=Byte,
+    min_amplitude=Float32b,
+    max_amplitude=Float32b,
 )
