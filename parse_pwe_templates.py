@@ -491,7 +491,6 @@ class ClassDefinition:
         big_format = get_endianness(self.game_id) + "".join(
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
-        assert len(big_format) == 1 + 3 * num_props
         yield "_FAST_FORMAT = None"
         yield f"_FAST_IDS = ({', '.join(ids)})"
         yield ""
@@ -515,12 +514,18 @@ class ClassDefinition:
         yield ""
 
         yield f"    return {self.class_name}("
+        offset = 0
         for i, prop in enumerate(self.all_props.values()):
-            value = f"dec[{i * 3 + 2}]"
-            if prop.prop_type.startswith("enums."):
-                yield f"        {prop.prop_type}({value}),"
+            offset += 2  # prop id + size
+            if len(prop.format_specifier) == 1:
+                value = f"dec[{offset}]"
+                if prop.prop_type.startswith("enums."):
+                    yield f"        {prop.prop_type}({value}),"
+                else:
+                    yield f"        {value},"
             else:
-                yield f"        {value},"
+                yield f"        {prop.prop_type}(*dec[{offset}:{offset + len(prop.format_specifier)}]),"
+            offset += len(prop.format_specifier)
 
         yield "    )"
 
@@ -1262,9 +1267,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             to_json_code = "{obj}.to_json()"
 
             if raw_type == "Color":
-                known_size = 4 * 4  # float * 4
+                format_specifier = "f" * 4
             else:
-                known_size = 4 * 3  # float * 3
+                format_specifier = "f" * 3
 
             s = struct.Struct(f"{endianness}f")
 
