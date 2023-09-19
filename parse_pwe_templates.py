@@ -925,7 +925,7 @@ from .AssetId import AssetId, default_asset_id
 
 @dataclasses.dataclass()
 class AnimationParameters(BaseProperty):
-    ancs: AssetId = default_asset_id
+    ancs: AssetId = dataclasses.field(metadata={{'asset_types': ['ANCS']}}, default=default_asset_id)
     character_index: int = 0
     initial_anim: int = 0
 
@@ -956,32 +956,67 @@ class AnimationParameters(BaseProperty):
         """# Generated file
 import dataclasses
 import typing
-import base64
+
+import construct
 
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.base_spline import BaseSpline, Knot
+from retro_data_structures.common_types import MayaSpline
 
 
 @dataclasses.dataclass()
-class Spline(BaseProperty):
-    data: bytes = b""
+class Spline(BaseSpline):
+    unknown: bytes = b""
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
-        assert size is not None
-        result = cls()
-        result.data = data.read(size)
-        return result
+        before = data.tell()
+        decoded = MayaSpline.parse_stream(data)
+        after = data.tell()
+
+        size_read = after - before
+        if size is not None and size != size_read:
+            unknown = data.read(size - size_read)
+        else:
+            unknown = b""
+
+        return cls(
+            pre_infinity=decoded.pre_infinity,
+            post_infinity=decoded.post_infinity,
+            knots=[
+                Knot(
+                    time=knot.time,
+                    amplitude=knot.amplitude,
+                    unk_a=knot.unk_a,
+                    unk_b=knot.unk_b,
+                )
+                for knot in decoded.knots
+            ],
+            clamp_mode=decoded.clamp_mode,
+            minimum_amplitude=decoded.minimum_amplitude,
+            maximum_amplitude=decoded.maximum_amplitude,
+            unknown=unknown,
+        )
 
     def to_stream(self, data: typing.BinaryIO):
-        data.write(self.data)
+        MayaSpline.build_stream(construct.Container(
+            pre_infinity=self.pre_infinity,
+            post_infinity=self.post_infinity,
+            knots=[
+                construct.Container(
+                    time=knot.time,
+                    amplitude=knot.amplitude,
+                    unk_a=knot.unk_a,
+                    unk_b=knot.unk_b,
+                )
+                for knot in self.knots
+            ],
+            clamp_mode=self.clamp_mode,
+            minimum_amplitude=self.minimum_amplitude,
+            maximum_amplitude=self.maximum_amplitude,
+        ), data)
+        data.write(self.unknown)
 
-    @classmethod
-    def from_json(cls, data):
-        return cls(base64.b64decode(data))
-
-    def to_json(self) -> str:
-        return base64.b64encode(self.data).decode("ascii")
 """
         + game_code
     )

@@ -68,9 +68,9 @@ ObjectTag_64 = Struct(
 
 MayaSpline = Struct(
     pre_infinity=Int8ub,
-    pos_infinity=Int8ub,
+    post_infinity=Int8ub,
     knots=PrefixedArray(Int32ub, Knot),
     clamp_mode=Byte,
-    min_amplitude=Float32b,
-    max_amplitude=Float32b,
+    minimum_amplitude=Float32b,
+    maximum_amplitude=Float32b,
 )
