@@ -553,9 +553,7 @@ class ClassDefinition:
             self.class_code += f"        property_count = {_CODE_PARSE_UINT16[endianness]}\n"
 
         if self._can_fast_decode():
-            self.class_code += (
-                "        if default_override is None and (result := _fast_decode(data, property_count)) is not None:\n"
-            )
+            self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
             self.class_code += "            return result\n\n"
 
             for fast_decode in self._create_fast_decode_body():
@@ -587,8 +585,12 @@ class ClassDefinition:
 
         signature = "data: typing.BinaryIO, property_size: int"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
-            self.after_class_code += f"    return {prop.parse_code}\n\n\n"
+            if prop.parse_code.endswith(".from_stream(data, property_size)"):
+                suffix_size = len("(data, property_size)")
+                self.after_class_code += f"_decode_{prop_name} = {prop.parse_code[:-suffix_size]}\n\n"
+            else:
+                self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
+                self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
