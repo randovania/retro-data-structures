@@ -955,13 +955,14 @@ class AnimationParameters(BaseProperty):
     core_path.joinpath("Spline.py").write_text(
         """# Generated file
 import dataclasses
+import struct
 import typing
 
 import construct
 
+from retro_data_structures.common_types import MayaSpline
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_spline import BaseSpline, Knot
-from retro_data_structures.common_types import MayaSpline
 
 
 @dataclasses.dataclass()
@@ -971,7 +972,13 @@ class Spline(BaseSpline):
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         before = data.tell()
-        decoded = MayaSpline.parse_stream(data)
+
+        pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
+        knots = [
+            Knot(*struct.unpack(">ffBB", data.read(10)))
+            for _ in range(knot_count)
+        ]
+        clamp_mode, minimum_amplitude, maximum_amplitude = struct.unpack(">Bff", data.read(9))
         after = data.tell()
 
         size_read = after - before
@@ -981,20 +988,12 @@ class Spline(BaseSpline):
             unknown = b""
 
         return cls(
-            pre_infinity=decoded.pre_infinity,
-            post_infinity=decoded.post_infinity,
-            knots=[
-                Knot(
-                    time=knot.time,
-                    amplitude=knot.amplitude,
-                    unk_a=knot.unk_a,
-                    unk_b=knot.unk_b,
-                )
-                for knot in decoded.knots
-            ],
-            clamp_mode=decoded.clamp_mode,
-            minimum_amplitude=decoded.minimum_amplitude,
-            maximum_amplitude=decoded.maximum_amplitude,
+            pre_infinity=pre_infinity,
+            post_infinity=post_infinity,
+            knots=knots,
+            clamp_mode=clamp_mode,
+            minimum_amplitude=minimum_amplitude,
+            maximum_amplitude=maximum_amplitude,
             unknown=unknown,
         )
 
