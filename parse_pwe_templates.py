@@ -1227,7 +1227,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
             meta["default_factory"] = "list"
-            parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32[endianness]})]"
+            if len(inner_prop.format_specifier or "") == 1:
+                specifier = f"{repr(endianness)} + {repr(inner_prop.format_specifier)} * (count := {_CODE_PARSE_UINT32[endianness]})"
+                parse_code = f"list(struct.unpack({specifier}, data.read(count * {inner_prop.known_size})))"
+            else:
+                parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32[endianness]})]"
             build_code.extend(
                 [
                     "array = {obj}",
