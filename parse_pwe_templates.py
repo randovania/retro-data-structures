@@ -514,7 +514,7 @@ class ClassDefinition:
         ret_state = [f"    return {self.class_name}("]
 
         offset = 0
-        for i, prop in enumerate(self.all_props.values()):
+        for prop in self.all_props.values():
             fast_check.append(f"dec[{offset}]")
 
             offset += 2  # prop id + size
@@ -540,6 +540,26 @@ class ClassDefinition:
 
         yield from ret_state
         yield "    )"
+
+    def _create_simple_decode_body(self):
+        num_props = len(self.all_props)
+        endianness = get_endianness(self.game_id)
+        [hex(prop.id) for prop in self.all_props.values()]
+
+        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        yield f"    if property_count != {num_props}:"
+        yield "        return None"
+        yield ""
+
+        for prop_name, prop in self.all_props.items():
+            # yield "    data.read(6)"  # TODO: assert correct
+            yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
+            yield f"    assert property_id == 0x{prop.id:08x}"
+            yield f"    {prop_name} = {prop.parse_code}"
+            yield ""
+
+        all_fields = ", ".join(self.all_props.keys())
+        yield f"    return {self.class_name}({all_fields})"
 
     def write_from_stream(self):
         game_id = self.game_id
@@ -569,13 +589,16 @@ class ClassDefinition:
         else:
             self.class_code += f"        property_count = {_CODE_PARSE_UINT16[endianness]}\n"
 
-        if self._can_fast_decode():
-            self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
-            self.class_code += "            return result\n\n"
+        self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
+        self.class_code += "            return result\n\n"
 
+        if self._can_fast_decode():
             for fast_decode in self._create_fast_decode_body():
                 self.after_class_code += f"{fast_decode}\n"
-            self.after_class_code += "\n\n"
+        else:
+            for fast_decode in self._create_simple_decode_body():
+                self.after_class_code += f"{fast_decode}\n"
+        self.after_class_code += "\n\n"
 
         if self.keep_unknown_properties():
             read_unknown = 'present_fields["unknown_properties"][property_id] = data.read(property_size)'
