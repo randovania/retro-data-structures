@@ -20,6 +20,7 @@ import inflection
 # ruff: noqa: PLW0603  we use globals here
 
 rds_root = Path(__file__).parent.joinpath("src", "retro_data_structures")
+FAST_DECODE_ASSERT = True  # fast import will assert the ids are in the correct order instead of failing if not
 
 _game_id_to_file = {
     "Prime": "prime",
@@ -504,7 +505,9 @@ class ClassDefinition:
         yield "    if _FAST_FORMAT is None:"
         yield f"        _FAST_FORMAT = struct.Struct({repr(big_format)})"
         yield ""
-        yield "    before = data.tell()"
+
+        if not FAST_DECODE_ASSERT:
+            yield "    before = data.tell()"
         yield f"    dec = _FAST_FORMAT.unpack(data.read({struct.calcsize(big_format)}))"
 
         fast_check = []
@@ -527,10 +530,13 @@ class ClassDefinition:
             ret_state.append(st)
             offset += len(prop.format_specifier)
 
-        yield f"    if ({', '.join(fast_check)}) != _FAST_IDS:"
-        yield "        data.seek(before)"
-        yield "        return None"
-        yield ""
+        if FAST_DECODE_ASSERT:
+            yield f"    assert ({', '.join(fast_check)}) == _FAST_IDS"
+        else:
+            yield f"    if ({', '.join(fast_check)}) != _FAST_IDS:"
+            yield "        data.seek(before)"
+            yield "        return None"
+            yield ""
 
         yield from ret_state
         yield "    )"
