@@ -507,26 +507,32 @@ class ClassDefinition:
         yield "    before = data.tell()"
         yield f"    dec = _FAST_FORMAT.unpack(data.read({struct.calcsize(big_format)}))"
 
-        left = [f"dec[{i * 3}]" for i in range(num_props)]
-        yield f"    if ({', '.join(left)}) != _FAST_IDS:"
-        yield "        data.seek(before)"
-        yield "        return None"
-        yield ""
+        fast_check = []
+        ret_state = [f"    return {self.class_name}("]
 
-        yield f"    return {self.class_name}("
         offset = 0
         for i, prop in enumerate(self.all_props.values()):
+            fast_check.append(f"dec[{offset}]")
+
             offset += 2  # prop id + size
             if len(prop.format_specifier) == 1:
                 value = f"dec[{offset}]"
                 if prop.prop_type.startswith("enums."):
-                    yield f"        {prop.prop_type}({value}),"
+                    st = f"        {prop.prop_type}({value}),"
                 else:
-                    yield f"        {value},"
+                    st = f"        {value},"
             else:
-                yield f"        {prop.prop_type}(*dec[{offset}:{offset + len(prop.format_specifier)}]),"
+                st = f"        {prop.prop_type}(*dec[{offset}:{offset + len(prop.format_specifier)}]),"
+
+            ret_state.append(st)
             offset += len(prop.format_specifier)
 
+        yield f"    if ({', '.join(fast_check)}) != _FAST_IDS:"
+        yield "        data.seek(before)"
+        yield "        return None"
+        yield ""
+
+        yield from ret_state
         yield "    )"
 
     def write_from_stream(self):
