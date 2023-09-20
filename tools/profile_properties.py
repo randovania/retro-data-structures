@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
+import json
 import time
 from pathlib import Path
 
@@ -11,7 +13,7 @@ from retro_data_structures import properties
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
 from retro_data_structures.formats import Mrea, Room
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties import BaseProperty
+from retro_data_structures.properties.base_property import BaseProperty
 from retro_data_structures.properties.prime import objects as prime_objects
 
 SerializedData = construct.Struct(
@@ -119,8 +121,14 @@ def do_dump_properties_room(game: Game, args):
 
 
 def _parse_properties(  # noqa: PLR0912 Too many branches
-    game: Game, property_data: construct.Container, build: bool, compare: bool
-):
+    game: Game,
+    property_data: construct.Container,
+    build: bool,
+    compare: bool,
+    report: bool,
+) -> list[dict]:
+    decoded_results = []
+
     start_time = time.time()
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
@@ -141,6 +149,13 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
             data.seek(before)
             data.read(instance.size)
             print(f"Unable to decode instance {instance.identifier} of type {type_name}: {type(e)} - {e}")
+            if report:
+                decoded_results.append(
+                    {
+                        "identifier": instance.identifier,
+                        "error": str(e),
+                    }
+                )
             continue
 
         after = data.tell()
@@ -152,6 +167,14 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
 
         if build:
             new_encoded = the_property.to_bytes()
+            if report:
+                decoded_results.append(
+                    {
+                        "identifier": instance.identifier,
+                        "value": the_property.to_json(),
+                        "rebuild_sha256": hashlib.sha256(new_encoded).hexdigest(),
+                    }
+                )
 
             if compare:
                 data.seek(before)
@@ -164,15 +187,28 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
                         print(f"Instance {instance.identifier} of type {type_name} is longer than the original")
 
     print(f"Processed properties in {time.time() - start_time:0.4f} seconds")
+    return decoded_results
 
 
 def do_parse_properties(game: Game, args):
     path = Path(__file__).parent.joinpath(f"properties_{game.name}.bin")
 
     property_data = SerializedData.parse_file(path)
+    decoded_result = None
 
     for repeat in range(args.repeat):
-        _parse_properties(game, property_data, args.build or args.compare, args.compare)
+        decoded_result = _parse_properties(game, property_data, args.build or args.compare, args.compare, args.report)
+
+    if args.report:
+        assert decoded_result is not None
+        encoded_results = json.dumps(decoded_result, indent=4)
+        encoded_results_path = path.with_suffix(".json")
+
+        if encoded_results_path.exists():
+            if encoded_results_path.read_text() != encoded_results:
+                print("Results differ from last run!")
+        else:
+            encoded_results_path.write_text(encoded_results)
 
 
 def main():
@@ -188,6 +224,7 @@ def main():
     parse_properties.add_argument("--repeat", default=1, type=int, help="Perform the decoding this many times")
     parse_properties.add_argument("--build", action="store_true", help="re-build and discard the result")
     parse_properties.add_argument("--compare", action="store_true", help="re-build and compare with original")
+    parse_properties.add_argument("--report", action="store_true", help="creates a json report of the decoded values")
 
     args = parser.parse_args()
     game: Game = getattr(Game, args.game)
