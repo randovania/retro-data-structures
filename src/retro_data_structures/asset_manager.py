@@ -34,7 +34,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.formats.ancs import Ancs
     from retro_data_structures.game_check import Game
 
-T = typing.TypeVar("T")
+T = typing.TypeVar("T", bound=BaseResource)
 logger = logging.getLogger(__name__)
 
 
