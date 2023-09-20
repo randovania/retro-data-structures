@@ -20,6 +20,7 @@ import inflection
 # ruff: noqa: PLW0603  we use globals here
 
 rds_root = Path(__file__).parent.joinpath("src", "retro_data_structures")
+FAST_DECODE_ASSERT = True  # fast import will assert the ids are in the correct order instead of failing if not
 
 _game_id_to_file = {
     "Prime": "prime",
@@ -491,7 +492,6 @@ class ClassDefinition:
         big_format = get_endianness(self.game_id) + "".join(
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
-        assert len(big_format) == 1 + 3 * num_props
         yield "_FAST_FORMAT = None"
         yield f"_FAST_IDS = ({', '.join(ids)})"
         yield ""
@@ -505,24 +505,61 @@ class ClassDefinition:
         yield "    if _FAST_FORMAT is None:"
         yield f"        _FAST_FORMAT = struct.Struct({repr(big_format)})"
         yield ""
-        yield "    before = data.tell()"
+
+        if not FAST_DECODE_ASSERT:
+            yield "    before = data.tell()"
         yield f"    dec = _FAST_FORMAT.unpack(data.read({struct.calcsize(big_format)}))"
 
-        left = [f"dec[{i * 3}]" for i in range(num_props)]
-        yield f"    if ({', '.join(left)}) != _FAST_IDS:"
-        yield "        data.seek(before)"
+        fast_check = []
+        ret_state = [f"    return {self.class_name}("]
+
+        offset = 0
+        for prop in self.all_props.values():
+            fast_check.append(f"dec[{offset}]")
+
+            offset += 2  # prop id + size
+            if len(prop.format_specifier) == 1:
+                value = f"dec[{offset}]"
+                if prop.prop_type.startswith("enums."):
+                    st = f"        {prop.prop_type}({value}),"
+                else:
+                    st = f"        {value},"
+            else:
+                st = f"        {prop.prop_type}(*dec[{offset}:{offset + len(prop.format_specifier)}]),"
+
+            ret_state.append(st)
+            offset += len(prop.format_specifier)
+
+        if FAST_DECODE_ASSERT:
+            yield f"    assert ({', '.join(fast_check)}) == _FAST_IDS"
+        else:
+            yield f"    if ({', '.join(fast_check)}) != _FAST_IDS:"
+            yield "        data.seek(before)"
+            yield "        return None"
+            yield ""
+
+        yield from ret_state
+        yield "    )"
+
+    def _create_simple_decode_body(self):
+        num_props = len(self.all_props)
+        endianness = get_endianness(self.game_id)
+        [hex(prop.id) for prop in self.all_props.values()]
+
+        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
 
-        yield f"    return {self.class_name}("
-        for i, prop in enumerate(self.all_props.values()):
-            value = f"dec[{i * 3 + 2}]"
-            if prop.prop_type.startswith("enums."):
-                yield f"        {prop.prop_type}({value}),"
-            else:
-                yield f"        {value},"
+        for prop_name, prop in self.all_props.items():
+            # yield "    data.read(6)"  # TODO: assert correct
+            yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
+            yield f"    assert property_id == 0x{prop.id:08x}"
+            yield f"    {prop_name} = {prop.parse_code}"
+            yield ""
 
-        yield "    )"
+        all_fields = ", ".join(self.all_props.keys())
+        yield f"    return {self.class_name}({all_fields})"
 
     def write_from_stream(self):
         game_id = self.game_id
@@ -552,15 +589,16 @@ class ClassDefinition:
         else:
             self.class_code += f"        property_count = {_CODE_PARSE_UINT16[endianness]}\n"
 
-        if self._can_fast_decode():
-            self.class_code += (
-                "        if default_override is None and (result := _fast_decode(data, property_count)) is not None:\n"
-            )
-            self.class_code += "            return result\n\n"
+        self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
+        self.class_code += "            return result\n\n"
 
+        if self._can_fast_decode():
             for fast_decode in self._create_fast_decode_body():
                 self.after_class_code += f"{fast_decode}\n"
-            self.after_class_code += "\n\n"
+        else:
+            for fast_decode in self._create_simple_decode_body():
+                self.after_class_code += f"{fast_decode}\n"
+        self.after_class_code += "\n\n"
 
         if self.keep_unknown_properties():
             read_unknown = 'present_fields["unknown_properties"][property_id] = data.read(property_size)'
@@ -587,8 +625,12 @@ class ClassDefinition:
 
         signature = "data: typing.BinaryIO, property_size: int"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
-            self.after_class_code += f"    return {prop.parse_code}\n\n\n"
+            if prop.parse_code.endswith(".from_stream(data, property_size)"):
+                suffix_size = len("(data, property_size)")
+                self.after_class_code += f"_decode_{prop_name} = {prop.parse_code[:-suffix_size]}\n\n"
+            else:
+                self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
+                self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
@@ -1220,7 +1262,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
             meta["default_factory"] = "list"
-            parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32[endianness]})]"
+            if len(inner_prop.format_specifier or "") == 1:
+                specifier = f"{repr(endianness)} + {repr(inner_prop.format_specifier)} * (count := {_CODE_PARSE_UINT32[endianness]})"
+                parse_code = f"list(struct.unpack({specifier}, data.read(count * {inner_prop.known_size})))"
+            else:
+                parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32[endianness]})]"
             build_code.extend(
                 [
                     "array = {obj}",
@@ -1237,7 +1283,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type = "str"
             meta["default"] = repr(prop["default_value"] if prop["has_default"] else "")
             null_byte = repr(b"\x00")
-            parse_code = f'b"".join(iter(lambda: data.read(1), {null_byte})).decode("utf-8")'
+            if game_id == "Prime":
+                # No property size for Prime 1
+                parse_code = f'b"".join(iter(lambda: data.read(1), {null_byte})).decode("utf-8")'
+            else:
+                parse_code = 'data.read(property_size)[:-1].decode("utf-8")'
             build_code.extend(
                 [
                     'data.write({obj}.encode("utf-8"))',
@@ -1256,9 +1306,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             to_json_code = "{obj}.to_json()"
 
             if raw_type == "Color":
-                known_size = 4 * 4  # float * 4
+                format_specifier = "f" * 4
             else:
-                known_size = 4 * 3  # float * 3
+                format_specifier = "f" * 3
 
             s = struct.Struct(f"{endianness}f")
 
