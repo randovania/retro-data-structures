@@ -8,12 +8,14 @@ import time
 from typing import TYPE_CHECKING
 
 import pytest
+from tests import test_lib
 
 from retro_data_structures.formats.mlvl import Mlvl
 from retro_data_structures.formats.mrea import AreaDependencies
 
 if TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import AssetId
 
 _MLVLS = (
     0x3BFA3EFF,  # Temple Grounds
@@ -186,3 +188,11 @@ def test_compare_mlvl(prime2_asset_manager: AssetManager):
 
     assert old_deps == new_deps
     assert set(old_deps.all_dependencies) == set(new_deps.all_dependencies)
+
+
+def test_compare_p2(prime2_asset_manager, mlvl_asset_id: AssetId):
+    test_lib.parse_and_build_compare(
+        prime2_asset_manager,
+        mlvl_asset_id,
+        Mlvl,
+    )

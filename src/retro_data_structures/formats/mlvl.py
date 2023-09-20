@@ -3,6 +3,7 @@ Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
 from __future__ import annotations
 
+import itertools
 import typing
 
 import construct
@@ -36,6 +37,7 @@ from retro_data_structures.formats import Mapw
 from retro_data_structures.formats.guid import GUID
 from retro_data_structures.formats.mrea import (
     Area,
+    AreaDependencies,
     AreaDependencyAdapter,
     AreaModuleDependencyAdapter,
 )
@@ -45,8 +47,6 @@ from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
-
-    pass
 
 MLVLConnectingDock = Struct(
     area_index=Int32ub,
@@ -75,10 +75,10 @@ class LayerFlags(Adapter):
             )
         )
 
-    def _decode(self, obj, context, path):
+    def _decode(self, obj: Container, context, path) -> list[bool]:
         return ListContainer(reversed(obj.layer_flags))[: obj.layer_count]
 
-    def _encode(self, obj, context, path):
+    def _encode(self, obj: list[bool], context, path) -> Container:
         flags = [True for i in range(64)]
         flags[: len(obj)] = obj
         return Container({"layer_count": len(obj), "layer_flags": list(reversed(flags))})
@@ -188,7 +188,11 @@ def create(version: int, asset_id):
     fields.extend(
         [
             "area_layer_flags" / PrefixedArray(Int32ub, LayerFlags()),
-            "layer_names" / PrefixedArray(Int32ub, CString("utf-8")),
+            "_layer_names"
+            / construct.Rebuild(
+                PrefixedArray(Int32ub, CString("utf-8")),
+                lambda ctx: list(itertools.chain.from_iterable(ctx.area_layer_names)),
+            ),
         ]
     )
 
@@ -196,7 +200,24 @@ def create(version: int, asset_id):
     if version >= 0x19:
         fields.append("layer_guid" / PrefixedArray(Int32ub, GUID))
 
-    fields.append("area_layer_name_offset" / PrefixedArray(Int32ub, Int32ub))
+    fields.append(
+        "_area_layer_name_offset"
+        / construct.Rebuild(
+            PrefixedArray(Int32ub, Int32ub),
+            lambda ctx: [0] + list(itertools.accumulate(len(it) for it in ctx.area_layer_names[:-1])),
+        )
+    )
+    fields.append(
+        "area_layer_names"
+        / construct.Computed(
+            lambda ctx: [
+                ctx._layer_names[start:end]
+                for start, end in zip(
+                    ctx._area_layer_name_offset, ctx._area_layer_name_offset[1:] + [len(ctx._layer_names)], strict=True
+                )
+            ]
+        )
+    )
 
     return Struct(*fields)
 
@@ -256,16 +277,48 @@ class Mlvl(BaseResource):
 
     @property
     def areas(self) -> Iterator[Area]:
-        offsets = self._raw.area_layer_name_offset
-        names = self._raw.layer_names
+        area_layer_flags: list[list[bool]] = self._raw.area_layer_flags
+        names: list[list[str]] = self._raw.area_layer_names
+
         for i, area in enumerate(self._raw.areas):
-            area_layer_names = (
-                names[offsets[i] :] if i == len(self._raw.areas) - 1 else names[offsets[i] : offsets[i + 1]]
-            )
-            yield Area(area, self.asset_manager, self._raw.area_layer_flags[i], area_layer_names, i, self)
+            yield Area(area, self.asset_manager, area_layer_flags[i], names[i], i, self)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
+
+    def add_area(self, mrea_id: NameOrAssetId, name_id: NameOrAssetId, internal_name: str = "") -> Area:
+        """
+        :param mrea_id:
+        :param name_id: TODO: will be changed into a string in the future
+        :param internal_name:
+        :return:
+        """
+        area_index = len(self._raw.areas)
+        self._raw.areas.append(
+            Container(
+                area_name_id=self.asset_manager._resolve_asset_id(name_id),
+                area_transform=[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+                area_bounding_box=[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0],
+                area_mrea_id=self.asset_manager._resolve_asset_id(mrea_id),
+                internal_area_id=area_index,
+                attached_area_index=ListContainer(),
+                dependencies=AreaDependencies([], []),
+                docks=ListContainer(),
+                module_dependencies=ListContainer(),
+                internal_area_name=internal_name,
+            )
+        )
+        self._raw.area_layer_flags.append([])
+        self._raw.area_layer_names.append([])
+
+        return Area(
+            self._raw.areas[area_index],
+            self.asset_manager,
+            self._raw.area_layer_flags[area_index],
+            self._raw.area_layer_names[area_index],
+            area_index,
+            self,
+        )
 
     _name_strg_cached: Strg = None
     _dark_strg_cached: Strg = None

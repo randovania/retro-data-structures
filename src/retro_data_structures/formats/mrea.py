@@ -457,7 +457,7 @@ class MREAConstruct(construct.Construct):
         mrea_header.version = obj.version
         mrea_header.area_transform = obj.area_transform
         mrea_header.world_model_count = obj.world_model_count
-        mrea_header.script_layer_count = len(obj.raw_sections.script_layers_section)
+        mrea_header.script_layer_count = len(raw_sections.script_layers_section)
         mrea_header.data_section_count = len(data_sections)
 
         MREAHeader._build(mrea_header, stream, context, path)
@@ -598,8 +598,8 @@ class AreaDependencies:
 
 
 class Area:
-    _flags: Container
-    _layer_names: ListContainer
+    _flags: list[bool]
+    _layer_names: list[str]
     _index: int
 
     _mrea: Mrea = None
@@ -611,8 +611,8 @@ class Area:
         self,
         raw: Container,
         asset_manager: AssetManager,
-        flags: Container,
-        names: Container,
+        flags: list[bool],
+        names: list[str],
         index: int,
         parent_mlvl: Mlvl,
     ):
@@ -685,7 +685,7 @@ class Area:
         self._layer_names.append(name)
         self._flags.append(active)
         raw = new_layer(index, self.asset_manager.target_game)
-        self.mrea._raw.sections.script_layer_section.append(raw)
+        self.mrea.get_section("script_layer_section").append(raw)
         return self.get_layer(name)
 
     @property
