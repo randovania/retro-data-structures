@@ -28,6 +28,8 @@ Knot = Struct(
     amplitude=Float32b,
     unk_a=Byte,
     unk_b=Byte,
+    cached_tangents_a=construct.If(construct.this.unk_a == 5, Vector2f),
+    cached_tangents_b=construct.If(construct.this.unk_b == 5, Vector2f),
 )
 
 AABox = Struct(

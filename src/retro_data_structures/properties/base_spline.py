@@ -12,6 +12,8 @@ class Knot:
     amplitude: float  # Y position
     unk_a: int
     unk_b: int
+    cached_tangents_a: tuple[float, float] | None
+    cached_tangents_b: tuple[float, float] | None
 
     @classmethod
     def from_json(cls, data: dict) -> typing.Self:
@@ -20,6 +22,8 @@ class Knot:
             amplitude=data["amplitude"],
             unk_a=data["unk_a"],
             unk_b=data["unk_b"],
+            cached_tangents_a=data["cached_tangents_a"],
+            cached_tangents_b=data["cached_tangents_b"],
         )
 
     def to_json(self) -> dict:
@@ -28,6 +32,8 @@ class Knot:
             "amplitude": self.amplitude,
             "unk_a": self.unk_a,
             "unk_b": self.unk_b,
+            "cached_tangents_a": self.cached_tangents_a,
+            "cached_tangents_b": self.cached_tangents_b,
         }
 
 

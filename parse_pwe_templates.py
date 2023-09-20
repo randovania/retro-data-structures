@@ -965,27 +965,29 @@ from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_spline import BaseSpline, Knot
 
 
+def _read_knot(data: typing.BinaryIO) -> Knot:
+    header = struct.unpack(">ffBB", data.read(10))
+    cached_tangents_a = None
+    cached_tangents_b = None
+    if header[2] == 5:
+        cached_tangents_a = struct.unpack(">ff", data.read(8))
+    if header[3] == 5:
+        cached_tangents_b = struct.unpack(">ff", data.read(8))
+
+    return Knot(*header, cached_tangents_a=cached_tangents_a, cached_tangents_b=cached_tangents_b)
+
+
 @dataclasses.dataclass()
 class Spline(BaseSpline):
-    unknown: bytes = b""
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
-        before = data.tell()
-
         pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
         knots = [
-            Knot(*struct.unpack(">ffBB", data.read(10)))
+            _read_knot(data)
             for _ in range(knot_count)
         ]
         clamp_mode, minimum_amplitude, maximum_amplitude = struct.unpack(">Bff", data.read(9))
-        after = data.tell()
-
-        size_read = after - before
-        if size is not None and size != size_read:
-            unknown = data.read(size - size_read)
-        else:
-            unknown = b""
 
         return cls(
             pre_infinity=pre_infinity,
@@ -994,7 +996,6 @@ class Spline(BaseSpline):
             clamp_mode=clamp_mode,
             minimum_amplitude=minimum_amplitude,
             maximum_amplitude=maximum_amplitude,
-            unknown=unknown,
         )
 
     def to_stream(self, data: typing.BinaryIO):
@@ -1007,6 +1008,8 @@ class Spline(BaseSpline):
                     amplitude=knot.amplitude,
                     unk_a=knot.unk_a,
                     unk_b=knot.unk_b,
+                    cached_tangents_a=knot.cached_tangents_a,
+                    cached_tangents_b=knot.cached_tangents_b,
                 )
                 for knot in self.knots
             ],
@@ -1014,7 +1017,6 @@ class Spline(BaseSpline):
             minimum_amplitude=self.minimum_amplitude,
             maximum_amplitude=self.maximum_amplitude,
         ), data)
-        data.write(self.unknown)
 
 """
         + game_code
