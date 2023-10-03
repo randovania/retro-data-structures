@@ -478,7 +478,6 @@ class ClassDefinition:
     def finalize_props(self):
         if self.keep_unknown_properties():
             self.class_code += "    unknown_properties: dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
-        pass
 
     def keep_unknown_properties(self):
         return self.is_incomplete
