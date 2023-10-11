@@ -353,7 +353,8 @@ class PropDetails:
     to_json_code: str
     custom_cook_pref: bool
     known_size: int | None
-    meta: dict
+    dataclass_field_params: dict
+    dataclass_metadata: dict
     needed_imports: dict[str, str]
     format_specifier: str | None
     dependency_code: str | None
@@ -362,12 +363,26 @@ class PropDetails:
     def id(self):
         return self.raw["id"]
 
+    def get_from_json(self, prop_name: str) -> str:
+        if self.from_json_code == "{obj}":
+            return "json_util.identity"
+        elif self.from_json_code == f"{self.prop_type}.from_json({{obj}})":
+            return f"{self.prop_type}.from_json"
+        return f"_from_json_{prop_name}"
 
-def _get_default(meta: dict) -> str:
-    if "default" in meta:
-        default_value = meta["default"]
+    def get_to_json(self, prop_name: str) -> str:
+        if self.to_json_code == "{obj}":
+            return "json_util.identity"
+        elif self.to_json_code == "{obj}.to_json()":
+            return f"{self.prop_type}.to_json"
+        return f"_to_json_{prop_name}"
+
+
+def _get_default(field_params: dict) -> str:
+    if "default" in field_params:
+        default_value = field_params["default"]
     else:
-        default_value: str = meta["default_factory"]
+        default_value: str = field_params["default_factory"]
         if default_value.startswith("lambda: "):
             default_value = default_value[len("lambda: ") :]
         else:
@@ -386,6 +401,7 @@ class ClassDefinition:
     is_incomplete: bool
 
     class_code: str = ""
+    before_class_code: str = ""
     after_class_code: str = ""
     properties_builder: str = ""
     property_count: int = 0
@@ -400,7 +416,7 @@ class ClassDefinition:
     def atomic(self) -> bool:
         return self.raw_def["atomic"]
 
-    def add_prop(self, prop: PropDetails, prop_name: str):
+    def add_prop(self, prop: PropDetails, prop_name: str, raw_name: str):
         self.all_props[prop_name] = prop
         self.need_enums = self.need_enums or prop.need_enums
         self.has_custom_cook_pref = self.has_custom_cook_pref or prop.custom_cook_pref
@@ -412,11 +428,27 @@ class ClassDefinition:
             raise ValueError(f"Unable to parse property {prop_name} of {self.raw_name}")
 
         self.class_code += f"    {prop_name}: {prop.prop_type}"
-        if prop.meta:
-            self.class_code += " = dataclasses.field({})".format(
-                ", ".join(f"{key}={value}" for key, value in prop.meta.items())
-            )
 
+        self.class_code += " = dataclasses.field({}, metadata={{\n".format(
+            ", ".join(f"{key}={value}" for key, value in prop.dataclass_field_params.items())
+        )
+        self.class_code += "        "
+
+        dataclass_metadata = [f"'{key}': {value}" for key, value in prop.dataclass_metadata.items()]
+        dataclass_metadata.append(f"'reflection': FieldReflection[{prop.prop_type}](")
+        self.class_code += ", ".join(dataclass_metadata)
+
+        # from retro_data_structures.json_util import JsonValue
+        reflection_fields = [
+            f"id=0x{prop.id:08x}",
+            f"original_name={repr(raw_name)}",
+        ]
+        if (from_json := prop.get_from_json(prop_name)) != "json_util.identity":
+            reflection_fields.append(f"from_json={from_json}")
+        if (to_json := prop.get_from_json(prop_name)) != "json_util.identity":
+            reflection_fields.append(f"to_json={to_json}")
+
+        self.class_code += "\n            " + ", ".join(reflection_fields) + "\n        ),\n    })"
         if prop.comment is not None:
             self.class_code += f"  # {prop.comment}"
         self.class_code += "\n"
@@ -455,7 +487,7 @@ class ClassDefinition:
                 build_prop = []
 
             else:
-                default_value = _get_default(prop.meta)
+                default_value = _get_default(prop.dataclass_field_params)
 
                 if prop.raw["cook_preference"] == "Default":
                     self.properties_builder += f"        self.{prop_name} = default_override.get({repr(prop_name)}, {default_value})  # Cooks with Default\n"
@@ -715,11 +747,17 @@ class ClassDefinition:
     def write_from_json(self):
         self.class_code += """
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: json_util.JsonObject) -> typing_extensions.Self:
         return cls(
 """
         space = "            "
         for prop_name, prop in self.all_props.items():
+            if prop.get_from_json(prop_name) == f"_from_json_{prop_name}":
+                self.before_class_code += (
+                    f"def _from_json_{prop_name}(data: json_util.JsonValue) -> {prop.prop_type}:\n"
+                )
+                self.before_class_code += f"    return {prop.from_json_code.format(obj='data')}\n\n"
+
             self.class_code += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
 
         if self.keep_unknown_properties():
@@ -740,6 +778,10 @@ class ClassDefinition:
 """
         space = "            "
         for prop_name, prop in self.all_props.items():
+            if prop.get_to_json(prop_name) == f"_to_json_{prop_name}":
+                self.before_class_code += f"\ndef _to_json_{prop_name}(obj: {prop.prop_type}) -> json_util.JsonValue:\n"
+                self.before_class_code += f"    return {prop.to_json_code.format(obj='obj')}\n"
+
             self.class_code += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
 
         if self.keep_unknown_properties():
@@ -1108,22 +1150,23 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         from_json_code = "None"
         to_json_code = "None"
         known_size = None
-        meta = {}
+        field_params = {}
         needed_imports = {}
         format_specifier = None
         dependency_code = None
+        dataclass_metadata = {}
 
         if raw_type == "Sound":
             raw_type = "Int"
-            meta["default"] = 65535
-            meta["metadata"] = {"sound": True}
+            field_params["default"] = 65535
+            dataclass_metadata["sound"] = True
             dependency_code = "asset_manager.get_audio_group_dependency({obj})"
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"].replace("_", ".")
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
-            meta["default_factory"] = prop_type
+            field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
             dependency_code = "{obj}.dependencies_for(asset_manager)"
@@ -1140,7 +1183,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     continue
 
                 inner_details = get_prop_details(inner_prop)
-                default_override[inner_name] = _get_default(inner_details.meta)
+                default_override[inner_name] = _get_default(inner_details.dataclass_field_params)
                 needed_imports.update(inner_details.needed_imports)
                 need_enums = need_enums or inner_details.need_enums
 
@@ -1170,12 +1213,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
-                        meta["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
-                assert "default" in meta
+                        field_params["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
+                assert "default" in field_params
             else:
                 comment = "Choice"
                 prop_type = "int"
-                meta["default"] = repr(default_value)
+                field_params["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32[endianness]
                 build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
                 from_json_code = "{obj}"
@@ -1188,7 +1231,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             if "flagset_name" in prop:
                 prop_type = "enums." + _scrub_enum(prop["flagset_name"])
                 need_enums = True
-                meta["default"] = f"{prop_type}({default_value})"
+                field_params["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
                 from_json_code = f"{prop_type}.from_json({{obj}})"
@@ -1196,7 +1239,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             else:
                 prop_type = "int"
                 comment = "Flagset"
-                meta["default"] = default_value
+                field_params["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32[endianness]
                 build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
                 from_json_code = "{obj}"
@@ -1205,17 +1248,16 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Asset":
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
-            field_meta = {"asset_types": prop["type_filter"]}
+            dataclass_metadata["asset_types"] = prop["type_filter"]
             if not any(asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")):
                 dependency_code = "asset_manager.get_dependencies_for_asset({obj})"
 
             if "ignore_dependencies_mlvl" in prop:
-                field_meta["ignore_dependencies_mlvl"] = True
+                dataclass_metadata["ignore_dependencies_mlvl"] = True
 
-            meta["metadata"] = repr(field_meta)
             default_value = "default_asset_id"
 
-            meta["default"] = default_value
+            field_params["default"] = default_value
 
             if game_id in ["PrimeRemastered"]:
                 needed_imports["uuid"] = True
@@ -1250,7 +1292,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
-            meta["default_factory"] = prop_type
+            field_params["default_factory"] = prop_type
 
         elif raw_type == "Array":
             inner_prop = get_prop_details(prop["item_archetype"])
@@ -1258,7 +1300,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type = f"list[{inner_prop.prop_type}]"
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
-            meta["default_factory"] = "list"
+            field_params["default_factory"] = "list"
             if len(inner_prop.format_specifier or "") == 1:
                 specifier = f"{repr(endianness)} + {repr(inner_prop.format_specifier)} * (count := {_CODE_PARSE_UINT32[endianness]})"
                 parse_code = f"list(struct.unpack({specifier}, data.read(count * {inner_prop.known_size})))"
@@ -1278,7 +1320,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif raw_type == "String":
             prop_type = "str"
-            meta["default"] = repr(prop["default_value"] if prop["has_default"] else "")
+            field_params["default"] = repr(prop["default_value"] if prop["has_default"] else "")
             null_byte = repr(b"\x00")
             if game_id == "Prime":
                 # No property size for Prime 1
@@ -1313,11 +1355,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 default_value = {k: s.unpack(s.pack(v))[0] for k, v in prop["default_value"].items()}
                 if raw_type == "Color":
                     value = {"A": 0.0, **default_value}
-                    meta["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
+                    field_params["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
                 else:
-                    meta["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**default_value)
+                    field_params["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**default_value)
             else:
-                meta["default_factory"] = prop_type
+                field_params["default_factory"] = prop_type
 
         elif raw_type in _literal_prop_types:
             literal_prop = _literal_prop_types[raw_type]
@@ -1337,9 +1379,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             except struct.error as e:
                 print(f"{hex(prop['id'])} ({prop['type']}) has invalid default value  {default_value}: {e}")
                 default_value = literal_prop.default
-            meta["default"] = repr(default_value)
+            field_params["default"] = repr(default_value)
 
-        if "default" not in meta and "default_factory" not in meta:
+        if "default" not in field_params and "default_factory" not in field_params:
             raise ValueError(f"Unable to find default value for prop {prop}.")
 
         if prop_type is None:
@@ -1360,7 +1402,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             to_json_code,
             custom_cook_pref=prop["cook_preference"] != "Always",
             known_size=known_size,
-            meta=meta,
+            dataclass_field_params=field_params,
+            dataclass_metadata=dataclass_metadata,
             needed_imports=needed_imports,
             format_specifier=format_specifier,
             dependency_code=dependency_code,
@@ -1398,7 +1441,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             if all_names.count(prop_name) > 1:
                 final_prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(get_prop_details(prop), final_prop_name)
+            cls.add_prop(get_prop_details(prop), final_prop_name, prop["name"] or property_names.get(prop["id"]))
         cls.finalize_props()
 
         cls.class_code += "\n    @classmethod\n"
@@ -1451,10 +1494,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.write_dependencies()
 
         code_code = "# Generated File\n"
-        code_code += "import dataclasses\nimport struct\nimport typing\n"
+        code_code += "import dataclasses\nimport struct\nimport typing\nimport typing_extensions\n"
 
-        code_code += "\nfrom retro_data_structures.game_check import Game\n"
+        code_code += "\nfrom retro_data_structures import json_util\n"
+        code_code += "from retro_data_structures.game_check import Game\n"
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
+        code_code += "from retro_data_structures.properties.field_reflection import FieldReflection\n"
 
         if cls.need_enums:
             code_code += f"import retro_data_structures.enums.{_game_id_to_file[game_id]} as enums\n"
@@ -1465,6 +1510,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             else:
                 code_code += f"from {import_path} import {code_import}\n"
 
+        if cls.before_class_code:
+            code_code += "\n\n"
+            code_code += cls.before_class_code
         code_code += "\n\n"
         code_code += cls.class_code
         if cls.after_class_code:
