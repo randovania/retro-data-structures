@@ -70,7 +70,7 @@ def _scrub_enum(string: str):
 
 
 def create_enums_file(game_id: str, enums: list[EnumDefinition]):
-    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions'
     endianness = get_endianness(game_id)
 
     for e in enums:
@@ -79,17 +79,17 @@ def create_enums_file(game_id: str, enums: list[EnumDefinition]):
             code += f"    {_scrub_enum(name)} = {value}\n"
 
         code += "\n    @classmethod\n"
-        code += "    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):\n"
+        code += "    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:\n"
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
-        code += "\n    def to_stream(self, data: typing.BinaryIO):\n"
+        code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
         code += '        data.write(struct.pack("' + endianness + 'L", self.value))\n'
 
         code += "\n    @classmethod\n"
-        code += "    def from_json(cls, data):\n"
+        code += "    def from_json(cls, data: int) -> typing_extensions.Self:\n"
         code += "        return cls(data)\n"
 
-        code += "\n    def to_json(self):\n"
+        code += "\n    def to_json(self) -> int:\n"
         code += "        return self.value\n"
 
     return code
@@ -355,7 +355,7 @@ class PropDetails:
     known_size: int | None
     dataclass_field_params: dict
     dataclass_metadata: dict
-    needed_imports: dict[str, str]
+    needed_imports: dict[str, str | bool]
     format_specifier: str | None
     dependency_code: str | None
 
@@ -401,6 +401,7 @@ class ClassDefinition:
     is_incomplete: bool
 
     class_code: str = ""
+    type_checking_code: list[str] = dataclasses.field(default_factory=list)
     before_class_code: str = ""
     after_class_code: str = ""
     properties_builder: str = ""
@@ -408,7 +409,8 @@ class ClassDefinition:
     modules: list[str] = dataclasses.field(default_factory=list)
 
     all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
-    needed_imports: dict = dataclasses.field(default_factory=dict)
+    needed_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
+    typing_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
     need_enums: bool = False
     has_custom_cook_pref: bool = False
 
@@ -445,7 +447,7 @@ class ClassDefinition:
         ]
         if (from_json := prop.get_from_json(prop_name)) != "json_util.identity":
             reflection_fields.append(f"from_json={from_json}")
-        if (to_json := prop.get_from_json(prop_name)) != "json_util.identity":
+        if (to_json := prop.get_to_json(prop_name)) != "json_util.identity":
             reflection_fields.append(f"to_json={to_json}")
 
         self.class_code += "\n            " + ", ".join(reflection_fields) + "\n        ),\n    })"
@@ -528,7 +530,7 @@ class ClassDefinition:
         yield ""
         yield ""
 
-        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> {self.class_name} | None:"
         yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
@@ -577,7 +579,7 @@ class ClassDefinition:
         endianness = get_endianness(self.game_id)
         [hex(prop.id) for prop in self.all_props.values()]
 
-        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> {self.class_name} | None:"
         yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
@@ -598,7 +600,7 @@ class ClassDefinition:
 
         self.class_code += """
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None, default_override: typing.Optional[dict] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None, default_override: dict | None = None) -> typing_extensions.Self:
 """
         if self.atomic or game_id == "Prime":
             self.class_code += "        property_size = None  # Atomic\n"
@@ -671,7 +673,7 @@ class ClassDefinition:
 
     def write_to_stream(self):
         self.class_code += """
-    def to_stream(self, data: typing.BinaryIO, default_override: typing.Optional[dict] = None):
+    def to_stream(self, data: typing.BinaryIO, default_override: dict | None = None) -> None:
         default_override = default_override or {}
 """
         endianness = get_endianness(self.game_id)
@@ -747,33 +749,49 @@ class ClassDefinition:
     def write_from_json(self):
         self.class_code += """
     @classmethod
-    def from_json(cls, data: json_util.JsonObject) -> typing_extensions.Self:
-        return cls(
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
 """
+        data_var = "data"
+        if self.all_props:
+            data_var = "json_data"
+            self.class_code += f"        json_data = typing.cast({self.class_name}Json, data)\n"
+            self.type_checking_code.append(f"class {self.class_name}Json(typing_extensions.TypedDict):")
+
+        self.class_code += "        return cls(\n"
         space = "            "
+
         for prop_name, prop in self.all_props.items():
+            json_type = "json_util.JsonValue"
+            if prop.from_json_code == "{obj}":
+                json_type = prop.prop_type
+            self.type_checking_code.append(f"    {prop_name}: {json_type}")
+
             if prop.get_from_json(prop_name) == f"_from_json_{prop_name}":
                 self.before_class_code += (
                     f"def _from_json_{prop_name}(data: json_util.JsonValue) -> {prop.prop_type}:\n"
                 )
-                self.before_class_code += f"    return {prop.from_json_code.format(obj='data')}\n\n"
+                self.before_class_code += f"    return {prop.from_json_code.format(obj=data_var)}\n\n"
 
-            self.class_code += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+            self.class_code += (
+                f"{space}{prop_name}={prop.from_json_code.format(obj=f'{data_var}[{repr(prop_name)}]')},\n"
+            )
+
+        if self.all_props:
+            self.type_checking_code.append("")
 
         if self.keep_unknown_properties():
             self.needed_imports["base64"] = True
-            self.class_code += """
-            unknown_properties={
+            self.class_code += f"""{space}unknown_properties={{
                 int(property_id, 16): base64.b64decode(property_data)
                 for property_id, property_data in data["unknown_properties"].items()
-            },
+            }},
 """
 
         self.class_code += "        )\n"
 
     def write_to_json(self):
         self.class_code += """
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {
 """
         space = "            "
@@ -856,6 +874,7 @@ def _add_default_types(core_path: Path, game_id: str):
         f"""# Generated file
 import struct
 import typing
+import typing_extensions
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_color import BaseColor
@@ -863,10 +882,10 @@ from retro_data_structures.properties.base_color import BaseColor
 
 class Color(BaseColor):
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}ffff', data.read(16)))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}ffff', self.r, self.g, self.b, self.a))
 
 """
@@ -876,6 +895,7 @@ class Color(BaseColor):
         f"""# Generated file
 import struct
 import typing
+import typing_extensions
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_vector import BaseVector
@@ -883,10 +903,10 @@ from retro_data_structures.properties.base_vector import BaseVector
 
 class Vector(BaseVector):
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}fff', data.read(12)))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}fff', self.x, self.y, self.z))
 """
         + game_code
@@ -907,7 +927,9 @@ class Vector(BaseVector):
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
+from retro_data_structures import json_util
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
@@ -919,13 +941,13 @@ class PooledString(BaseProperty):
     size_or_str: typing.Union[int, bytes] = b""
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         a, b = struct.unpack('{endianness}lL', data.read(8))
         if a == -1:
             b = data.read(b)
         return cls(a, b)
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         a, b = self.index, self.size_or_str
         if a == -1:
             b = len(b)
@@ -934,10 +956,10 @@ class PooledString(BaseProperty):
             data.write(self.size_or_str)
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         return cls(data["index"], data["size_or_str"])
 
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {{
             "index": self.index,
             "size_or_str": self.size_or_str,
@@ -959,7 +981,9 @@ class PooledString(BaseProperty):
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
+from retro_data_structures import json_util
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
@@ -972,17 +996,17 @@ class AnimationParameters(BaseProperty):
     initial_anim: int = 0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}{format_specifier}LL', data.read({known_size})))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}{format_specifier}LL', self.ancs, self.character_index, self.initial_anim))
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         return cls(data["ancs"], data["character_index"], data["initial_anim"])
 
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {{
             "ancs": self.ancs,
             "character_index": self.character_index,
@@ -999,6 +1023,7 @@ class AnimationParameters(BaseProperty):
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
 import construct
 
@@ -1023,7 +1048,7 @@ def _read_knot(data: typing.BinaryIO) -> Knot:
 class Spline(BaseSpline):
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
         knots = [
             _read_knot(data)
@@ -1040,7 +1065,7 @@ class Spline(BaseSpline):
             maximum_amplitude=maximum_amplitude,
         )
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         MayaSpline.build_stream(construct.Container(
             pre_infinity=self.pre_infinity,
             post_infinity=self.post_infinity,
@@ -1151,7 +1176,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         to_json_code = "None"
         known_size = None
         field_params = {}
-        needed_imports = {}
+        needed_imports: dict[str, str | bool] = {}
         format_specifier = None
         dependency_code = None
         dataclass_metadata = {}
@@ -1449,7 +1474,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.class_code += f"        return Game.{_game_id_to_enum[game_id]}\n"
 
         if is_struct:
-            cls.class_code += "\n    def get_name(self) -> typing.Optional[str]:\n"
+            cls.class_code += "\n    def get_name(self) -> str | None:\n"
             if game_id == "Prime":
                 if "name" in cls.all_props:
                     name_field = "self.name"
@@ -1509,6 +1534,20 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 code_code += f"import {import_path}\n"
             else:
                 code_code += f"from {import_path} import {code_import}\n"
+
+        typing_imports = {k: v for k, v in cls.typing_imports.items() if k not in cls.needed_imports}
+        if typing_imports or cls.type_checking_code:
+            code_code += "\nif typing.TYPE_CHECKING:\n"
+            for import_path, code_import in sorted(cls.typing_imports.items()):
+                if code_import is True:
+                    code_code += f"    import {import_path}\n"
+                else:
+                    code_code += f"    from {import_path} import {code_import}\n"
+
+            if typing_imports:
+                code_code += "\n"
+
+            code_code += "\n".join(f"    {line}" for line in cls.type_checking_code)
 
         if cls.before_class_code:
             code_code += "\n\n"

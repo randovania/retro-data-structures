@@ -6,11 +6,12 @@ import typing
 from abc import ABC
 
 if typing.TYPE_CHECKING:
+    import typing_extensions
+
+    from retro_data_structures import json_util
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId, Dependency
     from retro_data_structures.game_check import Game
-
-Self = typing.TypeVar("Self", bound="BaseProperty")
 
 
 class BaseProperty:
@@ -19,11 +20,11 @@ class BaseProperty:
         raise NotImplementedError
 
     @classmethod
-    def from_stream(cls: type[Self], data: typing.BinaryIO, size: int | None = None) -> Self:
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         raise NotImplementedError
 
     @classmethod
-    def from_bytes(cls: type[Self], data: bytes) -> Self:
+    def from_bytes(cls, data: bytes) -> typing_extensions.Self:
         stream = io.BytesIO(data)
         return cls.from_stream(stream, len(data))
 
@@ -36,10 +37,10 @@ class BaseProperty:
         return stream.getvalue()
 
     @classmethod
-    def from_json(cls: type[Self], data: typing.Any) -> Self:
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         raise NotImplementedError
 
-    def to_json(self) -> typing.Any:
+    def to_json(self) -> json_util.JsonValue:
         raise NotImplementedError
 
     def _is_property_mrea_or_mlvl(self, field: dataclasses.Field) -> bool:

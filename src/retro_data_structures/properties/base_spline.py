@@ -5,6 +5,11 @@ import typing
 
 from retro_data_structures.properties.base_property import BaseProperty
 
+if typing.TYPE_CHECKING:
+    import typing_extensions
+
+    from retro_data_structures import json_util
+
 
 @dataclasses.dataclass()
 class Knot:
@@ -47,7 +52,7 @@ class BaseSpline(BaseProperty):
     clamp_mode: int = 0
 
     @classmethod
-    def from_json(cls, data: dict) -> typing.Self:
+    def from_json(cls, data: json_util.JsonObject) -> typing_extensions.Self:
         return cls(
             knots=[Knot.from_json(knot) for knot in data["knots"]],
             minimum_amplitude=data["minimum_amplitude"],
@@ -57,7 +62,7 @@ class BaseSpline(BaseProperty):
             clamp_mode=data["clamp_mode"],
         )
 
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {
             "knots": [knot.to_json() for knot in self.knots],
             "minimum_amplitude": self.minimum_amplitude,
