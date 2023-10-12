@@ -52,7 +52,7 @@ class BaseSpline(BaseProperty):
     clamp_mode: int = 0
 
     @classmethod
-    def from_json(cls, data: json_util.JsonObject) -> typing_extensions.Self:
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         return cls(
             knots=[Knot.from_json(knot) for knot in data["knots"]],
             minimum_amplitude=data["minimum_amplitude"],
