@@ -659,23 +659,25 @@ class ClassDefinition:
         else:
             for fast_decode in self._create_simple_decode_body():
                 self.class_code += f"    {fast_decode}\n"
-        self.class_code += "\n"
 
         # Defining the _decode_X methods and _property_decoder
 
         signature = "data: typing.BinaryIO, property_size: int"
+        decode_names = {}
+
         for prop_name, prop in self.all_props.items():
             if prop.parse_code.endswith(".from_stream(data, property_size)"):
                 suffix_size = len("(data, property_size)")
-                self.after_class_code += f"_decode_{prop_name} = {prop.parse_code[:-suffix_size]}\n\n"
+                decode_names[prop_name] = prop.parse_code[:-suffix_size]
             else:
+                decode_names[prop_name] = f"_decode_{prop_name}"
                 self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
                 self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, _decode_{prop_name}),\n"
+            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
 
     def write_to_stream(self):
