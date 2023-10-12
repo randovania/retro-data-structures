@@ -14,6 +14,6 @@ T = TypeVar("T")
 @dataclasses.dataclass(frozen=True)
 class FieldReflection(Generic[T]):
     id: int
-    original_name: str
+    original_name: str | None
     from_json: Callable[[json_util.JsonValue], T] = json_util.identity
     to_json: Callable[[T], json_util.JsonValue] = json_util.identity

@@ -584,14 +584,20 @@ class ClassDefinition:
         yield "        return None"
         yield ""
 
+        variables = []
         for prop_name, prop in self.all_props.items():
+            variable_name = prop_name
+            if variable_name in ("data", "property_count", "property_id", "property_size", "cls"):
+                variable_name += "_"
+
             # yield "    data.read(6)"  # TODO: assert correct
             yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
             yield f"    assert property_id == 0x{prop.id:08x}"
-            yield f"    {prop_name} = {prop.parse_code}"
+            yield f"    {variable_name} = {prop.parse_code}"
             yield ""
+            variables.append(variable_name)
 
-        all_fields = ", ".join(self.all_props.keys())
+        all_fields = ", ".join(variables)
         yield f"    return cls({all_fields})"
 
     def write_from_stream(self):
@@ -995,6 +1001,8 @@ class PooledString(BaseProperty):
 
     core_path.joinpath("AnimationParameters.py").write_text(
         f"""# Generated file
+from __future__ import annotations
+
 import dataclasses
 import struct
 import typing
@@ -1004,6 +1012,10 @@ from retro_data_structures import json_util
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
 
 
 @dataclasses.dataclass()
@@ -1021,7 +1033,8 @@ class AnimationParameters(BaseProperty):
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
-        return cls(data["ancs"], data["character_index"], data["initial_anim"])
+        data_json = typing.cast(dict[str, int], data)
+        return cls(data_json["ancs"], data_json["character_index"], data_json["initial_anim"])
 
     def to_json(self) -> json_util.JsonObject:
         return {{
@@ -1030,7 +1043,7 @@ class AnimationParameters(BaseProperty):
             "initial_anim": self.initial_anim,
         }}
 
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from asset_manager.get_dependencies_for_ancs(self.ancs, self.character_index)
 """
         + game_code
@@ -1050,13 +1063,13 @@ from retro_data_structures.properties.base_spline import BaseSpline, Knot
 
 
 def _read_knot(data: typing.BinaryIO) -> Knot:
-    header = struct.unpack(">ffBB", data.read(10))
+    header = typing.cast(tuple[float, float, int, int], struct.unpack(">ffBB", data.read(10)))
     cached_tangents_a = None
     cached_tangents_b = None
     if header[2] == 5:
-        cached_tangents_a = struct.unpack(">ff", data.read(8))
+        cached_tangents_a = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
     if header[3] == 5:
-        cached_tangents_b = struct.unpack(">ff", data.read(8))
+        cached_tangents_b = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
 
     return Knot(*header, cached_tangents_a=cached_tangents_a, cached_tangents_b=cached_tangents_b)
 
@@ -1206,7 +1219,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             dependency_code = "asset_manager.get_audio_group_dependency({obj})"
 
         if raw_type == "Struct":
-            archetype_path: str = prop["archetype"].replace("_", ".")
+            archetype_path: str = prop["archetype"]
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
             field_params["default_factory"] = prop_type
@@ -1480,8 +1493,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             game_id=game_id,
             raw_name=name,
             raw_def=this,
-            class_name=name.split("_")[-1] if game_id != "PrimeRemastered" else name,
-            class_path=name.replace("_", "/") if game_id != "PrimeRemastered" else name,
+            class_name=name,
+            class_path=name,
             is_struct=is_struct,
             is_incomplete=this["incomplete"],
         )
@@ -1617,7 +1630,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n"
 
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
-    fourcc_mapping = "\n_FOUR_CC_MAPPING = {\n"
+    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[BaseObjectType]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
