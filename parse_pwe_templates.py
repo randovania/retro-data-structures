@@ -763,7 +763,7 @@ class ClassDefinition:
         data_var = "data"
         if self.all_props:
             data_var = "json_data"
-            self.class_code += f"        json_data = typing.cast({self.class_name}Json, data)\n"
+            self.class_code += f'        json_data = typing.cast("{self.class_name}Json", data)\n'
             self.type_checking_code.append(f"class {self.class_name}Json(typing_extensions.TypedDict):")
 
         self.class_code += "        return cls(\n"
@@ -825,32 +825,42 @@ class ClassDefinition:
             return
 
         has_dep = False
+        method_name = {}
 
         for prop_name, prop in self.all_props.items():
             if prop.dependency_code is None:
                 continue
 
             has_dep = True
-            prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
-            if prop.raw.get("ignore_dependencies_mlvl"):
-                self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
-                prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
-            else:
-                prop_code = f"yield from {prop_code}"
 
-            self.class_code += f"""
-    def _dependencies_for_{prop_name}(self, asset_manager):
+            prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
+            if prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
+                method_name[prop_name] = f"self.{prop_name}.dependencies_for"
+            else:
+                if prop.raw.get("ignore_dependencies_mlvl"):
+                    self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
+                    prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
+                else:
+                    prop_code = f"yield from {prop_code}"
+
+                method_name[prop_name] = f"self._dependencies_for_{prop_name}"
+
+                self.class_code += f"""
+    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         {prop_code}
 """
 
         if has_dep:
             method_list = "\n".join(
-                f'            (self._dependencies_for_{prop_name}, "{prop_name}", "{prop.prop_type}"),'
+                f'            ({method_name[prop_name]}, "{prop_name}", "{prop.prop_type}"),'
                 for prop_name, prop in self.all_props.items()
                 if prop.dependency_code is not None
             )
+            self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
+            self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
+
             self.class_code += f"""
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         for method, field_name, field_type in [
 {method_list}
         ]:
@@ -1540,6 +1550,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.write_dependencies()
 
         code_code = "# Generated File\n"
+        code_code += "from __future__ import annotations\n\n"
         code_code += "import dataclasses\nimport struct\nimport typing\nimport typing_extensions\n"
 
         code_code += "\nfrom retro_data_structures import json_util\n"
