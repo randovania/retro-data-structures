@@ -14,6 +14,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.game_check import Game
 
 
+@dataclasses.dataclass()
 class BaseProperty:
     @classmethod
     def game(cls) -> Game:

@@ -445,6 +445,7 @@ class ClassDefinition:
 
         # from retro_data_structures.json_util import JsonValue
         reflection_fields = [
+            prop.prop_type,
             f"id=0x{prop.id:08x}",
             f"original_name={repr(raw_name)}",
         ]
