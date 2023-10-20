@@ -9,7 +9,7 @@ from construct import (
     CString,
     Float32b,
     Hex,
-    Int16ub,
+    Int8ub,
     Int32ub,
     Int64ub,
     PaddedString,
@@ -28,6 +28,8 @@ Knot = Struct(
     amplitude=Float32b,
     unk_a=Byte,
     unk_b=Byte,
+    cached_tangents_a=construct.If(construct.this.unk_a == 5, Vector2f),
+    cached_tangents_b=construct.If(construct.this.unk_b == 5, Vector2f),
 )
 
 AABox = Struct(
@@ -67,9 +69,10 @@ ObjectTag_64 = Struct(
 )
 
 MayaSpline = Struct(
-    unk=Int16ub,
+    pre_infinity=Int8ub,
+    post_infinity=Int8ub,
     knots=PrefixedArray(Int32ub, Knot),
-    clampMode=Byte,
-    minAmplitude=Float32b,
-    maxAmplitude=Float32b,
+    clamp_mode=Byte,
+    minimum_amplitude=Float32b,
+    maximum_amplitude=Float32b,
 )

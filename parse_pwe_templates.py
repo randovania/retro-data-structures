@@ -812,21 +812,14 @@ def _add_default_types(core_path: Path, game_id: str):
 
     core_path.joinpath("Color.py").write_text(
         f"""# Generated file
-import dataclasses
 import struct
 import typing
 
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.base_color import BaseColor
 
 
-@dataclasses.dataclass()
-class Color(BaseProperty):
-    r: float = 0.0
-    g: float = 0.0
-    b: float = 0.0
-    a: float = 0.0
-
+class Color(BaseColor):
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         return cls(*struct.unpack('{endianness}ffff', data.read(16)))
@@ -834,56 +827,25 @@ class Color(BaseProperty):
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('{endianness}ffff', self.r, self.g, self.b, self.a))
 
-    @classmethod
-    def from_json(cls, data: dict):
-        return cls(data["r"], data["g"], data["b"], data["a"])
-
-    def to_json(self) -> dict:
-        return {{
-            "r": self.r,
-            "g": self.g,
-            "b": self.b,
-            "a": self.a,
-        }}
 """
         + game_code
     )
     core_path.joinpath("Vector.py").write_text(
         f"""# Generated file
-import dataclasses
 import struct
 import typing
 
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.base_vector import BaseVector
 
 
-@dataclasses.dataclass()
-class Vector(BaseProperty):
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-
+class Vector(BaseVector):
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
         return cls(*struct.unpack('{endianness}fff', data.read(12)))
 
     def to_stream(self, data: typing.BinaryIO):
         data.write(struct.pack('{endianness}fff', self.x, self.y, self.z))
-
-    @classmethod
-    def from_json(cls, data: dict):
-        return cls(data["x"], data["y"], data["z"])
-
-    def to_json(self) -> dict:
-        return {{
-            "x": self.x,
-            "y": self.y,
-            "z": self.z,
-        }}
-
-    def dependencies_for(self, asset_manager):
-        yield from []
 """
         + game_code
     )
@@ -963,7 +925,7 @@ from .AssetId import AssetId, default_asset_id
 
 @dataclasses.dataclass()
 class AnimationParameters(BaseProperty):
-    ancs: AssetId = default_asset_id
+    ancs: AssetId = dataclasses.field(metadata={{'asset_types': ['ANCS']}}, default=default_asset_id)
     character_index: int = 0
     initial_anim: int = 0
 
@@ -993,33 +955,69 @@ class AnimationParameters(BaseProperty):
     core_path.joinpath("Spline.py").write_text(
         """# Generated file
 import dataclasses
+import struct
 import typing
-import base64
 
+import construct
+
+from retro_data_structures.common_types import MayaSpline
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.base_spline import BaseSpline, Knot
+
+
+def _read_knot(data: typing.BinaryIO) -> Knot:
+    header = struct.unpack(">ffBB", data.read(10))
+    cached_tangents_a = None
+    cached_tangents_b = None
+    if header[2] == 5:
+        cached_tangents_a = struct.unpack(">ff", data.read(8))
+    if header[3] == 5:
+        cached_tangents_b = struct.unpack(">ff", data.read(8))
+
+    return Knot(*header, cached_tangents_a=cached_tangents_a, cached_tangents_b=cached_tangents_b)
 
 
 @dataclasses.dataclass()
-class Spline(BaseProperty):
-    data: bytes = b""
+class Spline(BaseSpline):
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
-        assert size is not None
-        result = cls()
-        result.data = data.read(size)
-        return result
+        pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
+        knots = [
+            _read_knot(data)
+            for _ in range(knot_count)
+        ]
+        clamp_mode, minimum_amplitude, maximum_amplitude = struct.unpack(">Bff", data.read(9))
+
+        return cls(
+            pre_infinity=pre_infinity,
+            post_infinity=post_infinity,
+            knots=knots,
+            clamp_mode=clamp_mode,
+            minimum_amplitude=minimum_amplitude,
+            maximum_amplitude=maximum_amplitude,
+        )
 
     def to_stream(self, data: typing.BinaryIO):
-        data.write(self.data)
+        MayaSpline.build_stream(construct.Container(
+            pre_infinity=self.pre_infinity,
+            post_infinity=self.post_infinity,
+            knots=[
+                construct.Container(
+                    time=knot.time,
+                    amplitude=knot.amplitude,
+                    unk_a=knot.unk_a,
+                    unk_b=knot.unk_b,
+                    cached_tangents_a=knot.cached_tangents_a,
+                    cached_tangents_b=knot.cached_tangents_b,
+                )
+                for knot in self.knots
+            ],
+            clamp_mode=self.clamp_mode,
+            minimum_amplitude=self.minimum_amplitude,
+            maximum_amplitude=self.maximum_amplitude,
+        ), data)
 
-    @classmethod
-    def from_json(cls, data):
-        return cls(base64.b64decode(data))
-
-    def to_json(self) -> str:
-        return base64.b64encode(self.data).decode("ascii")
 """
         + game_code
     )
