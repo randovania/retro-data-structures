@@ -62,13 +62,22 @@ class BaseVector(BaseProperty):
         raise TypeError
 
     def rotate(self, rotation: BaseVector, center: BaseVector | None = None) -> typing_extensions.Self:
+        """
+        Rotates the vector on all three axes, around a center point.
+
+        :param rotation: The angle (in degrees) to rotate around each axis
+        :param center: The point around which to revolve
+        :returns: A new vector with the rotation applied
+        """
+
         if center is None:
             center = BaseVector()
 
         pos = [self.x - center.x, self.y - center.y, self.z - center.z]
+        rot = [rotation.x, rotation.y, rotation.z]
 
         for i in range(3):
-            theta = rotation[i] * math.pi / 180.0
+            theta = rot[i] * math.pi / 180.0
             sin = math.sin(theta)
             cos = math.cos(theta)
 
