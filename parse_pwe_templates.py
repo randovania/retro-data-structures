@@ -70,7 +70,8 @@ def _scrub_enum(string: str):
 
 
 def create_enums_file(game_id: str, enums: list[EnumDefinition]):
-    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
+    code += "\nfrom retro_data_structures import json_util\n"
     endianness = get_endianness(game_id)
 
     for e in enums:
@@ -79,17 +80,18 @@ def create_enums_file(game_id: str, enums: list[EnumDefinition]):
             code += f"    {_scrub_enum(name)} = {value}\n"
 
         code += "\n    @classmethod\n"
-        code += "    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):\n"
+        code += "    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:\n"
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
-        code += "\n    def to_stream(self, data: typing.BinaryIO):\n"
+        code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
         code += '        data.write(struct.pack("' + endianness + 'L", self.value))\n'
 
         code += "\n    @classmethod\n"
-        code += "    def from_json(cls, data):\n"
+        code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
+        code += "        assert isinstance(data, int)\n"
         code += "        return cls(data)\n"
 
-        code += "\n    def to_json(self):\n"
+        code += "\n    def to_json(self) -> int:\n"
         code += "        return self.value\n"
 
     return code
@@ -345,6 +347,7 @@ def _fix_module_name(output_path: Path, class_path: str):
 class PropDetails:
     raw: dict
     prop_type: str
+    json_type: str
     need_enums: bool
     comment: str | None
     parse_code: str
@@ -353,8 +356,9 @@ class PropDetails:
     to_json_code: str
     custom_cook_pref: bool
     known_size: int | None
-    meta: dict
-    needed_imports: dict[str, str]
+    dataclass_field_params: dict
+    dataclass_metadata: dict
+    needed_imports: dict[str, str | bool]
     format_specifier: str | None
     dependency_code: str | None
 
@@ -362,12 +366,26 @@ class PropDetails:
     def id(self):
         return self.raw["id"]
 
+    def get_from_json(self, prop_name: str) -> str:
+        if self.from_json_code == "{obj}":
+            return "json_util.identity"
+        elif self.from_json_code == f"{self.prop_type}.from_json({{obj}})":
+            return f"{self.prop_type}.from_json"
+        return f"_from_json_{prop_name}"
 
-def _get_default(meta: dict) -> str:
-    if "default" in meta:
-        default_value = meta["default"]
+    def get_to_json(self, prop_name: str) -> str:
+        if self.to_json_code == "{obj}":
+            return "json_util.identity"
+        elif self.to_json_code == "{obj}.to_json()":
+            return f"{self.prop_type}.to_json"
+        return f"_to_json_{prop_name}"
+
+
+def _get_default(field_params: dict) -> str:
+    if "default" in field_params:
+        default_value = field_params["default"]
     else:
-        default_value: str = meta["default_factory"]
+        default_value: str = field_params["default_factory"]
         if default_value.startswith("lambda: "):
             default_value = default_value[len("lambda: ") :]
         else:
@@ -386,13 +404,16 @@ class ClassDefinition:
     is_incomplete: bool
 
     class_code: str = ""
+    type_checking_code: list[str] = dataclasses.field(default_factory=list)
+    before_class_code: str = ""
     after_class_code: str = ""
     properties_builder: str = ""
     property_count: int = 0
     modules: list[str] = dataclasses.field(default_factory=list)
 
     all_props: dict[str, PropDetails] = dataclasses.field(default_factory=dict)
-    needed_imports: dict = dataclasses.field(default_factory=dict)
+    needed_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
+    typing_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
     need_enums: bool = False
     has_custom_cook_pref: bool = False
 
@@ -400,7 +421,7 @@ class ClassDefinition:
     def atomic(self) -> bool:
         return self.raw_def["atomic"]
 
-    def add_prop(self, prop: PropDetails, prop_name: str):
+    def add_prop(self, prop: PropDetails, prop_name: str, raw_name: str):
         self.all_props[prop_name] = prop
         self.need_enums = self.need_enums or prop.need_enums
         self.has_custom_cook_pref = self.has_custom_cook_pref or prop.custom_cook_pref
@@ -412,11 +433,28 @@ class ClassDefinition:
             raise ValueError(f"Unable to parse property {prop_name} of {self.raw_name}")
 
         self.class_code += f"    {prop_name}: {prop.prop_type}"
-        if prop.meta:
-            self.class_code += " = dataclasses.field({})".format(
-                ", ".join(f"{key}={value}" for key, value in prop.meta.items())
-            )
 
+        self.class_code += " = dataclasses.field({}, metadata={{\n".format(
+            ", ".join(f"{key}={value}" for key, value in prop.dataclass_field_params.items())
+        )
+        self.class_code += "        "
+
+        dataclass_metadata = [f"'{key}': {value}" for key, value in prop.dataclass_metadata.items()]
+        dataclass_metadata.append(f"'reflection': FieldReflection[{prop.prop_type}](")
+        self.class_code += ", ".join(dataclass_metadata)
+
+        # from retro_data_structures.json_util import JsonValue
+        reflection_fields = [
+            prop.prop_type,
+            f"id=0x{prop.id:08x}",
+            f"original_name={repr(raw_name)}",
+        ]
+        if (from_json := prop.get_from_json(prop_name)) != "json_util.identity":
+            reflection_fields.append(f"from_json={from_json}")
+        if (to_json := prop.get_to_json(prop_name)) != "json_util.identity":
+            reflection_fields.append(f"to_json={to_json}")
+
+        self.class_code += "\n            " + ", ".join(reflection_fields) + "\n        ),\n    })"
         if prop.comment is not None:
             self.class_code += f"  # {prop.comment}"
         self.class_code += "\n"
@@ -455,7 +493,7 @@ class ClassDefinition:
                 build_prop = []
 
             else:
-                default_value = _get_default(prop.meta)
+                default_value = _get_default(prop.dataclass_field_params)
 
                 if prop.raw["cook_preference"] == "Default":
                     self.properties_builder += f"        self.{prop_name} = default_override.get({repr(prop_name)}, {default_value})  # Cooks with Default\n"
@@ -483,7 +521,7 @@ class ClassDefinition:
         return self.is_incomplete
 
     def _can_fast_decode(self) -> bool:
-        return all(prop.format_specifier is not None for prop in self.all_props.values())
+        return all(prop.format_specifier is not None for prop in self.all_props.values()) and self.all_props
 
     def _create_fast_decode_body(self):
         num_props = len(self.all_props)
@@ -491,12 +529,10 @@ class ClassDefinition:
         big_format = get_endianness(self.game_id) + "".join(
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
-        yield "_FAST_FORMAT = None"
-        yield f"_FAST_IDS = ({', '.join(ids)})"
-        yield ""
-        yield ""
 
-        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
+        self.before_class_code += "_FAST_FORMAT = None\n"
+        self.before_class_code += f"_FAST_IDS = ({', '.join(ids)})\n"
+
         yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
@@ -510,7 +546,7 @@ class ClassDefinition:
         yield f"    dec = _FAST_FORMAT.unpack(data.read({struct.calcsize(big_format)}))"
 
         fast_check = []
-        ret_state = [f"    return {self.class_name}("]
+        ret_state = ["    return cls("]
 
         offset = 0
         for prop in self.all_props.values():
@@ -545,20 +581,25 @@ class ClassDefinition:
         endianness = get_endianness(self.game_id)
         [hex(prop.id) for prop in self.all_props.values()]
 
-        yield f"def _fast_decode(data: typing.BinaryIO, property_count: int) -> typing.Optional[{self.class_name}]:"
         yield f"    if property_count != {num_props}:"
         yield "        return None"
         yield ""
 
+        variables = []
         for prop_name, prop in self.all_props.items():
+            variable_name = prop_name
+            if variable_name in ("data", "property_count", "property_id", "property_size", "cls"):
+                variable_name += "_"
+
             # yield "    data.read(6)"  # TODO: assert correct
             yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
             yield f"    assert property_id == 0x{prop.id:08x}"
-            yield f"    {prop_name} = {prop.parse_code}"
+            yield f"    {variable_name} = {prop.parse_code}"
             yield ""
+            variables.append(variable_name)
 
-        all_fields = ", ".join(self.all_props.keys())
-        yield f"    return {self.class_name}({all_fields})"
+        all_fields = ", ".join(variables)
+        yield f"    return cls({all_fields})"
 
     def write_from_stream(self):
         game_id = self.game_id
@@ -566,7 +607,7 @@ class ClassDefinition:
 
         self.class_code += """
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None, default_override: typing.Optional[dict] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None, default_override: dict | None = None) -> typing_extensions.Self:
 """
         if self.atomic or game_id == "Prime":
             self.class_code += "        property_size = None  # Atomic\n"
@@ -588,16 +629,8 @@ class ClassDefinition:
         else:
             self.class_code += f"        property_count = {_CODE_PARSE_UINT16[endianness]}\n"
 
-        self.class_code += "        if (result := _fast_decode(data, property_count)) is not None:\n"
+        self.class_code += "        if (result := cls._fast_decode(data, property_count)) is not None:\n"
         self.class_code += "            return result\n\n"
-
-        if self._can_fast_decode():
-            for fast_decode in self._create_fast_decode_body():
-                self.after_class_code += f"{fast_decode}\n"
-        else:
-            for fast_decode in self._create_simple_decode_body():
-                self.after_class_code += f"{fast_decode}\n"
-        self.after_class_code += "\n\n"
 
         if self.keep_unknown_properties():
             read_unknown = 'present_fields["unknown_properties"][property_id] = data.read(property_size)'
@@ -622,24 +655,41 @@ class ClassDefinition:
 
         self.class_code += "        return cls(**present_fields)\n"
 
+        self.class_code += "\n    @classmethod\n"
+        self.class_code += (
+            "    def _fast_decode(cls, data: typing.BinaryIO, property_count: int"
+            ") -> typing_extensions.Self | None:\n"
+        )
+        if self._can_fast_decode():
+            for fast_decode in self._create_fast_decode_body():
+                self.class_code += f"    {fast_decode}\n"
+        else:
+            for fast_decode in self._create_simple_decode_body():
+                self.class_code += f"    {fast_decode}\n"
+
+        # Defining the _decode_X methods and _property_decoder
+
         signature = "data: typing.BinaryIO, property_size: int"
+        decode_names = {}
+
         for prop_name, prop in self.all_props.items():
             if prop.parse_code.endswith(".from_stream(data, property_size)"):
                 suffix_size = len("(data, property_size)")
-                self.after_class_code += f"_decode_{prop_name} = {prop.parse_code[:-suffix_size]}\n\n"
+                decode_names[prop_name] = prop.parse_code[:-suffix_size]
             else:
+                decode_names[prop_name] = f"_decode_{prop_name}"
                 self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
                 self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, _decode_{prop_name}),\n"
+            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
 
     def write_to_stream(self):
         self.class_code += """
-    def to_stream(self, data: typing.BinaryIO, default_override: typing.Optional[dict] = None):
+    def to_stream(self, data: typing.BinaryIO, default_override: dict | None = None) -> None:
         default_override = default_override or {}
 """
         endianness = get_endianness(self.game_id)
@@ -715,31 +765,55 @@ class ClassDefinition:
     def write_from_json(self):
         self.class_code += """
     @classmethod
-    def from_json(cls, data: dict):
-        return cls(
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
 """
+        data_var = "data"
+        if self.all_props:
+            data_var = "json_data"
+            self.class_code += f'        json_data = typing.cast("{self.class_name}Json", data)\n'
+            self.type_checking_code.append(f"class {self.class_name}Json(typing_extensions.TypedDict):")
+
+        self.class_code += "        return cls(\n"
         space = "            "
+
         for prop_name, prop in self.all_props.items():
-            self.class_code += f"{space}{prop_name}={prop.from_json_code.format(obj=f'data[{repr(prop_name)}]')},\n"
+            self.type_checking_code.append(f"    {prop_name}: {prop.json_type}")
+
+            if prop.get_from_json(prop_name) == f"_from_json_{prop_name}":
+                self.before_class_code += (
+                    f"def _from_json_{prop_name}(data: json_util.JsonValue) -> {prop.prop_type}:\n"
+                    f"    json_data = typing.cast({prop.json_type}, data)\n"
+                )
+                self.before_class_code += f"    return {prop.from_json_code.format(obj=data_var)}\n\n"
+
+            self.class_code += (
+                f"{space}{prop_name}={prop.from_json_code.format(obj=f'{data_var}[{repr(prop_name)}]')},\n"
+            )
+
+        if self.all_props:
+            self.type_checking_code.append("")
 
         if self.keep_unknown_properties():
             self.needed_imports["base64"] = True
-            self.class_code += """
-            unknown_properties={
+            self.class_code += f"""{space}unknown_properties={{
                 int(property_id, 16): base64.b64decode(property_data)
                 for property_id, property_data in data["unknown_properties"].items()
-            },
+            }},
 """
 
         self.class_code += "        )\n"
 
     def write_to_json(self):
         self.class_code += """
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {
 """
         space = "            "
         for prop_name, prop in self.all_props.items():
+            if prop.get_to_json(prop_name) == f"_to_json_{prop_name}":
+                self.before_class_code += f"\ndef _to_json_{prop_name}(obj: {prop.prop_type}) -> json_util.JsonValue:\n"
+                self.before_class_code += f"    return {prop.to_json_code.format(obj='obj')}\n"
+
             self.class_code += f"{space}{repr(prop_name)}: {prop.to_json_code.format(obj=f'self.{prop_name}')},\n"
 
         if self.keep_unknown_properties():
@@ -758,32 +832,42 @@ class ClassDefinition:
             return
 
         has_dep = False
+        method_name = {}
 
         for prop_name, prop in self.all_props.items():
             if prop.dependency_code is None:
                 continue
 
             has_dep = True
-            prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
-            if prop.raw.get("ignore_dependencies_mlvl"):
-                self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
-                prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
-            else:
-                prop_code = f"yield from {prop_code}"
 
-            self.class_code += f"""
-    def _dependencies_for_{prop_name}(self, asset_manager):
+            prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
+            if prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
+                method_name[prop_name] = f"self.{prop_name}.dependencies_for"
+            else:
+                if prop.raw.get("ignore_dependencies_mlvl"):
+                    self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
+                    prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
+                else:
+                    prop_code = f"yield from {prop_code}"
+
+                method_name[prop_name] = f"self._dependencies_for_{prop_name}"
+
+                self.class_code += f"""
+    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         {prop_code}
 """
 
         if has_dep:
             method_list = "\n".join(
-                f'            (self._dependencies_for_{prop_name}, "{prop_name}", "{prop.prop_type}"),'
+                f'            ({method_name[prop_name]}, "{prop_name}", "{prop.prop_type}"),'
                 for prop_name, prop in self.all_props.items()
                 if prop.dependency_code is not None
             )
+            self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
+            self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
+
             self.class_code += f"""
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         for method, field_name, field_type in [
 {method_list}
         ]:
@@ -814,6 +898,7 @@ def _add_default_types(core_path: Path, game_id: str):
         f"""# Generated file
 import struct
 import typing
+import typing_extensions
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_color import BaseColor
@@ -821,10 +906,10 @@ from retro_data_structures.properties.base_color import BaseColor
 
 class Color(BaseColor):
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}ffff', data.read(16)))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}ffff', self.r, self.g, self.b, self.a))
 
 """
@@ -834,6 +919,7 @@ class Color(BaseColor):
         f"""# Generated file
 import struct
 import typing
+import typing_extensions
 
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_vector import BaseVector
@@ -841,10 +927,10 @@ from retro_data_structures.properties.base_vector import BaseVector
 
 class Vector(BaseVector):
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}fff', data.read(12)))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}fff', self.x, self.y, self.z))
 """
         + game_code
@@ -865,7 +951,9 @@ class Vector(BaseVector):
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
+from retro_data_structures import json_util
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
@@ -877,13 +965,13 @@ class PooledString(BaseProperty):
     size_or_str: typing.Union[int, bytes] = b""
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         a, b = struct.unpack('{endianness}lL', data.read(8))
         if a == -1:
             b = data.read(b)
         return cls(a, b)
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         a, b = self.index, self.size_or_str
         if a == -1:
             b = len(b)
@@ -892,10 +980,10 @@ class PooledString(BaseProperty):
             data.write(self.size_or_str)
 
     @classmethod
-    def from_json(cls, data: dict):
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         return cls(data["index"], data["size_or_str"])
 
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {{
             "index": self.index,
             "size_or_str": self.size_or_str,
@@ -914,13 +1002,21 @@ class PooledString(BaseProperty):
 
     core_path.joinpath("AnimationParameters.py").write_text(
         f"""# Generated file
+from __future__ import annotations
+
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
+from retro_data_structures import json_util
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
 
 
 @dataclasses.dataclass()
@@ -930,24 +1026,25 @@ class AnimationParameters(BaseProperty):
     initial_anim: int = 0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         return cls(*struct.unpack('{endianness}{format_specifier}LL', data.read({known_size})))
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         data.write(struct.pack('{endianness}{format_specifier}LL', self.ancs, self.character_index, self.initial_anim))
 
     @classmethod
-    def from_json(cls, data: dict):
-        return cls(data["ancs"], data["character_index"], data["initial_anim"])
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
+        data_json = typing.cast(dict[str, int], data)
+        return cls(data_json["ancs"], data_json["character_index"], data_json["initial_anim"])
 
-    def to_json(self) -> dict:
+    def to_json(self) -> json_util.JsonObject:
         return {{
             "ancs": self.ancs,
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
         }}
 
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from asset_manager.get_dependencies_for_ancs(self.ancs, self.character_index)
 """
         + game_code
@@ -957,6 +1054,7 @@ class AnimationParameters(BaseProperty):
 import dataclasses
 import struct
 import typing
+import typing_extensions
 
 import construct
 
@@ -966,13 +1064,13 @@ from retro_data_structures.properties.base_spline import BaseSpline, Knot
 
 
 def _read_knot(data: typing.BinaryIO) -> Knot:
-    header = struct.unpack(">ffBB", data.read(10))
+    header = typing.cast(tuple[float, float, int, int], struct.unpack(">ffBB", data.read(10)))
     cached_tangents_a = None
     cached_tangents_b = None
     if header[2] == 5:
-        cached_tangents_a = struct.unpack(">ff", data.read(8))
+        cached_tangents_a = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
     if header[3] == 5:
-        cached_tangents_b = struct.unpack(">ff", data.read(8))
+        cached_tangents_b = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
 
     return Knot(*header, cached_tangents_a=cached_tangents_a, cached_tangents_b=cached_tangents_b)
 
@@ -981,7 +1079,7 @@ def _read_knot(data: typing.BinaryIO) -> Knot:
 class Spline(BaseSpline):
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: typing.Optional[int] = None):
+    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
         pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
         knots = [
             _read_knot(data)
@@ -998,7 +1096,7 @@ class Spline(BaseSpline):
             maximum_amplitude=maximum_amplitude,
         )
 
-    def to_stream(self, data: typing.BinaryIO):
+    def to_stream(self, data: typing.BinaryIO) -> None:
         MayaSpline.build_stream(construct.Container(
             pre_infinity=self.pre_infinity,
             post_infinity=self.post_infinity,
@@ -1101,6 +1199,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     def get_prop_details(prop) -> PropDetails:
         raw_type = prop["type"]
         prop_type = None
+        json_type = None
         need_enums = False
         comment = None
         parse_code = "None"
@@ -1108,25 +1207,27 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         from_json_code = "None"
         to_json_code = "None"
         known_size = None
-        meta = {}
-        needed_imports = {}
+        field_params = {}
+        needed_imports: dict[str, str | bool] = {}
         format_specifier = None
         dependency_code = None
+        dataclass_metadata = {}
 
         if raw_type == "Sound":
             raw_type = "Int"
-            meta["default"] = 65535
-            meta["metadata"] = {"sound": True}
+            field_params["default"] = 65535
+            dataclass_metadata["sound"] = True
             dependency_code = "asset_manager.get_audio_group_dependency({obj})"
 
         if raw_type == "Struct":
-            archetype_path: str = prop["archetype"].replace("_", ".")
+            archetype_path: str = prop["archetype"]
             prop_type = archetype_path.split(".")[-1]
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
-            meta["default_factory"] = prop_type
+            field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
             dependency_code = "{obj}.dependencies_for(asset_manager)"
+            json_type = "json_util.JsonObject"
 
             default_override = {}
             for inner_prop in prop["properties"]:
@@ -1140,7 +1241,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     continue
 
                 inner_details = get_prop_details(inner_prop)
-                default_override[inner_name] = _get_default(inner_details.meta)
+                default_override[inner_name] = _get_default(inner_details.dataclass_field_params)
                 needed_imports.update(inner_details.needed_imports)
                 need_enums = need_enums or inner_details.need_enums
 
@@ -1156,6 +1257,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             default_value = prop["default_value"] if prop["has_default"] else 0
             enum_name = _scrub_enum(prop["archetype"] or prop["name"] or property_names.get(prop["id"]) or "")
             format_specifier = "L"
+            json_type = "int"
 
             uses_known_enum = enum_name in known_enums and (
                 default_value in list(known_enums[enum_name].values.values())
@@ -1170,12 +1272,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
-                        meta["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
-                assert "default" in meta
+                        field_params["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
+                assert "default" in field_params
             else:
                 comment = "Choice"
                 prop_type = "int"
-                meta["default"] = repr(default_value)
+                field_params["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32[endianness]
                 build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
                 from_json_code = "{obj}"
@@ -1184,11 +1286,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Flags":
             default_value = repr(prop["default_value"] if prop["has_default"] else 0)
             format_specifier = "L"
+            json_type = "int"
 
             if "flagset_name" in prop:
                 prop_type = "enums." + _scrub_enum(prop["flagset_name"])
                 need_enums = True
-                meta["default"] = f"{prop_type}({default_value})"
+                field_params["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
                 from_json_code = f"{prop_type}.from_json({{obj}})"
@@ -1196,7 +1299,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             else:
                 prop_type = "int"
                 comment = "Flagset"
-                meta["default"] = default_value
+                field_params["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32[endianness]
                 build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
                 from_json_code = "{obj}"
@@ -1205,19 +1308,19 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Asset":
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
-            field_meta = {"asset_types": prop["type_filter"]}
+            dataclass_metadata["asset_types"] = prop["type_filter"]
             if not any(asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")):
                 dependency_code = "asset_manager.get_dependencies_for_asset({obj})"
 
             if "ignore_dependencies_mlvl" in prop:
-                field_meta["ignore_dependencies_mlvl"] = True
+                dataclass_metadata["ignore_dependencies_mlvl"] = True
 
-            meta["metadata"] = repr(field_meta)
             default_value = "default_asset_id"
 
-            meta["default"] = default_value
+            field_params["default"] = default_value
 
             if game_id in ["PrimeRemastered"]:
+                json_type = "str"
                 needed_imports["uuid"] = True
                 known_size = 16
                 parse_code = "uuid.UUID(bytes_le=data.read(16))"
@@ -1226,6 +1329,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 to_json_code = "str({obj})"
 
             else:
+                json_type = "int"
                 if game_id in ["Prime", "Echoes"]:
                     format_specifier = "L"
                     known_size = 4
@@ -1250,15 +1354,18 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
-            meta["default_factory"] = prop_type
+            field_params["default_factory"] = prop_type
+            json_type = "json_util.JsonObject"
 
         elif raw_type == "Array":
             inner_prop = get_prop_details(prop["item_archetype"])
 
             prop_type = f"list[{inner_prop.prop_type}]"
+            json_type = f"list[{inner_prop.json_type}]"
+
             need_enums = inner_prop.need_enums
             comment = inner_prop.comment
-            meta["default_factory"] = "list"
+            field_params["default_factory"] = "list"
             if len(inner_prop.format_specifier or "") == 1:
                 specifier = f"{repr(endianness)} + {repr(inner_prop.format_specifier)} * (count := {_CODE_PARSE_UINT32[endianness]})"
                 parse_code = f"list(struct.unpack({specifier}, data.read(count * {inner_prop.known_size})))"
@@ -1278,7 +1385,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif raw_type == "String":
             prop_type = "str"
-            meta["default"] = repr(prop["default_value"] if prop["has_default"] else "")
+            field_params["default"] = repr(prop["default_value"] if prop["has_default"] else "")
             null_byte = repr(b"\x00")
             if game_id == "Prime":
                 # No property size for Prime 1
@@ -1301,6 +1408,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
+            json_type = "json_util.JsonValue"
 
             if raw_type == "Color":
                 format_specifier = "f" * 4
@@ -1313,11 +1421,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 default_value = {k: s.unpack(s.pack(v))[0] for k, v in prop["default_value"].items()}
                 if raw_type == "Color":
                     value = {"A": 0.0, **default_value}
-                    meta["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
+                    field_params["default_factory"] = "lambda: Color(r={R}, g={G}, b={B}, a={A})".format(**value)
                 else:
-                    meta["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**default_value)
+                    field_params["default_factory"] = "lambda: Vector(x={X}, y={Y}, z={Z})".format(**default_value)
             else:
-                meta["default_factory"] = prop_type
+                field_params["default_factory"] = prop_type
 
         elif raw_type in _literal_prop_types:
             literal_prop = _literal_prop_types[raw_type]
@@ -1337,14 +1445,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             except struct.error as e:
                 print(f"{hex(prop['id'])} ({prop['type']}) has invalid default value  {default_value}: {e}")
                 default_value = literal_prop.default
-            meta["default"] = repr(default_value)
+            field_params["default"] = repr(default_value)
 
-        if "default" not in meta and "default_factory" not in meta:
+        if "default" not in field_params and "default_factory" not in field_params:
             raise ValueError(f"Unable to find default value for prop {prop}.")
 
         if prop_type is None:
             print("what?")
             print(prop)
+
+        if json_type is None:
+            json_type = prop_type
 
         if known_size is None and format_specifier is not None:
             known_size = struct.calcsize(endianness + format_specifier)
@@ -1352,6 +1463,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         return PropDetails(
             prop,
             prop_type,
+            json_type,
             need_enums,
             comment,
             parse_code,
@@ -1360,7 +1472,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             to_json_code,
             custom_cook_pref=prop["cook_preference"] != "Always",
             known_size=known_size,
-            meta=meta,
+            dataclass_field_params=field_params,
+            dataclass_metadata=dataclass_metadata,
             needed_imports=needed_imports,
             format_specifier=format_specifier,
             dependency_code=dependency_code,
@@ -1381,8 +1494,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             game_id=game_id,
             raw_name=name,
             raw_def=this,
-            class_name=name.split("_")[-1] if game_id != "PrimeRemastered" else name,
-            class_path=name.replace("_", "/") if game_id != "PrimeRemastered" else name,
+            class_name=name,
+            class_path=name,
             is_struct=is_struct,
             is_incomplete=this["incomplete"],
         )
@@ -1398,7 +1511,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             if all_names.count(prop_name) > 1:
                 final_prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(get_prop_details(prop), final_prop_name)
+            cls.add_prop(get_prop_details(prop), final_prop_name, prop["name"] or property_names.get(prop["id"]))
         cls.finalize_props()
 
         cls.class_code += "\n    @classmethod\n"
@@ -1406,7 +1519,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.class_code += f"        return Game.{_game_id_to_enum[game_id]}\n"
 
         if is_struct:
-            cls.class_code += "\n    def get_name(self) -> typing.Optional[str]:\n"
+            cls.class_code += "\n    def get_name(self) -> str | None:\n"
             if game_id == "Prime":
                 if "name" in cls.all_props:
                     name_field = "self.name"
@@ -1451,10 +1564,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.write_dependencies()
 
         code_code = "# Generated File\n"
-        code_code += "import dataclasses\nimport struct\nimport typing\n"
+        code_code += "from __future__ import annotations\n\n"
+        code_code += "import dataclasses\nimport struct\nimport typing\nimport typing_extensions\n"
 
-        code_code += "\nfrom retro_data_structures.game_check import Game\n"
+        code_code += "\nfrom retro_data_structures import json_util\n"
+        code_code += "from retro_data_structures.game_check import Game\n"
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
+        code_code += "from retro_data_structures.properties.field_reflection import FieldReflection\n"
 
         if cls.need_enums:
             code_code += f"import retro_data_structures.enums.{_game_id_to_file[game_id]} as enums\n"
@@ -1465,6 +1581,23 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             else:
                 code_code += f"from {import_path} import {code_import}\n"
 
+        typing_imports = {k: v for k, v in cls.typing_imports.items() if k not in cls.needed_imports}
+        if typing_imports or cls.type_checking_code:
+            code_code += "\nif typing.TYPE_CHECKING:\n"
+            for import_path, code_import in sorted(cls.typing_imports.items()):
+                if code_import is True:
+                    code_code += f"    import {import_path}\n"
+                else:
+                    code_code += f"    from {import_path} import {code_import}\n"
+
+            if typing_imports:
+                code_code += "\n"
+
+            code_code += "\n".join(f"    {line}" for line in cls.type_checking_code)
+
+        if cls.before_class_code:
+            code_code += "\n\n"
+            code_code += cls.before_class_code
         code_code += "\n\n"
         code_code += cls.class_code
         if cls.after_class_code:
@@ -1498,7 +1631,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n"
 
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
-    fourcc_mapping = "\n_FOUR_CC_MAPPING = {\n"
+    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[BaseObjectType]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
