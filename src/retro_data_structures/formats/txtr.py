@@ -1,6 +1,7 @@
 """
 https://wiki.axiodl.com/w/TXTR_(File_Format)
 """
+
 from __future__ import annotations
 
 import enum
