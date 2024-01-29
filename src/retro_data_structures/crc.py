@@ -1,6 +1,7 @@
 """
 Module for calculating CRC hashes with the algorithm and data used by Retro.
 """
+
 from __future__ import annotations
 
 _crc32_constants = [

@@ -1,6 +1,7 @@
 """
 For checking which game is being parsed
 """
+
 from __future__ import annotations
 
 import typing
