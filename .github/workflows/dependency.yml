@@ -17,4 +17,4 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       
       - name: Automatically approve the PR
-        uses: hmarr/auto-approve-action@v3
+        uses: hmarr/auto-approve-action@v4
