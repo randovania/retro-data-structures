@@ -278,12 +278,7 @@ def do_convert(args):
 
     for converted_asset in converter.converted_assets.values():
         print(
-            " {}: {:08x} from {:08x} ({})".format(
-                converted_asset.type,
-                converted_asset.id,
-                reverse_converted_ids[converted_asset.id][1],
-                reverse_converted_ids[converted_asset.id][0].name,
-            )
+            f" {converted_asset.type}: {converted_asset.id:08x} from {reverse_converted_ids[converted_asset.id][1]:08x} ({reverse_converted_ids[converted_asset.id][0].name})"
         )
 
 
