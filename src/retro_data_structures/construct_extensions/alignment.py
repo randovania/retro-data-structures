@@ -30,7 +30,7 @@ class AlignTo(Construct):
 
 
 class AlignedPrefixed(Subconstruct):
-    def __init__(self, length_field, subcon, modulus, length_size, pad_byte=b"\xFF"):
+    def __init__(self, length_field, subcon, modulus, length_size, pad_byte=b"\xff"):
         super().__init__(subcon)
         self.length_field = length_field
         self.modulus = modulus

@@ -86,11 +86,8 @@ class LZOCompressedBlock(Adapter):
         decompressed_size = construct.evaluate(self.decompressed_size, context)
         if decompressed_size != len(uncompressed):
             raise ValueError(
-                "Decompressed size {} doesn't match size of data to compress ({}) at {}".format(
-                    decompressed_size,
-                    len(uncompressed),
-                    path,
-                )
+                f"Decompressed size {decompressed_size} doesn't match size of data "
+                f"to compress ({len(uncompressed)}) at {path}"
             )
 
         segment_size = self.segment_size

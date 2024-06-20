@@ -181,7 +181,7 @@ MAPA = construct.Aligned(
             ),
         ),
     ),
-    b"\xFF",
+    b"\xff",
 )
 
 

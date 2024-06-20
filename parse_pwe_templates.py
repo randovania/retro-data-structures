@@ -714,7 +714,7 @@ class ClassDefinition:
         has_root_size_offset = False
 
         if self.is_struct:
-            null_bytes = repr(b"\xFF\xFF\xFF\xFF")
+            null_bytes = repr(b"\xff\xff\xff\xff")
             self.class_code += f"        data.write({null_bytes})  # struct object id\n"
             placeholder = repr(b"\x00\x00")
             self.class_code += "        root_size_offset = data.tell()\n"
