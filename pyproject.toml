@@ -60,6 +60,10 @@ markers = [
 
 [tool.ruff]
 line-length = 120
+target-version = "py310"
+src = ["src"]
+
+[tool.ruff.lint]
 select = [
     "E", "F", "W", "C90", "I", "UP", "C4",
     "RSE",
@@ -75,23 +79,15 @@ select = [
     "PLW",
 ]
 extend-ignore = [
+    "ISC001",  # may cause conflicts with formatter
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic values show up everywhere in construct defs
 ]
 
-src = ["src"]
-
-# Version to target for generated code.
-target-version = "py310"
-
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 # Flag errors (`C901`) whenever the complexity level exceeds 25.
 # Defaults to 10, but we're being very flexible right now
 max-complexity = 25
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
-
-[tool.black]
-line-length = 120
-target-version = ['py310', 'py311']
