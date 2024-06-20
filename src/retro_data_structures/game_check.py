@@ -160,7 +160,11 @@ class CurrentGameCheck(IfThenElse):
 
     def _emitparse(self, code: construct.CodeGen):
         code.append("from retro_data_structures import game_check")
-        return f"(({self.thensubcon._compileparse(code)}) if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name}) else ({self.elsesubcon._compileparse(code)}))"
+        return (
+            f"(({self.thensubcon._compileparse(code)}) "
+            f"if (game_check.get_current_game(this) >= game_check.Game.{self.target_game.name}) "
+            f"else ({self.elsesubcon._compileparse(code)}))"
+        )
 
     def _emitbuild(self, code: construct.CodeGen):
         code.append("from retro_data_structures import game_check")

@@ -507,6 +507,6 @@ def test_compare_from_build():
     for source_file in source.files:
         pad = 32 - len(source_file.compressed_data) % 32
         if pad < 32:
-            source_file.compressed_data += b"\xFF" * pad
+            source_file.compressed_data += b"\xff" * pad
 
     assert decoded == source

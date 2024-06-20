@@ -41,7 +41,10 @@ class DictConstruct(construct.Construct):
             self.value_type._build(value, stream, context, field_path)
 
     def _emitparse(self, code):
-        return f"Container(({self.key_type._compileparse(code)}, {self.value_type._compileparse(code)}) for i in range({self.count_type._compileparse(code)}))"
+        return (
+            f"Container(({self.key_type._compileparse(code)}, {self.value_type._compileparse(code)}) "
+            f"for i in range({self.count_type._compileparse(code)}))"
+        )
 
     def _emitbuild(self, code):
         fname = f"build_dict_{code.allocateId()}"
