@@ -10,8 +10,9 @@ import dataclasses
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC, String, AssetId64
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
-from retro_data_structures.compression import LZOCompressedBlock
-from retro_data_structures.construct_extensions.dict import make_dict, AlignTo
+from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
+from retro_data_structures.construct_extensions.dict import make_dict
+from retro_data_structures.construct_extensions.alignment import AlignTo
 
 if TYPE_CHECKING:
     from retro_data_structures.game_check import Game
@@ -48,12 +49,12 @@ def _emitparse_header(code: construct.CodeGen) -> str:
 ConstructResourceHeader._emitparse = _emitparse_header
 
 PAKNoData = Struct(
-    _start=construct.Tell,      ##Should always be 0x00
+    _start=construct.Tell,      # Should always be 0x00
     _header=PAKHeader,
-    _table_of_contents_start=construct.Tell,        ##Should always be 0x40
-    ##Not entirely sure what DictConstruct is supposed to represent
+    _table_of_contents_start=construct.Tell,        #  Should always be 0x40
     table_of_contents=construct.Aligned(64, make_dict(Int32ub, FourCC)),
-    _named_resources_start=construct.Tell,      ##Should always be 0x80
+    # Usually starts at 0x80, though ToC semantically has a dynamic length
+    _named_resources_start=construct.Tell,      
     named_resources=construct.Aligned(
         64,
         PrefixedArray(
@@ -75,19 +76,16 @@ PAKNoData = Struct(
         construct.this.table_of_contents.RSHD == construct.this._resources_end - construct.this._resources_start
     ),
 ) 
-##TODO : Once the struct is confirmed, compile it
+# TODO : Once the struct is confirmed, compile it
 
-## Not sure how this is supposed to work, is this for the whole compressed resource
-##or a single block ?
 CompressedPakResource = FocusedSeq(
     "data",
     decompressed_size = Rebuild(Int32ub, construct.len_(construct.this.data)),
-    ## Since Corruption only uses LZO1X, I don't think
-    ## we should necessarily check which compression algorithm to use
+    # Added Zlib check for DKCR
     data = IfThenElse(
         game_check.uses_lzo,
         LZOCompressedBlock(construct.this.decompressed_size),
-        None
+        ZlibCompressedBlock
     )
 )
 
@@ -100,11 +98,7 @@ class PakFile:
     compressed_data: bytes | None      
     extra: construct.Container | None = None
 
-    ## Considering I'm working on corruption specifically, 
-    ## I made it the default target game. Not sure whether to hard code it
-    ## unless we want to support Other M, Trilogy or the JP New Play Control! versions
-    ## for some reason
-    def get_decompressed(self, target_game : Game = Game.CORRUPTION) -> bytes:
+    def get_decompressed(self, target_game : Game) -> bytes:
         if self.compressed_data is None:
             self.uncompressed_data = CompressedPakResource.parse(
                 self.compressed_data,
@@ -112,7 +106,7 @@ class PakFile:
             )
         return self.uncompressed_data
         
-    def get_compressed(self, target_game : Game = Game.CORRUPTION) -> bytes:
+    def get_compressed(self, target_game : Game) -> bytes:
         if self.compressed_data is None:
                 self.compressed_data = CompressedPakResource.build(
                     self.uncompressed_data,
@@ -141,7 +135,7 @@ class ConstructPakWii(construct.Construct):
                 raise construct.ConstructError(f"Expected resource at {resource.offset}", path)
             
             data = construct.stream_read(stream, resource.size, path)
-            ## TODO : Padding to be added ?
+            # TODO : Padding to be added ?
             if resource.compressed > 0:
                 uncompressed_data = None
                 compressed_data = data
@@ -170,10 +164,7 @@ class ConstructPakWii(construct.Construct):
     def _build(self, obj: PakBody, stream, context, path):
         assert isinstance(obj, PakBody)
 
-        ## I believe this follows the PAKNoData Struct ?
         header = construct.Container(
-            ## I assume this is just initializing to default values
-            ## before updating _header ?
             _header = construct.Container(),
             named_resources = construct.ListContainer(
                 construct.Container(
@@ -195,27 +186,23 @@ class ConstructPakWii(construct.Construct):
             )
         )
 
-        ## I'd assume header_start should always be 0 considering
-        ## this class is supposed to model the whole PAK ?
         header_start = construct.stream_tell(stream, path)
         PAKNoData._build(header, stream, context, path)
-        ## Also not sure what is the purpose for this line
+        # Not sure what is the purpose for this line
         AlignTo(64)._build(None, stream, context, path)
 
         for i, file in enumerate(obj.files):
             compressed = file.should_compress
-            ## Again, since Corruption paks exclusively use LZO1X,
-            ## I don't think checking the game should be necessary ?
             game = game_check.get_current_game(context)
             if compressed:
                 data = file.get_compressed(game)
             else :
                 data = file.get_decompressed(game)
             
-            ## Attempt at checking for compression size exceeding actual size
-            if compressed and len(data) > len(file.get_decompressed(game)):
-                compressed = False
-                data = file.get_decompressed(game)
+            # TODO : If the file ends up bigger, don't compress
+            # if compressed and len(data) > len(file.get_decompressed(game)):
+            #     compressed = False
+            #     data = file.get_decompressed(game)
 
             pad = 64 - (len(data) % 64)
             if pad < 64:
@@ -226,7 +213,7 @@ class ConstructPakWii(construct.Construct):
             header.resources[i].compressed = int(compressed)
             construct.stream_write(stream, data, len(data), path)
 
-        ## Update header to contain accurate information to PAK contents
+        # Update header to contain accurate information to PAK contents
         files_end = construct.steam_tell(stream, path)
         construct.stream_seek(stream, header_start, 0, path)
         PAKNoData._build(header, stream, context, path)
