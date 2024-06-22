@@ -124,15 +124,17 @@ class PakBody:
      files: list[PakFile]
 
 class ConstructPakWii(construct.Construct):
-    def _parse(stream, context, path) -> PakBody:
+    def _parse(self, stream, context, path) -> PakBody:
         header = PAKNoData._parsereport(stream, context, f"{path} -> header")
 
         AlignTo(64)._parse(stream, context, path)
 
         files = []
+        # Resource offsets are relative to the start of the DATA section
+        data_start = construct.stream_tell(stream, path)
         for i, resource in enumerate(header.resources):
-            if resource.offset != construct.stream_tell(stream, path):
-                raise construct.ConstructError(f"Expected resource at {resource.offset}", path)
+            if resource.offset + data_start != construct.stream_tell(stream, path):
+                raise construct.ConstructError(f"Expected resource at {resource.offset + data_start}", path)
             
             data = construct.stream_read(stream, resource.size, path)
             # TODO : Padding to be added ?
