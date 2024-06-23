@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import itertools
 import json
 import logging
@@ -12,7 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from retro_data_structures import dependencies, formats
-from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
+from retro_data_structures.asset_manager import AssetManager, FileProvider, IsoFileProvider, PathFileProvider
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
@@ -60,12 +61,12 @@ def add_game_argument(parser: argparse.ArgumentParser, name="--game"):
 
 
 def add_provider_argument(parser: argparse.ArgumentParser):
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--input-path", type=Path, help="Path to where to find pak files")
     group.add_argument("--input-iso", type=Path, help="Path to where to find ISO")
 
 
-def get_provider_from_argument(args):
+def get_provider_from_argument(args: argparse.Namespace) -> FileProvider:
     if args.input_path is not None:
         return PathFileProvider(args.input_path)
     else:
@@ -79,7 +80,23 @@ def asset_id_conversion(x: str) -> AssetId:
         return int(x, 0)
 
 
-def create_parser():
+def _add_areas_command(area_tool: argparse.ArgumentParser) -> None:
+    add_game_argument(area_tool)
+    add_provider_argument(area_tool)
+    area_sub = area_tool.add_subparsers(dest="area_command", required=True)
+    area_sub.add_parser("list-areas", help="List all areas").add_argument("--world", help="Only in the given world")
+
+    list_objs_cmd = area_sub.add_parser("list-objects", help="List all objects in an area")
+    list_docks_cmd = area_sub.add_parser("list-docks", help="List all docks in an area")
+    print_cmd = area_sub.add_parser("print-object", help="Print details about an object")
+    for c in [list_objs_cmd, list_docks_cmd, print_cmd]:
+        c.add_argument("world_id", type=lambda x: int(x, 0), help="Asset id of the world")
+        c.add_argument("area_id", type=lambda x: int(x, 0), help="Asset id of the area")
+    list_objs_cmd.add_argument("--layer", help="Only in the given layer")
+    print_cmd.add_argument("instance_id", type=lambda x: int(x, 0), help="Instance id of the object to print")
+
+
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
 
     subparser = parser.add_subparsers(dest="command", required=True)
@@ -129,24 +146,16 @@ def create_parser():
     convert.add_argument("asset_ids", type=asset_id_conversion, nargs="+", help="Asset id to list dependencies for")
 
     area_tool = subparser.add_parser("areas")
-    add_game_argument(area_tool)
-    add_provider_argument(area_tool)
-    area_sub = area_tool.add_subparsers(dest="area_command", required=True)
-    area_sub.add_parser("list-areas", help="List all areas").add_argument("--world", help="Only in the given world")
+    _add_areas_command(area_tool)
 
-    list_objs_cmd = area_sub.add_parser("list-objects", help="List all objects in an area")
-    list_docks_cmd = area_sub.add_parser("list-docks", help="List all docks in an area")
-    print_cmd = area_sub.add_parser("print-object", help="Print details about an object")
-    for c in [list_objs_cmd, list_docks_cmd, print_cmd]:
-        c.add_argument("world_id", type=lambda x: int(x, 0), help="Asset id of the world")
-        c.add_argument("area_id", type=lambda x: int(x, 0), help="Asset id of the area")
-    list_objs_cmd.add_argument("--layer", help="Only in the given layer")
-    print_cmd.add_argument("instance_id", type=lambda x: int(x, 0), help="Instance id of the object to print")
+    hash_tool = subparser.add_parser("hash")
+    add_game_argument(hash_tool)
+    add_provider_argument(hash_tool)
 
     return parser
 
 
-def do_ksy_export(args):
+def do_ksy_export(args: argparse.Namespace) -> None:
     output_path: Path = args.output_path
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -156,7 +165,7 @@ def do_ksy_export(args):
             cls.export_ksy(f"{game}_{format_name}", output_path.joinpath(f"{game}_{format_name}.ksy"))
 
 
-def dump_to(path: Path, decoded):
+def dump_to(path: Path, decoded: object) -> None:
     def default(o):
         if callable(o):
             o = o()
@@ -422,6 +431,60 @@ def do_area_command(args):
         raise ValueError(f"Unknown command: {args.area_command}")
 
 
+def hash_data(data: bytes) -> str:
+    return "sha256: " + hashlib.sha256(data).hexdigest()
+
+
+def hash_mlvl(level_id: AssetId, level: Mlvl) -> None:
+    try:
+        world_name = level.world_name
+    except UnknownAssetId:
+        world_name = "~no name~"
+
+    print(f"0x{level_id:08X} ({world_name}):")
+    for area in level.areas:
+        print(f"    0x{area.mrea_asset_id:08X}; {area.name}")
+
+        raw_sections = area.mrea.get_raw_section("script_layers_section")
+        layers = list(area.layers)
+
+        if len(raw_sections) != len(layers):
+            for i, raw_section in enumerate(raw_sections):
+                print(f"    - layer {i:>2}; {hash_data(raw_section)}")
+
+        for layer in area.layers:
+            if len(raw_sections) == len(layers):
+                print(f"    - layer {layer.index:>2} {hash_data(raw_sections[layer.index])} ({layer.name}):")
+            else:
+                print(f"    - layer {layer.index:>2} ({layer.name}):")
+
+            for instance in layer.instances:
+                print(f"        - instance {instance.id}; {hash_data(instance.raw_properties)}")
+
+
+def do_hash_command(args: argparse.Namespace) -> None:
+    game: Game = args.game
+    asset_manager = AssetManager(get_provider_from_argument(args), game)
+    provider = asset_manager.provider
+
+    for file in provider.get_file_list():
+        print(f"{file}:")
+        if file.endswith(".pak"):
+            pak = asset_manager.get_pak(file)
+            for asset_id, asset in pak.get_all_assets():
+                print(f"    {asset.type} 0x{asset_id:08X}; {hash_data(asset.data)}")
+        else:
+            with provider.open_binary(file) as f:
+                content = f.read()
+            print(f"    {hash_data(content)}")
+
+    mlvl_ids = [i for i in asset_manager.all_asset_ids() if asset_manager.get_asset_type(i) == "MLVL"]
+
+    print("Worlds:")
+    for mlvl_id in mlvl_ids:
+        hash_mlvl(mlvl_id, asset_manager.get_file(mlvl_id, Mlvl))
+
+
 def handle_args(args) -> None:
     if args.command == "ksy-export":
         do_ksy_export(args)
@@ -441,6 +504,8 @@ def handle_args(args) -> None:
         asyncio.run(compare_all_files_in_path(args))
     elif args.command == "areas":
         do_area_command(args)
+    elif args.command == "hash":
+        do_hash_command(args)
     else:
         raise ValueError(f"Unknown command: {args.command}")
 
