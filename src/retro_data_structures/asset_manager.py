@@ -7,6 +7,7 @@ import logging
 import typing
 from collections import defaultdict
 
+import construct
 import nod
 
 from retro_data_structures import formats
@@ -24,12 +25,11 @@ from retro_data_structures.exceptions import DependenciesHandledElsewhere, Unkno
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
+from retro_data_structures.game_disc import GameDisc
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
-
-    import construct
 
     from retro_data_structures.formats.ancs import Ancs
     from retro_data_structures.game_check import Game
@@ -46,6 +46,9 @@ class FileProvider:
         raise NotImplementedError
 
     def open_binary(self, name: str) -> typing.BinaryIO:
+        raise NotImplementedError
+
+    def read_binary(self, name: str) -> bytes:
         raise NotImplementedError
 
     def get_dol(self) -> bytes:
@@ -71,24 +74,42 @@ class PathFileProvider(FileProvider):
     def open_binary(self, name: str) -> typing.BinaryIO:
         return self.root.joinpath(name).open("rb")
 
+    def read_binary(self, name: str) -> bytes:
+        with self.open_binary(name) as f:
+            return f.read()
+
     def get_dol(self) -> bytes:
         with self.open_binary("sys/main.dol") as f:
             return f.read()
 
 
 class IsoFileProvider(FileProvider):
+    game_disc: GameDisc | None
+    disc: nod.DiscBase
+    data: nod.Partition
+
     def __init__(self, iso_path: Path):
-        result = nod.open_disc_from_image(iso_path)
-        if result is None:
-            raise ValueError(f"{iso_path} is not a GC/Wii ISO")
-
-        self.disc = result[0]
-        self.data = self.disc.get_data_partition()
-        if self.data is None:
-            raise ValueError(f"{iso_path} does not have data")
-
-        self.all_files = self.data.files()
         self.iso_path = iso_path
+
+        self.game_disc = None
+
+        try:
+            self.game_disc = GameDisc.parse(iso_path)
+            self.all_files = self.game_disc.files()
+
+        except construct.ConstError:
+            # Fallback to nod, likely a Wii ISO
+
+            result = nod.open_disc_from_image(iso_path)
+            if result is None:
+                raise ValueError(f"{iso_path} is not a GC/Wii ISO")
+
+            self.disc = result[0]
+            self.data = self.disc.get_data_partition()
+            if self.data is None:
+                raise ValueError(f"{iso_path} does not have data")
+
+            self.all_files = self.data.files()
 
     def __repr__(self):
         return f"<IsoFileProvider {self.iso_path}>"
@@ -102,10 +123,23 @@ class IsoFileProvider(FileProvider):
                 yield it
 
     def open_binary(self, name: str):
-        return self.data.read_file(name)
+        if self.game_disc is None:
+            return self.data.read_file(name)
+        else:
+            return self.game_disc.open_binary(name)
+
+    def read_binary(self, name: str) -> bytes:
+        if self.game_disc is None:
+            with self.open_binary(name) as f:
+                return f.read()
+        else:
+            return self.game_disc.read_binary(name)
 
     def get_dol(self) -> bytes:
-        return self.data.get_dol()
+        if self.game_disc is None:
+            return self.data.get_dol()
+        else:
+            return self.game_disc.get_dol()
 
 
 class AssetManager:
@@ -154,8 +188,7 @@ class AssetManager:
 
         self._custom_asset_ids = {}
         if self.provider.is_file("custom_names.json"):
-            with self.provider.open_binary("custom_names.json") as f:
-                custom_names_text = f.read().decode("utf-8")
+            custom_names_text = self.provider.read_binary("custom_names.json").decode("utf-8")
 
             self._custom_asset_ids.update(dict(json.loads(custom_names_text).items()))
 
@@ -380,8 +413,7 @@ class AssetManager:
 
         if pak_name not in self._in_memory_paks:
             logger.info("Reading %s", pak_name)
-            with self.provider.open_binary(pak_name) as f:
-                data = f.read()
+            data = self.provider.read_binary(pak_name)
 
             self._in_memory_paks[pak_name] = Pak.parse(data, target_game=self.target_game)
 
