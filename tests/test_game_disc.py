@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 from typing import TYPE_CHECKING
 
-from retro_data_structures import game_disc
+from retro_data_structures.disc import game_disc
 
 if TYPE_CHECKING:
     from pathlib import Path

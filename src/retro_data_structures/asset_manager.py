@@ -7,9 +7,6 @@ import logging
 import typing
 from collections import defaultdict
 
-import construct
-import nod
-
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
     AssetId,
@@ -21,15 +18,17 @@ from retro_data_structures.base_resource import (
     Resource,
     resolve_asset_id,
 )
+from retro_data_structures.disc.game_disc import GameDisc
 from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.game_disc import GameDisc
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
     from pathlib import Path
+
+    import construct
 
     from retro_data_structures.formats.ancs import Ancs
     from retro_data_structures.game_check import Game
@@ -92,31 +91,12 @@ class PathFileProvider(FileProvider):
 
 class IsoFileProvider(FileProvider):
     game_disc: GameDisc | None
-    disc: nod.DiscBase
-    data: nod.Partition
 
     def __init__(self, iso_path: Path):
         self.iso_path = iso_path
 
-        self.game_disc = None
-
-        try:
-            self.game_disc = GameDisc.parse(iso_path)
-            self.all_files = self.game_disc.files()
-
-        except construct.ConstError:
-            # Fallback to nod, likely a Wii ISO
-
-            result = nod.open_disc_from_image(iso_path)
-            if result is None:
-                raise ValueError(f"{iso_path} is not a GC/Wii ISO")
-
-            self.disc = result[0]
-            self.data = self.disc.get_data_partition()
-            if self.data is None:
-                raise ValueError(f"{iso_path} does not have data")
-
-            self.all_files = self.data.files()
+        self.game_disc = GameDisc.parse(iso_path)
+        self.all_files = self.game_disc.files()
 
     def __repr__(self):
         return f"<IsoFileProvider {self.iso_path}>"
@@ -130,23 +110,13 @@ class IsoFileProvider(FileProvider):
                 yield it
 
     def open_binary(self, name: str):
-        if self.game_disc is None:
-            return self.data.read_file(name)
-        else:
-            return self.game_disc.open_binary(name)
+        return self.game_disc.open_binary(name)
 
     def read_binary(self, name: str) -> bytes:
-        if self.game_disc is None:
-            with self.open_binary(name) as f:
-                return f.read()
-        else:
-            return self.game_disc.read_binary(name)
+        return self.game_disc.read_binary(name)
 
     def get_dol(self) -> bytes:
-        if self.game_disc is None:
-            return self.data.get_dol()
-        else:
-            return self.game_disc.get_dol()
+        return self.game_disc.get_dol()
 
     def get_file_list(self) -> list[str]:
         return list(self.all_files)
