@@ -51,6 +51,9 @@ class FileProvider:
     def get_dol(self) -> bytes:
         raise NotImplementedError
 
+    def get_file_list(self) -> list[str]:
+        raise NotImplementedError
+
 
 class PathFileProvider(FileProvider):
     def __init__(self, root: Path):
@@ -74,6 +77,9 @@ class PathFileProvider(FileProvider):
     def get_dol(self) -> bytes:
         with self.open_binary("sys/main.dol") as f:
             return f.read()
+
+    def get_file_list(self) -> list[str]:
+        return list(self.rglob("*"))
 
 
 class IsoFileProvider(FileProvider):
@@ -106,6 +112,9 @@ class IsoFileProvider(FileProvider):
 
     def get_dol(self) -> bytes:
         return self.data.get_dol()
+
+    def get_file_list(self) -> list[str]:
+        return list(self.all_files)
 
 
 class AssetManager:
