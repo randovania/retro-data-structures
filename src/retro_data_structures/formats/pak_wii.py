@@ -122,8 +122,9 @@ class PakFile:
 @dataclasses.dataclass
 class PakBody:
     # Maybe need to add md5 hash here as well if we don't know what string generated it
-     named_resources: dict[str, Dependency]
-     files: list[PakFile]
+    md5_hash: bytes
+    named_resources: dict[str, Dependency]
+    files: list[PakFile]
 
 class ConstructPakWii(construct.Construct):
     def _parse(self, stream, context, path) -> PakBody:
@@ -158,6 +159,7 @@ class ConstructPakWii(construct.Construct):
             )
 
         return PakBody(
+            md5_hash = header._header.md5_hash,
             named_resources = {
                 named.name: Dependency(type = named.asset_type, id = named.asset_id)
                 for named in header.named_resources
@@ -172,7 +174,7 @@ class ConstructPakWii(construct.Construct):
             # These next 5 fields are for now default values and will need to be rebuilt
             _header = construct.Container(
                 header_size = 0,
-                md5_hash = b"\x00" * 16     # Fairly certain this info is absent given the PAKBody
+                md5_hash = obj.md5_hash
             ),
             table_of_contents = construct.Container(
                 STRG = 0,     # Named resources size
