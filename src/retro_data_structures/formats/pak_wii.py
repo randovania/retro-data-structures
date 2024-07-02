@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import construct
-from construct import Bytes, Const, Int32ub, PrefixedArray, Struct, FocusedSeq, Rebuild, IfThenElse
+from construct import Bytes, Const, Int32ub, PrefixedArray, Struct, FocusedSeq, Rebuild, IfThenElse, this, len_
 
 from typing import TYPE_CHECKING
 
@@ -49,6 +49,7 @@ def _emitparse_header(code: construct.CodeGen) -> str:
 ConstructResourceHeader._emitparse = _emitparse_header
 
 PAKNoData = Struct(
+    # Only keep _header, table_of_contents, named_resources, and resources in the finished product
     _start=construct.Tell,      # Should always be 0x00
     _header=PAKHeader,
     _table_of_contents_start=construct.Tell,        #  Should always be 0x40
@@ -67,24 +68,24 @@ PAKNoData = Struct(
         ),
     ),
     _resources_start=construct.Tell,
-    _resources_start_assert=construct.Check(
-        construct.this.table_of_contents.STRG == construct.this._resources_start - construct.this._named_resources_start
-    ),
+    # _resources_start_assert=construct.Check(
+    #    construct.this.table_of_contents.STRG == construct.this._resources_start - construct.this._named_resources_start
+    # ),
     resources=construct.Aligned(64, PrefixedArray(Int32ub, ConstructResourceHeader)),
     _resources_end=construct.Tell,
-    _resources_end_assert=construct.Check(
-        construct.this.table_of_contents.RSHD == construct.this._resources_end - construct.this._resources_start
-    ),
-) 
+    # _resources_end_assert=construct.Check(
+    #    construct.this.table_of_contents.RSHD == construct.this._resources_end - construct.this._resources_start
+    # ),
+)
 # TODO : Once the struct is confirmed, compile it
 
 CompressedPakResource = FocusedSeq(
     "data",
-    decompressed_size = Rebuild(Int32ub, construct.len_(construct.this.data)),
+    decompressed_size = Rebuild(Int32ub, len_(this.data)),
     # Added Zlib check for DKCR
     data = IfThenElse(
         game_check.uses_lzo,
-        LZOCompressedBlock(construct.this.decompressed_size),
+        LZOCompressedBlock(this.decompressed_size),
         ZlibCompressedBlock
     )
 )
@@ -99,7 +100,7 @@ class PakFile:
     extra: construct.Container | None = None
 
     def get_decompressed(self, target_game : Game) -> bytes:
-        if self.compressed_data is None:
+        if self.uncompressed_data is None:
             self.uncompressed_data = CompressedPakResource.parse(
                 self.compressed_data,
                 target_game = target_game
@@ -120,6 +121,7 @@ class PakFile:
 
 @dataclasses.dataclass
 class PakBody:
+    # Maybe need to add md5 hash here as well if we don't know what string generated it
      named_resources: dict[str, Dependency]
      files: list[PakFile]
 
@@ -167,11 +169,20 @@ class ConstructPakWii(construct.Construct):
         assert isinstance(obj, PakBody)
 
         header = construct.Container(
-            _header = construct.Container(),
+            # These next 5 fields are for now default values and will need to be rebuilt
+            _header = construct.Container(
+                header_size = 0,
+                md5_hash = b"\x00" * 16     # Fairly certain this info is absent given the PAKBody
+            ),
+            table_of_contents = construct.Container(
+                STRG = 0,     # Named resources size
+                RSHD = 0,     # Resource table size
+                DATA = 0,     # Data section size
+            ),
             named_resources = construct.ListContainer(
                 construct.Container(
-                    asset_type = dep.asset_type,
-                    asset_id = dep.asset_id,
+                    asset_type = dep.type,
+                    asset_id = dep.id,
                     name = name
                 )
                 for name, dep in obj.named_resources.items()
@@ -189,8 +200,14 @@ class ConstructPakWii(construct.Construct):
         )
 
         header_start = construct.stream_tell(stream, path)
-        PAKNoData._build(header, stream, context, path)
-        # Not sure what is the purpose for this line
+
+        pnd_build = PAKNoData._build(header, stream, context, path)
+        section_lengths = {
+            "header" : pnd_build._table_of_contents_start - pnd_build._start,
+            "STRG" : pnd_build._resources_start - pnd_build._named_resources_start,
+            "RSHD" : pnd_build._resources_end - pnd_build._resources_start,
+            "DATA" : 0
+        }
         AlignTo(64)._build(None, stream, context, path)
 
         for i, file in enumerate(obj.files):
@@ -213,10 +230,17 @@ class ConstructPakWii(construct.Construct):
             header.resources[i].offset = construct.stream_tell(stream, path)
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
+            section_lengths["DATA"] += len(data)
             construct.stream_write(stream, data, len(data), path)
 
         # Update header to contain accurate information to PAK contents
-        files_end = construct.steam_tell(stream, path)
+        # TODO : Update ToC & _header
+        files_end = construct.stream_tell(stream, path)
+        for key, value in section_lengths.items() :
+            if key == "header" :
+                header._header.header_size = value
+            else :
+                header.table_of_contents[key] = value
         construct.stream_seek(stream, header_start, 0, path)
         PAKNoData._build(header, stream, context, path)
         construct.stream_seek(stream, files_end, 0, path)
