@@ -135,9 +135,6 @@ GetBitFlag = Struct(
 )
 
 
-#
-
-
 def create_keyf_emitter(keys_type):
     return Struct(
         a=Int32ub,
