@@ -211,6 +211,8 @@ class ConstructPakWii(construct.Construct):
             "DATA" : 0
         }
         AlignTo(64)._build(None, stream, context, path)
+        
+        data_start = construct.stream_tell(stream, path)
 
         for i, file in enumerate(obj.files):
             compressed = file.should_compress
@@ -229,7 +231,7 @@ class ConstructPakWii(construct.Construct):
             if pad < 64:
                 data += b"\xFF" * pad
             
-            header.resources[i].offset = construct.stream_tell(stream, path)
+            header.resources[i].offset = construct.stream_tell(stream, path) - data_start    # TODO : Substract the start of the data section
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
             section_lengths["DATA"] += len(data)
