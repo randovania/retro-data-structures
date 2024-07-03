@@ -4,11 +4,11 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import construct
-from construct import Bytes, Const, Int32ub, PrefixedArray, Struct, FocusedSeq, Rebuild, IfThenElse, this, len_
+from construct import Bytes, Const, FocusedSeq, IfThenElse, Int32ub, PrefixedArray, Rebuild, Struct, len_, this
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
-from retro_data_structures.common_types import FourCC, String, AssetId64
+from retro_data_structures.common_types import AssetId64, FourCC, String
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.dict import make_dict
@@ -48,9 +48,9 @@ def _emitparse_header(code: construct.CodeGen) -> str:
 ConstructResourceHeader._emitparse = _emitparse_header
 
 PAKNoData = Struct(
-    _start=construct.Tell,      # Should always be 0x00
+    _start=construct.Tell,  # Should always be 0x00
     _header=PAKHeader,
-    _table_of_contents_start=construct.Tell,        #  Should always be 0x40
+    _table_of_contents_start=construct.Tell,  #  Should always be 0x40
     table_of_contents=construct.Aligned(64, make_dict(Int32ub, FourCC)),
     # Usually starts at 0x80, though ToC semantically has a dynamic length
     _named_resources_start=construct.Tell,
@@ -72,43 +72,34 @@ PAKNoData = Struct(
 
 CompressedPakResource = FocusedSeq(
     "data",
-    decompressed_size = Rebuild(Int32ub, len_(this.data)),
+    decompressed_size=Rebuild(Int32ub, len_(this.data)),
     # Added Zlib check for DKCR
-    data = IfThenElse(
-        game_check.uses_lzo,
-        LZOCompressedBlock(this.decompressed_size),
-        ZlibCompressedBlock
-    )
+    data=IfThenElse(game_check.uses_lzo, LZOCompressedBlock(this.decompressed_size), ZlibCompressedBlock),
 )
+
 
 @dataclasses.dataclass
 class PakFile:
     asset_id: AssetId
     asset_type: AssetType
-    should_compress: bool 
-    uncompressed_data: bytes | None    
-    compressed_data: bytes | None      
+    should_compress: bool
+    uncompressed_data: bytes | None
+    compressed_data: bytes | None
     extra: construct.Container | None = None
 
-    def get_decompressed(self, target_game : Game) -> bytes:
+    def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
-            self.uncompressed_data = CompressedPakResource.parse(
-                self.compressed_data,
-                target_game = target_game
-            )
+            self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
         return self.uncompressed_data
-        
-    def get_compressed(self, target_game : Game) -> bytes:
+
+    def get_compressed(self, target_game: Game) -> bytes:
         if self.compressed_data is None:
-                self.compressed_data = CompressedPakResource.build(
-                    self.uncompressed_data,
-                    target_game = target_game
-                )
+            self.compressed_data = CompressedPakResource.build(self.uncompressed_data, target_game=target_game)
         return self.compressed_data
 
     def set_new_data(self, data: bytes):
-         self.uncompressed_data = data
-         self.compressed_data = None
+        self.uncompressed_data = data
+        self.compressed_data = None
 
 
 @dataclasses.dataclass
@@ -130,33 +121,28 @@ class ConstructPakWii(construct.Construct):
         for i, resource in enumerate(header.resources):
             if resource.offset + data_start != construct.stream_tell(stream, path):
                 raise construct.ConstructError(f"Expected resource at {resource.offset + data_start}", path)
-            
+
             data = construct.stream_read(stream, resource.size, path)
             # TODO : Padding to be added ?
             if resource.compressed > 0:
                 uncompressed_data = None
                 compressed_data = data
-            else :
+            else:
                 uncompressed_data = data
                 compressed_data = None
-            
+
             files.append(
                 PakFile(
-                    resource.asset_id,
-                    resource.asset_type,
-                    resource.compressed > 0,
-                    uncompressed_data,
-                    compressed_data
+                    resource.asset_id, resource.asset_type, resource.compressed > 0, uncompressed_data, compressed_data
                 )
             )
 
         return PakBody(
-            md5_hash = header._header.md5_hash,
-            named_resources = {
-                named.name: Dependency(type = named.asset_type, id = named.asset_id)
-                for named in header.named_resources
+            md5_hash=header._header.md5_hash,
+            named_resources={
+                named.name: Dependency(type=named.asset_type, id=named.asset_id) for named in header.named_resources
             },
-            files = files
+            files=files,
         )
 
     def _build(self, obj: PakBody, stream, context, path):
@@ -164,46 +150,33 @@ class ConstructPakWii(construct.Construct):
 
         header = construct.Container(
             # These next 5 fields are for now default values and will need to be rebuilt
-            _header = construct.Container(
-                header_size = 0,
-                md5_hash = obj.md5_hash
+            _header=construct.Container(header_size=0, md5_hash=obj.md5_hash),
+            table_of_contents=construct.Container(
+                STRG=0,  # Named resources size
+                RSHD=0,  # Resource table size
+                DATA=0,  # Data section size
             ),
-            table_of_contents = construct.Container(
-                STRG = 0,     # Named resources size
-                RSHD = 0,     # Resource table size
-                DATA = 0,     # Data section size
-            ),
-            named_resources = construct.ListContainer(
-                construct.Container(
-                    asset_type = dep.type,
-                    asset_id = dep.id,
-                    name = name
-                )
+            named_resources=construct.ListContainer(
+                construct.Container(asset_type=dep.type, asset_id=dep.id, name=name)
                 for name, dep in obj.named_resources.items()
             ),
-            resources = construct.ListContainer(
-                construct.Container(
-                    compressed = 0,
-                    asset_type = file.asset_type,
-                    asset_id = file.asset_id,
-                    size = 0,
-                    offset = 0
-                )
+            resources=construct.ListContainer(
+                construct.Container(compressed=0, asset_type=file.asset_type, asset_id=file.asset_id, size=0, offset=0)
                 for file in obj.files
-            )
+            ),
         )
 
         header_start = construct.stream_tell(stream, path)
 
         pnd_build = PAKNoData._build(header, stream, context, path)
         section_lengths = {
-            "header" : pnd_build._table_of_contents_start - pnd_build._start,
-            "STRG" : pnd_build._resources_start - pnd_build._named_resources_start,
-            "RSHD" : pnd_build._resources_end - pnd_build._resources_start,
-            "DATA" : 0
+            "header": pnd_build._table_of_contents_start - pnd_build._start,
+            "STRG": pnd_build._resources_start - pnd_build._named_resources_start,
+            "RSHD": pnd_build._resources_end - pnd_build._resources_start,
+            "DATA": 0,
         }
         AlignTo(64)._build(None, stream, context, path)
-        
+
         data_start = construct.stream_tell(stream, path)
 
         for i, file in enumerate(obj.files):
@@ -211,9 +184,9 @@ class ConstructPakWii(construct.Construct):
             game = game_check.get_current_game(context)
             if compressed:
                 data = file.get_compressed(game)
-            else :
+            else:
                 data = file.get_decompressed(game)
-            
+
             # TODO : If the file ends up bigger, don't compress
             # if compressed and len(data) > len(file.get_decompressed(game)):
             #     compressed = False
@@ -221,8 +194,8 @@ class ConstructPakWii(construct.Construct):
 
             pad = 64 - (len(data) % 64)
             if pad < 64:
-                data += b"\xFF" * pad
-            
+                data += b"\xff" * pad
+
             header.resources[i].offset = construct.stream_tell(stream, path) - data_start
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
@@ -231,13 +204,14 @@ class ConstructPakWii(construct.Construct):
 
         # Update header to contain accurate information to PAK contents
         files_end = construct.stream_tell(stream, path)
-        for key, value in section_lengths.items() :
-            if key == "header" :
+        for key, value in section_lengths.items():
+            if key == "header":
                 header._header.header_size = value
-            else :
+            else:
                 header.table_of_contents[key] = value
         construct.stream_seek(stream, header_start, 0, path)
         PAKNoData._build(header, stream, context, path)
         construct.stream_seek(stream, files_end, 0, path)
+
 
 PAK_WII = ConstructPakWii()
