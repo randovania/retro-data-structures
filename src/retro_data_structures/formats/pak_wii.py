@@ -241,3 +241,5 @@ class ConstructPakWii(construct.Construct):
         construct.stream_seek(stream, files_end, 0, path)
 
 PAK_WII = ConstructPakWii()
+
+
