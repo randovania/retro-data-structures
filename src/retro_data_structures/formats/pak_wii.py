@@ -105,7 +105,7 @@ class PakFile:
 @dataclasses.dataclass
 class PakBody:
     md5_hash: bytes
-    named_resources: dict[str, Dependency]
+    named_resources: list[tuple[str, Dependency]]
     files: list[PakFile]
 
 
@@ -139,9 +139,9 @@ class ConstructPakWii(construct.Construct):
 
         return PakBody(
             md5_hash=header._header.md5_hash,
-            named_resources={
-                named.name: Dependency(type=named.asset_type, id=named.asset_id) for named in header.named_resources
-            },
+            named_resources=[
+                (named.name, Dependency(type=named.asset_type, id=named.asset_id)) for named in header.named_resources
+            ],
             files=files,
         )
 
@@ -158,7 +158,7 @@ class ConstructPakWii(construct.Construct):
             ),
             named_resources=construct.ListContainer(
                 construct.Container(asset_type=dep.type, asset_id=dep.id, name=name)
-                for name, dep in obj.named_resources.items()
+                for name, dep in obj.named_resources
             ),
             resources=construct.ListContainer(
                 construct.Container(compressed=0, asset_type=file.asset_type, asset_id=file.asset_id, size=0, offset=0)
