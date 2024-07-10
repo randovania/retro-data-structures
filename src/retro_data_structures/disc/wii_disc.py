@@ -219,6 +219,7 @@ class EncryptedDiscFileReader(disc_common.DiscFileReader):
         )
 
         self._dec_key = dec_key
+        self._initial_offset = offset
         self._offset = offset
         self._cur_block = -1
 
@@ -234,7 +235,7 @@ class EncryptedDiscFileReader(disc_common.DiscFileReader):
         block_rem = self._offset % 0x7C00
 
         if size == -1:
-            size = self._size - self._offset
+            size = self._size - (self._offset - self._initial_offset)
 
         ret = b""
         rem = size
