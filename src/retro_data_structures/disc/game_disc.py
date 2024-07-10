@@ -7,8 +7,9 @@ import typing
 
 import construct
 
+from retro_data_structures.disc import disc_common
 from retro_data_structures.disc.gc_disc import GcDisc
-from retro_data_structures.disc.wii_disc import WiiDisc
+from retro_data_structures.disc.wii_disc import WiiDisc, WiiPartition
 from retro_data_structures.formats import dol
 
 if typing.TYPE_CHECKING:
@@ -124,26 +125,27 @@ class GameDisc:
         recurse("", self._file_tree)
         return result
 
-    def _open_data_at_offset(self, offset: int) -> typing.BinaryIO:
-        file = self._file_path.open("rb")
+    def _open_data_at_offset(self, offset: int, size: int) -> disc_common.DiscFileReader:
         if self._is_wii:
-            return self._raw.data_partition.begin_read_stream(file, offset)
+            assert isinstance(self._raw.data_partition, WiiPartition)
+            return self._raw.data_partition.begin_read_stream(self._file_path, offset, size)
         else:
-            file.seek(offset)
-            return file
+            return disc_common.DiscFileReader(self._file_path, offset, size)
 
-    def open_binary(self, name: str) -> typing.BinaryIO:
-        return self._open_data_at_offset(self._get_file_entry(name).offset)
+    def open_binary(self, name: str) -> disc_common.DiscFileReader:
+        entry = self._get_file_entry(name)
+        return self._open_data_at_offset(entry.offset, entry.size)
 
     def read_binary(self, name: str) -> bytes:
         entry = self._get_file_entry(name)
-        with self._open_data_at_offset(entry.offset) as file:
+        with self._open_data_at_offset(entry.offset, entry.size) as file:
             return file.read(entry.size)
 
     def get_dol(self) -> bytes:
         disc_header = self._raw.data_partition.disc_header
-        with self._open_data_at_offset(disc_header.main_executable_offset) as file:
+        with self._open_data_at_offset(disc_header.main_executable_offset, -1) as file:
             header = dol.DolHeader.parse_stream(file)
             dol_size = dol.calculate_size_from_header(header)
-            file.seek(disc_header.main_executable_offset)
-            return file.read(dol_size)
+
+        with self._open_data_at_offset(disc_header.main_executable_offset, dol_size) as file:
+            return file.read()

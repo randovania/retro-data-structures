@@ -9,6 +9,9 @@ from Crypto.Cipher import AES
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.disc import disc_common
 
+if typing.TYPE_CHECKING:
+    from pathlib import Path
+
 COMMON_KEYS = [
     # Normal
     b"\xeb\xe4\x2a\x22\x5e\x85\x93\xe4\x48\xd9\xc5\x45\x73\x81\xaa\xf7",
@@ -203,54 +206,42 @@ RootFileEntry = construct.Struct(
 )
 
 
-class EncryptedPartitionReadStream:
+class EncryptedDiscFileReader(disc_common.DiscFileReader):
     """
     Reads encrypted Wii Disc Partitions
     """
 
-    def __init__(self, dec_key: bytes, base_offset: int, offset: int, source: typing.BinaryIO):
+    def __init__(self, file: Path | typing.BinaryIO, size: int, dec_key: bytes, base_offset: int, offset: int):
+        super().__init__(
+            file,
+            base_offset,
+            size,
+        )
+
         self._dec_key = dec_key
-        self._base_offset = base_offset
         self._offset = offset
-        self._source = source
+        self._cur_block = -1
 
-        block = self._offset // 0x7C00
+    def _decrypt_block(self, block: int) -> None:
         self._cur_block = block
-        self._decrypt_block()
-
-    def _decrypt_block(self) -> None:
-        self._source.seek(self._base_offset + self._cur_block * 0x8000)
-        enc_buf = self._source.read(0x8000)
+        self._file.seek(self._base_offset + self._cur_block * 0x8000)
+        enc_buf = self._file.read(0x8000)
         aes = AES.new(key=self._dec_key, mode=AES.MODE_CBC, iv=enc_buf[0x3D0:0x3E0])
         self._dec_buf = aes.decrypt(enc_buf[0x400:])
 
-    def seek(self, offset: int, whence: int = 0) -> None:
-        if whence == 0:
-            self._offset = offset
-        elif whence == 1:
-            self._offset += offset
-        else:
-            return
-
-        block = self._offset // 0x7C00
-        if block != self._cur_block:
-            self._cur_block = block
-            self._decrypt_block()
-
-    def tell(self) -> int:
-        return self._offset
-
-    def read(self, length: int) -> bytes:
+    def read(self, size: int = -1) -> bytes:
         block_quot = self._offset // 0x7C00
         block_rem = self._offset % 0x7C00
 
+        if size == -1:
+            size = self._size - self._offset
+
         ret = b""
-        rem = length
+        rem = size
 
         while rem > 0:
             if block_quot != self._cur_block:
-                self._decrypt_block()
-                self._cur_block = block_quot
+                self._decrypt_block(block_quot)
 
             cache_size = rem
             if cache_size + block_rem > 0x7C00:
@@ -261,17 +252,19 @@ class EncryptedPartitionReadStream:
             block_rem = 0
             block_quot += 1
 
-        self._offset += length
+        self._offset += size
         return ret
 
-    def __enter__(self) -> EncryptedPartitionReadStream:
-        return self
+    def seek(self, offset: int, whence: int = 0) -> None:
+        if whence == 0:
+            self._offset = offset
+        elif whence == 1:
+            self._offset += offset
+        else:
+            return
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.close()
-
-    def close(self) -> None:
-        self._source.close()
+    def tell(self) -> int:
+        return self._offset
 
 
 class WiiPartition:
@@ -300,7 +293,7 @@ class WiiPartition:
         )
         self._dec_key = aes.decrypt(self._part_header.ticket.enc_key)
 
-        ds = self.begin_read_stream(source, 0)
+        ds = self.begin_read_stream(source, 0, -1)
         self.disc_header = WiiDiscHeader.parse_stream(ds)
         self.disc_header_info = disc_common.DiscHeaderInformation.parse_stream(ds)
 
@@ -313,8 +306,10 @@ class WiiPartition:
             self.disc_header.fst_size, ShiftedInteger(construct.Int32ub)
         ).parse_stream(ds)
 
-    def begin_read_stream(self, file_io: typing.BinaryIO, offset: int) -> EncryptedPartitionReadStream:
-        return EncryptedPartitionReadStream(self._dec_key, self._data_offset, offset, file_io)
+    def begin_read_stream(
+        self, file_io: Path | typing.BinaryIO, offset: int, file_size: int
+    ) -> EncryptedDiscFileReader:
+        return EncryptedDiscFileReader(file_io, file_size, self._dec_key, self._data_offset, offset)
 
 
 class WiiDiscConstruct(construct.Construct):

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
+import os
 import typing
+from pathlib import Path
 
 import construct
 
@@ -20,7 +23,6 @@ DiscHeaderInformation = construct.Struct(
     padding=construct.Padding(8144),
 )
 assert DiscHeaderInformation.sizeof() == 0x2000
-
 
 RootFileEntry = construct.Struct(
     is_directory=construct.Const(True, construct.Flag),
@@ -53,3 +55,52 @@ def file_system_tree(length: typing.Callable, offset_type: construct.Construct) 
             names=construct.GreedyBytes,
         ),
     )
+
+
+class DiscFileReader(io.IOBase):
+    _file: typing.BinaryIO
+
+    def __init__(self, file_path: Path | typing.BinaryIO, base_offset: int, size: int):
+        if isinstance(file_path, Path):
+            self._file = file_path.open("rb")
+        else:
+            self._file = file_path
+
+        self._base_offset = base_offset
+        self._size = size
+
+        self._file.seek(self._base_offset)
+
+    def read(self, size: int = -1) -> bytes:
+        if size == -1:
+            size = self._size
+
+        if 0 < self._size < size + self.tell():
+            size -= self.tell()
+        return self._file.read(size)
+
+    def seek(self, offset: int, whence: int = os.SEEK_SET, /) -> None:
+        if whence == os.SEEK_CUR:
+            self._file.seek(offset, os.SEEK_CUR)
+            return
+
+        if whence == os.SEEK_END:
+            offset += self._size
+
+        self._file.seek(self._base_offset + offset)
+
+    def tell(self) -> int:
+        return self._file.tell() - self._base_offset
+
+    def writable(self) -> bool:
+        return False
+
+    def __enter__(self) -> typing.Self:
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
+
+    def close(self) -> None:
+        super().close()
+        self._file.close()
