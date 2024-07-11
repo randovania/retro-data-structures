@@ -393,9 +393,8 @@ class AssetManager:
 
         if pak_name not in self._in_memory_paks:
             logger.info("Reading %s", pak_name)
-            data = self.provider.read_binary(pak_name)
-
-            self._in_memory_paks[pak_name] = Pak.parse(data, target_game=self.target_game)
+            with self.provider.open_binary(pak_name) as data:
+                self._in_memory_paks[pak_name] = Pak.parse_stream(data, target_game=self.target_game)
 
         return self._in_memory_paks[pak_name]
 
