@@ -222,13 +222,14 @@ class EncryptedDiscFileReader(disc_common.DiscFileReader):
         self._initial_offset = offset
         self._offset = offset
         self._cur_block = -1
+        self._dec_buf = bytearray(0x8000 - 0x400)
 
     def _decrypt_block(self, block: int) -> None:
         self._cur_block = block
         self._file.seek(self._base_offset + self._cur_block * 0x8000)
-        enc_buf = self._file.read(0x8000)
+        enc_buf = memoryview(self._file.read(0x8000))
         aes = AES.new(key=self._dec_key, mode=AES.MODE_CBC, iv=enc_buf[0x3D0:0x3E0])
-        self._dec_buf = aes.decrypt(enc_buf[0x400:])
+        aes.decrypt(enc_buf[0x400:], self._dec_buf)
 
     def read(self, size: int = -1) -> bytes:
         block_quot = self._offset // 0x7C00
@@ -237,7 +238,7 @@ class EncryptedDiscFileReader(disc_common.DiscFileReader):
         if size == -1:
             size = self._size - (self._offset - self._initial_offset)
 
-        ret = b""
+        ret = bytearray()
         rem = size
 
         while rem > 0:
@@ -248,7 +249,7 @@ class EncryptedDiscFileReader(disc_common.DiscFileReader):
             if cache_size + block_rem > 0x7C00:
                 cache_size = 0x7C00 - block_rem
 
-            ret += self._dec_buf[block_rem : block_rem + cache_size]
+            ret += memoryview(self._dec_buf)[block_rem : block_rem + cache_size]
             rem -= cache_size
             block_rem = 0
             block_quot += 1
@@ -309,7 +310,7 @@ class WiiPartition:
 
     def begin_read_stream(
         self, file_io: Path | typing.BinaryIO, offset: int, file_size: int
-    ) -> EncryptedDiscFileReader:
+    ) -> disc_common.DiscFileReader:
         return EncryptedDiscFileReader(file_io, file_size, self._dec_key, self._data_offset, offset)
 
 

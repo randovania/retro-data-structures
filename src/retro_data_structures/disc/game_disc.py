@@ -102,8 +102,12 @@ class GameDisc:
 
     def _get_file_entry(self, name: str) -> FileEntry:
         file_entry = self._file_tree
-        for segment in name.split("/"):
-            file_entry = file_entry[segment]
+
+        try:
+            for segment in name.split("/"):
+                file_entry = file_entry[segment]
+        except KeyError:
+            raise FileNotFoundError(f"{name} does not exist")
 
         if isinstance(file_entry, FileEntry):
             return file_entry
@@ -111,6 +115,10 @@ class GameDisc:
             raise OSError(f"{name} is a directory")
 
     def files(self) -> list[str]:
+        """
+        Lists all files in this disc. For Wii, it's only the data partition.
+        :return:
+        """
         result = []
 
         def recurse(parent: str, tree: FileTree) -> None:
@@ -133,15 +141,29 @@ class GameDisc:
             return disc_common.DiscFileReader(self._file_path, offset, size)
 
     def open_binary(self, name: str) -> disc_common.DiscFileReader:
+        """
+        Returns an IOBase for reading a file with the given name.
+        :param name:
+        :return:
+        """
         entry = self._get_file_entry(name)
         return self._open_data_at_offset(entry.offset, entry.size)
 
     def read_binary(self, name: str) -> bytes:
+        """
+        Returns the entire contents of the file with given name.
+        :param name:
+        :return:
+        """
         entry = self._get_file_entry(name)
         with self._open_data_at_offset(entry.offset, entry.size) as file:
             return file.read(entry.size)
 
     def get_dol(self) -> bytes:
+        """
+        Gets the main dol for this disc. With Wii discs, returns the dol in the data partition.
+        :return:
+        """
         disc_header = self._raw.data_partition.disc_header
         with self._open_data_at_offset(disc_header.main_executable_offset, -1) as file:
             header = dol.DolHeader.parse_stream(file)
