@@ -17,8 +17,8 @@ from retro_data_structures.game_check import Game
 # ruff: noqa: E501
 
 # The following variables are only used for the file tests and should be set before executing said tests locally
-# pak_target = "C:/Users/belok/Emu/PAKTool/testpak.pak"
-# pak_build_dir = "C:/Users/belok/Emu/PAKTool/Metroid3-pak"
+# pak_target = "."
+# pak_build_dir = "."
 
 paks = {
     "FrontEnd",
