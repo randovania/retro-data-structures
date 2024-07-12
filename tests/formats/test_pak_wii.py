@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 # The two following imports are only used by file tests
+# from glob import glob
+# from os import path
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.pak_wii import (
     PAK_WII,
