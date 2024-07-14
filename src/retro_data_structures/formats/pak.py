@@ -12,7 +12,7 @@ def _pak_for_game(game: Game):
     if game == Game.PRIME_REMASTER:
         return pak_wiiu.PAK_WIIU
     elif game >= Game.CORRUPTION:
-        raise ValueError("Unsupported game")
+        return pak_wii.PAK_WII
     else:
         return pak_gc.PAK_GC
 
