@@ -87,7 +87,7 @@ class PakFile:
     compressed_data: bytes | None
     extra: construct.Container | None = None
 
-    def get_decompressed(self, target_game: Game) -> bytes:
+    def get_decompressed(self, target_game: Game) -> bytes:  # Returns empty bytes for some reason ?
         if self.uncompressed_data is None:
             self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
         return self.uncompressed_data
