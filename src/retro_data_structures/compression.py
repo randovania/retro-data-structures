@@ -56,6 +56,42 @@ class LZOSegment(construct.Subconstruct):
             return buildret
 
 
+class LZOCorruptionSegment(construct.Subconstruct):
+    def __init__(self, compressed_size, decompressed_size):
+        super().__init__(CompressedLZO(construct.Bytes(compressed_size), compressed_size))
+        self.compressed_size = compressed_size
+        self.decompressed_size = decompressed_size
+
+    def _parse(self, stream, context, path):
+        decompressed_size = construct.evaluate(self.decompressed_size, context)
+        compressed_size = construct.evaluate(self.compressed_size, context)
+
+        data = construct.stream_read(stream, compressed_size, path)
+        if compressed_size < decompressed_size:
+            result = self.subcon._parsereport(io.BytesIO(data), context, path)
+            if len(result) != decompressed_size:
+                raise construct.StreamError(
+                    f"Expected to decompress {decompressed_size} bytes, got {len(result)}", path
+                )
+            return result
+        else:
+            return data
+
+    # TODO : adapt building to Corruption's format and include size metadata if necessary
+    def _build(self, uncompressed, stream, context, path):
+        stream2 = io.BytesIO()
+        buildret = self.subcon._build(uncompressed, stream2, context, path)
+        compressed_data = stream2.getvalue()
+        if len(compressed_data) < len(uncompressed):
+            construct.Int16sb._build(len(compressed_data), stream, context, path)
+            construct.stream_write(stream, compressed_data, len(compressed_data), path)
+            return buildret
+        else:
+            construct.Int16sb._build(-len(uncompressed), stream, context, path)
+            construct.stream_write(stream, uncompressed, len(uncompressed), path)
+            return buildret
+
+
 class LZOCompressedBlock(Adapter):
     def __init__(self, decompressed_size, segment_size=0x4000):
         super().__init__(GreedyRange(LZOSegment(self._actual_segment_size)))

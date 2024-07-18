@@ -10,10 +10,11 @@ from retro_data_structures.game_check import Game
 
 # ruff: noqa: E501
 
-# The following variables are only used for the file tests and should be set before executing said tests locally
+# The following variables are used for file and debug tests and should be set before executing said tests locally
 pak_target = Path("C:/Users/belok/Emu/PAKTool/testpak.pak")
-pak_build_dir = Path("C:/Users/belok/Emu/PAKTool/Worlds.pak")
-resource_target = Path("C:/Users/belok/Emu/PAKTool/Worlds-pak/09ad3599129e8a2b.STRG")
+pak_build_dir = Path("C:/Users/belok/Emu/PAKTool/Compressed-resources")
+resource_target = Path("C:/Users/belok/Emu/PAKTool/Compressed-resources/63344da1b78a8eb9.TXTR")
+prime3_iso_pak_target = "Metroid3.pak"
 
 paks = {
     "FrontEnd",
@@ -136,7 +137,7 @@ def test_parse_new_pak():
 def test_resource_extraction(prime3_iso_provider):
     game = Game.CORRUPTION
 
-    with prime3_iso_provider.open_binary("Worlds.pak") as f:
+    with prime3_iso_provider.open_binary(prime3_iso_pak_target) as f:
         raw = f.read()
 
     decoded = Pak.parse(raw, game)
@@ -149,10 +150,46 @@ def test_resource_extraction(prime3_iso_provider):
     original_id = int(original_id, 16)
 
     # Search for target resource in pak
-
     for resource in decoded._raw.files:
         if resource.asset_id == original_id:
             pak_resource = resource
             break
 
     assert original_data == pak_resource.get_decompressed(game)
+
+
+# The following functions are debug functions : they serve no purpose as tests and are only here
+# to search for specific resources or look for patterns
+
+
+def write_resources(target_dir: Path, resource_list: list[PakFile], decompressed: bool = True):
+    for resource in resource_list:
+        file_name = hex(resource.asset_id)[2:]
+        file_extension = resource.asset_type
+
+        output_file = target_dir / Path(file_name + "." + file_extension)
+        with output_file.open("wb") as fd:
+            fd.write(resource.uncompressed_data if decompressed else resource.compressed_data)
+
+
+def test_get_all_compressed(prime3_iso_provider):
+    game = Game.CORRUPTION
+
+    with prime3_iso_provider.open_binary(prime3_iso_pak_target) as f:
+        raw = f.read()
+
+    decoded = Pak.parse(raw, game)
+
+    res = [cmpd_res for cmpd_res in decoded._raw.files if cmpd_gt_1_block(cmpd_res)]
+    write_resources(pak_build_dir, res, False)
+
+
+# The following functions only denote specific filters for PakFiles to target them specifically
+
+
+def cmpd_gt_1_block(resource: PakFile) -> bool:
+    return resource.should_compress and (resource.compressed_data[4:8] > b"\x00\x00\x00\x01")
+
+
+def cmpd_gt_2_block(resource: PakFile) -> bool:
+    return resource.should_compress and (resource.compressed_data[4:8] > b"\x00\x00\x00\x02")

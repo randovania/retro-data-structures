@@ -4,12 +4,12 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import construct
-from construct import Bytes, Const, FocusedSeq, IfThenElse, Int32ub, PrefixedArray, Rebuild, Struct, len_, this
+from construct import Bytes, Const, FocusedSeq, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.common_types import AssetId64, FourCC, String
-from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
+from retro_data_structures.compression import LZOCorruptionSegment
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.dict import make_dict
 
@@ -72,9 +72,24 @@ PAKNoData = Struct(
 
 CompressedPakResource = FocusedSeq(
     "data",
-    decompressed_size=Rebuild(Int32ub, len_(this.data)),
-    # Added Zlib check for DKCR
-    data=IfThenElse(game_check.uses_lzo, LZOCompressedBlock(this.decompressed_size), ZlibCompressedBlock),
+    magic=Const(b"CMPD"),
+    block_count=Int32ub,
+    block_header=construct.Array(
+        construct.this.block_count,
+        Struct(
+            flag=construct.Byte,
+            compressed_size=construct.Int24ub,
+            uncompressed_size=construct.Int32ub,
+        ),
+    ),
+    blocks=construct.Array(
+        construct.this.block_count,
+        LZOCorruptionSegment(
+            lambda this: this.block_header[this._index].compressed_size,
+            lambda this: this.block_header[this._index].uncompressed_size,
+        ),
+    ),
+    data=construct.Computed(lambda this: b"".join(this.blocks)),
 )
 
 
