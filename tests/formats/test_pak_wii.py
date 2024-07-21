@@ -79,6 +79,10 @@ def test_compare_header_keep_data(prime3_iso_provider):
 
 
 # def test_write_new_pak():
+#     """
+#     This test writes an arbitrary pak file
+#     This is mostly to test whether written pak files work with Aruki's PakTool
+#     """
 #     game = Game.CORRUPTION
 #     files = [PakFile(0xDEADBEEF, "STRG", False, b"abcdefg", None), PakFile(0xDEADD00D, "STRG", False, b"hijklmn", None)]
 #     body = PakBody(
@@ -93,6 +97,11 @@ def test_compare_header_keep_data(prime3_iso_provider):
 
 
 # def test_build_from_extracted_pak():
+#     """
+#     This test builds a pak from a specified folder filled with different resources
+#     Its purpose is to rebuild a pak that was extracted via PakTool, see if it can be repackaged,
+#     and if the game can still run with the rebuilt pak
+#     """
 #     game = Game.CORRUPTION
 
 #     files = []
@@ -125,6 +134,9 @@ def test_compare_header_keep_data(prime3_iso_provider):
 
 
 # def test_parse_new_pak():
+#     """
+#     This tests whether a pak file that was built with RDS can be parsed back
+#     """
 #     game = Game.CORRUPTION
 
 #     with pak_target.open("rb") as fd:
@@ -135,6 +147,10 @@ def test_compare_header_keep_data(prime3_iso_provider):
 
 
 # def test_resource_extraction(prime3_iso_provider):
+#     """
+#     This test is here to check whether a specific compressed resource is extracted properly by comparing it
+#     to a decompressed resource extracted by PakTool
+#     """
 #     game = Game.CORRUPTION
 
 #     with prime3_iso_provider.open_binary(prime3_iso_pak_target) as f:

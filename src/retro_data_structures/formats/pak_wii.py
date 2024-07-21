@@ -4,12 +4,12 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import construct
-from construct import Bytes, Const, FocusedSeq, Int32ub, PrefixedArray, Struct
+from construct import Bytes, Const, FocusedSeq, IfThenElse, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.common_types import AssetId64, FourCC, String
-from retro_data_structures.compression import LZOCorruptionSegment
+from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.dict import make_dict
 
@@ -84,9 +84,11 @@ CompressedPakResource = FocusedSeq(
     ),
     blocks=construct.Array(
         construct.this.block_count,
-        LZOCorruptionSegment(
-            lambda this: this.block_header[this._index].compressed_size,
-            lambda this: this.block_header[this._index].uncompressed_size,
+        IfThenElse(
+            lambda this: this.block_header[this._index].compressed_size
+            < this.block_header[this._index].uncompressed_size,
+            LZOCompressedBlock(lambda this: this.block_header[this._index].uncompressed_size),
+            Bytes(lambda this: this.block_header[this._index].uncompressed_size),
         ),
     ),
     data=construct.Computed(lambda this: b"".join(this.blocks)),
