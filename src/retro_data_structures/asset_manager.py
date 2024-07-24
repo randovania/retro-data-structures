@@ -57,23 +57,24 @@ class PathFileProvider(FileProvider):
         if not root.is_dir():
             raise FileNotFoundError(f"{root} is not a directory")
         self.root = root
+        self.file_root = root.joinpath("files")
 
     def __repr__(self):
         return f"<PathFileProvider {self.root}>"
 
     def is_file(self, name: str) -> bool:
-        return self.root.joinpath(name).is_file()
+        return self.file_root.joinpath(name).is_file()
 
     def rglob(self, name: str) -> Iterator[str]:
-        for it in self.root.rglob(name):
-            yield it.relative_to(self.root).as_posix()
+        for it in self.file_root.rglob(name):
+            if it.is_file():
+                yield it.relative_to(self.file_root).as_posix()
 
     def open_binary(self, name: str) -> typing.BinaryIO:
-        return self.root.joinpath(name).open("rb")
+        return self.file_root.joinpath(name).open("rb")
 
     def get_dol(self) -> bytes:
-        with self.open_binary("sys/main.dol") as f:
-            return f.read()
+        return self.root.joinpath("sys/main.dol").read_bytes()
 
 
 class IsoFileProvider(FileProvider):
