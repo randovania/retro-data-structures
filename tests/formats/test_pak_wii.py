@@ -3,8 +3,10 @@ from __future__ import annotations
 # The two following imports are only used by file tests
 from pathlib import Path
 
+import pytest
+
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_wii import PAK_WII, PAKNoData
+from retro_data_structures.formats.pak_wii import PAK_WII, CompressedPakResource, PAKNoData
 from retro_data_structures.game_check import Game
 
 # ruff: noqa: E501
@@ -12,7 +14,7 @@ from retro_data_structures.game_check import Game
 # The following variables are used for file and debug tests and should be set before executing said tests locally
 pak_target = Path("C:/Users/belok/Emu/PAKTool/testpak.pak")
 pak_build_dir = Path("C:/Users/belok/Emu/PAKTool/Compressed-resources")
-resource_target = Path("C:/Users/belok/Emu/PAKTool/Compressed-resources/63344da1b78a8eb9.TXTR")
+resource_target = Path("C:/Users/belok/Emu/PAKTool/Metroid3-pak/434e8f026eb716a1.TXTR")
 prime3_iso_pak_target = "Metroid3.pak"
 csv_target = Path("C:/Users/belok/Emu/PAKTool/decompression_analysis.csv")
 
@@ -38,6 +40,32 @@ paks = {
     "UniverseArea",
     "Worlds",
 }
+
+
+@pytest.fixture(name="compressed_resource")
+def _compressed_resource():
+    """
+    The resource can be found in Metroid3.pak
+    """
+    return {
+        "compressed": 1,
+        "asset": {"type": "TXTR", "id": 4849971089334802081},
+        "contents": {
+            "data": b"CMPD\x00\x00\x00\x02\x00\x00\x00\x0c\x00\x00\x00\x0c\xc0\x00\x00\x11\x00\x00\x00\xa0"
+            b"\x00\x00\x00\n\x00\x10\x00\x10\x00\x00\x00\x02\x00\x0f\x16\x01\xe0\x02\xa0\xaa@\x00 "
+            b"w\x1c\x00\x11\x00\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff",
+            "value": (
+                b"\x00\x00\x00\n\x00\x10\x00\x10\x00\x00\x00\x02\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02"
+                b"\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01"
+                b"\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa"
+                b"\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa"
+                b"\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02"
+                b"\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01"
+                b"\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa"
+                b"\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa\x01\xe0\x02\xa0\xaa\xaa\xaa\xaa"
+            ),
+        },
+    }
 
 
 def test_identical_when_keep_data(prime3_iso_provider):
@@ -71,6 +99,25 @@ def test_compare_header_keep_data(prime3_iso_provider):
 
         custom_sizes = [(r.compressed, r.offset, r.size) for r in custom_header.resources]
         assert custom_sizes == raw_sizes
+
+
+def test_corruption_resource_decode(compressed_resource):
+    # This seems to only return the first block
+    # This is because parsing the second block fails because the context index is 0 instead of 1
+    # hence providing the wrong length
+    # Manually providing the right index still fails, because the _actual_segment_size method uses
+    # that same index which raises a false StopFieldError
+    decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.CORRUPTION)
+
+    assert len(decoded) == len(compressed_resource["contents"]["value"])
+    assert decoded == compressed_resource["contents"]["value"]
+
+
+def test_corruption_resource_encode_decode(compressed_resource):
+    raw = compressed_resource["contents"]["value"]
+    decoded = CompressedPakResource.build(raw, target_game=Game.CORRUPTION)
+    encoded = CompressedPakResource.parse(decoded, target_game=Game.CORRUPTION)
+    assert raw == encoded
 
 
 # The following tests are what I call file tests :

@@ -4,7 +4,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import construct
-from construct import Bytes, Const, FocusedSeq, IfThenElse, Int32ub, PrefixedArray, Struct
+from construct import Bytes, Const, IfThenElse, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
@@ -70,8 +70,7 @@ PAKNoData = Struct(
     _resources_end=construct.Tell,
 )
 
-CompressedPakResource = FocusedSeq(
-    "data",
+CMPD_Pak_Resource = Struct(
     magic=Const(b"CMPD"),
     block_count=Int32ub,
     block_header=construct.Array(
@@ -91,8 +90,44 @@ CompressedPakResource = FocusedSeq(
             Bytes(lambda this: this.block_header[this._index].uncompressed_size),
         ),
     ),
-    data=construct.Computed(lambda this: b"".join(this.blocks)),
 )
+
+
+class CMPD_Pak_Adapter(construct.Adapter):
+    def _decode(self, obj, context, path):
+        return b"".join(obj.blocks)
+
+    # Going to rip a page out of PWE's book and compress everything in a single block
+    def _encode(self, uncompressed, context, path):
+        res = construct.Container(
+            [
+                ("magic", b"CMPD"),
+                ("block_count", 1),
+                (
+                    "block_header",
+                    construct.ListContainer(
+                        [
+                            construct.Container(
+                                [
+                                    ("flag", 0xA0),
+                                    ("compressed_size", None),
+                                    ("uncompressed_size", len(uncompressed)),
+                                ]
+                            ),
+                        ]
+                    ),
+                ),
+                (
+                    "blocks",
+                    construct.ListContainer(LZOCompressedBlock(len(uncompressed))._encode(uncompressed, context, path)),
+                ),
+            ]
+        )
+        res.block_header[0].compressed_size = len(res.blocks[0])
+        return res
+
+
+CompressedPakResource = CMPD_Pak_Adapter(CMPD_Pak_Resource)
 
 
 @dataclasses.dataclass
@@ -104,14 +139,14 @@ class PakFile:
     compressed_data: bytes | None
     extra: construct.Container | None = None
 
-    def get_decompressed(self, target_game: Game) -> bytes:  # Returns empty bytes for some reason ?
+    def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
-            self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
+            self.uncompressed_data = CMPD_Pak_Resource.parse(self.compressed_data, target_game=target_game)
         return self.uncompressed_data
 
     def get_compressed(self, target_game: Game) -> bytes:
         if self.compressed_data is None:
-            self.compressed_data = CompressedPakResource.build(self.uncompressed_data, target_game=target_game)
+            self.compressed_data = CMPD_Pak_Resource.build(self.uncompressed_data, target_game=target_game)
         return self.compressed_data
 
     def set_new_data(self, data: bytes):

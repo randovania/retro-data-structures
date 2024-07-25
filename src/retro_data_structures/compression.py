@@ -28,6 +28,9 @@ class LZOSegment(construct.Subconstruct):
         self.decompressed_size = decompressed_size
 
     def _parse(self, stream, context, path):
+        # Context seems to be having the wrong index here, but why ?
+        # Manually setting index to 1 will cause this to call LZOCompressedBlock's
+        # _actual_segment_size, which raises StopFieldError
         decompressed_size = construct.evaluate(self.decompressed_size, context)
 
         length = construct.Int16sb._parsereport(stream, context, path)
@@ -56,42 +59,6 @@ class LZOSegment(construct.Subconstruct):
             return buildret
 
 
-class LZOCorruptionSegment(construct.Subconstruct):
-    def __init__(self, compressed_size, decompressed_size):
-        super().__init__(CompressedLZO(construct.Bytes(compressed_size), compressed_size))
-        self.compressed_size = compressed_size
-        self.decompressed_size = decompressed_size
-
-    def _parse(self, stream, context, path):
-        decompressed_size = construct.evaluate(self.decompressed_size, context)
-        compressed_size = construct.evaluate(self.compressed_size, context)
-
-        data = construct.stream_read(stream, compressed_size, path)
-        if compressed_size < decompressed_size:
-            result = self.subcon._parsereport(io.BytesIO(data), context, path)
-            if len(result) != decompressed_size:
-                raise construct.StreamError(
-                    f"Expected to decompress {decompressed_size} bytes, got {len(result)}", path
-                )
-            return result
-        else:
-            return data
-
-    # TODO : adapt building to Corruption's format and include size metadata if necessary
-    def _build(self, uncompressed, stream, context, path):
-        stream2 = io.BytesIO()
-        buildret = self.subcon._build(uncompressed, stream2, context, path)
-        compressed_data = stream2.getvalue()
-        if len(compressed_data) < len(uncompressed):
-            construct.Int16sb._build(len(compressed_data), stream, context, path)
-            construct.stream_write(stream, compressed_data, len(compressed_data), path)
-            return buildret
-        else:
-            construct.Int16sb._build(-len(uncompressed), stream, context, path)
-            construct.stream_write(stream, uncompressed, len(uncompressed), path)
-            return buildret
-
-
 class LZOCompressedBlock(Adapter):
     def __init__(self, decompressed_size, segment_size=0x4000):
         super().__init__(GreedyRange(LZOSegment(self._actual_segment_size)))
@@ -102,6 +69,8 @@ class LZOCompressedBlock(Adapter):
         decompressed_size = construct.evaluate(self.decompressed_size, context)
         segment_size = construct.evaluate(self.segment_size, context)
 
+        # This is the same index than the one used when parsing a resource : this index is incorrect
+        # when parsing a compressed block that isn't of index 0
         previous_segments = context._index * segment_size
         if previous_segments > decompressed_size:
             # This segment is redundant!
