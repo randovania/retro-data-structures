@@ -171,8 +171,7 @@ def test_echoes_resource_encode_decode(compressed_resource):
 
 def test_identical_when_keep_data(prime2_iso_provider):
     game = Game.ECHOES
-    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
-        raw = f.read()
+    raw = prime2_iso_provider.read_binary("GGuiSys.pak")
 
     decoded = Pak.parse(raw, target_game=game)
     encoded = decoded.build()
@@ -182,8 +181,7 @@ def test_identical_when_keep_data(prime2_iso_provider):
 
 def test_compare_header_keep_data(prime2_iso_provider):
     game = Game.ECHOES
-    with prime2_iso_provider.open_binary("GGuiSys.pak") as f:
-        raw = f.read()
+    raw = prime2_iso_provider.read_binary("GGuiSys.pak")
 
     raw_header = PAKNoData.parse(raw, target_game=game)
     raw_sizes = [(r.compressed, r.offset, r.size) for r in raw_header.resources]
