@@ -35,6 +35,7 @@ Homepage = "https://github.com/randovania/retro-data-structures"
 
 [project.optional-dependencies]
 test = [
+    "nod",
     "pytest",
     "pytest-cov",
     # "pytest-asyncio",
