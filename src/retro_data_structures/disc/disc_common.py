@@ -104,3 +104,50 @@ class DiscFileReader(io.IOBase):
     def close(self) -> None:
         super().close()
         self._file.close()
+
+
+class ShiftedInteger(construct.Adapter):
+    """
+    An int, shifted by 2 after parsing. Used in Wii addresses and offsets.
+    """
+
+    def _decode(self, obj, context, path):
+        return obj << 2
+
+    def _encode(self, obj, context, path):
+        return obj >> 2
+
+
+ShiftedOnWii = construct.IfThenElse(construct.this.is_wii, ShiftedInteger(construct.Int32ub), construct.Int32ub)
+ShiftedOnWii._sizeof = lambda context, path: construct.Int32ub._sizeof(context, path)
+
+WII_MAGIC_WORD = 0x5D1C9EA300000000
+GC_MAGIC_WORD = 0x00000000C2339F3D
+
+DiscHeader = construct.Struct(
+    game_code=construct.PaddedString(4, "ascii"),
+    maker_code=construct.PaddedString(2, "ascii"),
+    disc_id=construct.Int8ub,  # for multi-disc games
+    version=construct.Int8ub,
+    audio_streaming=construct.Int8ub,
+    stream_buffer_size=construct.Int8ub,
+    _unused_a=construct.Const(b"\x00" * 14),
+    _magic_words=construct.OneOf(construct.Int64ub, {WII_MAGIC_WORD, GC_MAGIC_WORD}),
+    is_wii=construct.Computed(construct.this._magic_words == WII_MAGIC_WORD),
+    game_name=construct.PaddedString(64, "utf8"),
+    disable_hash_verification=construct.Flag,
+    disable_disc_encryption=construct.Flag,
+    _unused_b=construct.Const(b"\x00" * 0x39E),
+    debug_monitor_offset=construct.Int32ub,
+    debug_monitor_load_address=construct.Int32ub,
+    _unused_c=construct.Const(b"\x00" * 24),
+    main_executable_offset=ShiftedOnWii,
+    fst_offset=ShiftedOnWii,
+    fst_size=ShiftedOnWii,
+    fst_maximum_size=construct.Int32ub,
+    fst_memory_address=construct.Int32ub,
+    user_position=construct.Int32ub,
+    user_length=construct.Int32ub,
+    _unused_d=construct.Const(b"\x00" * 4),  # construct.Bytes(0x4),
+)
+assert DiscHeader.sizeof() == 0x0440

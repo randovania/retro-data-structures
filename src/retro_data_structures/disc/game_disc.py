@@ -59,17 +59,7 @@ def decode_into_file_tree(fst) -> FileTree:
     return file_tree
 
 
-CommonGCWiiHeader = construct.Struct(
-    game_code=construct.Bytes(4),
-    maker_code=construct.Bytes(2),
-    disc_id=construct.Int8ub,  # for multi-disc games
-    version=construct.Int8ub,
-    audio_streaming=construct.Int8ub,
-    stream_buffer_size=construct.Int8ub,
-    _unused_a=construct.Const(b"\x00" * 14),
-    wii_magic_word=construct.Int32ub,  # 0x5D1C9EA3
-    gc_magic_word=construct.Int32ub,  # 0xC2339F3D
-)
+MagicWordSeek = construct.Struct(construct.Seek(24), "magic_word" / construct.Int64ub)
 
 
 class GameDisc:
@@ -86,13 +76,13 @@ class GameDisc:
     @classmethod
     def parse(cls, file_path: Path) -> GameDisc:
         with file_path.open("rb") as source:
-            header = CommonGCWiiHeader.parse_stream(source)
+            header = MagicWordSeek.parse_stream(source)
             source.seek(0)
 
-            if header.wii_magic_word == 0x5D1C9EA3:
+            if header.magic_word == disc_common.WII_MAGIC_WORD:
                 data = WiiDisc.parse_stream(source)
                 is_wii = True
-            elif header.gc_magic_word == 0xC2339F3D:
+            elif header.magic_word == disc_common.GC_MAGIC_WORD:
                 data = GcDisc.parse_stream(source)
                 is_wii = False
             else:

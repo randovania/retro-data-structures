@@ -8,6 +8,7 @@ from Crypto.Cipher import AES
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.disc import disc_common
+from retro_data_structures.disc.disc_common import DiscHeader, ShiftedInteger
 
 if typing.TYPE_CHECKING:
     from pathlib import Path
@@ -18,43 +19,6 @@ COMMON_KEYS = [
     # Korean
     b"\x63\xb8\x2b\xb4\xf4\x61\x4e\x2e\x13\xf2\xfe\xfb\xba\x4c\x9b\x7e",
 ]
-
-
-class ShiftedInteger(construct.Adapter):
-    def _decode(self, obj, context, path):
-        return obj << 2
-
-    def _encode(self, obj, context, path):
-        return obj >> 2
-
-
-WiiDiscHeader = construct.Struct(
-    game_code=construct.Bytes(4),
-    maker_code=construct.Bytes(2),
-    disc_id=construct.Int8ub,  # for multi-disc games
-    version=construct.Int8ub,
-    audio_streaming=construct.Int8ub,
-    stream_buffer_size=construct.Int8ub,
-    _unused_a=construct.Const(b"\x00" * 14),
-    _wii_magic_word=construct.Const(0x5D1C9EA3, construct.Int32ub),
-    _gc_magic_word=construct.Const(0, construct.Int32ub),
-    game_name=construct.PaddedString(64, "utf8"),
-    disable_hash_verification=construct.Flag,
-    disable_disc_encryption=construct.Flag,
-    _unused_b=construct.Const(b"\x00" * 0x39E),
-    debug_monitor_offset=construct.Int32ub,
-    debug_monitor_load_address=construct.Int32ub,
-    _unused_c=construct.Const(b"\x00" * 24),
-    main_executable_offset=ShiftedInteger(construct.Int32ub),
-    fst_offset=ShiftedInteger(construct.Int32ub),
-    fst_size=ShiftedInteger(construct.Int32ub),
-    fst_maximum_size=construct.Int32ub,
-    fst_memory_address=construct.Int32ub,
-    user_position=construct.Int32ub,
-    user_length=construct.Int32ub,
-    _unused_d=construct.Const(b"\x00" * 4),  # construct.Bytes(0x4),
-)
-assert WiiDiscHeader.sizeof() == 0x0440
 
 
 class PartitionKind(enum.IntEnum):
@@ -83,7 +47,7 @@ PartInfo = construct.Struct(
 )
 
 Ticket = construct.Struct(
-    "sig_type" / construct.Int32ub,
+    "sig_type" / construct.Const(SigType.RSA_2048, EnumAdapter(SigType)),
     "sig" / construct.Bytes(256),
     construct.Padding(60),
     "sig_issuer" / construct.Bytes(64),
@@ -296,7 +260,7 @@ class WiiPartition:
         self._dec_key = aes.decrypt(self._part_header.ticket.enc_key)
 
         ds = self.begin_read_stream(source, 0, -1)
-        self.disc_header = WiiDiscHeader.parse_stream(ds)
+        self.disc_header = DiscHeader.parse_stream(ds)
         self.disc_header_info = disc_common.DiscHeaderInformation.parse_stream(ds)
 
         ds.seek(0x2440 + 0x14)
@@ -316,7 +280,7 @@ class WiiPartition:
 
 class WiiDiscConstruct(construct.Construct):
     def _parse(self, stream: typing.BinaryIO, context: construct.Container, path: str) -> construct.Container:
-        header = WiiDiscHeader.parse_stream(stream)
+        header = DiscHeader.parse_stream(stream)
 
         part_infos = []
         partitions = []
