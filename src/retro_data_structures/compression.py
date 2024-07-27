@@ -66,11 +66,13 @@ class LZOCompressedBlock(Adapter):
         self.segment_size = segment_size
 
     def _actual_segment_size(self, context):
+        # DEBUG: Set context._index to 1 on 1st pass
         decompressed_size = construct.evaluate(self.decompressed_size, context)
         segment_size = construct.evaluate(self.segment_size, context)
 
         # This is the same index than the one used when parsing a resource : this index is incorrect
         # when parsing a compressed block that isn't of index 0
+        # DEBUG : Set context._index back to 0 on 1st pass
         previous_segments = context._index * segment_size
         if previous_segments > decompressed_size:
             # This segment is redundant!

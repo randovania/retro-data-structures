@@ -105,8 +105,9 @@ def test_corruption_resource_decode(compressed_resource):
     # This seems to only return the first block
     # This is because parsing the second block fails because the context index is 0 instead of 1
     # hence providing the wrong length
-    # Manually providing the right index still fails, because the _actual_segment_size method uses
-    # that same index which raises a false StopFieldError
+    # In debug mode, manually setting the context._index to 1 when evaluating decompressed_size on 1st pass and
+    # segment_size in _actual_segment_size for LZOCompressedBlock, then setting it back to 0
+    # when computing previous_segments seems to fix the problem
     decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.CORRUPTION)
 
     assert len(decoded) == len(compressed_resource["contents"]["value"])
