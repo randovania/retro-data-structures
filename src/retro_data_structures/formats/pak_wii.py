@@ -9,7 +9,7 @@ from construct import Bytes, Const, IfThenElse, Int32ub, PrefixedArray, Struct
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
 from retro_data_structures.common_types import AssetId64, FourCC, String
-from retro_data_structures.compression import LZOCompressedBlock
+from retro_data_structures.compression import LZOCompressedBlockCorruption
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.dict import make_dict
 
@@ -86,7 +86,9 @@ CMPD_Pak_Resource = Struct(
         IfThenElse(
             lambda this: this.block_header[this._index].compressed_size
             < this.block_header[this._index].uncompressed_size,
-            LZOCompressedBlock(lambda this: this.block_header[this._index].uncompressed_size),
+            Struct(
+                block=LZOCompressedBlockCorruption(lambda this: this._.block_header[this._index].uncompressed_size),
+            ),
             Bytes(lambda this: this.block_header[this._index].uncompressed_size),
         ),
     ),
@@ -95,7 +97,7 @@ CMPD_Pak_Resource = Struct(
 
 class CMPD_Pak_Adapter(construct.Adapter):
     def _decode(self, obj, context, path):
-        return b"".join(obj.blocks)
+        return b"".join([block if type(block) is bytes else block.block for block in obj.blocks])
 
     # Going to rip a page out of PWE's book and compress everything in a single block
     def _encode(self, uncompressed, context, path):
@@ -119,7 +121,9 @@ class CMPD_Pak_Adapter(construct.Adapter):
                 ),
                 (
                     "blocks",
-                    construct.ListContainer(LZOCompressedBlock(len(uncompressed))._encode(uncompressed, context, path)),
+                    construct.ListContainer(
+                        LZOCompressedBlockCorruption(len(uncompressed))._encode(uncompressed, context, path)
+                    ),
                 ),
             ]
         )

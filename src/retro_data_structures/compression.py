@@ -28,9 +28,6 @@ class LZOSegment(construct.Subconstruct):
         self.decompressed_size = decompressed_size
 
     def _parse(self, stream, context, path):
-        # Context seems to be having the wrong index here, but why ?
-        # Manually setting index to 1 will cause this to call LZOCompressedBlock's
-        # _actual_segment_size, which raises StopFieldError
         decompressed_size = construct.evaluate(self.decompressed_size, context)
 
         length = construct.Int16sb._parsereport(stream, context, path)
@@ -66,13 +63,9 @@ class LZOCompressedBlock(Adapter):
         self.segment_size = segment_size
 
     def _actual_segment_size(self, context):
-        # DEBUG: Set context._index to 1 on 1st pass
         decompressed_size = construct.evaluate(self.decompressed_size, context)
         segment_size = construct.evaluate(self.segment_size, context)
 
-        # This is the same index than the one used when parsing a resource : this index is incorrect
-        # when parsing a compressed block that isn't of index 0
-        # DEBUG : Set context._index back to 0 on 1st pass
         previous_segments = context._index * segment_size
         if previous_segments > decompressed_size:
             # This segment is redundant!
@@ -102,6 +95,31 @@ class LZOCompressedBlock(Adapter):
             uncompressed[segment_size * i : segment_size * (i + 1)]
             for i in range(math.ceil(len(uncompressed) / segment_size))
         ]
+
+
+class LZOCompressedBlockCorruption(LZOCompressedBlock):
+    # Distinct implementation for Corruption's indexing needs :
+    # Corruption needs distinct indices for the current segment and the current block within the segment
+    def _actual_segment_size(self, context):
+        mem = context._index
+        context._index = context._._index
+
+        decompressed_size = construct.evaluate(self.decompressed_size, context)
+        segment_size = construct.evaluate(self.segment_size, context)
+        context._index = mem
+
+        previous_segments = context._index * segment_size
+        if previous_segments > decompressed_size:
+            # This segment is redundant!
+            raise construct.StopFieldError
+
+        elif previous_segments + segment_size > decompressed_size:
+            # Last segment
+            return decompressed_size - previous_segments
+
+        else:
+            # Another segment with this size
+            return segment_size
 
 
 ZlibCompressedBlock = construct.Compressed(construct.GreedyBytes, "zlib", level=9)
