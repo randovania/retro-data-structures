@@ -4,7 +4,7 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 import construct
-from construct import Bytes, Const, IfThenElse, Int32ub, PrefixedArray, Struct
+from construct import Bytes, Const, FocusedSeq, IfThenElse, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, Dependency
@@ -70,7 +70,7 @@ PAKNoData = Struct(
     _resources_end=construct.Tell,
 )
 
-CMPD_Pak_Resource = Struct(
+CMPD = Struct(
     magic=Const(b"CMPD"),
     block_count=Int32ub,
     block_header=construct.Array(
@@ -86,7 +86,8 @@ CMPD_Pak_Resource = Struct(
         IfThenElse(
             lambda this: this.block_header[this._index].compressed_size
             < this.block_header[this._index].uncompressed_size,
-            Struct(
+            FocusedSeq(
+                "block",
                 block=LZOCompressedBlockCorruption(lambda this: this._.block_header[this._index].uncompressed_size),
             ),
             Bytes(lambda this: this.block_header[this._index].uncompressed_size),
@@ -95,9 +96,9 @@ CMPD_Pak_Resource = Struct(
 )
 
 
-class CMPD_Pak_Adapter(construct.Adapter):
+class CMPDAdapter(construct.Adapter):
     def _decode(self, obj, context, path):
-        return b"".join([block if type(block) is bytes else block.block for block in obj.blocks])
+        return b"".join(obj.blocks)
 
     # Going to rip a page out of PWE's book and compress everything in a single block
     def _encode(self, uncompressed, context, path):
@@ -131,7 +132,7 @@ class CMPD_Pak_Adapter(construct.Adapter):
         return res
 
 
-CompressedPakResource = CMPD_Pak_Adapter(CMPD_Pak_Resource)
+CompressedPakResource = CMPDAdapter(CMPD)
 
 
 @dataclasses.dataclass
@@ -145,12 +146,12 @@ class PakFile:
 
     def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
-            self.uncompressed_data = CMPD_Pak_Resource.parse(self.compressed_data, target_game=target_game)
+            self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
         return self.uncompressed_data
 
     def get_compressed(self, target_game: Game) -> bytes:
         if self.compressed_data is None:
-            self.compressed_data = CMPD_Pak_Resource.build(self.uncompressed_data, target_game=target_game)
+            self.compressed_data = CompressedPakResource.build(self.uncompressed_data, target_game=target_game)
         return self.compressed_data
 
     def set_new_data(self, data: bytes):
