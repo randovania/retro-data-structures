@@ -32,6 +32,11 @@ def prime2_iso() -> Path:
 
 
 @pytest.fixture(scope="module")
+def prime2_pal_iso() -> Path:
+    return Path(get_env_or_skip("PRIME2_PAL_ISO"))
+
+
+@pytest.fixture(scope="module")
 def prime3_iso() -> Path:
     return Path(get_env_or_skip("PRIME3_ISO"))
 
@@ -44,6 +49,11 @@ def prime1_iso_provider(prime1_iso: Path) -> IsoFileProvider:
 @pytest.fixture(scope="module")
 def prime2_iso_provider(prime2_iso: Path) -> IsoFileProvider:
     return IsoFileProvider(prime2_iso)
+
+
+@pytest.fixture(scope="module")
+def prime2_pal_iso_provider(prime2_pal_iso: Path) -> IsoFileProvider:
+    return IsoFileProvider(prime2_pal_iso)
 
 
 @pytest.fixture(scope="module")
