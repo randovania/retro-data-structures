@@ -134,7 +134,7 @@ jobs:
           venv/bin/python -m pytest --cov retro_data_structures --cov-report=xml --fail-if-missing --durations=100 -n 2
 
       - name: codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
         env:
