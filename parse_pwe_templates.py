@@ -885,7 +885,22 @@ class ClassDefinition:
 """
 
 
+def create_all_file(path: Path, prefix: str, modules: list[str]) -> None:
+    code = "# Generated File\n"
+
+    all_list = []
+    for name in modules:
+        code += f"from {prefix}{name} import {name}\n"
+        all_list.append(f'    "{name}",')
+
+    code += "\n__all__ = [\n" + "\n".join(all_list) + "\n]\n"
+    path.write_text(code)
+
+
 def _add_default_types(core_path: Path, game_id: str):
+    modules = []
+    base_import = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.core."
+
     game_code = f"""
     @classmethod
     def game(cls) -> Game:
@@ -915,6 +930,7 @@ class Color(BaseColor):
 """
         + game_code
     )
+    modules.append("Color")
     core_path.joinpath("Vector.py").write_text(
         f"""# Generated file
 import struct
@@ -935,6 +951,7 @@ class Vector(BaseVector):
 """
         + game_code
     )
+    modules.append("Vector")
     if game_id == "PrimeRemastered":
         asset_code = "import uuid\n\nAssetId = uuid.UUID\ndefault_asset_id = uuid.UUID(int=0)\n"
     else:
@@ -944,6 +961,7 @@ class Vector(BaseVector):
             invalid_id = "0xFFFFFFFFFFFFFFFF"
         asset_code = f"AssetId = int\ndefault_asset_id = {invalid_id}\n"
     core_path.joinpath("AssetId.py").write_text(asset_code)
+    modules.append("AssetId")
 
     if game_id == "PrimeRemastered":
         core_path.joinpath("PooledString.py").write_text(
@@ -991,6 +1009,8 @@ class PooledString(BaseProperty):
 """
             + game_code
         )
+        modules.append("PooledString")
+        create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
         return
 
     if game_id in ["Prime", "Echoes"]:
@@ -1049,6 +1069,7 @@ class AnimationParameters(BaseProperty):
 """
         + game_code
     )
+    modules.append("AnimationParameters")
     core_path.joinpath("Spline.py").write_text(
         """# Generated file
 import dataclasses
@@ -1119,6 +1140,9 @@ class Spline(BaseSpline):
 """
         + game_code
     )
+    modules.append("Spline")
+
+    create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
 
 
 def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
@@ -1612,6 +1636,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         _ensure_is_generated_dir(final_path.parent)
         final_path.write_text(code_code)
+        return True
 
     path = code_path.joinpath("objects")
     _ensure_is_generated_dir(path)
@@ -1650,8 +1675,16 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     print("> Creating archetypes")
     path = code_path.joinpath("archetypes")
     _ensure_is_generated_dir(path)
+
+    base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.archetypes."
+
+    archetype_all = []
     for archetype_name, archetype in property_archetypes.items():
-        parse_struct(archetype_name, archetype, path, struct_fourcc=None)
+        if parse_struct(archetype_name, archetype, path, struct_fourcc=None):
+            archetype_all.append(archetype_name)
+
+    create_all_file(path.joinpath("__init__.py"), base_import_path, archetype_all)
+
     print("> Done.")
 
     return {
