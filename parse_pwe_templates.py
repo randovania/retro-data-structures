@@ -163,7 +163,7 @@ def _prop_flags(element: Element, game_id: str, path: Path) -> dict:
             name = property_names.get(int(element.attrib.get("ID"), 16))
 
         if name == "Unknown" and element.attrib.get("ID"):
-            name += f'_{element.attrib.get("ID")}'
+            name += f"_{element.attrib.get('ID')}"
 
         _enums_by_game[game_id].append(EnumDefinition(name, extras["flags"], enum_base="IntFlag"))
         extras["flagset_name"] = name
@@ -657,8 +657,7 @@ class ClassDefinition:
 
         self.class_code += "\n    @classmethod\n"
         self.class_code += (
-            "    def _fast_decode(cls, data: typing.BinaryIO, property_count: int"
-            ") -> typing_extensions.Self | None:\n"
+            "    def _fast_decode(cls, data: typing.BinaryIO, property_count: int) -> typing_extensions.Self | None:\n"
         )
         if self._can_fast_decode():
             for fast_decode in self._create_fast_decode_body():
