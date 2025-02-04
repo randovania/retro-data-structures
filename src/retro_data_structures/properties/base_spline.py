@@ -12,10 +12,6 @@ if typing.TYPE_CHECKING:
     from retro_data_structures import json_util
 
 
-def cached_tangent_default() -> tuple[float, float]:
-    return (float(0.0), float(0.0))
-
-
 @dataclasses.dataclass()
 class Knot(BaseProperty):
     time: float = dataclasses.field(default=0.0, metadata={
@@ -38,12 +34,12 @@ class Knot(BaseProperty):
             int, id=0x00000003, original_name='UnknownB'
         ),
     })
-    cached_tangents_a: tuple[float, float] | None = dataclasses.field(default_factory=cached_tangent_default, metadata={
+    cached_tangents_a: tuple[float, float] | None = dataclasses.field(default=None, metadata={
         'reflection': FieldReflection[tuple](
             list, id=0x00000004, original_name='CachedTangentsA'
         ),
     })
-    cached_tangents_b: tuple[float, float] | None = dataclasses.field(default_factory=cached_tangent_default, metadata={
+    cached_tangents_b: tuple[float, float] | None = dataclasses.field(default=None, metadata={
         'reflection': FieldReflection[tuple](
             list, id=0x00000005, original_name='CachedTangentsB'
         ),
