@@ -14,36 +14,42 @@ if typing.TYPE_CHECKING:
 
 @dataclasses.dataclass()
 class Knot(BaseProperty):
-    time: float = dataclasses.field(default=0.0, metadata={
-        'reflection': FieldReflection[float](
-            float, id=0x00000000, original_name='Time'
-        ),
-    })  # X position
-    amplitude: float = dataclasses.field(default=0.0, metadata={
-        'reflection': FieldReflection[float](
-            float, id=0x00000001, original_name='Amplitude'
-        ),
-    })  # Y position
-    unk_a: int = dataclasses.field(default=0, metadata={
-        'reflection': FieldReflection[int](
-            int, id=0x00000002, original_name='UnknownA'
-        ),
-    })
-    unk_b: int = dataclasses.field(default=0, metadata={
-        'reflection': FieldReflection[int](
-            int, id=0x00000003, original_name='UnknownB'
-        ),
-    })
-    cached_tangents_a: tuple[float, float] | None = dataclasses.field(default=None, metadata={
-        'reflection': FieldReflection[tuple](
-            list, id=0x00000004, original_name='CachedTangentsA'
-        ),
-    })
-    cached_tangents_b: tuple[float, float] | None = dataclasses.field(default=None, metadata={
-        'reflection': FieldReflection[tuple](
-            list, id=0x00000005, original_name='CachedTangentsB'
-        ),
-    })
+    time: float = dataclasses.field(
+        default=0.0,
+        metadata={
+            "reflection": FieldReflection[float](float, id=0x00000000, original_name="Time"),
+        },
+    )  # X position
+    amplitude: float = dataclasses.field(
+        default=0.0,
+        metadata={
+            "reflection": FieldReflection[float](float, id=0x00000001, original_name="Amplitude"),
+        },
+    )  # Y position
+    unk_a: int = dataclasses.field(
+        default=0,
+        metadata={
+            "reflection": FieldReflection[int](int, id=0x00000002, original_name="UnknownA"),
+        },
+    )
+    unk_b: int = dataclasses.field(
+        default=0,
+        metadata={
+            "reflection": FieldReflection[int](int, id=0x00000003, original_name="UnknownB"),
+        },
+    )
+    cached_tangents_a: tuple[float, float] | None = dataclasses.field(
+        default=None,
+        metadata={
+            "reflection": FieldReflection[tuple](list, id=0x00000004, original_name="CachedTangentsA"),
+        },
+    )
+    cached_tangents_b: tuple[float, float] | None = dataclasses.field(
+        default=None,
+        metadata={
+            "reflection": FieldReflection[tuple](list, id=0x00000005, original_name="CachedTangentsB"),
+        },
+    )
 
     @classmethod
     def from_json(cls, data: dict) -> typing.Self:
@@ -69,36 +75,42 @@ class Knot(BaseProperty):
 
 @dataclasses.dataclass()
 class BaseSpline(BaseProperty):
-    pre_infinity: int = dataclasses.field(default=0, metadata={
-        'reflection': FieldReflection[int](
-            int, id=0x00000000, original_name='PreInfinity'
-        ),
-    })
-    post_infinity: int = dataclasses.field(default=0, metadata={
-        'reflection': FieldReflection[int](
-            int, id=0x00000001, original_name='PostInfinity'
-        ),
-    })
-    knots: list[Knot] = dataclasses.field(default_factory=list, metadata={
-        'reflection': FieldReflection[list](
-            list, id=0x00000002, original_name='Knots'
-        ),
-    })
-    clamp_mode: int = dataclasses.field(default=0, metadata={
-        'reflection': FieldReflection[int](
-            int, id=0x00000003, original_name='ClampMode'
-        ),
-    })
-    minimum_amplitude: float = dataclasses.field(default=0.0, metadata={
-        'reflection': FieldReflection[float](
-            float, id=0x00000004, original_name='MinimumAmplitude'
-        ),
-    })
-    maximum_amplitude: float = dataclasses.field(default=0.0, metadata={
-        'reflection': FieldReflection[float](
-            float, id=0x00000005, original_name='MaximumAmplitude'
-        ),
-    })
+    pre_infinity: int = dataclasses.field(
+        default=0,
+        metadata={
+            "reflection": FieldReflection[int](int, id=0x00000000, original_name="PreInfinity"),
+        },
+    )
+    post_infinity: int = dataclasses.field(
+        default=0,
+        metadata={
+            "reflection": FieldReflection[int](int, id=0x00000001, original_name="PostInfinity"),
+        },
+    )
+    knots: list[Knot] = dataclasses.field(
+        default_factory=list,
+        metadata={
+            "reflection": FieldReflection[list](list, id=0x00000002, original_name="Knots"),
+        },
+    )
+    clamp_mode: int = dataclasses.field(
+        default=0,
+        metadata={
+            "reflection": FieldReflection[int](int, id=0x00000003, original_name="ClampMode"),
+        },
+    )
+    minimum_amplitude: float = dataclasses.field(
+        default=0.0,
+        metadata={
+            "reflection": FieldReflection[float](float, id=0x00000004, original_name="MinimumAmplitude"),
+        },
+    )
+    maximum_amplitude: float = dataclasses.field(
+        default=0.0,
+        metadata={
+            "reflection": FieldReflection[float](float, id=0x00000005, original_name="MaximumAmplitude"),
+        },
+    )
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
