@@ -9,6 +9,8 @@ if typing.TYPE_CHECKING:
     import typing_extensions
 
     from retro_data_structures import json_util
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
 
 
 @dataclasses.dataclass()
@@ -29,5 +31,5 @@ class BaseVector(BaseProperty):
             "z": self.z,
         }
 
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from []

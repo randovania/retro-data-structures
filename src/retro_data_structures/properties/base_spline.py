@@ -11,6 +11,35 @@ if typing.TYPE_CHECKING:
 
     from retro_data_structures import json_util
 
+    class KnotJson(typing_extensions.TypedDict):
+        time: float
+        amplitude: float
+        unk_a: int
+        unk_b: int
+        cached_tangents_a: list[float] | None
+        cached_tangents_b: list[float] | None
+
+    class SplineJson(typing_extensions.TypedDict):
+        pre_infinity: int
+        post_infinity: int
+        knots: list[json_util.JsonObject]
+        clamp_mode: int
+        minimum_amplitude: float
+        maximum_amplitude: float
+
+
+def _cached_tangents_from_json(data: json_util.JsonValue) -> tuple[float, float] | None:
+    if data is None:
+        return None
+    assert isinstance(data, list) and len(data) == 2
+    return typing.cast(tuple[float, float], (data[0], data[1]))
+
+
+def _cached_tangents_to_json(data: tuple[float, float] | None) -> json_util.JsonValue:
+    if data is None:
+        return None
+    return list(data)
+
 
 @dataclasses.dataclass()
 class Knot(BaseProperty):
@@ -41,25 +70,38 @@ class Knot(BaseProperty):
     cached_tangents_a: tuple[float, float] | None = dataclasses.field(
         default=None,
         metadata={
-            "reflection": FieldReflection[tuple](list, id=0x00000004, original_name="CachedTangentsA"),
+            "reflection": FieldReflection[tuple[float, float] | None](
+                tuple[float, float],
+                id=0x00000004,
+                original_name="CachedTangentsA",
+                from_json=_cached_tangents_from_json,
+                to_json=_cached_tangents_to_json,
+            ),
         },
     )
     cached_tangents_b: tuple[float, float] | None = dataclasses.field(
         default=None,
         metadata={
-            "reflection": FieldReflection[tuple](list, id=0x00000005, original_name="CachedTangentsB"),
+            "reflection": FieldReflection[tuple[float, float] | None](
+                tuple[float, float],
+                id=0x00000005,
+                original_name="CachedTangentsB",
+                from_json=_cached_tangents_from_json,
+                to_json=_cached_tangents_to_json,
+            ),
         },
     )
 
     @classmethod
-    def from_json(cls, data: dict) -> typing.Self:
+    def from_json(cls, data: json_util.JsonValue) -> typing.Self:
+        json_data = typing.cast("KnotJson", data)
         return cls(
-            time=data["time"],
-            amplitude=data["amplitude"],
-            unk_a=data["unk_a"],
-            unk_b=data["unk_b"],
-            cached_tangents_a=data["cached_tangents_a"],
-            cached_tangents_b=data["cached_tangents_b"],
+            time=json_data["time"],
+            amplitude=json_data["amplitude"],
+            unk_a=json_data["unk_a"],
+            unk_b=json_data["unk_b"],
+            cached_tangents_a=_cached_tangents_from_json(json_data["cached_tangents_a"]),
+            cached_tangents_b=_cached_tangents_from_json(json_data["cached_tangents_b"]),
         )
 
     def to_json(self) -> dict:
@@ -68,8 +110,8 @@ class Knot(BaseProperty):
             "amplitude": self.amplitude,
             "unk_a": self.unk_a,
             "unk_b": self.unk_b,
-            "cached_tangents_a": self.cached_tangents_a,
-            "cached_tangents_b": self.cached_tangents_b,
+            "cached_tangents_a": _cached_tangents_to_json(self.cached_tangents_a),
+            "cached_tangents_b": _cached_tangents_to_json(self.cached_tangents_b),
         }
 
 
@@ -114,13 +156,14 @@ class BaseSpline(BaseProperty):
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
+        json_data = typing.cast(SplineJson, data)
         return cls(
-            knots=[Knot.from_json(knot) for knot in data["knots"]],
-            minimum_amplitude=data["minimum_amplitude"],
-            maximum_amplitude=data["maximum_amplitude"],
-            pre_infinity=data["pre_infinity"],
-            post_infinity=data["post_infinity"],
-            clamp_mode=data["clamp_mode"],
+            knots=[Knot.from_json(knot) for knot in json_data["knots"]],
+            minimum_amplitude=json_data["minimum_amplitude"],
+            maximum_amplitude=json_data["maximum_amplitude"],
+            pre_infinity=json_data["pre_infinity"],
+            post_infinity=json_data["post_infinity"],
+            clamp_mode=json_data["clamp_mode"],
         )
 
     def to_json(self) -> json_util.JsonObject:

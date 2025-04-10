@@ -26,14 +26,14 @@ _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
     "Corruption": "corruption",
-    "DKCReturns": "dkc_returns",
+    # "DKCReturns": "dkc_returns",
     "PrimeRemastered": "prime_remastered",
 }
 _game_id_to_enum = {
     "Prime": "PRIME",
     "Echoes": "ECHOES",
     "Corruption": "CORRUPTION",
-    "DKCReturns": "DKC_RETURNS",
+    # "DKCReturns": "DKC_RETURNS",
     "PrimeRemastered": "PRIME_REMASTER",
 }
 
@@ -56,6 +56,18 @@ class EnumDefinition:
     name: str
     values: dict[str, typing.Any]
     enum_base: str = "Enum"
+
+    @property
+    def value_types(self) -> typing.Iterator[str]:
+        if self.enum_base in {"IntEnum", "IntFlag"}:
+            yield "int"
+            return
+
+        types: set[type] = set()
+        for v in self.values.values():
+            types.add(type(v))
+        for t in sorted(types):
+            yield t.__name__
 
 
 _enums_by_game: dict[str, list[EnumDefinition]] = {}
@@ -88,10 +100,10 @@ def create_enums_file(game_id: str, enums: list[EnumDefinition]):
 
         code += "\n    @classmethod\n"
         code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
-        code += "        assert isinstance(data, int)\n"
+        code += f"        assert isinstance(data, ({', '.join(sorted(e.value_types))}))\n"
         code += "        return cls(data)\n"
 
-        code += "\n    def to_json(self) -> int:\n"
+        code += f"\n    def to_json(self) -> {' | '.join(sorted(e.value_types))}:\n"
         code += "        return self.value\n"
 
     return code
@@ -530,7 +542,7 @@ class ClassDefinition:
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
 
-        self.before_class_code += "_FAST_FORMAT = None\n"
+        self.before_class_code += "_FAST_FORMAT: struct.Struct | None = None\n"
         self.before_class_code += f"_FAST_IDS = ({', '.join(ids)})\n"
 
         yield f"    if property_count != {num_props}:"
@@ -677,11 +689,11 @@ class ClassDefinition:
                 decode_names[prop_name] = prop.parse_code[:-suffix_size]
             else:
                 decode_names[prop_name] = f"_decode_{prop_name}"
-                self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
+                self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
                 self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
-        self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
+        self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
             self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
@@ -766,11 +778,17 @@ class ClassDefinition:
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
 """
-        data_var = "data"
+        data_var = "json_data"
         if self.all_props:
-            data_var = "json_data"
             self.class_code += f'        json_data = typing.cast("{self.class_name}Json", data)\n'
             self.type_checking_code.append(f"class {self.class_name}Json(typing_extensions.TypedDict):")
+        else:
+            self.class_code += "        json_data = typing.cast(json_util.JsonObject, data)\n"
+
+        if self.keep_unknown_properties():
+            self.class_code += (
+                "        unknown_properties = typing.cast(dict[str, str], json_data['unknown_properties'])\n"
+            )
 
         self.class_code += "        return cls(\n"
         space = "            "
@@ -796,7 +814,7 @@ class ClassDefinition:
             self.needed_imports["base64"] = True
             self.class_code += f"""{space}unknown_properties={{
                 int(property_id, 16): base64.b64decode(property_data)
-                for property_id, property_data in data["unknown_properties"].items()
+                for property_id, property_data in unknown_properties.items()
             }},
 """
 
@@ -819,7 +837,7 @@ class ClassDefinition:
             self.needed_imports["base64"] = True
             self.class_code += """
             'unknown_properties': {
-                hex(property_id): base64.b64encode(property_data)
+                hex(property_id): base64.b64encode(property_data).decode('utf-8')
                 for property_id, property_data in self.unknown_properties.items()
             }
 """
@@ -855,6 +873,8 @@ class ClassDefinition:
     def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         {prop_code}
 """
+        self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
+        self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
         if has_dep:
             method_list = "\n".join(
@@ -862,8 +882,6 @@ class ClassDefinition:
                 for prop_name, prop in self.all_props.items()
                 if prop.dependency_code is not None
             )
-            self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
-            self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
             self.class_code += f"""
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
@@ -879,7 +897,7 @@ class ClassDefinition:
 """
         else:
             self.class_code += """
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from []
 """
 
@@ -975,11 +993,16 @@ from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
 
+if typing.TYPE_CHECKING:
+    class PooledStringJson(typing_extensions.TypedDict):
+        index: int
+        size_or_str: int | str
+
 
 @dataclasses.dataclass()
 class PooledString(BaseProperty):
     index: int = -1
-    size_or_str: typing.Union[int, bytes] = b""
+    size_or_str: int | bytes = b""
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
@@ -991,19 +1014,30 @@ class PooledString(BaseProperty):
     def to_stream(self, data: typing.BinaryIO) -> None:
         a, b = self.index, self.size_or_str
         if a == -1:
+            assert isinstance(b, bytes)
             b = len(b)
         data.write(struct.pack('{endianness}lL', a, b))
         if a == -1:
+            assert isinstance(self.size_or_str, bytes)
             data.write(self.size_or_str)
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
-        return cls(data["index"], data["size_or_str"])
+        json_data = typing.cast("PooledStringJson", data)
+        if isinstance(json_data["size_or_str"], str):
+            size_or_str: int | bytes = json_data["size_or_str"].encode('utf-16')
+        else:
+            size_or_str = json_data["size_or_str"]
+        return cls(json_data["index"], size_or_str)
 
     def to_json(self) -> json_util.JsonObject:
+        if isinstance(self.size_or_str, bytes):
+            size_or_str: int | str = self.size_or_str.decode('utf-16')
+        else:
+            size_or_str = self.size_or_str
         return {{
             "index": self.index,
-            "size_or_str": self.size_or_str,
+            "size_or_str": size_or_str,
         }}
 """
             + game_code
@@ -1571,7 +1605,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         if cls.modules:
             cls.class_code += "\n    @classmethod\n"
-            cls.class_code += "    def modules(cls) -> typing.List[str]:\n"
+            cls.class_code += "    def modules(cls) -> list[str]:\n"
             cls.class_code += f"        return {repr(cls.modules)}\n"
 
         # from stream
@@ -1650,12 +1684,17 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         four_cc_wrap = repr
         four_cc_type = "str"
 
+    if game_id == "PrimeRemastered":
+        object_type = "BaseProperty"
+    else:
+        object_type = "BaseObjectType"
+
     getter_func = "# Generated File\n"
     getter_func += "import functools\nimport typing\n\n"
-    getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n"
+    getter_func += f"from retro_data_structures.properties.base_property import {object_type}\n"
 
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
-    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[BaseObjectType]] = {{\n"
+    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[{object_type}]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
@@ -1667,7 +1706,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "}\n\n\n"
 
     getter_func += "@functools.lru_cache(maxsize=None)\n"
-    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
+    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[{object_type}]:\n"
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
@@ -1745,14 +1784,11 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
         if len(games) < 2:
             continue
 
-        import_name = object_name.replace("_", ".")
-        type_name = object_name.split("_")[-1]
-
         for game in games:
-            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{import_name} as _{object_name}_{game}")
+            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{object_name} as _{object_name}_{game}")
         declarations.append(
             "{} = typing.Union[\n{}\n]".format(
-                object_name, ",\n".join(f"    _{object_name}_{game}.{type_name}" for game in games)
+                object_name, ",\n".join(f"    _{object_name}_{game}.{object_name}" for game in games)
             )
         )
 
@@ -1811,7 +1847,7 @@ def write_shared_types_helpers(all_games: dict):
         path_to_props.joinpath("shared_core.py"),
         "core",
         {
-            name: ["Prime", "Echoes", "Corruption", "DKCReturns"]
+            name: ["Prime", "Echoes", "Corruption"]
             for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
         },
     )
@@ -1823,6 +1859,7 @@ def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
     read_property_names(templates_path / "PropertyMap.xml")
 
     game_list = parse_game_list(templates_path)
+    del game_list["DKCReturns"]
     _parse_choice.unknowns = {game: 0 for game in game_list.keys()}
 
     all_games = {

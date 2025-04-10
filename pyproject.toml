@@ -92,3 +92,25 @@ max-complexity = 25
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.mypy]
+files = [
+    "src/retro_data_structures/properties/",
+    "src/retro_data_structures/enums/",
+    # "parse_pwe_templates.py",
+]
+follow_imports = "silent"
+disallow_untyped_defs = true
+local_partial_types = true
+warn_unused_ignores = true
+enable_error_code = [
+    "ignore-without-code",
+]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = true
+disable_error_code = [
+    "method-assign",
+]
