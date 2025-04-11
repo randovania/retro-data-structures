@@ -42,6 +42,10 @@ test = [
     # "pytest-asyncio",
     # "pytest-mock",
 ]
+typing = [
+    "types-jsonschema",
+    "mypy",
+]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
