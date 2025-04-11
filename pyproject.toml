@@ -98,7 +98,7 @@ required-imports = ["from __future__ import annotations"]
 files = [
     "src/retro_data_structures/properties/",
     "src/retro_data_structures/enums/",
-    # "parse_pwe_templates.py",
+    "parse_pwe_templates.py",
 ]
 follow_imports = "silent"
 disallow_untyped_defs = true
@@ -107,6 +107,15 @@ warn_unused_ignores = true
 enable_error_code = [
     "ignore-without-code",
 ]
+
+[[tool.mypy.overrides]]
+# any dependencies which we do not control but are missing types go here
+# not too much can be done about these, so they're not the end of the world
+# dependencies we DO control should use `type: ignore[import-untyped]`
+module = [
+    "construct.*",
+]
+ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "tests.*"
