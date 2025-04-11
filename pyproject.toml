@@ -104,6 +104,7 @@ required-imports = ["from __future__ import annotations"]
 files = [
     "src/retro_data_structures/properties/",
     "src/retro_data_structures/enums/",
+    "tests/test_properties.py",
     "parse_pwe_templates.py",
 ]
 follow_imports = "silent"

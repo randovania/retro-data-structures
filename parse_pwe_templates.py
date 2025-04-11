@@ -632,7 +632,7 @@ class ClassDefinition:
             assert prop.format_specifier is not None
             if len(prop.format_specifier) == 1:
                 value = f"dec[{offset}]"
-                if prop.prop_type.startswith("enums."):
+                if prop.need_enums or prop.local_enum:
                     st = f"        {prop.prop_type}({value}),"
                 else:
                     st = f"        {value},"
@@ -1090,14 +1090,14 @@ class PooledString(BaseProperty):
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         json_data = typing.cast("PooledStringJson", data)
         if isinstance(json_data["size_or_str"], str):
-            size_or_str: int | bytes = json_data["size_or_str"].encode('utf-16')
+            size_or_str: int | bytes = json_data["size_or_str"].encode('utf-8')
         else:
             size_or_str = json_data["size_or_str"]
         return cls(json_data["index"], size_or_str)
 
     def to_json(self) -> json_util.JsonObject:
         if isinstance(self.size_or_str, bytes):
-            size_or_str: int | str = self.size_or_str.decode('utf-16')
+            size_or_str: int | str = self.size_or_str.decode('utf-8')
         else:
             size_or_str = self.size_or_str
         return {{

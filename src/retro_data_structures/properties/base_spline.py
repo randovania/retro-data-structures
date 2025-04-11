@@ -156,7 +156,7 @@ class BaseSpline(BaseProperty):
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
-        json_data = typing.cast(SplineJson, data)
+        json_data = typing.cast("SplineJson", data)
         return cls(
             knots=[Knot.from_json(knot) for knot in json_data["knots"]],
             minimum_amplitude=json_data["minimum_amplitude"],
