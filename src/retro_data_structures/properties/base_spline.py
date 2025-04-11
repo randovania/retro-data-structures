@@ -93,7 +93,7 @@ class Knot(BaseProperty):
     )
 
     @classmethod
-    def from_json(cls, data: json_util.JsonValue) -> typing.Self:
+    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
         json_data = typing.cast("KnotJson", data)
         return cls(
             time=json_data["time"],
