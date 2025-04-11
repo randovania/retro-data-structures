@@ -16,13 +16,13 @@ if typing.TYPE_CHECKING:
         amplitude: float
         unk_a: int
         unk_b: int
-        cached_tangents_a: list[float] | None
-        cached_tangents_b: list[float] | None
+        cached_tangents_a: typing.Sequence[float] | None
+        cached_tangents_b: typing.Sequence[float] | None
 
     class SplineJson(typing_extensions.TypedDict):
         pre_infinity: int
         post_infinity: int
-        knots: list[json_util.JsonObject]
+        knots: typing.Sequence[json_util.JsonObject]
         clamp_mode: int
         minimum_amplitude: float
         maximum_amplitude: float

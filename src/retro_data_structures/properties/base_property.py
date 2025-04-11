@@ -54,13 +54,8 @@ class BaseProperty:
         field_type = field.type
 
         if not isinstance(field_type, type):
-            # try resolving it first, in case it's a string annotation
-            field_type = typing.get_type_hints(self)[field.name]
-
-        if not isinstance(field_type, type):
-            # probably a UnionType or some other special form
-            # just assume it has no dependencies
-            return
+            # account for unions, string annotations, etc.
+            field_type = type(getattr(self, field.name))
 
         if issubclass(field_type, BaseProperty):
             prop: BaseProperty = getattr(self, field.name)
