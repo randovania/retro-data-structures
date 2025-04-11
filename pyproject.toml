@@ -45,6 +45,8 @@ test = [
 typing = [
     "types-jsonschema",
     "mypy",
+    "inflection>=0.5.1",
+    "frozendict",
 ]
 
 [tool.setuptools_scm]
