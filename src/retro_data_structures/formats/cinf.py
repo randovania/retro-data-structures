@@ -31,7 +31,7 @@ CINF = Aligned(
         build_order_id=PrefixedArray(Int32ub, Int32ub),
         bone_names=PrefixedArray(Int32ub, BoneName),
     ),
-    pattern=b"\xFF",
+    pattern=b"\xff",
 )
 
 

@@ -1,6 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/MREA_(Metroid_Prime_2)
 """
+
 from __future__ import annotations
 
 import copy

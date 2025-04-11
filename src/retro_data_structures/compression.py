@@ -86,11 +86,8 @@ class LZOCompressedBlock(Adapter):
         decompressed_size = construct.evaluate(self.decompressed_size, context)
         if decompressed_size != len(uncompressed):
             raise ValueError(
-                "Decompressed size {} doesn't match size of data to compress ({}) at {}".format(
-                    decompressed_size,
-                    len(uncompressed),
-                    path,
-                )
+                f"Decompressed size {decompressed_size} doesn't match size of data "
+                f"to compress ({len(uncompressed)}) at {path}"
             )
 
         segment_size = self.segment_size
@@ -98,6 +95,31 @@ class LZOCompressedBlock(Adapter):
             uncompressed[segment_size * i : segment_size * (i + 1)]
             for i in range(math.ceil(len(uncompressed) / segment_size))
         ]
+
+
+class LZOCompressedBlockCorruption(LZOCompressedBlock):
+    # Distinct implementation for Corruption's indexing needs :
+    # Corruption needs distinct indices for the current segment and the current block within the segment
+    def _actual_segment_size(self, context):
+        mem = context._index
+        context._index = context._._index
+
+        decompressed_size = construct.evaluate(self.decompressed_size, context)
+        segment_size = construct.evaluate(self.segment_size, context)
+        context._index = mem
+
+        previous_segments = context._index * segment_size
+        if previous_segments > decompressed_size:
+            # This segment is redundant!
+            raise construct.StopFieldError
+
+        elif previous_segments + segment_size > decompressed_size:
+            # Last segment
+            return decompressed_size - previous_segments
+
+        else:
+            # Another segment with this size
+            return segment_size
 
 
 ZlibCompressedBlock = construct.Compressed(construct.GreedyBytes, "zlib", level=9)

@@ -1,6 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/MLVL_(File_Format)
 """
+
 from __future__ import annotations
 
 import itertools

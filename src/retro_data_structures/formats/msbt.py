@@ -184,7 +184,7 @@ class LabelsSectionBody(SectionBody):
         return new_context
 
 
-LabelsSection = construct.Aligned(16, LabelsSectionBody(), b"\xAB")
+LabelsSection = construct.Aligned(16, LabelsSectionBody(), b"\xab")
 
 AttributesSection = construct.Aligned(
     16,
@@ -193,7 +193,7 @@ AttributesSection = construct.Aligned(
         entry=construct.CString("utf_16_le"),
         has_entry_size=True,
     ),
-    b"\xAB",
+    b"\xab",
 )
 
 TextsSection = construct.Aligned(
@@ -203,7 +203,7 @@ TextsSection = construct.Aligned(
         entry=construct.StringEncoded(construct.GreedyBytes, "utf_16_le"),
         has_entry_size=False,
     ),
-    b"\xAB",
+    b"\xab",
 )
 
 

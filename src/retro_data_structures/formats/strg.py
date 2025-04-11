@@ -1,6 +1,7 @@
 """
 https://wiki.axiodl.com/w/STRG_(File_Format)
 """
+
 from __future__ import annotations
 
 import re

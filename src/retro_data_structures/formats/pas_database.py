@@ -1,6 +1,7 @@
 """
 Wiki: https://wiki.axiodl.com/w/PAS_Database
 """
+
 from __future__ import annotations
 
 import enum

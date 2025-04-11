@@ -184,7 +184,7 @@ class ConstructPakGc(construct.Construct):
 
             pad = 32 - (len(data) % 32)
             if pad < 32:
-                data += b"\xFF" * pad
+                data += b"\xff" * pad
 
             header.resources[i].offset = construct.stream_tell(stream, path)
             header.resources[i].size = len(data)

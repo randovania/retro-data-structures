@@ -158,7 +158,7 @@ CompressedAnimation = Struct(
 ANIM = Struct(
     anim_version=Int32ub,
     anim=IfThenElse(construct.this.anim_version == 0x00000000, UncompressedAnimation, CompressedAnimation),
-    trailing_bytes=GreedyRange(Const(b"\xFF")),
+    trailing_bytes=GreedyRange(Const(b"\xff")),
     _terminated=Terminated,
 )
 

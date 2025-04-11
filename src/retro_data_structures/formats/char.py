@@ -3,6 +3,7 @@ Wiki: https://wiki.axiodl.com/w/CHAR_(Metroid_Prime_3)
 
 To Do: DKCR CHAR Format
 """
+
 from __future__ import annotations
 
 import typing

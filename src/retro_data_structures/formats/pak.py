@@ -7,12 +7,15 @@ from retro_data_structures.formats import pak_gc, pak_wii, pak_wiiu
 from retro_data_structures.formats.pak_gc import PakBody, PakFile
 from retro_data_structures.game_check import Game
 
+if typing.TYPE_CHECKING:
+    from collections.abc import Iterator
+
 
 def _pak_for_game(game: Game):
     if game == Game.PRIME_REMASTER:
         return pak_wiiu.PAK_WIIU
     elif game >= Game.CORRUPTION:
-        raise ValueError("Unsupported game")
+        return pak_wii.PAK_WII
     else:
         return pak_gc.PAK_GC
 
@@ -47,6 +50,10 @@ class Pak:
 
     def build_stream(self, stream: typing.BinaryIO) -> bytes:
         return _pak_for_game(self.target_game).build_stream(self._raw, stream, target_game=self.target_game)
+
+    def get_all_assets(self) -> Iterator[tuple[AssetId, RawResource]]:
+        for file in self._raw.files:
+            yield file.asset_id, RawResource(file.asset_type, file.get_decompressed(self.target_game))
 
     def get_asset(self, asset_id: AssetId) -> RawResource | None:
         """
