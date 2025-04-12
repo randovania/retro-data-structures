@@ -36,19 +36,19 @@ def test_vector_invalid_operations():
         return re.escape(unescaped)
 
     with pytest.raises(TypeError, match=pattern("+")):
-        a + b
+        a + b  # type: ignore[operator]
 
     with pytest.raises(TypeError, match=pattern("-")):
-        a - b
+        a - b  # type: ignore[operator]
 
     with pytest.raises(TypeError, match=pattern("*")):
-        a * b
+        a * b  # type: ignore[operator]
 
     with pytest.raises(TypeError, match=pattern("/")):
-        a / b
+        a / b  # type: ignore[operator]
 
     with pytest.raises(TypeError, match=pattern("//")):
-        a // b
+        a // b  # type: ignore[operator]
 
 
 @pytest.mark.parametrize(
