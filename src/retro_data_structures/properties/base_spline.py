@@ -32,7 +32,7 @@ def _cached_tangents_from_json(data: json_util.JsonValue) -> tuple[float, float]
     if data is None:
         return None
     assert isinstance(data, list) and len(data) == 2
-    return typing.cast(tuple[float, float], (data[0], data[1]))
+    return typing.cast("tuple[float, float]", (data[0], data[1]))
 
 
 def _cached_tangents_to_json(data: tuple[float, float] | None) -> json_util.JsonValue:
