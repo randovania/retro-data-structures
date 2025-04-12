@@ -19,9 +19,9 @@ def test_vector_operations():
 @pytest.mark.parametrize(
     ("center", "expected"),
     (
-        (BaseVector(0.0, 0.0, 0.0), BaseVector(x=-3.5355339059327378, y=0.7071067811865481, z=-0.9999999999999998)),
-        (BaseVector(1.0, -3.0, 2.0), BaseVector(x=-3.2426406871192857, y=-5.82842712474619, z=2.0000000000000004)),
-        (BaseVector(2.4, 0.3, -24.03), BaseVector(x=-17.91517782348951, y=18.211014767455254, z=-22.63)),
+        (BaseVector(0.0, 0.0, 0.0), BaseVector(x=-3.535533905029297, y=0.7071067690849304, z=-1.0)),
+        (BaseVector(1.0, -3.0, 2.0), BaseVector(x=-3.242640733718872, y=-5.828427314758301, z=2.0)),
+        (BaseVector(2.4, 0.3, -24.03), BaseVector(x=-17.915178298950195, y=18.211015701293945, z=-22.6299991607666)),
     ),
 )
 def test_rotation(center: BaseVector, expected: BaseVector):
@@ -29,4 +29,4 @@ def test_rotation(center: BaseVector, expected: BaseVector):
     rot = BaseVector(45.0, 90.0, 180.0)
 
     result = pos.rotate(rot, center)
-    assert result == expected
+    assert result.truncated() == expected.truncated()

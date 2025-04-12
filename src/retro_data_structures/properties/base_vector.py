@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import math
+import struct
 import typing
 
 from retro_data_structures.properties.base_property import BaseProperty
@@ -62,6 +63,20 @@ class BaseVector(BaseProperty):
         if isinstance(other, int | float):
             return self.__class__(self.x // other, self.y // other, self.z // other)
         raise TypeError
+
+    def truncated(self) -> typing_extensions.Self:
+        """
+        Truncates the values of each component to be representable
+        with single-precision floats. Since the values are single-precision
+        in-game, this better reflects the actual value of this vector.
+
+        :returns: A new vector with truncated components
+        """
+
+        def truncate(val: float) -> float:
+            return struct.unpack(">f", struct.pack(">f", val))[0]
+
+        return self.__class__(truncate(self.x), truncate(self.y), truncate(self.z))
 
     def rotate(self, rotation: BaseVector, center: BaseVector | None = None) -> typing_extensions.Self:
         """
