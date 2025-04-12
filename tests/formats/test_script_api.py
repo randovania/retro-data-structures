@@ -79,12 +79,11 @@ def test_remove_instance(prime2_area: Area):
 
 # Script Layer
 def test_add_instance(prime2_area: Area):
-    from retro_data_structures.enums import echoes
-    from retro_data_structures.properties.echoes.objects.SpecialFunction import SpecialFunction
+    from retro_data_structures.properties.echoes.objects.SpecialFunction import Function, SpecialFunction
 
     inst = prime2_area.get_layer("Default").add_instance_with(
         SpecialFunction(
-            function=echoes.Function.Darkworld,
+            function=Function.Darkworld,
         )
     )
     assert inst.type == SpecialFunction

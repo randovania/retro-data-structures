@@ -18,8 +18,8 @@ class FieldReflection(Generic[T]):
     type: type[T]
     id: int
     original_name: str | None
-    from_json: Callable[[json_util.JsonValue], T] = json_util.identity
-    to_json: Callable[[T], json_util.JsonValue] = json_util.identity
+    from_json: Callable[[json_util.JsonValue], T] = json_util.identity  # type: ignore[assignment]
+    to_json: Callable[[T], json_util.JsonValue] = json_util.identity  # type: ignore[assignment]
 
 
 def get_reflection(cls: type[BaseProperty]) -> dict[str, FieldReflection]:

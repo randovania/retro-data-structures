@@ -1,14 +1,24 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal, overload
 
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
-    from retro_data_structures.properties.base_property import BaseObjectType
+    from retro_data_structures.properties.base_property import BaseObjectType, BaseProperty
 
 
-def get_game_object(game: Game, four_cc: str | int) -> type[BaseObjectType]:
+@overload
+def get_game_object(game: Literal[Game.PRIME], four_cc: int) -> type[BaseObjectType]: ...
+@overload
+def get_game_object(game: Literal[Game.ECHOES, Game.CORRUPTION], four_cc: str) -> type[BaseObjectType]: ...
+@overload
+def get_game_object(game: Literal[Game.PRIME_REMASTER], four_cc: int) -> type[BaseProperty]: ...
+@overload
+def get_game_object(game: Game, four_cc: str | int) -> type[BaseProperty]: ...
+
+
+def get_game_object(game: Game, four_cc: str | int) -> type[BaseObjectType] | type[BaseProperty]:
     if game == Game.PRIME:
         from .prime import objects as prime_objects
 

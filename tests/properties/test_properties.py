@@ -7,7 +7,9 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from retro_data_structures import properties
 from retro_data_structures.formats.script_object import _try_quick_get_name
+from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from retro_data_structures.properties.base_property import BaseProperty
@@ -130,8 +132,7 @@ def test_door():
         b"\x01\x00\x9e\xc6'\x12\x00\x0c\x00\x01\xb9N\x9b\xe7\x00\x04\xff\xff\xff\xff"
     )
 
-    from retro_data_structures.enums.echoes import Effect
-    from retro_data_structures.properties.echoes.archetypes.WeaponVulnerability import WeaponVulnerability
+    from retro_data_structures.properties.echoes.archetypes.WeaponVulnerability import Effect, WeaponVulnerability
     from retro_data_structures.properties.echoes.core.Color import Color
     from retro_data_structures.properties.echoes.objects import Door
 
@@ -165,3 +166,22 @@ def test_p1r_world_teleporter():
 
     assert teleporter == teleporter2
     assert encoded == data
+
+
+@pytest.mark.parametrize(
+    ("game", "four_cc", "expected_name"),
+    [
+        (Game.PRIME, 0x0, "Actor"),
+        (Game.ECHOES, "ACTR", "Actor"),
+        (Game.CORRUPTION, "ACTR", "Actor"),
+        (Game.PRIME_REMASTER, 0xB6200BE6, "ActorMP1"),
+    ],
+)
+def test_get_game_object(game: Game, four_cc: str | int, expected_name: str):
+    obj = properties.get_game_object(game, four_cc)
+    assert obj.__name__ == expected_name
+
+
+def test_get_game_object_invalid_game():
+    with pytest.raises(ValueError, match=r"Unknown Game: 2403"):
+        properties.get_game_object(2403, "")  # type: ignore[call-overload]

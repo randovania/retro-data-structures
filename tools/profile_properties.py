@@ -135,6 +135,8 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
         try:
             if game == Game.PRIME_REMASTER:
                 property_class = properties.get_game_object(game, instance.instance_id)
+            elif game == Game.PRIME:
+                property_class = properties.get_game_object(game, data.read(1)[0])
             else:
                 property_class = properties.get_game_object(game, data.read(4).decode("ascii"))
         except KeyError:

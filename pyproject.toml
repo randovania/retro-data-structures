@@ -4,6 +4,7 @@ requires = [
     "setuptools_scm[toml]>=3.4.3",
     "construct>=2.10.0",
     "inflection>=0.5.1",
+    "frozendict",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -40,6 +41,12 @@ test = [
     "pytest-cov",
     # "pytest-asyncio",
     # "pytest-mock",
+]
+typing = [
+    "types-jsonschema",
+    "mypy",
+    "inflection>=0.5.1",
+    "frozendict",
 ]
 
 [tool.setuptools_scm]
@@ -92,3 +99,35 @@ max-complexity = 25
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.mypy]
+files = [
+    "src/retro_data_structures/properties/",
+    "src/retro_data_structures/enums/",
+    "tests/properties/",
+    "parse_pwe_templates.py",
+]
+follow_imports = "silent"
+disallow_untyped_defs = true
+local_partial_types = true
+warn_unused_ignores = true
+enable_error_code = [
+    "ignore-without-code",
+]
+
+[[tool.mypy.overrides]]
+# any dependencies which we do not control but are missing types go here
+# not too much can be done about these, so they're not the end of the world
+# dependencies we DO control should use `type: ignore[import-untyped]`
+module = [
+    "construct.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+check_untyped_defs = true
+disable_error_code = [
+    "method-assign",
+]
