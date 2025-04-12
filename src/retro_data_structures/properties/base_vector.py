@@ -38,9 +38,13 @@ class BaseVector(BaseProperty):
         yield from []
 
     def __add__(self, other: BaseVector) -> typing_extensions.Self:
+        if not isinstance(other, BaseVector):
+            return NotImplemented
         return self.__class__(self.x + other.x, self.y + other.y, self.z + other.z)
 
     def __sub__(self, other: BaseVector) -> typing_extensions.Self:
+        if not isinstance(other, BaseVector):
+            return NotImplemented
         return self.__class__(self.x - other.x, self.y - other.y, self.z - other.z)
 
     def __mul__(self, other: int | float | BaseVector) -> typing_extensions.Self:
@@ -48,21 +52,24 @@ class BaseVector(BaseProperty):
             return self.__class__(self.x * other.x, self.y * other.y, self.z * other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x * other, self.y * other, self.z * other)
-        raise TypeError
+        return NotImplemented
+
+    def __rmul__(self, other: int | float | BaseVector) -> typing_extensions.Self:
+        return self.__mul__(other)  # commutative property
 
     def __truediv__(self, other: int | float | BaseVector) -> typing_extensions.Self:
         if isinstance(other, BaseVector):
             return self.__class__(self.x / other.x, self.y / other.y, self.z / other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x / other, self.y / other, self.z / other)
-        raise TypeError
+        return NotImplemented
 
     def __floordiv__(self, other: int | float | BaseVector) -> typing_extensions.Self:
         if isinstance(other, BaseVector):
             return self.__class__(self.x // other.x, self.y // other.y, self.z // other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x // other, self.y // other, self.z // other)
-        raise TypeError
+        return NotImplemented
 
     def truncated(self) -> typing_extensions.Self:
         """
