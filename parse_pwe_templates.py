@@ -12,12 +12,14 @@ from xml.etree import ElementTree
 from xml.etree.ElementTree import Element
 
 import inflection
+from frozendict import frozendict
 
 # ruff: noqa: E501
 # ruff: noqa: C901
 # ruff: noqa: PLR0912  lots of branches
 # ruff: noqa: PLR0915  lots of statements
 # ruff: noqa: PLW0603  we use globals here
+# ruff: noqa: PLR1714  helps with type narrowing for RawPropType
 
 rds_root = Path(__file__).parent.joinpath("src", "retro_data_structures")
 FAST_DECODE_ASSERT = True  # fast import will assert the ids are in the correct order instead of failing if not
@@ -26,14 +28,14 @@ _game_id_to_file = {
     "Prime": "prime",
     "Echoes": "echoes",
     "Corruption": "corruption",
-    "DKCReturns": "dkc_returns",
+    # "DKCReturns": "dkc_returns",
     "PrimeRemastered": "prime_remastered",
 }
 _game_id_to_enum = {
     "Prime": "PRIME",
     "Echoes": "ECHOES",
     "Corruption": "CORRUPTION",
-    "DKCReturns": "DKC_RETURNS",
+    # "DKCReturns": "DKC_RETURNS",
     "PrimeRemastered": "PRIME_REMASTER",
 }
 
@@ -46,37 +48,60 @@ _CODE_PARSE_UINT32 = {
     "<": 'struct.unpack("<L", data.read(4))[0]',
 }
 
+RawPropType = typing.Literal[
+    "Sound",
+    "Struct",
+    "Choice",
+    "Enum",
+    "Flags",
+    "Asset",
+    "AnimationSet",
+    "Spline",
+    "PooledString",
+    "Array",
+    "String",
+    "Color",
+    "Vector",
+    "Int",
+    "Float",
+    "Bool",
+    "Short",
+]
 
-def get_endianness(game_id):
+
+def get_endianness(game_id: str) -> str:
     return ">" if game_id != "PrimeRemastered" else "<"
+
+
+def find_assured(element: Element, path: str) -> Element:
+    e = element.find(path)
+    assert e is not None
+    return e
 
 
 @dataclasses.dataclass(frozen=True)
 class EnumDefinition:
     name: str
-    values: dict[str, typing.Any]
+    values: frozendict[str, typing.Any]
     enum_base: str = "Enum"
 
+    @property
+    def value_types(self) -> typing.Iterator[str]:
+        if self.enum_base in {"IntEnum", "IntFlag"}:
+            yield "int"
+            return
 
-_enums_by_game: dict[str, list[EnumDefinition]] = {}
+        types: set[type] = set()
+        for v in self.values.values():
+            types.add(type(v))
+        yield from sorted(t.__name__ for t in types)
 
+    def get_code(self, game_id: str) -> str:
+        code = ""
+        endianness = get_endianness(game_id)
 
-def _scrub_enum(string: str):
-    s = re.sub(r"\W", "", string)  # remove non-word characters
-    s = re.sub(r"^(?=\d)", "_", s)  # add leading underscore to strings starting with a number
-    s = re.sub(r"^None$", "_None", s)  # add leading underscore to None
-    s = s or "_EMPTY"  # add name for empty string keys
-    return s
-
-
-def create_enums_file(game_id: str, enums: list[EnumDefinition]):
-    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
-    code += "\nfrom retro_data_structures import json_util\n"
-    endianness = get_endianness(game_id)
-
-    for e in enums:
-        code += f"\n\nclass {_scrub_enum(e.name)}(enum.{e.enum_base}):\n"
-        for name, value in e.values.items():
+        code += f"\n\nclass {_scrub_enum(self.name)}(enum.{self.enum_base}):\n"
+        for name, value in self.values.items():
             code += f"    {_scrub_enum(name)} = {value}\n"
 
         code += "\n    @classmethod\n"
@@ -88,11 +113,33 @@ def create_enums_file(game_id: str, enums: list[EnumDefinition]):
 
         code += "\n    @classmethod\n"
         code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
-        code += "        assert isinstance(data, int)\n"
+        code += f"        assert isinstance(data, ({', '.join(self.value_types)}))\n"
         code += "        return cls(data)\n"
 
-        code += "\n    def to_json(self) -> int:\n"
+        code += f"\n    def to_json(self) -> {' | '.join(self.value_types)}:\n"
         code += "        return self.value\n"
+
+        return code
+
+
+_enums_by_game: dict[str, collections.defaultdict[EnumDefinition, list[str]]] = {}
+
+
+def _scrub_enum(string: str) -> str:
+    s = re.sub(r"\W", "", string)  # remove non-word characters
+    s = re.sub(r"^(?=\d)", "_", s)  # add leading underscore to strings starting with a number
+    s = re.sub(r"^None$", "_None", s)  # add leading underscore to None
+    s = s or "_EMPTY"  # add name for empty string keys
+    return s
+
+
+def create_enums_file(game_id: str, enums: dict[EnumDefinition, list[str]]) -> str:
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
+    code += "\nfrom retro_data_structures import json_util\n"
+
+    for e, classes in enums.items():
+        if len(classes) != 1:
+            code += e.get_code(game_id)
 
     return code
 
@@ -128,8 +175,8 @@ def _prop_struct(element: Element, game_id: str, path: Path) -> dict:
 
 def _prop_asset(element: Element, game_id: str, path: Path) -> dict:
     type_filter = []
-    if element.find("TypeFilter"):
-        type_filter = [t.text for t in element.find("TypeFilter")]
+    if (filt := element.find("TypeFilter")) is not None:
+        type_filter = [t.text for t in filt]
     return {"type_filter": type_filter}
 
 
@@ -156,23 +203,33 @@ def _prop_flags(element: Element, game_id: str, path: Path) -> dict:
             element.attrib["Name"]: int(element.attrib["Mask"], 16) for element in flags_element.findall("Element")
         }
 
+        element_id = element.attrib.get("ID")
+
         name = None
-        if element.find("Name") is not None:
-            name = element.find("Name").text
-        elif element.attrib.get("ID"):
-            name = property_names.get(int(element.attrib.get("ID"), 16))
+        if (ele_name := element.find("Name")) is not None:
+            name = ele_name.text
+        elif element_id is not None:
+            name = property_names.get(int(element_id, 16))
 
-        if name == "Unknown" and element.attrib.get("ID"):
-            name += f"_{element.attrib.get('ID')}"
+        if name is None:
+            name = "Unknown"
 
-        _enums_by_game[game_id].append(EnumDefinition(name, extras["flags"], enum_base="IntFlag"))
+        if name == "Unknown" and element_id is not None:
+            name += f"_{element_id}"
+
+        if name == path.stem:
+            name += "Flags"
+
+        enum_uses = _enums_by_game[game_id][EnumDefinition(name, frozendict(extras["flags"]), enum_base="IntFlag")]
+        if path.parent.stem != "Enums":
+            enum_uses.append(path.stem)
         extras["flagset_name"] = name
 
     return extras
 
 
 def _parse_single_property(element: Element, game_id: str, path: Path, include_id: bool = True) -> dict:
-    parsed = {}
+    parsed: dict[str, typing.Any] = {}
     if include_id:
         parsed.update({"id": int(element.attrib["ID"], 16)})
 
@@ -190,8 +247,8 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
         }
     )
 
-    ignore_dependencies_mlvl = element.attrib.get("IgnoreDependenciesMlvl", "False")
-    ignore_dependencies_mlvl = ignore_dependencies_mlvl.lower() != "false"
+    _ignore_dependencies_mlvl = element.attrib.get("IgnoreDependenciesMlvl", "False")
+    ignore_dependencies_mlvl = _ignore_dependencies_mlvl.lower() != "false"
     if ignore_dependencies_mlvl:
         parsed["ignore_dependencies_mlvl"] = True
 
@@ -219,7 +276,7 @@ def _parse_properties(properties: Element, game_id: str, path: Path) -> dict:
 
     return {
         "type": "Struct",
-        "name": properties.find("Name").text if properties.find("Name") is not None else "",
+        "name": name.text if (name := properties.find("Name")) is not None else "",
         "atomic": properties.find("Atomic") is not None,
         "incomplete": properties.attrib.get("Incomplete") == "true",
         "properties": elements,
@@ -236,32 +293,39 @@ def _parse_choice(properties: Element, game_id: str, path: Path) -> dict:
             choices[element.attrib["Name"]] = int(element.attrib["ID"], 16)
 
         name = ""
-        if properties.find("Name") is not None:
-            name = properties.find("Name").text
-        elif properties.attrib.get("ID"):
-            name = property_names.get(int(properties.attrib.get("ID"), 16), path.stem + properties.attrib.get("ID"))
+        if (ele_name := properties.find("Name")) is not None:
+            assert ele_name.text is not None
+            name = ele_name.text
+        elif (ele_id := properties.attrib.get("ID")) is not None:
+            name = property_names.get(int(ele_id, 16), path.stem + ele_id)
         else:
             return {
                 "type": _type,
                 "choices": choices,
             }
 
-        _enums_by_game[game_id].append(EnumDefinition(name, choices, enum_base="IntEnum"))
+        if name == path.stem:
+            name += "Enum"
+
+        enum_uses = _enums_by_game[game_id][EnumDefinition(name, frozendict(choices), enum_base="IntEnum")]
+        if path.parent.stem != "Enums":
+            enum_uses.append(path.stem)
 
     return {
         "type": _type,
     }
 
 
-_parse_choice.unknowns = {}
+_parse_choice.unknowns = {}  # type: ignore[attr-defined]
 
 
 def parse_script_object_file(path: Path, game_id: str) -> dict:
     t = ElementTree.parse(path)
     root = t.getroot()
-    result = _parse_properties(root.find("Properties"), game_id, path)
+    props = find_assured(root, "Properties")
+    result = _parse_properties(props, game_id, path)
 
-    if modules := root.find("Modules"):
+    if (modules := root.find("Modules")) is not None:
         result["modules"] = [item.text for item in modules.findall("Element")]
 
     return result
@@ -270,7 +334,7 @@ def parse_script_object_file(path: Path, game_id: str) -> dict:
 def parse_property_archetypes(path: Path, game_id: str) -> dict:
     t = ElementTree.parse(path)
     root = t.getroot()
-    archetype = root.find("PropertyArchetype")
+    archetype = find_assured(root, "PropertyArchetype")
     _type = archetype.attrib["Type"]
     if _type == "Struct":
         return _parse_properties(archetype, game_id, path)
@@ -283,27 +347,35 @@ def parse_property_archetypes(path: Path, game_id: str) -> dict:
 property_names: dict[int, str] = {}
 
 
-def read_property_names(map_path: Path):
+def read_property_names(map_path: Path) -> dict[int, str]:
     global property_names
 
     t = ElementTree.parse(map_path)
     root = t.getroot()
-    m = root.find("PropertyMap")
+    m = find_assured(root, "PropertyMap")
 
     property_names = {
-        int(item.find("Key").attrib["ID"], 16): item.find("Value").attrib["Name"]
+        int(find_assured(item, "Key").attrib["ID"], 16): find_assured(item, "Value").attrib["Name"]
         for item in typing.cast(typing.Iterable[Element], m)
     }
 
     return property_names
 
 
-def get_paths(elements: typing.Iterable[Element]) -> dict[str, str]:
-    return {item.find("Key").text: item.find("Value").attrib["Path"] for item in elements}
+def get_paths(element: Element) -> dict[str, str]:
+    return {
+        key: find_assured(item, "Value").attrib["Path"]
+        for item in element
+        if (key := find_assured(item, "Key").text) is not None
+    }
 
 
-def get_key_map(elements: typing.Iterable[Element]) -> dict[str, str]:
-    return {item.find("Key").text: item.find("Value").text for item in elements}
+def get_key_map(element: Element) -> dict[str, str]:
+    return {
+        key: find_assured(item, "Value").text or ""
+        for item in element
+        if (key := find_assured(item, "Key").text) is not None
+    }
 
 
 _to_snake_case_re = re.compile(r"(?<!^)(?=[A-Z])")
@@ -322,7 +394,7 @@ def _filter_property_name(n: str) -> str:
     return result
 
 
-def _ensure_is_generated_dir(path: Path):
+def _ensure_is_generated_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
     path.joinpath(".gitignore").write_text("*")
     init = path.joinpath("__init__.py")
@@ -330,7 +402,7 @@ def _ensure_is_generated_dir(path: Path):
         init.write_text("")
 
 
-def _fix_module_name(output_path: Path, class_path: str):
+def _fix_module_name(output_path: Path, class_path: str) -> None:
     # We created a nested module, but there was already a class with that name.
     rename_root = output_path
     for part in class_path.split("/")[:-1]:
@@ -349,6 +421,7 @@ class PropDetails:
     prop_type: str
     json_type: str
     need_enums: bool
+    local_enum: EnumDefinition | None
     comment: str | None
     parse_code: str
     build_code: list[str]
@@ -363,7 +436,7 @@ class PropDetails:
     dependency_code: str | None
 
     @property
-    def id(self):
+    def id(self) -> int:
         return self.raw["id"]
 
     def get_from_json(self, prop_name: str) -> str:
@@ -383,9 +456,9 @@ class PropDetails:
 
 def _get_default(field_params: dict) -> str:
     if "default" in field_params:
-        default_value = field_params["default"]
+        default_value: str = field_params["default"]
     else:
-        default_value: str = field_params["default_factory"]
+        default_value = field_params["default_factory"]
         if default_value.startswith("lambda: "):
             default_value = default_value[len("lambda: ") :]
         else:
@@ -415,15 +488,18 @@ class ClassDefinition:
     needed_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
     typing_imports: dict[str, str | bool] = dataclasses.field(default_factory=dict)
     need_enums: bool = False
+    local_enums: list[EnumDefinition] = dataclasses.field(default_factory=list)
     has_custom_cook_pref: bool = False
 
     @property
     def atomic(self) -> bool:
         return self.raw_def["atomic"]
 
-    def add_prop(self, prop: PropDetails, prop_name: str, raw_name: str):
+    def add_prop(self, prop: PropDetails, prop_name: str, raw_name: str) -> None:
         self.all_props[prop_name] = prop
         self.need_enums = self.need_enums or prop.need_enums
+        if prop.local_enum is not None and prop.local_enum not in self.local_enums:
+            self.local_enums.append(prop.local_enum)
         self.has_custom_cook_pref = self.has_custom_cook_pref or prop.custom_cook_pref
         endianness = get_endianness(self.game_id)
 
@@ -513,24 +589,24 @@ class ClassDefinition:
             self.properties_builder += "\n".join(build_prop)
             self.properties_builder += "\n"
 
-    def finalize_props(self):
+    def finalize_props(self) -> None:
         if self.keep_unknown_properties():
             self.class_code += "    unknown_properties: dict[int, bytes] = dataclasses.field(default_factory=dict)\n"
 
-    def keep_unknown_properties(self):
+    def keep_unknown_properties(self) -> bool:
         return self.is_incomplete
 
     def _can_fast_decode(self) -> bool:
-        return all(prop.format_specifier is not None for prop in self.all_props.values()) and self.all_props
+        return bool(all(prop.format_specifier is not None for prop in self.all_props.values()) and self.all_props)
 
-    def _create_fast_decode_body(self):
+    def _create_fast_decode_body(self) -> typing.Iterator[str]:
         num_props = len(self.all_props)
         ids = [hex(prop.id) for prop in self.all_props.values()]
         big_format = get_endianness(self.game_id) + "".join(
             f"LH{prop.format_specifier}" for prop in self.all_props.values()
         )
 
-        self.before_class_code += "_FAST_FORMAT = None\n"
+        self.before_class_code += "_FAST_FORMAT: struct.Struct | None = None\n"
         self.before_class_code += f"_FAST_IDS = ({', '.join(ids)})\n"
 
         yield f"    if property_count != {num_props}:"
@@ -553,9 +629,10 @@ class ClassDefinition:
             fast_check.append(f"dec[{offset}]")
 
             offset += 2  # prop id + size
+            assert prop.format_specifier is not None
             if len(prop.format_specifier) == 1:
                 value = f"dec[{offset}]"
-                if prop.prop_type.startswith("enums."):
+                if prop.need_enums or prop.local_enum:
                     st = f"        {prop.prop_type}({value}),"
                 else:
                     st = f"        {value},"
@@ -576,7 +653,7 @@ class ClassDefinition:
         yield from ret_state
         yield "    )"
 
-    def _create_simple_decode_body(self):
+    def _create_simple_decode_body(self) -> typing.Iterator[str]:
         num_props = len(self.all_props)
         endianness = get_endianness(self.game_id)
         [hex(prop.id) for prop in self.all_props.values()]
@@ -601,7 +678,7 @@ class ClassDefinition:
         all_fields = ", ".join(variables)
         yield f"    return cls({all_fields})"
 
-    def write_from_stream(self):
+    def write_from_stream(self) -> None:
         game_id = self.game_id
         endianness = get_endianness(game_id)
 
@@ -677,16 +754,16 @@ class ClassDefinition:
                 decode_names[prop_name] = prop.parse_code[:-suffix_size]
             else:
                 decode_names[prop_name] = f"_decode_{prop_name}"
-                self.after_class_code += f"def _decode_{prop_name}({signature}):\n"
+                self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
                 self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
-        self.after_class_code += f"_property_decoder: typing.Dict[int, typing.Tuple[str, {decoder_type}]] = {{\n"
+        self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
             self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
 
-    def write_to_stream(self):
+    def write_to_stream(self) -> None:
         self.class_code += """
     def to_stream(self, data: typing.BinaryIO, default_override: dict | None = None) -> None:
         default_override = default_override or {}
@@ -761,16 +838,22 @@ class ClassDefinition:
             self.class_code += f'            data.write(struct.pack("{endianness}H", {num_props_variable}))\n'
             self.class_code += "            data.seek(struct_end_offset)\n"
 
-    def write_from_json(self):
+    def write_from_json(self) -> None:
         self.class_code += """
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
 """
-        data_var = "data"
+        data_var = "json_data"
         if self.all_props:
-            data_var = "json_data"
             self.class_code += f'        json_data = typing.cast("{self.class_name}Json", data)\n'
             self.type_checking_code.append(f"class {self.class_name}Json(typing_extensions.TypedDict):")
+        else:
+            self.class_code += "        json_data = typing.cast(json_util.JsonObject, data)\n"
+
+        if self.keep_unknown_properties():
+            self.class_code += (
+                "        unknown_properties = typing.cast(dict[str, str], json_data['unknown_properties'])\n"
+            )
 
         self.class_code += "        return cls(\n"
         space = "            "
@@ -796,13 +879,13 @@ class ClassDefinition:
             self.needed_imports["base64"] = True
             self.class_code += f"""{space}unknown_properties={{
                 int(property_id, 16): base64.b64decode(property_data)
-                for property_id, property_data in data["unknown_properties"].items()
+                for property_id, property_data in unknown_properties.items()
             }},
 """
 
         self.class_code += "        )\n"
 
-    def write_to_json(self):
+    def write_to_json(self) -> None:
         self.class_code += """
     def to_json(self) -> json_util.JsonObject:
         return {
@@ -819,14 +902,14 @@ class ClassDefinition:
             self.needed_imports["base64"] = True
             self.class_code += """
             'unknown_properties': {
-                hex(property_id): base64.b64encode(property_data)
+                hex(property_id): base64.b64encode(property_data).decode('utf-8')
                 for property_id, property_data in self.unknown_properties.items()
             }
 """
 
         self.class_code += "        }\n"
 
-    def write_dependencies(self):
+    def write_dependencies(self) -> None:
         if self.keep_unknown_properties() or self.game_id not in {"Prime", "Echoes"}:
             return
 
@@ -855,6 +938,8 @@ class ClassDefinition:
     def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         {prop_code}
 """
+        self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
+        self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
         if has_dep:
             method_list = "\n".join(
@@ -862,8 +947,6 @@ class ClassDefinition:
                 for prop_name, prop in self.all_props.items()
                 if prop.dependency_code is not None
             )
-            self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
-            self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
             self.class_code += f"""
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
@@ -879,7 +962,7 @@ class ClassDefinition:
 """
         else:
             self.class_code += """
-    def dependencies_for(self, asset_manager):
+    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from []
 """
 
@@ -896,7 +979,7 @@ def create_all_file(path: Path, prefix: str, modules: list[str]) -> None:
     path.write_text(code)
 
 
-def _add_default_types(core_path: Path, game_id: str):
+def _add_default_types(core_path: Path, game_id: str) -> None:
     modules = []
     base_import = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.core."
 
@@ -975,11 +1058,16 @@ from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
 
+if typing.TYPE_CHECKING:
+    class PooledStringJson(typing_extensions.TypedDict):
+        index: int
+        size_or_str: int | str
+
 
 @dataclasses.dataclass()
 class PooledString(BaseProperty):
     index: int = -1
-    size_or_str: typing.Union[int, bytes] = b""
+    size_or_str: int | bytes = b""
 
     @classmethod
     def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
@@ -991,19 +1079,30 @@ class PooledString(BaseProperty):
     def to_stream(self, data: typing.BinaryIO) -> None:
         a, b = self.index, self.size_or_str
         if a == -1:
+            assert isinstance(b, bytes)
             b = len(b)
         data.write(struct.pack('{endianness}lL', a, b))
         if a == -1:
+            assert isinstance(self.size_or_str, bytes)
             data.write(self.size_or_str)
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
-        return cls(data["index"], data["size_or_str"])
+        json_data = typing.cast("PooledStringJson", data)
+        if isinstance(json_data["size_or_str"], str):
+            size_or_str: int | bytes = json_data["size_or_str"].encode('utf-8')
+        else:
+            size_or_str = json_data["size_or_str"]
+        return cls(json_data["index"], size_or_str)
 
     def to_json(self) -> json_util.JsonObject:
+        if isinstance(self.size_or_str, bytes):
+            size_or_str: int | str = self.size_or_str.decode('utf-8')
+        else:
+            size_or_str = self.size_or_str
         return {{
             "index": self.index,
-            "size_or_str": self.size_or_str,
+            "size_or_str": size_or_str,
         }}
 """
             + game_code
@@ -1152,44 +1251,44 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     t = ElementTree.parse(templates_path / game_xml)
     root = t.getroot()
 
-    states = get_key_map(root.find("States"))
-    messages = get_key_map(root.find("Messages"))
+    states = get_key_map(find_assured(root, "States"))
+    messages = get_key_map(find_assured(root, "Messages"))
 
-    game_enums = []
+    game_enums: collections.defaultdict[EnumDefinition, list[str]] = collections.defaultdict(list)
     _enums_by_game[game_id] = game_enums
 
-    if game_id == "Prime":
-        enum_value_repr = str
-        enum_base = "IntEnum"
-    else:
+    if game_id != "Prime":
         enum_value_repr = repr
         enum_base = "Enum"
+    else:
+        enum_value_repr = str
+        enum_base = "IntEnum"
 
     if states:
-        game_enums.append(
+        game_enums[
             EnumDefinition(
                 "State",
-                {value: enum_value_repr(key) for key, value in states.items()},
+                frozendict({value: enum_value_repr(key) for key, value in states.items()}),
                 enum_base=enum_base,
             )
-        )
+        ] = []
 
     if messages:
-        game_enums.append(
+        game_enums[
             EnumDefinition(
                 "Message",
-                {value: enum_value_repr(key) for key, value in messages.items()},
+                frozendict({value: enum_value_repr(key) for key, value in messages.items()}),
                 enum_base=enum_base,
             )
-        )
+        ] = []
 
-    script_objects_paths = dict(get_paths(root.find("ScriptObjects")).items())
+    script_objects_paths = dict(get_paths(find_assured(root, "ScriptObjects")).items())
     script_objects = {
         four_cc: parse_script_object_file(base_path / path, game_id) for four_cc, path in script_objects_paths.items()
     }
     property_archetypes = {
         name: parse_property_archetypes(base_path / path, game_id)
-        for name, path in get_paths(root.find("PropertyArchetypes")).items()
+        for name, path in get_paths(find_assured(root, "PropertyArchetypes")).items()
     }
 
     code_path = rds_root.joinpath("properties", _game_id_to_file[game_id])
@@ -1203,10 +1302,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         default: typing.Any
 
         @property
-        def byte_count(self):
+        def byte_count(self) -> int:
             return struct.calcsize(endianness + self.struct_format)
 
-    _literal_prop_types = {
+    _literal_prop_types: dict[RawPropType, LiteralPropType] = {
         "Int": LiteralPropType("int", "l", 0),
         "Float": LiteralPropType("float", "f", 0.0),
         "Bool": LiteralPropType("bool", "?", False),
@@ -1219,8 +1318,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
-    def get_prop_details(prop) -> PropDetails:
-        raw_type = prop["type"]
+    def get_prop_details(prop: dict) -> PropDetails:
+        raw_type = typing.cast(RawPropType, prop["type"])
         prop_type = None
         json_type = None
         need_enums = False
@@ -1230,12 +1329,14 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         from_json_code = "None"
         to_json_code = "None"
         known_size = None
-        field_params = {}
+        field_params: dict[str, typing.Any] = {}
         needed_imports: dict[str, str | bool] = {}
         format_specifier = None
         dependency_code = None
         dataclass_metadata = {}
+        local_enum: EnumDefinition | None = None
 
+        # using repeated == instead of `in` to help with type narrowing
         if raw_type == "Sound":
             raw_type = "Int"
             field_params["default"] = 65535
@@ -1245,7 +1346,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"]
             prop_type = archetype_path.split(".")[-1]
-            needed_imports[f"{import_base}.archetypes.{archetype_path}"] = prop_type
+            archetype_imports: set[str] = {prop_type}
             field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
@@ -1257,8 +1358,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 if not inner_prop.get("has_default"):
                     continue
 
-                inner_name = _filter_property_name(inner_prop["name"] or property_names.get(inner_prop["id"]))
-                assert inner_name is not None
+                inner_name = _filter_property_name(
+                    inner_prop["name"] or property_names.get(inner_prop["id"], "unknown")
+                )
+
                 if inner_name == "unknown":
                     print(f"Ignoring default override for field {inner_prop['id']:08x}: no known name")
                     continue
@@ -1267,6 +1370,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 default_override[inner_name] = _get_default(inner_details.dataclass_field_params)
                 needed_imports.update(inner_details.needed_imports)
                 need_enums = need_enums or inner_details.need_enums
+                if inner_details.local_enum is not None:
+                    archetype_imports.add(inner_details.local_enum.name)
 
             if default_override:
                 override = ", ".join(f"{repr(key)}: {value}" for key, value in default_override.items())
@@ -1276,26 +1381,36 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 parse_code = f"{prop_type}.from_stream(data, property_size)"
                 build_code.append("{obj}.to_stream(data)")
 
-        elif prop["type"] in ["Choice", "Enum"]:
+            needed_imports[f"{import_base}.archetypes.{archetype_path}"] = ", ".join(sorted(archetype_imports))
+
+        elif raw_type == "Choice" or raw_type == "Enum":
             default_value = prop["default_value"] if prop["has_default"] else 0
             enum_name = _scrub_enum(prop["archetype"] or prop["name"] or property_names.get(prop["id"]) or "")
+            if enum_name not in known_enums:
+                enum_name += "Enum"
             format_specifier = "L"
             json_type = "int"
 
             uses_known_enum = enum_name in known_enums and (
-                default_value in list(known_enums[enum_name].values.values())
+                default_value in list((enum_def := known_enums[enum_name]).values.values())
             )
             if uses_known_enum:
-                prop_type = f"enums.{enum_name}"
-                need_enums = True
-                parse_code = f"enums.{enum_name}.from_stream(data)"
+                if len(_enums_by_game[game_id][enum_def]) != 1:
+                    enum_prefix = "enums."
+                    need_enums = True
+                else:
+                    enum_prefix = ""
+                    local_enum = enum_def
+
+                prop_type = f"{enum_prefix}{enum_name}"
+                parse_code = f"{enum_prefix}{enum_name}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
                 from_json_code = f"{prop_type}.from_json({{obj}})"
                 to_json_code = "{obj}.to_json()"
 
                 for key, value in known_enums[enum_name].values.items():
                     if value == default_value:
-                        field_params["default"] = f"enums.{enum_name}.{_scrub_enum(key)}"
+                        field_params["default"] = f"{enum_prefix}{enum_name}.{_scrub_enum(key)}"
                 assert "default" in field_params
             else:
                 comment = "Choice"
@@ -1312,8 +1427,19 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             json_type = "int"
 
             if "flagset_name" in prop:
-                prop_type = "enums." + _scrub_enum(prop["flagset_name"])
-                need_enums = True
+                enum_name = _scrub_enum(prop["flagset_name"])
+                if enum_name not in known_enums:
+                    enum_name += "Flags"
+                enum_def = known_enums[enum_name]
+
+                if len(_enums_by_game[game_id][enum_def]) != 1:
+                    enum_prefix = "enums."
+                    need_enums = True
+                else:
+                    enum_prefix = ""
+                    local_enum = enum_def
+
+                prop_type = enum_prefix + enum_name
                 field_params["default"] = f"{prop_type}({default_value})"
                 parse_code = f"{prop_type}.from_stream(data)"
                 build_code.append("{obj}.to_stream(data)")
@@ -1366,7 +1492,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
-        elif raw_type in ["AnimationSet", "Spline", "PooledString"]:
+        elif raw_type == "AnimationSet" or raw_type == "Spline" or raw_type == "PooledString":
             if raw_type == "AnimationSet":
                 prop_type = "AnimationParameters"
                 dependency_code = "{obj}.dependencies_for(asset_manager)"
@@ -1424,7 +1550,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             from_json_code = "{obj}"
             to_json_code = "{obj}"
 
-        elif raw_type in ["Color", "Vector"]:
+        elif raw_type == "Color" or raw_type == "Vector":
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data)"
@@ -1450,7 +1576,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             else:
                 field_params["default_factory"] = prop_type
 
-        elif raw_type in _literal_prop_types:
+        else:
+            assert raw_type in _literal_prop_types
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
             struct_format = endianness + literal_prop.struct_format
@@ -1476,6 +1603,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         if prop_type is None:
             print("what?")
             print(prop)
+            prop_type = ""
 
         if json_type is None:
             json_type = prop_type
@@ -1488,6 +1616,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type,
             json_type,
             need_enums,
+            local_enum,
             comment,
             parse_code,
             build_code,
@@ -1502,11 +1631,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             dependency_code=dependency_code,
         )
 
-    def parse_struct(name: str, this, output_path: Path, struct_fourcc: str | None = None):
+    def parse_struct(name: str, this: dict, output_path: Path, struct_fourcc: str | None = None) -> bool:
         is_struct = struct_fourcc is not None and game_id != "PrimeRemastered"
         if this["type"] != "Struct":
             print("Ignoring {}. Is a {}".format(name, this["type"]))
-            return
+            return False
 
         all_names = [
             _filter_property_name(prop["name"] or property_names.get(prop["id"]) or "unnamed")
@@ -1534,7 +1663,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             if all_names.count(prop_name) > 1:
                 final_prop_name += "_0x{:08x}".format(prop["id"])
 
-            cls.add_prop(get_prop_details(prop), final_prop_name, prop["name"] or property_names.get(prop["id"]))
+            cls.add_prop(
+                get_prop_details(prop), final_prop_name, prop["name"] or property_names.get(prop["id"], str(prop["id"]))
+            )
         cls.finalize_props()
 
         cls.class_code += "\n    @classmethod\n"
@@ -1571,7 +1702,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         if cls.modules:
             cls.class_code += "\n    @classmethod\n"
-            cls.class_code += "    def modules(cls) -> typing.List[str]:\n"
+            cls.class_code += "    def modules(cls) -> list[str]:\n"
             cls.class_code += f"        return {repr(cls.modules)}\n"
 
         # from stream
@@ -1588,7 +1719,10 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         code_code = "# Generated File\n"
         code_code += "from __future__ import annotations\n\n"
-        code_code += "import dataclasses\nimport struct\nimport typing\nimport typing_extensions\n"
+        code_code += "import dataclasses\n"
+        if cls.local_enums:
+            code_code += "import enum\n"
+        code_code += "import struct\nimport typing\nimport typing_extensions\n"
 
         code_code += "\nfrom retro_data_structures import json_util\n"
         code_code += "from retro_data_structures.game_check import Game\n"
@@ -1618,6 +1752,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
             code_code += "\n".join(f"    {line}" for line in cls.type_checking_code)
 
+        for e in cls.local_enums:
+            code_code += e.get_code(game_id)
+
         if cls.before_class_code:
             code_code += "\n\n"
             code_code += cls.before_class_code
@@ -1642,20 +1779,28 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     if game_id in ["Prime", "PrimeRemastered"]:
 
-        def four_cc_wrap(it):
+        def four_cc_wrap(it: str) -> str:
             return it
 
         four_cc_type = "int"
     else:
-        four_cc_wrap = repr
+
+        def four_cc_wrap(it: str) -> str:
+            return repr(it)
+
         four_cc_type = "str"
+
+    if game_id == "PrimeRemastered":
+        object_type = "BaseProperty"
+    else:
+        object_type = "BaseObjectType"
 
     getter_func = "# Generated File\n"
     getter_func += "import functools\nimport typing\n\n"
-    getter_func += "from retro_data_structures.properties.base_property import BaseObjectType\n"
+    getter_func += f"from retro_data_structures.properties.base_property import {object_type}\n"
 
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
-    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[BaseObjectType]] = {{\n"
+    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[{object_type}]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
@@ -1667,7 +1812,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "}\n\n\n"
 
     getter_func += "@functools.lru_cache(maxsize=None)\n"
-    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[BaseObjectType]:\n"
+    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[{object_type}]:\n"
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
@@ -1696,12 +1841,16 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 def parse_game_list(templates_path: Path) -> dict:
     t = ElementTree.parse(templates_path / "GameList.xml")
     root = t.getroot()
-    return {game.attrib["ID"]: Path(game.find("GameTemplate").text) for game in root}
+    return {
+        game.attrib["ID"]: Path(template.text)
+        for game in root
+        if (template := find_assured(game, "GameTemplate")).text is not None
+    }
 
 
 def write_shared_type_with_common_import(
     output_file: Path, kind: str, import_path: str, all_objects: dict[str, list[str]]
-):
+) -> None:
     declarations = []
     base = f"import retro_data_structures.{import_path}."
 
@@ -1736,7 +1885,7 @@ def write_shared_type_with_common_import(
     )
 
 
-def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]):
+def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]) -> None:
     imports = []
     declarations = []
     base = "import retro_data_structures.properties."
@@ -1745,14 +1894,11 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
         if len(games) < 2:
             continue
 
-        import_name = object_name.replace("_", ".")
-        type_name = object_name.split("_")[-1]
-
         for game in games:
-            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{import_name} as _{object_name}_{game}")
+            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{object_name} as _{object_name}_{game}")
         declarations.append(
             "{} = typing.Union[\n{}\n]".format(
-                object_name, ",\n".join(f"    _{object_name}_{game}.{type_name}" for game in games)
+                object_name, ",\n".join(f"    _{object_name}_{game}.{object_name}" for game in games)
             )
         )
 
@@ -1764,10 +1910,10 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
     )
 
 
-def write_shared_types_helpers(all_games: dict):
-    all_archetypes = collections.defaultdict(list)
-    all_objects = collections.defaultdict(list)
-    all_enums = collections.defaultdict(list)
+def write_shared_types_helpers(all_games: dict) -> None:
+    all_archetypes: dict[str, list[str]] = collections.defaultdict(list)
+    all_objects: dict[str, list[str]] = collections.defaultdict(list)
+    all_enums: dict[str, list[str]] = collections.defaultdict(list)
 
     for game_id, game_data in all_games.items():
         for script_object in game_data["script_objects"].values():
@@ -1784,9 +1930,9 @@ def write_shared_types_helpers(all_games: dict):
                 continue
             all_archetypes[archetype["name"]].append(game_id)
 
-        for enum_def in game_data["enums"]:
+        for enum_def, enum_uses in game_data["enums"].items():
             assert isinstance(enum_def, EnumDefinition)
-            if "Unknown" not in enum_def.name:
+            if len(enum_uses) == 0 and "Unknown" not in enum_def.name:
                 all_enums[_scrub_enum(enum_def.name)].append(game_id)
 
     write_shared_type_with_common_import(
@@ -1811,7 +1957,7 @@ def write_shared_types_helpers(all_games: dict):
         path_to_props.joinpath("shared_core.py"),
         "core",
         {
-            name: ["Prime", "Echoes", "Corruption", "DKCReturns"]
+            name: ["Prime", "Echoes", "Corruption"]
             for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
         },
     )
@@ -1823,7 +1969,8 @@ def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
     read_property_names(templates_path / "PropertyMap.xml")
 
     game_list = parse_game_list(templates_path)
-    _parse_choice.unknowns = {game: 0 for game in game_list.keys()}
+    del game_list["DKCReturns"]
+    _parse_choice.unknowns = {game: 0 for game in game_list.keys()}  # type: ignore[attr-defined]
 
     all_games = {
         _id: parse_game(templates_path, game_path, _id)
@@ -1834,7 +1981,7 @@ def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
     return all_games
 
 
-def persist_data(parse_result):
+def persist_data(parse_result: dict[str, typing.Any]) -> None:
     logging.info("Persisting the parsed properties")
 
     # First write the enums

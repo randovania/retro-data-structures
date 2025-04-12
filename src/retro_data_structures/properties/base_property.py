@@ -51,15 +51,21 @@ class BaseProperty:
     def _dependencies_for_field(
         self, field: dataclasses.Field, asset_manager: AssetManager
     ) -> typing.Iterator[Dependency]:
-        if issubclass(field.type, BaseProperty):
+        field_type = field.type
+
+        if not isinstance(field_type, type):
+            # account for unions, string annotations, etc.
+            field_type = type(getattr(self, field.name))
+
+        if issubclass(field_type, BaseProperty):
             prop: BaseProperty = getattr(self, field.name)
             yield from prop.dependencies_for(asset_manager)
 
-        elif issubclass(field.type, int) and "sound" in field.metadata:
+        elif issubclass(field_type, int) and "sound" in field.metadata:
             sound_id: int = getattr(self, field.name)
             yield from asset_manager.get_audio_group_dependency(sound_id)
 
-        elif issubclass(field.type, int) and (field.default == 0xFFFFFFFF or "asset_types" in field.metadata):
+        elif issubclass(field_type, int) and (field.default == 0xFFFFFFFF or "asset_types" in field.metadata):
             if self._is_property_mrea_or_mlvl(field):
                 return
             asset_id: AssetId = getattr(self, field.name)
