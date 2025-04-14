@@ -23,8 +23,7 @@ class CreateTemplatesCommand(Command):
         pass
 
     def run(self):
-        if Path(__file__).parent.joinpath("retro-script-object-templates").is_dir():
-            generate_property_templates()
+        generate_property_templates()
 
 
 class CustomBuild(build):
