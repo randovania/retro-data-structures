@@ -5,27 +5,38 @@ import subprocess
 import sys
 from pathlib import Path
 
-from setuptools import setup
-from setuptools.command.egg_info import egg_info
+from setuptools import Command, setup
+from setuptools.command.build import build
 
 
 def generate_property_templates():
     subprocess.run([sys.executable, os.fspath(Path(__file__).parent.joinpath("parse_pwe_templates.py"))], check=True)
 
 
-class GenerateTemplateCommand(egg_info):
-    """
-    Generate script templates code before building the package.
-    """
+class CreateTemplatesCommand(Command):
+    """Custom build command."""
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
 
     def run(self):
         if Path(__file__).parent.joinpath("retro-script-object-templates").is_dir():
             generate_property_templates()
-        return egg_info.run(self)
+
+
+class CustomBuild(build):
+    sub_commands = [
+        ("create_templates", None),
+        *build.sub_commands,
+    ]
 
 
 setup(
     cmdclass={
-        "egg_info": GenerateTemplateCommand,
+        "create_templates": CreateTemplatesCommand,
+        "build": CustomBuild,
     },
 )
