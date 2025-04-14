@@ -1,5 +1,3 @@
-*.prop
-*.pname
 /shared_archetypes.py
 /shared_core.py
 /shared_objects.py
