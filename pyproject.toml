@@ -12,11 +12,12 @@ build-backend = "setuptools.build_meta"
 name = "retro-data-structures"
 description = "Construct file definitions for the Retro Studios game engine files"
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.10"
 dependencies = [
@@ -25,6 +26,7 @@ dependencies = [
     "pycryptodome",
     "typing-extensions>=4.0.0"
 ]
+license = "MIT"
 dynamic = ["version"]
 
 [project.readme]
@@ -48,6 +50,9 @@ typing = [
     "inflection>=0.5.1",
     "frozendict",
 ]
+
+[tool.setuptools.package-data]
+retro_data_structures = ["properties/*.prop", "properties/property_names.pname"]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
