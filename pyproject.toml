@@ -12,11 +12,12 @@ build-backend = "setuptools.build_meta"
 name = "retro-data-structures"
 description = "Construct file definitions for the Retro Studios game engine files"
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
 ]
 requires-python = ">=3.10"
 dependencies = [
@@ -26,6 +27,7 @@ dependencies = [
     "typing-extensions>=4.0.0"
 ]
 dynamic = ["version"]
+license = "MIT"
 
 [project.readme]
 file = "README.md"
