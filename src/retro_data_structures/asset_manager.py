@@ -64,7 +64,7 @@ class PathFileProvider(FileProvider):
         self.root = root
         self.file_root = root.joinpath("files")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<PathFileProvider {self.root}>"
 
     def is_file(self, name: str) -> bool:
@@ -90,7 +90,7 @@ class PathFileProvider(FileProvider):
 
 
 class IsoFileProvider(FileProvider):
-    game_disc: GameDisc | None
+    game_disc: GameDisc
 
     def __init__(self, iso_path: Path):
         self.iso_path = iso_path
@@ -98,7 +98,7 @@ class IsoFileProvider(FileProvider):
         self.game_disc = GameDisc.parse(iso_path)
         self.all_files = self.game_disc.files()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<IsoFileProvider {self.iso_path}>"
 
     def is_file(self, name: str) -> bool:
@@ -109,7 +109,7 @@ class IsoFileProvider(FileProvider):
             if fnmatch.fnmatch(it, pattern):
                 yield it
 
-    def open_binary(self, name: str):
+    def open_binary(self, name: str) -> typing.BinaryIO:
         return self.game_disc.open_binary(name)
 
     def read_binary(self, name: str) -> bytes:
@@ -120,6 +120,39 @@ class IsoFileProvider(FileProvider):
 
     def get_file_list(self) -> list[str]:
         return list(self.all_files)
+
+
+class FileWriter:
+    def open_text(self, name: str) -> typing.TextIO:
+        raise NotImplementedError
+
+    def open_binary(self, name: str) -> typing.BinaryIO:
+        raise NotImplementedError
+
+
+class PathFileWriter(FileWriter):
+    def __init__(self, root: Path):
+        if not root.is_dir():
+            raise FileNotFoundError(f"{root} is not a directory")
+        self.root = root
+        self.file_root = root.joinpath("files")
+
+    def _ensure_directories(self, name: str) -> None:
+        self.file_root.joinpath(name).parent.mkdir(parents=True, exist_ok=True)
+
+    def open_text(self, name: str) -> typing.TextIO:
+        self._ensure_directories(name)
+        return self.file_root.joinpath(name).open("w")
+
+    def open_binary(self, name: str) -> typing.BinaryIO:
+        self._ensure_directories(name)
+        return self.file_root.joinpath(name).open("w+b")
+
+
+def _get_name(asset_id: NameOrAssetId) -> str | None:
+    if isinstance(asset_id, str):
+        return asset_id
+    return None
 
 
 class AssetManager:
@@ -161,7 +194,7 @@ class AssetManager:
             return self._custom_asset_ids[str(value)]
         return resolve_asset_id(self.target_game, value)
 
-    def _update_headers(self):
+    def _update_headers(self) -> None:
         self._ensured_asset_ids = {}
         self._paks_for_asset_id = collections.defaultdict(set)
         self._types_for_asset_id = {}
@@ -190,7 +223,7 @@ class AssetManager:
         yield from self._paks_for_asset_id.keys()
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
-        original_name = asset_id
+        original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
         try:
             yield from self._paks_for_asset_id[asset_id]
@@ -214,7 +247,7 @@ class AssetManager:
         :param asset_id:
         :return:
         """
-        original_name = asset_id
+        original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
 
         if asset_id in self._modified_resources:
@@ -234,7 +267,7 @@ class AssetManager:
         Gets the bytes data for the given asset name/id, optionally restricting from which pak.
         :raises ValueError if the asset doesn't exist.
         """
-        original_name = asset_id
+        original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
 
         if asset_id in self._modified_resources:
@@ -250,6 +283,7 @@ class AssetManager:
                 result = pak.get_asset(asset_id)
                 if result is not None:
                     return result
+            raise UnknownAssetId(asset_id, original_name) from None
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
@@ -273,7 +307,7 @@ class AssetManager:
         """
         return self.get_parsed_asset(path, type_hint=type_hint)
 
-    def generate_asset_id(self):
+    def generate_asset_id(self) -> int:
         result = self._next_generated_id
         while self.does_asset_exists(result):
             result += 1
@@ -281,7 +315,7 @@ class AssetManager:
         self._next_generated_id = result + 1
         return result
 
-    def register_custom_asset_name(self, name: str, asset_id: AssetId):
+    def register_custom_asset_name(self, name: str, asset_id: AssetId) -> None:
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{asset_id} ({name}) already exists")
 
@@ -304,7 +338,7 @@ class AssetManager:
             raise ValueError(f"{name} already exists")
 
         in_paks = list(in_paks)
-        files_set = set()
+        files_set: set[str] = set()
 
         self._custom_asset_ids[str(name)] = asset_id
         self._paks_for_asset_id[asset_id] = files_set
@@ -321,7 +355,7 @@ class AssetManager:
         """
         return self.add_new_asset(new_name, self.get_parsed_asset(asset_id), ())
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource):
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource) -> AssetId:
         """
         Replaces an existing asset.
         See `add_new_asset` for new assets.
@@ -354,8 +388,8 @@ class AssetManager:
         else:
             return self.add_new_asset(name, new_data)
 
-    def delete_asset(self, asset_id: NameOrAssetId):
-        original_name = asset_id
+    def delete_asset(self, asset_id: NameOrAssetId) -> None:
+        original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
 
         # Test if the asset exists
@@ -369,14 +403,14 @@ class AssetManager:
             if asset_id in ensured_ids:
                 ensured_ids.remove(asset_id)
 
-    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId):
+    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
         if pak_name not in self._ensured_asset_ids:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 
-        original_name = asset_id
+        original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
 
         # Test if the asset exists
@@ -400,7 +434,7 @@ class AssetManager:
 
     def _get_dependencies_for_asset(
         self,
-        asset_id: NameOrAssetId,
+        asset_id: AssetId,
         must_exist: bool,
     ) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
@@ -437,7 +471,7 @@ class AssetManager:
         yield from deps
         yield Dependency(asset_type, asset_id, False)
 
-    def get_dependencies_for_asset(self, asset_id: NameOrAssetId, *, must_exist: bool = False) -> Iterator[Dependency]:
+    def get_dependencies_for_asset(self, asset_id: AssetId, *, must_exist: bool = False) -> Iterator[Dependency]:
         override = asset_id in self.target_game.mlvl_dependencies_to_ignore
         try:
             deps = self._get_dependencies_for_asset(asset_id, must_exist)
@@ -446,7 +480,7 @@ class AssetManager:
         for it in deps:
             yield Dependency(it.type, it.id, it.exclude_for_mlvl or override)
 
-    def get_dependencies_for_ancs(self, asset_id: NameOrAssetId, char_index: int | None = None):
+    def get_dependencies_for_ancs(self, asset_id: AssetId, char_index: int | None = None) -> Iterator[Dependency]:
         if not self.target_game.is_valid_asset_id(asset_id):
             return
 
@@ -461,16 +495,16 @@ class AssetManager:
             # logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
         else:
-            deps = list(self.target_game.special_ancs_dependencies(asset_id))
+            deps_list = list(self.target_game.special_ancs_dependencies(asset_id))
             ancs: Ancs = self.get_parsed_asset(asset_id)
-            deps.extend(ancs.ancs_dependencies_for(char_index=char_index))
-            deps = tuple(deps)
+            deps_list.extend(ancs.ancs_dependencies_for(char_index=char_index))
+            deps = tuple(deps_list)
             self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
 
         yield from deps
         yield Dependency("ANCS", asset_id)
 
-    def _build_audio_group_dependency_table(self):
+    def _build_audio_group_dependency_table(self) -> None:
         atbl: Atbl | None = None
         agsc_ids: list[AssetId] = []
 
@@ -483,7 +517,9 @@ class AssetManager:
             elif asset_type == "AGSC":
                 agsc_ids.append(asset_id)
 
-        define_id_to_agsc: dict[int, AssetId] = {0xFFFF: None, -1: None}
+        assert atbl is not None
+
+        define_id_to_agsc: dict[int, AssetId | None] = {0xFFFF: None, -1: None}
         for agsc_id in agsc_ids:
             try:
                 agsc = self.get_parsed_asset(agsc_id, type_hint=Agsc)
@@ -507,7 +543,7 @@ class AssetManager:
 
         if self._audio_group_dependency is None:
             self._audio_group_dependency = tuple(
-                self.get_file(asset, Dgrp) for asset in self.target_game.audio_group_dependencies()
+                self.get_file(asset_id, Dgrp) for asset_id in self.target_game.audio_group_dependencies()
             )
 
         dep = Dependency("AGSC", agsc, False)
@@ -516,16 +552,15 @@ class AssetManager:
         else:
             yield dep
 
-    def _write_custom_names(self, output_path: Path):
-        custom_names = output_path.joinpath("custom_names.json")
-        with custom_names.open("w") as f:
+    def _write_custom_names(self, output: FileWriter) -> None:
+        with output.open_text("custom_names.json") as f:
             json.dump(
                 dict(self._custom_asset_ids.items()),
                 f,
                 indent=4,
             )
 
-    def save_modifications(self, output_path: Path):
+    def save_modifications(self, output: FileWriter) -> None:
         modified_paks = set()
         asset_ids_to_copy = {}
 
@@ -559,12 +594,10 @@ class AssetManager:
                 pak.add_asset(asset_id, asset_ids_to_copy[asset_id])
 
             # Write the data
-            out_pak_path = output_path.joinpath(pak_name)
-            logger.info("Writing %s", out_pak_path)
-            out_pak_path.parent.mkdir(parents=True, exist_ok=True)
-            with out_pak_path.open("w+b") as f:
+            logger.info("Writing %s", pak_name)
+            with output.open_binary(pak_name) as f:
                 pak.build_stream(f)
 
-        self._write_custom_names(output_path)
+        self._write_custom_names(output)
         self._modified_resources = {}
         self._update_headers()
