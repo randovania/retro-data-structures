@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import collections
 import fnmatch
+import io
 import json
 import logging
 import typing
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+
+import ppc_asm.dol_file
 
 from retro_data_structures import formats
 from retro_data_structures.base_resource import (
@@ -22,7 +26,9 @@ from retro_data_structures.disc.game_disc import GameDisc
 from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
 from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
+from retro_data_structures.formats.ntwk import Ntwk
 from retro_data_structures.formats.pak import Pak
+from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
@@ -31,10 +37,23 @@ if typing.TYPE_CHECKING:
     import construct
 
     from retro_data_structures.formats.ancs import Ancs
-    from retro_data_structures.game_check import Game
 
 T = typing.TypeVar("T", bound=BaseResource)
 logger = logging.getLogger(__name__)
+
+
+class MemoryDol(ppc_asm.dol_file.DolEditor):
+    def __init__(self, dol: bytes):
+        super().__init__(ppc_asm.dol_file.DolHeader.from_bytes(dol))
+        self.dol_file = io.BytesIO(dol)
+
+    def _seek_and_read(self, seek: int, size: int):
+        self.dol_file.seek(seek)
+        return self.dol_file.read(size)
+
+    def _seek_and_write(self, seek: int, data: bytes):
+        self.dol_file.seek(seek)
+        self.dol_file.write(data)
 
 
 class FileProvider:
@@ -129,6 +148,9 @@ class FileWriter:
     def open_binary(self, name: str) -> typing.BinaryIO:
         raise NotImplementedError
 
+    def write_dol(self, data: bytes) -> None:
+        raise NotImplementedError
+
 
 class PathFileWriter(FileWriter):
     def __init__(self, root: Path):
@@ -147,6 +169,11 @@ class PathFileWriter(FileWriter):
     def open_binary(self, name: str) -> typing.BinaryIO:
         self._ensure_directories(name)
         return self.file_root.joinpath(name).open("w+b")
+
+    def write_dol(self, data: bytes) -> None:
+        target_dol = self.root.joinpath("sys/main.dol")
+        target_dol.parent.mkdir(exist_ok=True, parents=True)
+        target_dol.write_bytes(data)
 
 
 def _get_name(asset_id: NameOrAssetId) -> str | None:
@@ -169,6 +196,10 @@ class AssetManager:
     _types_for_asset_id: dict[AssetId, AssetType]
     _ensured_asset_ids: dict[str, set[AssetId]]
     _modified_resources: dict[AssetId, RawResource | None]
+    _memory_files: dict[NameOrAssetId, BaseResource]
+    _dol: MemoryDol | None = None
+    _tweaks: Ntwk | None = None
+
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
     _audio_group_dependency: tuple[Dgrp, ...] | None = None
@@ -181,17 +212,24 @@ class AssetManager:
         self.provider = provider
         self.target_game = target_game
         self._modified_resources = {}
+        self._memory_files = {}
         self._in_memory_paks = {}
         self._next_generated_id = 0xFFFF0000
 
         self._update_headers()
 
+        if target_game in [Game.PRIME, Game.ECHOES]:
+            self.dol = MemoryDol(provider.get_dol())
+        if target_game == Game.ECHOES:
+            with provider.open_binary("Standard.ntwk") as f:
+                self.tweaks = Ntwk.parse(f.read(), target_game)
+
         self._cached_dependencies = {}
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
 
     def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
-        if str(value) in self._custom_asset_ids:
-            return self._custom_asset_ids[str(value)]
+        if value in self._custom_asset_ids:
+            return self._custom_asset_ids[value]
         return resolve_asset_id(self.target_game, value)
 
     def _update_headers(self) -> None:
@@ -262,9 +300,13 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
+    def get_asset_format(self, asset_id: NameOrAssetId) -> type[BaseResource]:
+        asset_type = self.get_asset_type(asset_id)
+        return formats.resource_type_for(asset_type)
+
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
         """
-        Gets the bytes data for the given asset name/id, optionally restricting from which pak.
+        Gets the bytes data for the given asset name/id.
         :raises ValueError if the asset doesn't exist.
         """
         original_name = _get_name(asset_id)
@@ -287,10 +329,6 @@ class AssetManager:
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
 
-    def get_asset_format(self, asset_id: NameOrAssetId) -> type[BaseResource]:
-        asset_type = self.get_asset_type(asset_id)
-        return formats.resource_type_for(asset_type)
-
     def get_parsed_asset(self, asset_id: NameOrAssetId, *, type_hint: type[T] = BaseResource) -> T:
         """
         Gets the resource with the given name and decodes it based on the extension.
@@ -301,11 +339,14 @@ class AssetManager:
 
         return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game, asset_manager=self)
 
-    def get_file(self, path: NameOrAssetId, type_hint: type[T] = BaseResource) -> T:
+    def get_file(self, asset_id: NameOrAssetId, type_hint: type[T] = BaseResource) -> T:
         """
-        Wrapper for get_parsed_asset. Override in subclasses for additional behavior such as automatic saving.
+        Gets a file as from `get_parsed_asset` and keep it in memory.
+        Modifications made to it are applied by `build_modified_files`.
         """
-        return self.get_parsed_asset(path, type_hint=type_hint)
+        if asset_id not in self._memory_files:
+            self._memory_files[asset_id] = self.get_parsed_asset(asset_id, type_hint=type_hint)
+        return self._memory_files[asset_id]
 
     def generate_asset_id(self) -> int:
         result = self._next_generated_id
@@ -353,7 +394,7 @@ class AssetManager:
         Creates a new asset named `new_name` with the contents of `asset_id`
         :return: Asset id of the new asset.
         """
-        return self.add_new_asset(new_name, self.get_parsed_asset(asset_id), ())
+        return self.add_new_asset(new_name, self.get_raw_asset(asset_id), ())
 
     def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource) -> AssetId:
         """
@@ -381,13 +422,6 @@ class AssetManager:
 
         return asset_id
 
-    def add_or_replace_custom_asset(self, name: str, new_data: Resource) -> AssetId:
-        """Adds a new asset named `name`, or replaces an existing one if it already exists."""
-        if self.does_asset_exists(name):
-            return self.replace_asset(name, new_data)
-        else:
-            return self.add_new_asset(name, new_data)
-
     def delete_asset(self, asset_id: NameOrAssetId) -> None:
         original_name = _get_name(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
@@ -402,6 +436,26 @@ class AssetManager:
         for ensured_ids in self._ensured_asset_ids.values():
             if asset_id in ensured_ids:
                 ensured_ids.remove(asset_id)
+
+    def add_or_replace_custom_asset(self, name: str, new_data: Resource) -> AssetId:
+        """Adds a new asset named `name`, or replaces an existing one if it already exists."""
+        if self.does_asset_exists(name):
+            return self.replace_asset(name, new_data)
+        else:
+            return self.add_new_asset(name, new_data)
+
+    def add_file(
+        self,
+        name: str,
+        asset: Resource,
+    ) -> AssetId:
+        asset_id = self.target_game.hash_asset_id(name)
+        self.register_custom_asset_name(name, asset_id)
+        self.add_new_asset(name, asset, ())
+        return asset_id
+
+    def duplicate_file(self, name: str, asset: AssetId) -> AssetId:
+        return self.add_file(name, self.get_raw_asset(asset))
 
     def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
         """
@@ -560,7 +614,14 @@ class AssetManager:
                 indent=4,
             )
 
-    def save_modifications(self, output: FileWriter) -> None:
+    def build_modified_files(self):
+        """"""
+        with ThreadPoolExecutor() as executor:
+            for name, resource in self._memory_files.items():
+                executor.submit(self.replace_asset, name, resource)
+        self._memory_files.clear()
+
+    def _save_modified_paks(self, output: FileWriter) -> None:
         modified_paks = set()
         asset_ids_to_copy = {}
 
@@ -598,6 +659,20 @@ class AssetManager:
             with output.open_binary(pak_name) as f:
                 pak.build_stream(f)
 
+    def _save_dol(self, output: FileWriter) -> None:
+        if self.dol is not None:
+            output.write_dol(self.dol.dol_file.getvalue())
+
+    def _save_tweaks(self, output: FileWriter) -> None:
+        if self.tweaks is not None:
+            tweaks_bytes = self.tweaks.build()
+            with output.open_binary("Standard.ntwk") as std_tweak:
+                std_tweak.write(tweaks_bytes)
+
+    def save_modifications(self, output: FileWriter) -> None:
+        self._save_modified_paks(output)
+        self._save_dol(output)
+        self._save_tweaks(output)
         self._write_custom_names(output)
         self._modified_resources = {}
         self._update_headers()
