@@ -544,6 +544,13 @@ class Mrea(BaseResource):
                 self._raw.sections.script_layers_section[i] = section._raw
         return super().build()
 
+    def _create_script_layer(self, index: int, raw: Container) -> ScriptLayer:
+        """Internal method. See Area.add_layer instead."""
+        result = ScriptLayer(raw, index, self.asset_manager.target_game)
+        self.get_section("script_layers_section").append(raw)
+        self._script_layer_helpers[index] = result
+        return result
+
     @property
     def script_layers(self) -> Iterator[ScriptLayer]:
         self._ensure_decoded_section("script_layers_section", lazy_load=self.target_game != Game.PRIME)
@@ -681,13 +688,10 @@ class Area:
         return next(layer for layer in self.layers if layer.name == name)
 
     def add_layer(self, name: str, active: bool = True) -> ScriptLayer:
-        # FIXME
         index = len(self._layer_names)
         self._layer_names.append(name)
         self._flags.append(active)
-        raw = new_layer(index, self.asset_manager.target_game)
-        self.mrea.get_section("script_layer_section").append(raw)
-        return self.get_layer(name)
+        return self.mrea._create_script_layer(index, new_layer(index, self.asset_manager.target_game)).with_parent(self)
 
     @property
     def next_instance_id(self) -> int:
