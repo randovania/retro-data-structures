@@ -1,196 +1,143 @@
-"""
-https://wiki.axiodl.com/w/STRG_(File_Format)
-"""
-
 from __future__ import annotations
 
+import io
 import re
-import typing
+from typing import TYPE_CHECKING, Self
 
 import construct
-from construct import (
-    Array,
-    Byte,
-    Computed,
-    Const,
-    CString,
-    Enum,
-    GreedyRange,
-    If,
-    Int32ub,
-    Pointer,
-    Rebuild,
-    Seek,
-    Struct,
-    Tell,
-    len_,
-    this,
-)
+from construct import Array, Const, Container, CString, If, Int32ub, Prefixed, Rebuild, Struct, len_, this
 
-from retro_data_structures.adapters.offset import OffsetAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
-from retro_data_structures.common_types import FourCC, String
+from retro_data_structures.common_types import FourCC
+from retro_data_structures.construct_extensions.alignment import AlignTo
+from retro_data_structures.formats.room import GreedyBytes
+from retro_data_structures.game_check import Game
 
-if typing.TYPE_CHECKING:
-    from retro_data_structures.game_check import Game
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
-
-class CorruptionLanguageOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.string_table
-
-    def _get_table_length(self, context):
-        return context._.string_table_length
-
-    def _get_item_size(self, item):
-        return super()._get_item_size(item) + Int32ub.sizeof()
+    from retro_data_structures.asset_manager import AssetManager
 
 
-class LanguageOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.string_tables
+class NameTableConstruct(construct.Adapter):
+    def __init__(self):
+        super().__init__(
+            Struct(
+                "name_count" / Rebuild(Int32ub, len_(this.data.entries)),
+                "data"
+                / Prefixed(
+                    Int32ub,
+                    construct.Struct(
+                        "data_start" / construct.Tell,
+                        "entries"
+                        / Array(
+                            this._.name_count,
+                            Struct(
+                                "name_offset" / Int32ub,
+                                "string_index" / Int32ub,
+                            ),
+                        ),
+                        "strings_start" / construct.Tell,
+                        "raw_strings" / construct.GreedyBytes,
+                    ),
+                ),
+            )
+        )
 
-    def _get_table_length(self, context):
-        return context._.language_count
+    def _decode(self, obj: Container, context: Container, path: str) -> dict[str, int]:
+        c = CString("utf-8")
+        raw_strings = io.BytesIO(obj.data.raw_strings)
 
-    def _get_item_size(self, item):
-        return item._size_end - item._size_start
+        def stream_at(offset: int):
+            raw_strings.seek(offset - (obj.data.strings_start - obj.data.data_start))
+            return raw_strings
+
+        return {c.parse_stream(stream_at(entry.name_offset)): entry.string_index for entry in obj.data.entries}
+
+    def _encode(self, obj: dict[str, int], context: Container, path: str) -> Container:
+        raw_strings = []
+        entries = []
+
+        name_offset = Int32ub.sizeof() * 2 * len(obj)
+        for name, index in obj.items():
+            raw_strings.append(name.encode("ascii") + b"\x00")
+            entries.append(
+                Container(
+                    name_offset=name_offset,
+                    string_index=index,
+                )
+            )
+            name_offset += len(raw_strings[-1])
+
+        return Container(
+            data=Container(
+                entries=entries,
+                raw_strings=b"".join(raw_strings),
+            )
+        )
 
 
-class NameTableOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context._.name_array
+NameTable = NameTableConstruct()
 
-    def _get_table_length(self, context):
-        return context._.name_count
-
-    def _get_base_offset(self, context):
-        return context._._name_size_end - context._._size_start
-
-
-class StringTableOffsetAdapter(OffsetAdapter):
-    def _get_table(self, context):
-        return context.strings
-
-    def _get_table_length(self, context):
-        return context._.string_count
-
-    def _get_base_offset(self, context):
-        return Int32ub.sizeof() * context._.string_count
-
-
-def _compute_corruption_strings_size(ctx):
-    string_table = ctx._.string_table
-    offset_table = ctx.offsets
-    size = 0
-
-    for i in range(ctx._.string_count):
-        index = offset_table[i]
-        string = string_table[index]
-        size += string.size
-
-    return size
-
+STRGHeader = Struct(
+    "magic" / Const(0x87654321, Int32ub),
+    "version" / construct.Enum(Int32ub, prime1=0, prime2=1, prime3=3),
+    "language_count" / Int32ub,
+    "string_count" / Int32ub,
+)
 
 Language = Struct(
     "lang" / FourCC,
-    "offset" / LanguageOffsetAdapter(Int32ub),
-    "size" / If(this._.prime2, Rebuild(Int32ub, lambda this: this._.string_tables[this.offset]._size)),
+    "offset" / Int32ub,
+    "size" / If(this._.header.version == "prime2", Int32ub),
 )
 
-CorruptionLanguage = Struct(
-    "strings_size" / Rebuild(Int32ub, _compute_corruption_strings_size),
-    "offsets" / CorruptionLanguageOffsetAdapter(Int32ub)[this._.string_count],
-)
-
-NameTable = Struct(
-    "name_count" / Rebuild(Int32ub, len_(this.name_entries)),
-    "_start" / Tell,
-    Seek(Int32ub.sizeof(), 1),
-    "_size_start" / Tell,
-    "_entries_start" / Tell,
-    Seek(Int32ub.sizeof() * this.name_count * 2, 1),
-    "_name_size_end" / Tell,
-    "name_array"
+STRG_V1 = Struct(
+    "header" / STRGHeader,
+    "language_table" / Array(this.header.language_count, Language),
+    "name_table" / If(this.header.version == "prime2", NameTable),
+    "string_tables"
     / Array(
-        this.name_count,
+        this.header.language_count,
         Struct(
-            "_size_start" / Tell,
-            "string" / String,
-            "_size_end" / Tell,
-            "size" / Computed(this._size_end - this._size_start),
+            "size" / If(this._.header.version == "prime1", Int32ub),
+            "offsets" / Array(this._.header.string_count, Int32ub),
+            "raw_strings" / Array(this._.header.string_count, GreedyBytes),
         ),
     ),
-    "name_entries"
-    / Pointer(
-        this._entries_start,
-        Array(
-            this.name_count,
-            Struct(
-                "offset" / NameTableOffsetAdapter(Int32ub),
-                "index" / Int32ub,
-            ),
-        ),
-    ),
-    "_size_end" / Tell,
-    "size" / Pointer(this._start, Rebuild(Int32ub, this._size_end - this._size_start)),
+    AlignTo(32),
+    construct.Terminated,
 )
 
-StringTable = Struct(
-    "_start" / Tell,
-    If(this._.prime1, Seek(Int32ub.sizeof(), 1)),
-    "_size_start" / Tell,
-    "_offset_start" / Tell,
-    Seek(Int32ub.sizeof() * this._.string_count, 1),
-    "strings"
+STRG_V3 = Struct(
+    "header" / STRGHeader,
+    "name_table" / NameTable,
+    "language_ids" / Array(this.header.language_count, FourCC),
+    "language_table"
     / Array(
-        this._.string_count,
+        this.header.language_count,
         Struct(
-            "_size_start" / Tell,
-            "string" / CString("utf-16-be"),
-            "_size_end" / Tell,
-            "size" / Computed(this._size_end - this._size_start),
+            "strings_size" / Int32ub,
+            "string_offsets" / Array(this._.header.string_count, Int32ub),
         ),
     ),
-    "_size_end" / Tell,
-    "offsets" / Pointer(this._offset_start, StringTableOffsetAdapter(Int32ub)[this._.string_count]),
-    "_size" / Computed(this._size_end - this._size_start),
-    "size" / If(this._.prime1, Pointer(this._start, Rebuild(Int32ub, this._size))),
+    "strings" / construct.GreedyRange(Prefixed(Int32ub, CString("utf-8"))),
+    AlignTo(32),
+    construct.Terminated,
 )
 
-CorruptionString = Struct(
-    "_start" / Tell,
-    Seek(Int32ub.sizeof(), 1),
-    "_size_start" / Tell,
-    "string" / String,
-    "_size_end" / Tell,
-    "size" / Pointer(this._start, Rebuild(Int32ub, this._size_end - this._size_start)),
-)
-
-STRG = Struct(
-    "magic" / Const(0x87654321, Int32ub),
-    "version" / Enum(Int32ub, prime1=0, prime2=1, prime3=3),
-    "language_count" / Int32ub,
-    "string_count" / Int32ub,
-    "prime1" / Computed(this.version == "prime1"),
-    "prime2" / Computed(this.version == "prime2"),
-    "prime3" / Computed(this.version == "prime3"),
-    "lang_table_start" / Tell,
-    If(this.prime1 | this.prime2, Seek((FourCC.sizeof() + Int32ub.sizeof()) * this.language_count, 1)),
-    If(this.prime2, Seek(Int32ub.sizeof() * this.language_count, 1)),
-    "name_table" / If(this.prime2 | this.prime3, NameTable),
-    "corr_lang_ids_start" / Tell,
-    If(this.prime3, Seek(FourCC.sizeof() * this.language_count, 1)),
-    "corr_lang_table_start" / Tell,
-    If(this.prime3, Seek(Int32ub.sizeof() * (this.string_count + 1) * this.language_count, 1)),
-    "string_tables" / If(this.prime1 | this.prime2, StringTable[this.language_count]),
-    "string_table" / If(this.prime3, GreedyRange(CorruptionString)),
-    "string_table_length" / If(this.prime3, Computed(len_(this.string_table))),
-    "language_table" / If(this.prime1 | this.prime2, Pointer(this.lang_table_start, Language[this.language_count])),
-    "language_ids" / If(this.prime3, Pointer(this.corr_lang_ids_start, FourCC[this.language_count])),
-    "corruption_language_table"
-    / If(this.prime3, Pointer(this.corr_lang_table_start, CorruptionLanguage[this.language_count])),
-    "junk" / GreedyRange(Byte),
+STRG = construct.FocusedSeq(
+    "strg",
+    header=construct.Peek(STRGHeader),
+    strg=construct.Switch(
+        lambda this: this.header.version if this._parsing else this.strg.header.version,
+        {
+            "prime1": STRG_V1,
+            "prime2": STRG_V1,
+            "prime3": STRG_V3,
+        },
+        construct.Error,
+    ),
 )
 
 image_regex = re.compile(r"&image=(?:.+?,)*?((?:[a-fA-F0-9]+,?)+);")
@@ -202,16 +149,191 @@ class Strg(BaseResource):
     def resource_type(cls) -> AssetType:
         return "STRG"
 
-    @classmethod
-    def construct_class(cls, target_game: Game) -> construct.Construct:
-        return STRG
+    # Parsing
 
-    def dependencies_for(self) -> typing.Iterator[Dependency]:
+    @classmethod
+    def _parse_v1(cls, stream: io.BytesIO, header: Container, target_game: Game) -> Container:
+        languages = Language[header.language_count].parse_stream(stream, header=header)
+        name_table = None
+        if target_game >= Game.ECHOES:
+            name_table = NameTable.parse_stream(stream)
+
+        result = {}
+
+        for language in languages:
+            if target_game == Game.PRIME:
+                # table_size
+                Int32ub.parse_stream(stream)
+
+            Int32ub[header.string_count].parse_stream(stream)  # offsets
+            result[language.lang] = CString("utf-16-be")[header.string_count].parse_stream(stream)
+
+        return Container(
+            languages=result,
+            name_table=name_table,
+        )
+
+    @classmethod
+    def _parse_v3(cls, stream: io.BytesIO, header: Container, target_game: Game) -> Container:
+        name_table = NameTable.parse_stream(stream)
+        language_ids = FourCC[header.language_count].parse_stream(stream)
+
+        language_sizes = {}
+        language_offsets = {}
+
+        for language_id in language_ids:
+            # strings_size
+            language_sizes[language_id] = Int32ub.parse_stream(stream)
+            language_offsets[language_id] = Int32ub[header.string_count].parse_stream(stream)
+
+        raw_data = stream.read()
+        raw_strings = io.BytesIO(raw_data)
+
+        def stream_at(offset: int):
+            raw_strings.seek(offset)
+            return raw_strings
+
+        languages = {
+            language_id: [Prefixed(Int32ub, CString("utf-8")).parse_stream(stream_at(offset)) for offset in offsets]
+            for language_id, offsets in language_offsets.items()
+        }
+
+        return Container(
+            languages=languages,
+            name_table=name_table,
+        )
+
+    @classmethod
+    def parse(cls, data: bytes, target_game: Game, asset_manager: AssetManager | None = None) -> Self:
+        stream = io.BytesIO(data)
+
+        header = STRGHeader.parse_stream(stream)
+        if header.version in {"prime1", "prime2"}:
+            raw = cls._parse_v1(stream, header, target_game)
+        else:
+            raw = cls._parse_v3(stream, header, target_game)
+
+        return Strg(raw, target_game, asset_manager)
+
+    # Building
+
+    def _build_v1(self, header: Container) -> bytes:
+        languages = []
+        string_tables = []
+
+        current_lang_offset = 0
+        for language_id, language_strings in self._raw.languages.items():
+            offsets = []
+            raw_strings = []
+
+            current_strings_offset = 0
+            for string in language_strings:
+                offsets.append(current_strings_offset)
+                raw_strings.append(CString("utf-16-be").build(string))
+                current_strings_offset += len(raw_strings[-1])
+
+            languages.append(
+                Container(
+                    lang=language_id,
+                    offset=current_lang_offset,
+                    size=current_strings_offset,
+                )
+            )
+            current_lang_offset += current_strings_offset
+            string_tables.append(
+                Container(
+                    size=current_strings_offset,
+                    offsets=offsets,
+                    raw_strings=raw_strings,
+                )
+            )
+
+        return STRG_V1.build(
+            Container(
+                header=header,
+                language_table=languages,
+                name_table=self._raw.name_table,
+                string_tables=string_tables,
+            )
+        )
+
+    def _build_v3(self, header: Container) -> bytes:
+        languages = []
+
+        known_strings = {}
+        raw_strings = []
+        current_strings_offset = 0
+
+        for language_id, language_strings in self._raw.languages.items():
+            offsets = []
+
+            language_size = 0
+            for string in language_strings:
+                encoded_str = CString("utf-8").build(string)
+                language_size += len(encoded_str)
+
+                if string not in known_strings:
+                    raw_strings.append(string)
+                    known_strings[string] = current_strings_offset
+                    current_strings_offset += 4 + len(encoded_str)
+
+                offsets.append(known_strings[string])
+
+            languages.append(
+                Container(
+                    strings_size=language_size,
+                    string_offsets=offsets,
+                )
+            )
+
+        return STRG_V3.build(
+            Container(
+                header=header,
+                name_table=self._raw.name_table,
+                language_ids=list(self._raw.languages.keys()),
+                language_table=languages,
+                strings=raw_strings,
+            )
+        )
+
+    def build(self) -> bytes:
+        string_count = None
+        for language_id, language_strings in self._raw.languages.items():
+            if string_count is None:
+                string_count = len(language_strings)
+            else:
+                assert string_count == len(language_strings)
+
+        game_to_version = {
+            Game.PRIME: "prime1",
+            Game.ECHOES: "prime2",
+            Game.CORRUPTION: "prime3",
+        }
+        header = Container(
+            version=game_to_version[self.target_game],
+            language_count=len(self._raw.languages),
+            string_count=string_count,
+        )
+
+        # FIXME: ensure name table is sorted
+
+        if self.target_game <= Game.ECHOES:
+            return self._build_v1(header)
+        else:
+            return self._build_v3(header)
+
+    # Methods
+
+    @property
+    def _raw_languages(self) -> dict[str, list[str]]:
+        return self._raw.languages
+
+    def dependencies_for(self) -> Iterator[Dependency]:
         def _str_to_deps(id_str: str):
             yield from self.asset_manager.get_dependencies_for_asset(int(id_str, 16))
 
-        for lang in self.languages:
-            for string in self.get_strings(lang):
+        for string_list in self._raw_languages.values():
+            for string in string_list:
                 for match in image_regex.finditer(string):
                     ids = match.group(1).split(",")
                     for asset_id in ids:
@@ -219,71 +341,35 @@ class Strg(BaseResource):
                 for match in font_regex.finditer(string):
                     yield from _str_to_deps(match.group(1))
 
-    @property
-    def languages(self) -> typing.Iterator[str]:
-        if self._raw.prime3:
-            yield from self._raw.languageids
-        else:
-            for lang in self._raw.language_table:
-                yield lang.lang
+    def get_language_list(self) -> tuple[str, ...]:
+        return tuple(self._raw_languages.keys())
 
-    def get_strings(self, language: str) -> typing.Iterator[str]:
-        found = False
+    def get_strings(self, language: str = "ENGL") -> tuple[str, ...]:
+        return tuple(self._raw_languages[language])
 
-        if self._raw.prime3:
-            for i, lang in enumerate(self._raw.language_ids):
-                if lang != language:
-                    continue
-                for offset in self._raw.corruption_language_table[i].offsets:
-                    yield self._raw.string_table[offset].string
-                found = True
-                break
+    def set_single_string(self, index: int, string: str, language: str | None = None) -> None:
+        """
+        Changes the string at the given index.
+        :param index:
+        :param string: The string to add.
+        :param language: The language to change, or all languages if None.
+        :return:
+        """
+        for lang, string_list in self._raw_languages.items():
+            if language is None or lang == language:
+                string_list[index] = string
 
-        else:
-            for i, lang in enumerate(self._raw.language_table):
-                if lang.lang != language:
-                    continue
-                for string in self._raw.string_tables[i].strings:
-                    yield string.string
-                found = True
-                break
-
-        if not found:
-            raise ValueError(f"No language {language} found in STRG")
-
-    def set_strings(self, language: str, strings: list[str]):
-        found = False
-
-        if self._raw.prime3:
-            for i, lang in enumerate(self._raw.language_ids):
-                if lang != language:
-                    continue
-                for j, offset in enumerate(self._raw.corruption_language_table[i].offsets):
-                    self._raw.string_table[offset].string = strings[j]
-                found = True
-                break
-
-        else:
-            for i, lang in enumerate(self._raw.language_table):
-                if lang.lang != language:
-                    continue
-                for j, string in enumerate(self._raw.string_tables[i].strings):
-                    string.string = strings[j]
-                found = True
-                break
-
-        if not found:
-            raise ValueError(f"No language {language} found in STRG")
+    def set_string_list(self, string_list: list[str], language: str | None = None) -> None:
+        """
+        When changing the list length, make sure all languages have the same length.
+        :param string_list:
+        :param language: The language to change, or all languages if None.
+        :return:
+        """
+        for lang in self._raw_languages.keys():
+            if language is None or lang == language:
+                self._raw_languages[lang] = list(string_list)
 
     @property
-    def strings(self) -> list[str]:
-        return list(self.get_strings("ENGL"))
-
-    @strings.setter
-    def strings(self, value: list[str]):
-        self.set_strings("ENGL", value)
-
-    def set_string(self, index: int, value: str, *, language: str = "ENGL"):
-        strings = list(self.get_strings(language))
-        strings[index] = value
-        self.set_strings(language, strings)
+    def strings(self) -> tuple[str, ...]:
+        return self.get_strings("ENGL")
