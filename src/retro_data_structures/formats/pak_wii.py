@@ -106,8 +106,6 @@ class ConstructPakWii(construct.Construct):
     def _parse(self, stream, context, path) -> PakBody:
         header = PAKNoData._parsereport(stream, context, f"{path} -> header")
 
-        AlignTo(64)._parse(stream, context, path)
-
         files = []
         # Resource offsets are relative to the start of the DATA section
         data_start = construct.stream_tell(stream, path)
