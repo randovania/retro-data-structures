@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
 from tests import test_lib
 
 from retro_data_structures.formats.strg import Strg
@@ -27,7 +26,6 @@ def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
     )
 
 
-@pytest.mark.xfail
 def test_compare_p3(prime3_asset_manager):
     # with name table
     # Resources/strings/metroid3/gui/fesliderpopup.STRG
