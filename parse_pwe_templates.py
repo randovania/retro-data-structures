@@ -65,6 +65,7 @@ RawPropType = typing.Literal[
     "Color",
     "Vector",
     "Int",
+    "UInt",
     "Float",
     "Bool",
     "Short",
@@ -1309,6 +1310,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
     _literal_prop_types: dict[RawPropType, LiteralPropType] = {
         "Int": LiteralPropType("int", "l", 0),
+        "UInt": LiteralPropType("int", "L", 0),
         "Float": LiteralPropType("float", "f", 0.0),
         "Bool": LiteralPropType("bool", "?", False),
         "Short": LiteralPropType("int", "h", 0),
@@ -1579,6 +1581,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 field_params["default_factory"] = prop_type
 
         else:
+            if prop["name"] == "Area ID" and raw_type == "Int":
+                raw_type = "UInt"
+
             assert raw_type in _literal_prop_types
             literal_prop = _literal_prop_types[raw_type]
             prop_type = literal_prop.python_type
