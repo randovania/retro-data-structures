@@ -1581,6 +1581,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 field_params["default_factory"] = prop_type
 
         else:
+            # FIXME: Hack for LayerSwitch
             if prop["name"] == "Area ID" and raw_type == "Int":
                 raw_type = "UInt"
 
