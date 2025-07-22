@@ -691,6 +691,7 @@ class Area:
         index = len(self._layer_names)
         self._layer_names.append(name)
         self._flags.append(active)
+        self.module_dependencies.append([])
         return self.mrea._create_script_layer(index, new_layer(index, self.asset_manager.target_game)).with_parent(self)
 
     @property

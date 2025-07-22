@@ -256,6 +256,8 @@ class ScriptLayer:
         yield from self._parent_area.dependencies.layers[self._index]
 
     def build_module_dependencies(self) -> typing.Iterator[str]:
+        # FIXME: this copies the original dependencies when calculating the new values,
+        #  meaning it will never remove an entry
         rels = list(self.module_dependencies)
         for instance in self.instances:
             rels.extend(instance.get_properties().modules())
