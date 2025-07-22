@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import re
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING
 
 import construct
 from construct import Array, Const, Container, CString, If, Int32ub, Prefixed, Rebuild, Struct, len_, this
@@ -15,6 +15,8 @@ from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from typing_extensions import Self
 
     from retro_data_structures.asset_manager import AssetManager
 
