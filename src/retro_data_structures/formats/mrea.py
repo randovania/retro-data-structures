@@ -215,37 +215,37 @@ MREAHeader = Aligned(
         "script_layer_count" / WithVersion(MREAVersion.Echoes, Int32ub),
         # Number of data sections in the file.
         "data_section_count" / Int32ub,
-
         # below is not present in corruption/dkcr
-        
-        "section_index" / BeforeVersion(MREAVersion.Corruption, Struct(
-            # Section index for world geometry data. Always 0; starts on materials.
-            "geometry_section" / Int32ub,
-            # Section index for script layer data.
-            "script_layers_section" / Int32ub,
-            # Section index for generated script object data.
-            "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-            # Section index for collision data.
-            "collision_section" / Int32ub,
-            # Section index for first unknown section.
-            "unknown_section_1" / Int32ub,
-            # Section index for light data.
-            "lights_section" / Int32ub,
-            # Section index for visibility tree data.
-            "visibility_tree_section" / Int32ub,
-            # Section index for path data.
-            "path_section" / Int32ub,
-            # Section index for area octree data.
-            "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
-            # Section index for second unknown section.
-            "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
-            # Section index for portal area data.
-            "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-            # Section index for static geometry map data.
-            "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-        )),
-
-
+        "section_index"
+        / BeforeVersion(
+            MREAVersion.Corruption,
+            Struct(
+                # Section index for world geometry data. Always 0; starts on materials.
+                "geometry_section" / Int32ub,
+                # Section index for script layer data.
+                "script_layers_section" / Int32ub,
+                # Section index for generated script object data.
+                "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for collision data.
+                "collision_section" / Int32ub,
+                # Section index for first unknown section.
+                "unknown_section_1" / Int32ub,
+                # Section index for light data.
+                "lights_section" / Int32ub,
+                # Section index for visibility tree data.
+                "visibility_tree_section" / Int32ub,
+                # Section index for path data.
+                "path_section" / Int32ub,
+                # Section index for area octree data.
+                "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
+                # Section index for second unknown section.
+                "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for portal area data.
+                "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for static geometry map data.
+                "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+            ),
+        ),
         # Number of compressed data blocks in the file.
         "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
         # Number of section numbers at the end of the header.
@@ -312,7 +312,9 @@ class MREAConstruct(construct.Construct):
     def _aligned_parse(self, conn: construct.Construct, stream, context, path):
         return Aligned(32, conn)._parsereport(stream, context, path)
 
-    def _decode_compressed_blocks(self, compressed_block_headers, data_section_sizes, stream, context, path) -> list[bytes]:
+    def _decode_compressed_blocks(
+        self, compressed_block_headers, data_section_sizes, stream, context, path
+    ) -> list[bytes]:
         # Read compressed blocks from stream
         compressed_blocks = construct.ListContainer(
             self._aligned_parse(
@@ -360,16 +362,19 @@ class MREAConstruct(construct.Construct):
                 Array(mrea_header.section_number_count, Struct("label" / FourCC, "value" / Int32ub)),
                 stream,
                 context,
-                path
+                path,
             )
         else:
             categories = [
                 {"label": label, "value": mrea_header["section_index"][label]}
-                for label in _all_categories_echoes if mrea_header["section_index"][label] is not None
+                for label in _all_categories_echoes
+                if mrea_header["section_index"][label] is not None
             ]
-            
+
         if mrea_header.compressed_block_count is not None:
-            data_sections = self._decode_compressed_blocks(compressed_block_headers, data_section_sizes, stream, context, path)
+            data_sections = self._decode_compressed_blocks(
+                compressed_block_headers, data_section_sizes, stream, context, path
+            )
         else:
             data_sections = Array(
                 mrea_header.data_section_count,
@@ -501,8 +506,6 @@ class MREAConstruct(construct.Construct):
             else:
                 cats.append({"label": category, "value": None})
 
-        
-
         # Compress the data sections
         if version >= MREAVersion.Echoes.value:
             compressed_blocks = self._encode_compressed_blocks(data_sections, cats, context, path)
@@ -543,12 +546,9 @@ class MREAConstruct(construct.Construct):
                 path,
             )
             if version >= MREAVersion.Corruption.value:
-                Aligned(32, Array(mrea_header.section_number_count, Struct("label" / FourCC, "value" / Int32ub)))._build(
-                    cats,
-                    stream,
-                    context,
-                    path
-                )
+                Aligned(
+                    32, Array(mrea_header.section_number_count, Struct("label" / FourCC, "value" / Int32ub))
+                )._build(cats, stream, context, path)
             for compressed_block in compressed_blocks:
                 block_header = compressed_block.header
                 if block_header.compressed_size:
@@ -656,11 +656,11 @@ class Mrea(BaseResource):
     @property
     def generated_objects_layer(self) -> ScriptLayer:
         assert self.target_game >= Game.ECHOES
-        gen_script_section = "generated_script_objects_section" if int(self._raw.version) == MREAVersion.Echoes.value else "SGEN"
+        gen_script_section = (
+            "generated_script_objects_section" if int(self._raw.version) == MREAVersion.Echoes.value else "SGEN"
+        )
         if self._generated_objects_layer is None:
-            self._generated_objects_layer = ScriptLayer(
-                self.get_section(gen_script_section)[0], None, self.target_game
-            )
+            self._generated_objects_layer = ScriptLayer(self.get_section(gen_script_section)[0], None, self.target_game)
         return self._generated_objects_layer
 
 
