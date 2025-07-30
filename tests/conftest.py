@@ -90,6 +90,8 @@ def pytest_generate_tests(metafunc):
                 asset_ids = test_lib.PRIME_ASSET_IDS
             elif game_name == "prime2":
                 asset_ids = test_lib.ECHOES_ASSET_IDS
+            elif game_name == "prime3":
+                asset_ids = test_lib.CORRUPTION_ASSET_IDS
             else:
                 raise RuntimeError(f"Unsupported {game_name} for id list")
 

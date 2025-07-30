@@ -29,6 +29,7 @@ def _parse_assets_file(name: str) -> list[TypedAsset]:
 
 PRIME_ASSET_IDS = _parse_assets_file("assets_prime.json")
 ECHOES_ASSET_IDS = _parse_assets_file("assets_echoes.json")
+CORRUPTION_ASSET_IDS = _parse_assets_file("assets_corruption.json")
 
 
 def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=False, save_file=None):
