@@ -64,6 +64,7 @@ class MREAVersion(IntEnum):
     Corruption = 0x1E
     DonkeyKongCountryReturns = 0x20
 
+
 @dataclasses.dataclass(frozen=True)
 class MREAVersionData:
     categories: dict[str, construct.Construct]
@@ -74,9 +75,10 @@ class MREAVersionData:
     portal_area_section: str
     static_geometry_section: str
 
+
 _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
     MREAVersion.Echoes: MREAVersionData(
-        categories = {
+        categories={
             "geometry_section": lazy_world_geometry(),
             "script_layers_section": SCLY,
             "generated_script_objects_section": SCGN,
@@ -99,11 +101,10 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
         generated_scripts_section="generated_script_objects_section",
         path_section="path_section",
         portal_area_section="portal_area_section",
-        static_geometry_section="static_geometry_map_section"
+        static_geometry_section="static_geometry_map_section",
     ),
-
     MREAVersion.Corruption: MREAVersionData(
-        categories = {
+        categories={
             "WOBJ": construct.Pass,
             "ROCT": AROT,
             "AABB": construct.Pass,
@@ -125,9 +126,10 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
         generated_scripts_section="SGEN",
         path_section="PFL2",
         portal_area_section="APTL",
-        static_geometry_section="EGMC"
-    )
+        static_geometry_section="EGMC",
+    ),
 }
+
 
 class AreaDependencyAdapter(Adapter):
     def __init__(self, asset_id):
@@ -198,6 +200,7 @@ class AreaModuleDependencyAdapter(Adapter):
             offsets.append(offset)
 
         return {"rel_module": list(itertools.chain(*obj)), "rel_offset": offsets}
+
 
 MREAHeader = Aligned(
     32,
@@ -366,7 +369,8 @@ class MREAConstruct(construct.Construct):
         else:
             categories = [
                 {"label": label, "value": mrea_header["section_index"][label]}
-                for label in context.version_data.categories.keys() if mrea_header["section_index"][label] is not None
+                for label in context.version_data.categories.keys()
+                if mrea_header["section_index"][label] is not None
             ]
 
         if mrea_header.compressed_block_count is not None:
@@ -493,9 +497,7 @@ class MREAConstruct(construct.Construct):
 
         # Encode each category
         for category, values in obj.sections.items():
-            raw_sections[category] = _encode_category(
-                values, _all_cats.get(category), context, f"{path} -> {category}"
-            )
+            raw_sections[category] = _encode_category(values, _all_cats.get(category), context, f"{path} -> {category}")
 
         # Combine all sections into the data sections array
         data_sections = ListContainer()
@@ -580,10 +582,10 @@ class Mrea(BaseResource):
 
     def version(self) -> MREAVersion:
         return MREAVersion(int(self._raw.version))
-    
-    def version_data(self) ->  MREAVersionData:
+
+    def version_data(self) -> MREAVersionData:
         return _VERSION_DATA[self.version()]
-    
+
     def _ensure_decoded_section(self, section_name: str, lazy_load: bool = False):
         if section_name not in self._raw.sections:
             context = Container(target_game=self.target_game)
