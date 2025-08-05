@@ -82,12 +82,12 @@ class PakFile:
 
     def get_decompressed(self, target_game: Game) -> bytes:
         if self.uncompressed_data is None:
-            self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
+            self.uncompressed_data = bytes(CompressedPakResource.parse(self.compressed_data, target_game=target_game))
         return self.uncompressed_data
 
     def get_compressed(self, target_game: Game) -> bytes:
         if self.compressed_data is None:
-            self.compressed_data = CompressedPakResource.build(self.uncompressed_data, target_game=target_game)
+            self.compressed_data = bytes(CompressedPakResource.build(self.uncompressed_data, target_game=target_game))
         return self.compressed_data
 
     def set_new_data(self, data: bytes):
@@ -177,6 +177,7 @@ class ConstructPakWii(construct.Construct):
                 data = file.get_compressed(game)
             else:
                 data = file.get_decompressed(game)
+            print(type(data))
 
             # TODO : If the file ends up bigger, don't compress
             # if compressed and len(data) > len(file.get_decompressed(game)):
@@ -191,7 +192,7 @@ class ConstructPakWii(construct.Construct):
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
             section_lengths["DATA"] += len(data)
-            construct.stream_write(stream, data, len(data), path)
+            construct.stream_write(stream, bytes(data), len(data), path)
 
         # Update header to contain accurate information to PAK contents
         files_end = construct.stream_tell(stream, path)
