@@ -110,7 +110,7 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
             # WorldModelHeader, SurfaceOffsets, SurfaceGroupIds, SurfaceLookupTable
             # GPUD repeats the same structure for each world model:
             # four buffers as section (vertices, normals, colors, UVs),
-            # followed by each surface as its own section. 
+            # followed by each surface as its own section.
             "WOBJ": construct.Pass,
             "ROCT": AROT,
             "AABB": PrefixedArray(Int32ub, SurfaceGroupBounds),
