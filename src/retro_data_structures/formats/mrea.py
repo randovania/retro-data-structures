@@ -41,7 +41,7 @@ from retro_data_structures.formats.rsos import RSOS
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
-from retro_data_structures.formats.world_geometry import lazy_world_geometry
+from retro_data_structures.formats.world_geometry import SurfaceGroupBounds, lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
@@ -105,10 +105,16 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
     ),
     MREAVersion.Corruption: MREAVersionData(
         categories={
+            # TODO fix WOBJ/GPUD
+            # WOBJ is MaterialSet at section 0 and each world model has 4 sections:
+            # WorldModelHeader, SurfaceOffsets, SurfaceGroupIds, SurfaceLookupTable
+            # GPUD repeats the same structure for each world model:
+            # four buffers as section (vertices, normals, colors, UVs),
+            # followed by each surface as its own section. 
             "WOBJ": construct.Pass,
             "ROCT": AROT,
-            "AABB": construct.Pass,
-            "GPUD": lazy_world_geometry(),
+            "AABB": PrefixedArray(Int32ub, SurfaceGroupBounds),
+            "GPUD": construct.Pass,
             "DEPS": DEPS,
             "SOBJ": SCLY,
             "SGEN": SCGN,
@@ -486,7 +492,6 @@ class MREAConstruct(construct.Construct):
         return compressed_blocks
 
     def _build(self, obj: Container, stream, context, path):
-        print(obj)
         version = int(obj.version)
         context.version_data = _VERSION_DATA[version]
         mrea_header = Container()

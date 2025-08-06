@@ -1,22 +1,12 @@
-# from construct.core import (
-#     Array,
-#     Const,
-#     Float16b,
-#     GreedyBytes,
-#     GreedyRange,
-#     Int16sb,
-#     Int16ub,
-#     Int32ub,
-#     PrefixedArray,
-#     Struct, Construct,
-# )
+from construct.core import (
+    GreedyBytes,
+    Int16sb,
+    Int16ub,
+    Struct
+)
 from __future__ import annotations
 
-# from retro_data_structures.common_types import AABox, Color4f, Transform4f, Vector2f, Vector3
-# from retro_data_structures.construct_extensions.version import get_version
-# from retro_data_structures.formats.arot import AROT
-# from retro_data_structures.formats.cmdl import MaterialSet, Normal, Surface
-# from retro_data_structures.formats.mrea import MREAVersion
+from retro_data_structures.common_types import AABox
 from construct import GreedyBytes, Optional, Struct
 
 from retro_data_structures.formats.cmdl import MaterialSet
@@ -29,13 +19,13 @@ def lazy_world_geometry():
 # # TODO: FlagEnum
 # WorldModelHeader = Struct("visor_flags" / Int32ub, "transform" / Transform4f, "bounding_box" / AABox)
 
-# SurfaceGroupBounds = Struct(
-#     "bounding_box" / AABox,
-#     "world_model_index" / Int16ub,
-#     "surface_group_index" / Int16ub,
-#     "unk1" / Int16sb,  # IfThenElse(this._index == 0, Const(1, Int16sb), Const(-1, Int16sb)),
-#     "unk2" / Int16sb,  # IfThenElse(this._index == 0, Const(-1, Int16sb), Const(this.surface_group_index+1, Int16sb))
-# )
+SurfaceGroupBounds = Struct(
+    "bounding_box" / AABox,
+    "world_model_index" / Int16ub,
+    "surface_group_index" / Int16ub,
+    "unk1" / Int16sb,  # IfThenElse(this._index == 0, Const(1, Int16sb), Const(-1, Int16sb)),
+    "unk2" / Int16sb,  # IfThenElse(this._index == 0, Const(-1, Int16sb), Const(this.surface_group_index+1, Int16sb))
+)
 
 
 # def SurfaceGroupIds(surface_count):
