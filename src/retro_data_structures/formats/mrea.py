@@ -491,13 +491,9 @@ class MREAConstruct(construct.Construct):
         add_group("Final group.")
         return compressed_blocks
 
-    def _build(self, obj: Container, stream, context, path):
-        version = int(obj.version)
-        context.version_data = _VERSION_DATA[version]
-        mrea_header = Container()
+    def _encode_all_sections(self, obj: Container, context, path):
         cats = ListContainer()
         _all_cats = context.version_data.categories
-
         raw_sections = copy.copy(obj.raw_sections)
 
         # Encode each category
@@ -512,6 +508,19 @@ class MREAConstruct(construct.Construct):
                 data_sections.extend(raw_sections[category])
             else:
                 cats.append({"label": category, "value": None})
+
+        return data_sections, cats
+
+    def _build(self, obj: Container, stream, context, path):
+        version = int(obj.version)
+        context.version_data = _VERSION_DATA[version]
+        mrea_header = Container()
+        cats = ListContainer()
+        _all_cats = context.version_data.categories
+
+        raw_sections = copy.copy(obj.raw_sections)
+
+        data_sections, cats = self._encode_all_sections(obj, context, path)
 
         # Compress the data sections
         if version >= MREAVersion.Echoes.value:

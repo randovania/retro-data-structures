@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from construct import GreedyBytes, Optional, Struct
-from construct.core import GreedyBytes, Int16sb, Int16ub, Struct
+from construct.core import GreedyBytes, Int16sb, Int16ub, Optional, Struct
 
 from retro_data_structures.common_types import AABox
 from retro_data_structures.formats.cmdl import MaterialSet
