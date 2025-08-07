@@ -26,7 +26,7 @@ from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
-from retro_data_structures.common_types import AssetId32, FourCC, String, Transform4f
+from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, String, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
@@ -35,9 +35,7 @@ from retro_data_structures.exceptions import DependenciesHandledElsewhere, Unkno
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
-from retro_data_structures.formats.deps import DEPS
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.rsos import RSOS
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
@@ -75,6 +73,15 @@ class MREAVersionData:
     portal_area_section: str
     static_geometry_section: str
 
+DEPS = Struct(
+    "dependencies" / PrefixedArray(Int32ub, Struct("asset_id" / AssetId64, "type" / FourCC)),
+    "offsets" / PrefixedArray(Int32ub, Int32ub),
+)
+
+RSOS = Struct(
+    "modules" / PrefixedArray(Int32ub, String),
+    "offsets" / PrefixedArray(Int32ub, Int32ub),
+)
 
 _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
     MREAVersion.Echoes: MREAVersionData(
