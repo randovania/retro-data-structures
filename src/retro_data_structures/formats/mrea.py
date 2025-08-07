@@ -73,6 +73,7 @@ class MREAVersionData:
     portal_area_section: str
     static_geometry_section: str
 
+
 DEPS = Struct(
     "dependencies" / PrefixedArray(Int32ub, Struct("asset_id" / AssetId64, "type" / FourCC)),
     "offsets" / PrefixedArray(Int32ub, Int32ub),
