@@ -24,7 +24,8 @@ dependencies = [
     "construct>=2.10.0",
     "lzokay",
     "pycryptodome",
-    "typing-extensions>=4.0.0"
+    "typing-extensions>=4.0.0",
+    "ppc-asm",
 ]
 dynamic = ["version"]
 license = "MIT"
@@ -91,6 +92,7 @@ extend-ignore = [
     "ISC001",  # may cause conflicts with formatter
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic values show up everywhere in construct defs
+    "PLC0415",  # `import` should be at the top-level of a file
 ]
 
 [tool.ruff.lint.mccabe]

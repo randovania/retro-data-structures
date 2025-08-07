@@ -710,6 +710,8 @@ class AreaDependencies:
                 return False
         return set(self.non_layer) == set(__value.non_layer)
 
+    __hash__ = None
+
 
 class Area:
     _flags: list[bool]
