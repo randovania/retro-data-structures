@@ -40,3 +40,24 @@ def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
         assert isinstance(instance, ScriptInstance)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+
+
+def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
+    def _all_instances(mrea: Mrea):
+        for layer in mrea.script_layers:
+            yield from layer.instances
+        yield from mrea.generated_objects_layer.instances
+
+    resource = prime3_asset_manager.get_raw_asset(mrea_asset_id)
+
+    decoded = Mrea.parse(resource.data, target_game=prime3_asset_manager.target_game)
+    for instance in _all_instances(decoded):
+        assert isinstance(instance, ScriptInstance)
+
+    encoded = decoded.build()
+
+    decoded2 = Mrea.parse(encoded, target_game=prime3_asset_manager.target_game)
+    for instance in _all_instances(decoded2):
+        assert isinstance(instance, ScriptInstance)
+
+    assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)

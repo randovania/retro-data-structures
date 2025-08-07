@@ -191,7 +191,7 @@ class ConstructPakWii(construct.Construct):
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
             section_lengths["DATA"] += len(data)
-            construct.stream_write(stream, data, len(data), path)
+            construct.stream_write(stream, bytes(data), len(data), path)
 
         # Update header to contain accurate information to PAK contents
         files_end = construct.stream_tell(stream, path)
