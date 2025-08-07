@@ -6,6 +6,7 @@ import typing
 from pathlib import Path
 
 import construct
+import typing_extensions
 
 DiscHeaderInformation = construct.Struct(
     debug_monitor_size=construct.Int32ub,
@@ -95,7 +96,7 @@ class DiscFileReader(io.IOBase):
     def writable(self) -> bool:
         return False
 
-    def __enter__(self) -> typing.Self:
+    def __enter__(self) -> typing_extensions.Self:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
