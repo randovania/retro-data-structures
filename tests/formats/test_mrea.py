@@ -53,6 +53,7 @@ def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
     decoded = Mrea.parse(resource.data, target_game=prime3_asset_manager.target_game)
     for instance in _all_instances(decoded):
         assert isinstance(instance, ScriptInstance)
+        instance.type.from_bytes(instance.raw_properties)
 
     encoded = decoded.build()
 
