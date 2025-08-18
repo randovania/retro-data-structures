@@ -1114,7 +1114,7 @@ class PooledString(BaseProperty):
         create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
         return
 
-    if game_id in ["Prime", "Echoes"]:
+    if game_id in ["Prime", "Echoes", "Corruption"]:
         format_specifier = "L"
         known_size = 12
     else:
@@ -1542,12 +1542,12 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             null_byte = repr(b"\x00")
             if game_id == "Prime":
                 # No property size for Prime 1
-                parse_code = f'b"".join(iter(lambda: data.read(1), {null_byte})).decode("utf-8")'
+                parse_code = f'b"".join(iter(lambda: data.read(1), {null_byte})).decode("iso-8859-1")'
             else:
-                parse_code = 'data.read(property_size)[:-1].decode("utf-8")'
+                parse_code = 'data.read(property_size)[:-1].decode("iso-8859-1")'
             build_code.extend(
                 [
-                    'data.write({obj}.encode("utf-8"))',
+                    'data.write({obj}.encode("iso-8859-1"))',
                     f"data.write({null_byte})",
                 ]
             )
