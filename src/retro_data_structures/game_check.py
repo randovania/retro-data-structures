@@ -16,7 +16,7 @@ from retro_data_structures.base_resource import Dependency
 from retro_data_structures.crc import crc32, crc64
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
     import construct
 
@@ -96,14 +96,14 @@ class Game(Enum):
             return (0x7B2EA5B1,)
         return ()
 
-    def audio_group_dependencies(self):
+    def audio_group_dependencies(self) -> Iterator[int]:
         if self == Game.ECHOES:
             # audio_groups_single_player_DGRP
             yield 0x31CB5ADB
             # audio_groups_multi_player_DGRP
             # yield 0xEE0CC360 # FIXME
 
-    def special_ancs_dependencies(self, ancs: AssetId):
+    def special_ancs_dependencies(self, ancs: AssetId) -> Iterator[Dependency]:
         if self == Game.ECHOES:
             if ancs == 0xC043D342:
                 # every gun animation needs these i guess
