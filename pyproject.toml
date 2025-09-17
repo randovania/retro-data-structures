@@ -24,7 +24,8 @@ dependencies = [
     "construct>=2.10.0",
     "lzokay",
     "pycryptodome",
-    "typing-extensions>=4.0.0"
+    "typing-extensions>=4.0.0",
+    "ppc-asm",
 ]
 dynamic = ["version"]
 license = "GPL-3.0"

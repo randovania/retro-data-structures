@@ -62,23 +62,45 @@ def prime3_iso_provider(prime3_iso: Path) -> IsoFileProvider:
 
 
 @pytest.fixture(scope="module")
-def prime1_asset_manager(prime1_iso_provider):
+def internal_prime1_asset_manager(prime1_iso_provider):
     return AssetManager(prime1_iso_provider, target_game=Game.PRIME)
 
 
 @pytest.fixture(scope="module")
-def prime2_asset_manager(prime2_iso_provider):
+def internal_prime2_asset_manager(prime2_iso_provider):
     return AssetManager(prime2_iso_provider, target_game=Game.ECHOES)
 
 
 @pytest.fixture(scope="module")
-def prime3_asset_manager(prime3_iso_provider):
+def internal_prime3_asset_manager(prime3_iso_provider):
     return AssetManager(prime3_iso_provider, target_game=Game.CORRUPTION)
+
+
+@pytest.fixture()
+def prime1_asset_manager(internal_prime1_asset_manager):
+    yield internal_prime1_asset_manager
+    internal_prime1_asset_manager._memory_files.clear()
+
+
+@pytest.fixture()
+def prime2_asset_manager(internal_prime2_asset_manager):
+    yield internal_prime2_asset_manager
+    internal_prime2_asset_manager._memory_files.clear()
+
+
+@pytest.fixture()
+def prime3_asset_manager(internal_prime3_asset_manager):
+    yield internal_prime3_asset_manager
+    internal_prime3_asset_manager._memory_files.clear()
 
 
 def pytest_generate_tests(metafunc):
     fixture_names: list[str] = list(metafunc.fixturenames)
-    asset_manager_fixtures = [fixture for fixture in metafunc.fixturenames if fixture.endswith("_asset_manager")]
+    asset_manager_fixtures = [
+        fixture
+        for fixture in metafunc.fixturenames
+        if fixture.endswith("_asset_manager") and not fixture.startswith("internal_")
+    ]
     if asset_manager_fixtures:
         asset_id_fixtures = [fixture_name for fixture_name in fixture_names if fixture_name.endswith("_asset_id")]
         if asset_id_fixtures:
