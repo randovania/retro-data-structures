@@ -714,10 +714,7 @@ class AreaDependencies:
 
     @cached_property
     def _comparison_tuple(self) -> tuple[frozenset[Dependency], ...]:
-        return (
-            frozenset(self.non_layer),
-            *[frozenset(layer) for layer in self.layers]
-        )
+        return (frozenset(self.non_layer), *[frozenset(layer) for layer in self.layers])
 
     def __eq__(self, __value: object) -> bool:
         if not isinstance(__value, AreaDependencies):
