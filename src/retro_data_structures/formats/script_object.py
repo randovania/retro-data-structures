@@ -239,6 +239,8 @@ class ScriptInstance:
     def __eq__(self, other):
         return isinstance(other, ScriptInstance) and self._raw == other._raw
 
+    __hash__ = None
+
     @classmethod
     def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
         property_type = properties.get_game_object(target_game, instance_type)

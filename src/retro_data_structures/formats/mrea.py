@@ -10,6 +10,7 @@ import io
 import itertools
 import typing
 from enum import IntEnum
+from functools import cached_property
 
 import construct
 from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Struct
@@ -43,7 +44,9 @@ from retro_data_structures.formats.world_geometry import SurfaceGroupBounds, laz
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
+
+    from typing_extensions import Self
 
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.formats.mlvl import Mlvl
@@ -173,7 +176,7 @@ class AreaDependencyAdapter(Adapter):
             Dependency(dep.asset_type.decode("ascii"), dep.asset_id) for dep in obj.dependencies[obj.offsets[-1] :]
         ]
 
-        return AreaDependencies(layers, non_layer)
+        return AreaDependencies.from_iterables(layers, non_layer)
 
     def _encode(self, obj: AreaDependencies, context, path):
         layer_deps = list(obj.layers)
@@ -693,8 +696,15 @@ class Mrea(BaseResource):
 
 @dataclasses.dataclass(frozen=True)
 class AreaDependencies:
-    layers: list[list[Dependency]]
-    non_layer: list[Dependency]
+    layers: tuple[tuple[Dependency, ...], ...]
+    non_layer: tuple[Dependency, ...]
+
+    @classmethod
+    def from_iterables(cls, layers: Iterable[Iterable[Dependency]], non_layer: Iterable[Dependency]) -> Self:
+        return cls(
+            layers=tuple(tuple(deps) for deps in layers),
+            non_layer=tuple(non_layer),
+        )
 
     @property
     def all_dependencies(self) -> Iterator[Dependency]:
@@ -702,13 +712,17 @@ class AreaDependencies:
         for layer in self.layers:
             yield from layer
 
+    @cached_property
+    def _comparison_tuple(self) -> tuple[frozenset[Dependency], ...]:
+        return (frozenset(self.non_layer), *[frozenset(layer) for layer in self.layers])
+
     def __eq__(self, __value: object) -> bool:
         if not isinstance(__value, AreaDependencies):
             return False
-        for self_layer, other_layer in zip(self.layers, __value.layers):
-            if set(self_layer) != set(other_layer):
-                return False
-        return set(self.non_layer) == set(__value.non_layer)
+        return self._comparison_tuple == __value._comparison_tuple
+
+    def __hash__(self) -> int:
+        return hash(self._comparison_tuple)
 
 
 class Area:
@@ -906,7 +920,7 @@ class Area:
             if "!!non_layer!!" in _hardcoded_dependencies.get(self.mrea_asset_id, {}):
                 non_layer.extend(_hardcoded_dependencies[self.mrea_asset_id]["!!non_layer!!"])
 
-        self.dependencies = AreaDependencies(layer_deps, non_layer)
+        self.dependencies = AreaDependencies.from_iterables(layer_deps, non_layer)
 
     def dependencies_for(self):
         yield from self.dependencies.all_dependencies

@@ -91,6 +91,7 @@ extend-ignore = [
     "ISC001",  # may cause conflicts with formatter
     "PLR0913",  # Too many arguments to function call
     "PLR2004",  # Magic values show up everywhere in construct defs
+    "PLC0415",  # we defer imports for performance in a number of places
 ]
 
 [tool.ruff.lint.mccabe]
