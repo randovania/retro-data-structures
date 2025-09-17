@@ -106,8 +106,6 @@ class ConstructPakWii(construct.Construct):
     def _parse(self, stream, context, path) -> PakBody:
         header = PAKNoData._parsereport(stream, context, f"{path} -> header")
 
-        AlignTo(64)._parse(stream, context, path)
-
         files = []
         # Resource offsets are relative to the start of the DATA section
         data_start = construct.stream_tell(stream, path)
@@ -193,7 +191,7 @@ class ConstructPakWii(construct.Construct):
             header.resources[i].size = len(data)
             header.resources[i].compressed = int(compressed)
             section_lengths["DATA"] += len(data)
-            construct.stream_write(stream, data, len(data), path)
+            construct.stream_write(stream, bytes(data), len(data), path)
 
         # Update header to contain accurate information to PAK contents
         files_end = construct.stream_tell(stream, path)

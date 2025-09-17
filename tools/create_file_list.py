@@ -18,7 +18,7 @@ def main():
     manager = AssetManager(IsoFileProvider(args.path), target_game=game)
 
     result = [{"id": asset_id, "type": manager.get_asset_type(asset_id)} for asset_id in manager.all_asset_ids()]
-    Path(__file__).parents[1].joinpath("test", "test_files", f"assets_{game.name.lower()}.json").write_text(
+    Path(__file__).parents[1].joinpath("tests", "test_files", f"assets_{game.name.lower()}.json").write_text(
         json.dumps(result, indent=4)
     )
 

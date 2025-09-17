@@ -303,7 +303,7 @@ class Mlvl(BaseResource):
                 area_mrea_id=self.asset_manager._resolve_asset_id(mrea_id),
                 internal_area_id=area_index,
                 attached_area_index=ListContainer(),
-                dependencies=AreaDependencies([], []),
+                dependencies=AreaDependencies((), ()),
                 docks=ListContainer(),
                 module_dependencies=ListContainer(),
                 internal_area_name=internal_name,

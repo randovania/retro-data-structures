@@ -9,7 +9,7 @@ from retro_data_structures.game_check import Game
 
 # ruff: noqa: E501
 
-paks = {
+paks = [
     "FrontEnd",
     "GuiDVD",
     "GuiNAND",
@@ -30,7 +30,7 @@ paks = {
     "SamusGun",
     "UniverseArea",
     "Worlds",
-}
+]
 
 
 @pytest.fixture(name="compressed_resources")
@@ -75,16 +75,15 @@ def _compressed_resources():
     ]
 
 
-def test_identical_when_keep_data(prime3_iso_provider):
-    game = Game.CORRUPTION
-    for pakfile in paks:
-        with prime3_iso_provider.open_binary(pakfile + ".pak") as f:
-            raw = f.read()
+@pytest.mark.parametrize("pakfile", paks)
+def test_identical_when_keep_data(prime3_iso_provider, pakfile):
+    with prime3_iso_provider.open_binary(pakfile + ".pak") as f:
+        raw = f.read()
 
-        decoded = Pak.parse(raw, target_game=game)
-        encoded = decoded.build()
+    decoded = Pak.parse(raw, target_game=Game.CORRUPTION)
+    encoded = decoded.build()
 
-        assert raw == encoded
+    assert raw == encoded
 
 
 def test_compare_header_keep_data(prime3_iso_provider):

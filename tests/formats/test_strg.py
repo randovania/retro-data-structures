@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pytest
 from tests import test_lib
 
 from retro_data_structures.formats.strg import Strg
@@ -27,7 +26,6 @@ def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
     )
 
 
-@pytest.mark.xfail
 def test_compare_p3(prime3_asset_manager):
     # with name table
     # Resources/strings/metroid3/gui/fesliderpopup.STRG
@@ -51,4 +49,17 @@ def test_compare_p3(prime3_asset_manager):
         prime3_asset_manager,
         0x08417493AF6B57E2,
         Strg,
+    )
+
+
+def test_change_table_length(prime2_asset_manager):
+    strg = prime2_asset_manager.get_parsed_asset(0x2E681FEF)
+    strg.set_string_list([])
+
+    assert strg.build() == (
+        b"\x87eC!\x00\x00\x00\x01\x00\x00\x00\x06\x00\x00\x00\x00ENGL\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00FREN\x00\x00\x00\x00\x00\x00\x00\x00GERM\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00SPAN\x00\x00\x00\x00\x00\x00\x00\x00ITAL\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00JAPN\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+        b"\x00\x00\x00\x00"
     )
