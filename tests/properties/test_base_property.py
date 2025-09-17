@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import dataclasses
 
-from retro_data_structures.properties.echoes.archetypes.Vector2f import Vector2f
-
 from retro_data_structures.properties.base_property import BaseProperty
+from retro_data_structures.properties.echoes.archetypes.Vector2f import Vector2f
 from retro_data_structures.properties.field_reflection import FieldReflection, get_reflection
 
 
