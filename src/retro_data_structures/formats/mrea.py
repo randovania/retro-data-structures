@@ -539,7 +539,7 @@ class MREAConstruct(construct.Construct):
             mrea_header.compressed_block_count = len(compressed_blocks)
         else:
             compressed_blocks = None
-            raise RuntimeError("Not implemented yet")
+            raise NotImplementedError
 
         mrea_header.version = obj.version
         mrea_header.area_transform = obj.area_transform
