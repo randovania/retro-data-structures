@@ -71,10 +71,10 @@ class MREAVersionData:
     categories: dict[str, construct.Construct]
     geometry_section: str
     script_layers_section: str
-    generated_scripts_section: str
+    generated_scripts_section: str | None
     path_section: str
-    portal_area_section: str
-    static_geometry_section: str
+    portal_area_section: str | None
+    static_geometry_section: str | None
 
 
 DEPS = Struct(
@@ -87,7 +87,28 @@ RSOS = Struct(
     "offsets" / PrefixedArray(Int32ub, Int32ub),
 )
 
+# FIXME: the way this was implemented requires adding an
+# explicit entry for each version we support
+# why was it done this way?
 _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
+    MREAVersion.Prime: MREAVersionData(
+        categories={
+            "geometry_section": lazy_world_geometry(),
+            "area_octree_section": AROT,
+            "script_layers_section": SCLY,
+            "collision_section": AreaCollision,
+            "unknown_section_1": Struct(magic=If(game_check.is_prime3, Const("LLTE", FourCC)), data=Const(1, Int32ub)),
+            "lights_section": Lights,
+            "visibility_tree_section": VISI,
+            "path_section": AssetIdCorrect,
+        },
+        geometry_section="geometry_section",
+        script_layers_section="script_layers_section",
+        path_section="path_section",
+        generated_scripts_section=None,
+        portal_area_section=None,
+        static_geometry_section=None,
+    ),
     MREAVersion.Echoes: MREAVersionData(
         categories={
             "geometry_section": lazy_world_geometry(),
@@ -371,9 +392,12 @@ class MREAConstruct(construct.Construct):
         context.version_data = _VERSION_DATA[int(mrea_header.version)]
         data_section_sizes = self._aligned_parse(Array(mrea_header.data_section_count, Int32ub), stream, context, path)
 
-        compressed_block_headers = self._aligned_parse(
-            Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
-        )
+        if mrea_header.compressed_block_count is not None:
+            compressed_block_headers = self._aligned_parse(
+                Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
+            )
+        else:
+            compressed_block_headers = None
 
         # split data sections into the named sections
         if int(mrea_header.version) >= MREAVersion.Corruption.value:
@@ -390,7 +414,7 @@ class MREAConstruct(construct.Construct):
                 if mrea_header["section_index"][label] is not None
             ]
 
-        if mrea_header.compressed_block_count is not None:
+        if compressed_block_headers is not None:
             data_sections = self._decode_compressed_blocks(
                 compressed_block_headers, data_section_sizes, stream, context, path
             )
@@ -539,7 +563,7 @@ class MREAConstruct(construct.Construct):
             mrea_header.compressed_block_count = len(compressed_blocks)
         else:
             compressed_blocks = None
-            raise RuntimeError("Not implemented yet")
+            raise NotImplementedError
 
         mrea_header.version = obj.version
         mrea_header.area_transform = obj.area_transform
