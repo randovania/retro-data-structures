@@ -61,6 +61,7 @@ git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 minversion = "6.0"
 # asyncio_mode = "auto"
 xfail_strict = true
+empty_parameter_set_mark = "fail_at_collect"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
