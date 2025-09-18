@@ -14,8 +14,6 @@ from retro_data_structures.game_check import Game
 if TYPE_CHECKING:
     from retro_data_structures.properties.base_property import BaseProperty
 
-_root = Path(__file__).parents[2].joinpath("src")
-
 
 def perform_module_checks(path: Path):
     module_name = path.with_suffix("").as_posix().replace("/", ".")
@@ -40,10 +38,12 @@ def perform_module_checks(path: Path):
 
 
 def _parametrize_for_game(game: str):
-    r = _root.joinpath("retro_data_structures", "properties", game)
+    props = Path(properties.__file__)
+    root = props.parents[2]
+
     return [
-        pytest.param(p.relative_to(_root), id=p.relative_to(_root).as_posix())
-        for p in r.rglob("*.py")
+        pytest.param(p.relative_to(root), id=p.relative_to(root).as_posix())
+        for p in props.parent.joinpath(game).rglob("*.py")
         if p.name not in ("__init__.py", "AssetId.py")
     ]
 
