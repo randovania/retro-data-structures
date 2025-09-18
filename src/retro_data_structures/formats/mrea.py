@@ -392,6 +392,13 @@ class MREAConstruct(construct.Construct):
         context.version_data = _VERSION_DATA[int(mrea_header.version)]
         data_section_sizes = self._aligned_parse(Array(mrea_header.data_section_count, Int32ub), stream, context, path)
 
+        if mrea_header.compressed_block_count is not None:
+            compressed_block_headers = self._aligned_parse(
+                Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
+            )
+        else:
+            compressed_block_headers = None
+
         # split data sections into the named sections
         if int(mrea_header.version) >= MREAVersion.Corruption.value:
             categories = self._aligned_parse(
@@ -407,10 +414,7 @@ class MREAConstruct(construct.Construct):
                 if mrea_header["section_index"][label] is not None
             ]
 
-        if mrea_header.compressed_block_count is not None:
-            compressed_block_headers = self._aligned_parse(
-                Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
-            )
+        if compressed_block_headers is not None:
             data_sections = self._decode_compressed_blocks(
                 compressed_block_headers, data_section_sizes, stream, context, path
             )
