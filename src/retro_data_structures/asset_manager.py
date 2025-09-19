@@ -392,7 +392,11 @@ class AssetManager:
 
         self._custom_asset_ids[str(name)] = asset_id
         self._paks_for_asset_id[asset_id] = files_set
-        self._types_for_asset_id[asset_id] = new_data.resource_type()
+        if isinstance(new_data, BaseResource):
+            self._types_for_asset_id[asset_id] = new_data.resource_type()
+        else:
+            self._types_for_asset_id[asset_id] = new_data.type
+
         self.replace_asset(name, new_data)
         for pak_name in in_paks:
             self.ensure_present(pak_name, asset_id)
