@@ -196,7 +196,7 @@ class AssetManager:
     _types_for_asset_id: dict[AssetId, AssetType]
     _ensured_asset_ids: dict[str, set[AssetId]]
     _modified_resources: dict[AssetId, RawResource | None]
-    _memory_files: dict[NameOrAssetId, BaseResource]
+    _memory_files: dict[AssetId, BaseResource]
     _dol: MemoryDol | None = None
     _tweaks: Ntwk | None = None
 
@@ -344,9 +344,18 @@ class AssetManager:
         Gets a file as from `get_parsed_asset` and keep it in memory.
         Modifications made to it are applied by `build_modified_files`.
         """
+        asset_id = self._resolve_asset_id(asset_id)
         if asset_id not in self._memory_files:
             self._memory_files[asset_id] = self.get_parsed_asset(asset_id, type_hint=type_hint)
         return self._memory_files[asset_id]
+
+    def _get_asset_in_memory_or_pak(self, asset_id: NameOrAssetId, type_hint: type[T] = BaseResource) -> T:
+        """
+        Gets a file from memory if present, otherwise parses it but does not keep it in memory.
+        Useful for a read-only view when you aren't sure whether the asset is currently in memory.
+        """
+        asset_id = self._resolve_asset_id(asset_id)
+        return self._memory_files.get(asset_id, self.get_parsed_asset(asset_id, type_hint=type_hint))
 
     def generate_asset_id(self) -> int:
         result = self._next_generated_id
@@ -396,10 +405,17 @@ class AssetManager:
         """
         return self.add_new_asset(new_name, self.get_raw_asset(asset_id), ())
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource) -> AssetId:
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource, *, encode: bool = False) -> AssetId:
         """
         Replaces an existing asset.
+
         See `add_new_asset` for new assets.
+
+        :param asset_id: The name or Asset ID for the asset being replaced.
+        :param new_data: The new data, either in raw or parsed form.
+        :param encode: If `new_data` is a parsed resource, `build()` it.
+
+        :return: The resolved Asset ID of the replaced asset.
         """
         original_name = str(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
@@ -409,16 +425,21 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
-            logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
-            raw_asset = RawResource(
-                type=new_data.resource_type(),
-                data=new_data.build(),
-            )
+            if encode:
+                logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
+                raw_asset = RawResource(
+                    type=new_data.resource_type(),
+                    data=new_data.build(),
+                )
+                self._modified_resources[asset_id] = raw_asset
+            else:
+                self._memory_files[asset_id] = new_data
 
         else:
             raw_asset = new_data
+            self._modified_resources[asset_id] = raw_asset
 
-        self._modified_resources[asset_id] = raw_asset
+        self._clear_cached_dependencies_for_asset(asset_id)
 
         return asset_id
 
@@ -431,6 +452,8 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         self._modified_resources[asset_id] = None
+
+        self._clear_cached_dependencies_for_asset(asset_id)
 
         # If this asset id was previously ensured, remove that
         for ensured_ids in self._ensured_asset_ids.values():
@@ -486,6 +509,10 @@ class AssetManager:
 
         return self._in_memory_paks[pak_name]
 
+    def _clear_cached_dependencies_for_asset(self, asset_id: AssetId) -> None:
+        self._cached_dependencies.pop(asset_id, None)
+        self._cached_ancs_per_char_dependencies.pop(asset_id, None)
+
     def _get_dependencies_for_asset(
         self,
         asset_id: AssetId,
@@ -508,16 +535,28 @@ class AssetManager:
             # logger.debug(f"Fetching cached asset {asset_id:#8x}...")
             deps = dep_cache[asset_id]
         else:
-            if dependency_cheating.should_cheat_asset(asset_type):
+            # always calculate if the file is already in memory
+            if asset_id in self._memory_files:
+                should_calc = True
+
+            # don't bother parsing the file if we have a quicker way to get its dependencies
+            elif dependency_cheating.should_cheat_asset(asset_type):
+                should_calc = False
                 deps = tuple(dependency_cheating.get_cheated_dependencies(self.get_raw_asset(asset_id), self))
 
+            # calculate dependencies if possible
             elif formats.has_resource_type(asset_type):
-                if self.get_asset_format(asset_id).has_dependencies(self.target_game):
-                    deps = tuple(self.get_parsed_asset(asset_id).dependencies_for())
-                deps += tuple(self.target_game.special_ancs_dependencies(asset_id))
+                should_calc = True
 
+            # ideally this never happens!
             else:
+                should_calc = False
                 logger.warning(f"Potential missing assets for {asset_type} {asset_id}")
+
+            if should_calc:
+                if self.get_asset_format(asset_id).has_dependencies(self.target_game):
+                    deps = tuple(self._get_asset_in_memory_or_pak(asset_id).dependencies_for())
+                deps += tuple(self.target_game.special_ancs_dependencies(asset_id))
 
             # logger.debug(f"Adding {asset_id:#8x} deps to cache...")
             dep_cache[asset_id] = deps
@@ -550,7 +589,7 @@ class AssetManager:
             deps = self._cached_ancs_per_char_dependencies[asset_id][char_index]
         else:
             deps_list = list(self.target_game.special_ancs_dependencies(asset_id))
-            ancs: Ancs = self.get_parsed_asset(asset_id)
+            ancs: Ancs = self._get_asset_in_memory_or_pak(asset_id)
             deps_list.extend(ancs.ancs_dependencies_for(char_index=char_index))
             deps = tuple(deps_list)
             self._cached_ancs_per_char_dependencies[asset_id][char_index] = deps
@@ -616,9 +655,14 @@ class AssetManager:
 
     def build_modified_files(self):
         """"""
+
+        # flush dependencies before building to prevent inaccuracy
+        self._cached_dependencies.clear()
+        self._cached_ancs_per_char_dependencies.clear()
+
         with ThreadPoolExecutor() as executor:
             for name, resource in self._memory_files.items():
-                executor.submit(self.replace_asset, name, resource)
+                executor.submit(self.replace_asset, name, resource, encode=True)
         self._memory_files.clear()
 
     def _save_modified_paks(self, output: FileWriter) -> None:
