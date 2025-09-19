@@ -405,7 +405,7 @@ class AssetManager:
         """
         return self.add_new_asset(new_name, self.get_raw_asset(asset_id), ())
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource) -> AssetId:
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource, *, encode: bool = False) -> AssetId:
         """
         Replaces an existing asset.
         See `add_new_asset` for new assets.
@@ -418,16 +418,21 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
-            logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
-            raw_asset = RawResource(
-                type=new_data.resource_type(),
-                data=new_data.build(),
-            )
+            if encode:
+                logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
+                raw_asset = RawResource(
+                    type=new_data.resource_type(),
+                    data=new_data.build(),
+                )
+                self._modified_resources[asset_id] = raw_asset
+            else:
+                self._memory_files[asset_id] = new_data
 
         else:
             raw_asset = new_data
+            self._modified_resources[asset_id] = raw_asset
 
-        self._modified_resources[asset_id] = raw_asset
+        self._clear_cached_dependencies_for_asset(asset_id)
 
         return asset_id
 
@@ -440,6 +445,8 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         self._modified_resources[asset_id] = None
+
+        self._clear_cached_dependencies_for_asset(asset_id)
 
         # If this asset id was previously ensured, remove that
         for ensured_ids in self._ensured_asset_ids.values():
@@ -494,6 +501,10 @@ class AssetManager:
                 self._in_memory_paks[pak_name] = Pak.parse_stream(data, target_game=self.target_game)
 
         return self._in_memory_paks[pak_name]
+
+    def _clear_cached_dependencies_for_asset(self, asset_id: AssetId) -> None:
+        self._cached_dependencies.pop(asset_id, None)
+        self._cached_ancs_per_char_dependencies.pop(asset_id, None)
 
     def _get_dependencies_for_asset(
         self,
@@ -644,7 +655,7 @@ class AssetManager:
 
         with ThreadPoolExecutor() as executor:
             for name, resource in self._memory_files.items():
-                executor.submit(self.replace_asset, name, resource)
+                executor.submit(self.replace_asset, name, resource, encode=True)
         self._memory_files.clear()
 
     def _save_modified_paks(self, output: FileWriter) -> None:
