@@ -13,7 +13,7 @@ from enum import IntEnum
 from functools import cached_property
 
 import construct
-from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Struct
+from construct import Adapter, Aligned, Int32ub, PrefixedArray, Struct
 from construct.core import (
     Array,
     Computed,
@@ -25,7 +25,6 @@ from construct.core import (
 )
 from construct.lib.containers import Container, ListContainer
 
-from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, String, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
@@ -97,7 +96,7 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
             "area_octree_section": AROT,
             "script_layers_section": SCLY,
             "collision_section": AreaCollision,
-            "unknown_section_1": Struct(magic=If(game_check.is_prime3, Const("LLTE", FourCC)), data=Const(1, Int32ub)),
+            "unknown_section_1": Const(1, Int32ub),
             "lights_section": Lights,
             "visibility_tree_section": VISI,
             "path_section": AssetIdCorrect,
@@ -112,21 +111,21 @@ _VERSION_DATA: dict[MREAVersion, MREAVersionData] = {
     MREAVersion.Echoes: MREAVersionData(
         categories={
             "geometry_section": lazy_world_geometry(),
-            "script_layers_section": SCLY,
-            "generated_script_objects_section": SCGN,
-            "area_octree_section": AROT,
-            "collision_section": AreaCollision,
-            "lights_section": Lights,
-            "visibility_tree_section": VISI,
-            "path_section": AssetIdCorrect,
-            "portal_area_section": AssetIdCorrect,
-            "static_geometry_map_section": AssetIdCorrect,
-            "unknown_section_1": Struct(magic=If(game_check.is_prime3, Const("LLTE", FourCC)), data=Const(1, Int32ub)),
             "unknown_section_2": Struct(
                 unk1=PrefixedArray(Int32ub, Int32ub),
                 # TODO: rebuild according to surface group count
                 unk2=PrefixedArray(Int32ub, Enum(Int8ub, ON=0xFF, OFF=0x00)),
             ),
+            "script_layers_section": SCLY,
+            "generated_script_objects_section": SCGN,
+            "collision_section": AreaCollision,
+            "unknown_section_1": Const(1, Int32ub),
+            "lights_section": Lights,
+            "visibility_tree_section": VISI,
+            "path_section": AssetIdCorrect,
+            "area_octree_section": AROT,
+            "portal_area_section": AssetIdCorrect,
+            "static_geometry_map_section": AssetIdCorrect,
         },
         geometry_section="geometry_section",
         script_layers_section="script_layers_section",
@@ -435,6 +434,7 @@ class MREAConstruct(construct.Construct):
             sections[c["label"]] = data_sections[start:end]
 
         return Container(
+            mrea_header=mrea_header,  # Include the header for testing purposes
             version=mrea_header.version,
             area_transform=mrea_header.area_transform,
             world_model_count=mrea_header.world_model_count,
