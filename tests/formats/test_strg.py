@@ -26,6 +26,16 @@ def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
     )
 
 
+def test_get_by_name(prime2_asset_manager):
+    table = prime2_asset_manager.get_parsed_asset(0x88E242D6, type_hint=Strg)
+
+    assert table.get_string_by_name("CorruptedFile") == (
+        "The Metroid Prime 2 Echoes save file on the \nMemory Card in Slot A is corrupted\nand must be deleted."
+    )
+    table.set_single_string_by_name("ChoiceDeleteCorruptedFile", "Delete Incompatible File")
+    assert table.get_string_by_name("ChoiceDeleteCorruptedFile") == "Delete Incompatible File"
+
+
 def test_compare_p3(prime3_asset_manager):
     # with name table
     # Resources/strings/metroid3/gui/fesliderpopup.STRG
