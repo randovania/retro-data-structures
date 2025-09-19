@@ -408,7 +408,14 @@ class AssetManager:
     def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource, *, encode: bool = False) -> AssetId:
         """
         Replaces an existing asset.
+
         See `add_new_asset` for new assets.
+
+        :param asset_id: The name or Asset ID for the asset being replaced.
+        :param new_data: The new data, either in raw or parsed form.
+        :param encode: If `new_data` is a parsed resource, `build()` it.
+
+        :return: The resolved Asset ID of the replaced asset.
         """
         original_name = str(asset_id)
         asset_id = self._resolve_asset_id(asset_id)
