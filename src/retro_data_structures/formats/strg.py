@@ -360,6 +360,7 @@ class Strg(BaseResource):
     def get_strings(self, language: str = "ENGL") -> tuple[str, ...]:
         """
         Gets all strings for the given language.
+
         :param language: The language to get. Defaults to ENGL (English).
         :return:
         """
@@ -368,6 +369,7 @@ class Strg(BaseResource):
     def get_string_by_name(self, name: str, language: str = "ENGL") -> str:
         """
         Gets a single string, indexed by name.
+
         :param name: A name present in the name table.
         :param language: The language to get. Defaults to ENGL (English).
         :return:
@@ -378,10 +380,10 @@ class Strg(BaseResource):
     def set_single_string(self, index: int, string: str, language: str | None = None) -> None:
         """
         Changes the string at the given index.
+
         :param index:
         :param string: The string to add.
         :param language: The language to change, or all languages if None.
-        :return:
         """
         for lang, string_list in self._raw_languages.items():
             if language is None or lang == language:
@@ -390,16 +392,18 @@ class Strg(BaseResource):
     def set_single_string_by_name(self, name: str, string: str, language: str | None = None) -> None:
         """
         Changes the string with the given name.
+
         :param name: A name present in the name table.
         :param string: The string to add.
         :param language: The language to change, or all languages if None.
-        :return:
+        :raise: KeyError, if the name is not known.
         """
         self.set_single_string(self._raw.name_table[name], string, language)
 
     def set_string_list(self, string_list: list[str], language: str | None = None) -> None:
         """
         When changing the list length, make sure all languages have the same length.
+
         :param string_list:
         :param language: The language to change, or all languages if None.
         :return:
