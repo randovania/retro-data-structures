@@ -7,10 +7,10 @@ from construct import Construct, GreedyBytes, Subconstruct, stream_tell
 
 
 class AlignTo(Construct):
-    def __init__(self, modulus):
+    def __init__(self, modulus, pattern: bytes = b"\x00"):
         super().__init__()
         self.modulus = modulus
-        self.pattern = b"\x00"
+        self.pattern = pattern
         self.flagbuildnone = True
 
     def _parse(self, stream, context, path):
