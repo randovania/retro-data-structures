@@ -54,13 +54,30 @@ def purge_hidden(data: Container) -> Container:
     return {k: purge_hidden(v) if isinstance(v, Container) else v for k, v in data.items()}
 
 
-def parse_and_build_compare_auto_manager(asset_manager: AssetManager, asset_id: AssetId, print_data=False):
+def parse_and_build_compare_auto_manager(
+    asset_manager: AssetManager,
+    asset_id: AssetId,
+    *,
+    print_data: bool = False,
+    byte_match: bool = True,
+):
     resource_type = asset_manager.get_asset_format(asset_id)
-    return parse_and_build_compare(asset_manager, asset_id, resource_type, print_data)
+    return parse_and_build_compare(
+        asset_manager,
+        asset_id,
+        resource_type,
+        print_data=print_data,
+        byte_match=byte_match,
+    )
 
 
 def parse_and_build_compare(
-    asset_manager: AssetManager, asset_id: AssetId, resource_class: type[BaseResource], print_data=False
+    asset_manager: AssetManager,
+    asset_id: AssetId,
+    resource_class: type[BaseResource],
+    *,
+    print_data: bool = False,
+    byte_match: bool = True,
 ) -> tuple[RawResource, BaseResource, bytes]:
     resource = asset_manager.get_raw_asset(asset_id)
     assert resource.type == resource_class.resource_type()
@@ -70,9 +87,12 @@ def parse_and_build_compare(
         print(decoded)
 
     encoded = decoded.build()
-    decoded2 = resource_class.parse(encoded, target_game=asset_manager.target_game)
 
-    assert purge_hidden(decoded2.raw) == purge_hidden(decoded.raw)
+    if byte_match:
+        assert resource.data == encoded
+    else:
+        decoded2 = resource_class.parse(encoded, target_game=asset_manager.target_game)
+        assert purge_hidden(decoded2.raw) == purge_hidden(decoded.raw)
 
     return resource, decoded, encoded
 

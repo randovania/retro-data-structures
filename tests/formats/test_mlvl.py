@@ -195,4 +195,5 @@ def test_compare_p2(prime2_asset_manager, mlvl_asset_id: AssetId):
         prime2_asset_manager,
         mlvl_asset_id,
         Mlvl,
+        byte_match=False,
     )
