@@ -107,7 +107,7 @@ STRG_V1 = Struct(
             "raw_strings" / Array(this._.header.string_count, GreedyBytes),
         ),
     ),
-    AlignTo(32),
+    AlignTo(32, b"\xff"),
     construct.Terminated,
 )
 
@@ -176,10 +176,17 @@ class Strg(BaseResource):
         for language in languages:
             if target_game == Game.PRIME:
                 # table_size
-                Int32ub.parse_stream(stream)
+                language.size = Int32ub.parse_stream(stream)
 
-            Int32ub[header.string_count].parse_stream(stream)  # offsets
-            result[language.lang] = CString("utf-16-be")[header.string_count].parse_stream(stream)
+            start_offset = stream.tell()
+            offsets = Int32ub[header.string_count].parse_stream(stream)  # offsets
+
+            lang_strings = []
+            for offset in offsets:
+                assert offset == (stream.tell() - start_offset)
+                lang_strings.append(CString("utf-16-be").parse_stream(stream))
+
+            result[language.lang] = lang_strings
 
         return Container(
             languages=result,
@@ -239,7 +246,8 @@ class Strg(BaseResource):
             offsets = []
             raw_strings = []
 
-            current_strings_offset = 0
+            current_strings_offset = Int32ub[len(language_strings)].sizeof()
+
             for string in language_strings:
                 offsets.append(current_strings_offset)
                 raw_strings.append(CString("utf-16-be").build(string))

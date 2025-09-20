@@ -15,8 +15,14 @@ def test_compare_p1(prime1_asset_manager, strg_asset_id: AssetId):
         prime1_asset_manager,
         strg_asset_id,
         Strg,
-        byte_match=False,  # FIXME
     )
+
+
+# These string tables have a duplicated entry in the name table
+_MALFORMED_NAME_TABLE = {
+    0x3F341ABD,
+    0xA5C74B8B,
+}
 
 
 def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
@@ -24,7 +30,7 @@ def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
         prime2_asset_manager,
         strg_asset_id,
         Strg,
-        byte_match=False,  # FIXME
+        byte_match=strg_asset_id not in _MALFORMED_NAME_TABLE,
     )
 
 
