@@ -325,6 +325,10 @@ class AssetManager:
                 result = pak.get_asset(asset_id)
                 if result is not None:
                     return result
+
+            if asset_id in self._memory_files:
+                raise ValueError(f"Attempt to get raw of new asset {asset_id}, but it hasn't been built yet.")
+
             raise UnknownAssetId(asset_id, original_name) from None
         except KeyError:
             raise UnknownAssetId(asset_id, original_name) from None
@@ -355,7 +359,10 @@ class AssetManager:
         Useful for a read-only view when you aren't sure whether the asset is currently in memory.
         """
         asset_id = self._resolve_asset_id(asset_id)
-        return self._memory_files.get(asset_id, self.get_parsed_asset(asset_id, type_hint=type_hint))
+        result = self._memory_files.get(asset_id)
+        if result is not None:
+            return result
+        return self.get_parsed_asset(asset_id, type_hint=type_hint)
 
     def generate_asset_id(self) -> int:
         result = self._next_generated_id
