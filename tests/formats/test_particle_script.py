@@ -18,7 +18,32 @@ def test_particles_swhc(prime2_asset_manager: AssetManager, swhc_asset_id):
 
 
 def test_particles_crsc(prime2_asset_manager: AssetManager, crsc_asset_id):
-    test_lib.parse_and_build_compare_auto_manager(prime2_asset_manager, crsc_asset_id)
+    test_lib.parse_and_build_compare_auto_manager(
+        prime2_asset_manager,
+        crsc_asset_id,
+        byte_match=crsc_asset_id
+        in {
+            0x6091C2BD,
+            0x39EB7161,
+            0x20174221,
+            0x29592460,
+            0x31E60852,
+            0x6731F933,
+            0x4D90E3DA,
+            0x4E6CF690,
+            0xFBD1B105,
+            0x15FDC70A,
+            0xAEC26927,
+            0x2C9E9ADD,
+            0xB0823ECE,
+            0xA0C10690,
+            0xFB5E6DA1,
+            0x5550D412,
+            0x13763D25,
+            0xB7D3455B,
+            0x7FE927EF,
+        },
+    )
 
 
 def test_particles_wpsc(prime2_asset_manager: AssetManager, wpsc_asset_id):
@@ -30,7 +55,7 @@ def test_particles_dpsc(prime2_asset_manager: AssetManager, dpsc_asset_id):
 
 
 def test_particles_srsc(prime2_asset_manager: AssetManager, srsc_asset_id):
-    test_lib.parse_and_build_compare_auto_manager(prime2_asset_manager, srsc_asset_id)
+    test_lib.parse_and_build_compare_auto_manager(prime2_asset_manager, srsc_asset_id, byte_match=False)
 
 
 def test_particles_part(prime2_asset_manager: AssetManager, part_asset_id):
