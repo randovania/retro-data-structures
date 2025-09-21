@@ -54,7 +54,6 @@ def prime2_area(prime2_mlvl: Mlvl) -> Area:
 
 
 # Area
-@pytest.mark.xfail(reason="This feature had never been tested and does not work")
 @pytest.mark.parametrize("active", (False, True))
 def test_add_layer(prime2_area: Area, active: bool):
     layer = prime2_area.add_layer("Test", active)
