@@ -87,7 +87,7 @@ def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
 def _compare_mrea_hashes(hash_file_name: str, encoded: bytes, asset_id: AssetId):
     hash_file = Path(__file__).parent.parent.joinpath("test_files", hash_file_name)
     with hash_file.open() as f:
-        hashes: dict[AssetId, str] = json.load(f)
+        hashes: dict[str, str] = json.load(f)
 
     mrea_hash = hashlib.sha256(encoded).digest().hex(" ")
     asset_id_key = f"{asset_id:08X}"
@@ -124,14 +124,10 @@ def test_compare_p3_hashes(prime3_asset_manager, mrea_asset_id: AssetId):
     _compare_mrea_hashes("mrea_hashes_corruption.json", encoded, mrea_asset_id)
 
 
-def test_compare_p2_add_layer_hashes(prime2_asset_manager, mlvl_asset_id: AssetId, mrea_asset_id: AssetId):
-    mlvl = prime2_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
+def test_compare_p2_add_layer_hashes(prime2_asset_manager, mrea_asset_id: AssetId):
+    mlvl = prime2_asset_manager.get_parsed_asset(prime2_asset_manager.find_mlvl_for_mrea(mrea_asset_id), type_hint=Mlvl)
 
-    try:
-        area = mlvl.get_area(mrea_asset_id)
-    except StopIteration:
-        return  # area isn't in this level
-
+    area = mlvl.get_area(mrea_asset_id)
     test_layer = area.add_layer("Test Layer")
     test_layer.add_instance("TRGR")
 

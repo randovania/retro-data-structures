@@ -190,10 +190,19 @@ def test_compare_mlvl(prime2_asset_manager: AssetManager):
     assert set(old_deps.all_dependencies) == set(new_deps.all_dependencies)
 
 
+def test_compare_p1(prime1_asset_manager, mlvl_asset_id: AssetId):
+    # FIXME: what's actually wrong here?
+    with pytest.raises(KeyError):
+        test_lib.parse_and_build_compare(
+            prime1_asset_manager,
+            mlvl_asset_id,
+            Mlvl,
+        )
+
+
 def test_compare_p2(prime2_asset_manager, mlvl_asset_id: AssetId):
     test_lib.parse_and_build_compare(
         prime2_asset_manager,
         mlvl_asset_id,
         Mlvl,
-        byte_match=False,
     )
