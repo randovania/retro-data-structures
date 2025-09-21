@@ -191,6 +191,7 @@ class AssetManager:
     _modified_resources: mapping of asset id to raw resources. When saving, these asset ids are replaced
     """
 
+    provider: FileProvider
     headers: dict[str, construct.Container]
     _paks_for_asset_id: dict[AssetId, set[str]]
     _types_for_asset_id: dict[AssetId, AssetType]
@@ -199,6 +200,7 @@ class AssetManager:
     _memory_files: dict[AssetId, BaseResource]
     _dol: MemoryDol | None = None
     _tweaks: Ntwk | None = None
+    _mrea_to_mlvl: dict[AssetId, AssetId] | None = None
 
     _in_memory_paks: dict[str, Pak]
     _custom_asset_ids: dict[str, AssetId]
@@ -259,6 +261,14 @@ class AssetManager:
         Returns an iterator of all asset ids in the available paks.
         """
         yield from self._paks_for_asset_id.keys()
+
+    def all_asset_ids_of_type(self, asset_type: str) -> Iterator[AssetId]:
+        """
+        Returns an iterator of all asset ids in the available paks that have the matching file type.
+        """
+        for asset_id in self.all_asset_ids():
+            if self.get_asset_type(asset_id) == asset_type:
+                yield asset_id
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
         original_name = _get_name(asset_id)
@@ -732,3 +742,22 @@ class AssetManager:
         self._write_custom_names(output)
         self._modified_resources = {}
         self._update_headers()
+
+    def find_mlvl_for_mrea(self, mrea_id: AssetId) -> AssetId:
+        """
+        Searches all MLVL for the one that contains the given MREA as an area.
+        Results are cached, so it'll be a fast operation in subsequent uses.
+
+        :param mrea_id: Asset ID of the MREA to search for
+        :return: Asset ID of the found MLVL
+        :raise: KeyError, if no MLVL contains the given MREA
+        """
+
+        if self._mrea_to_mlvl is None:
+            self._mrea_to_mlvl = {}
+            for mlvl_id in self.all_asset_ids_of_type("MLVL"):
+                mlvl = self._get_asset_in_memory_or_pak(mlvl_id)
+                for area in mlvl.areas:
+                    self._mrea_to_mlvl[area.mrea_asset_id] = mlvl_id
+
+        return self._mrea_to_mlvl[mrea_id]

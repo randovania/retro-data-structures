@@ -236,11 +236,7 @@ def list_dependencies(args):
     if args.asset_ids is not None:
         asset_ids = args.asset_ids
     else:
-        asset_ids = [
-            asset_id
-            for asset_id in asset_provider.all_asset_ids()
-            if asset_provider.get_asset_type(asset_id) == args.asset_type.upper()
-        ]
+        asset_ids = list(asset_provider.all_asset_ids_of_type(args.asset_type.upper()))
 
     for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
         print(f"{asset_type}: {hex(asset_id)}")
@@ -364,7 +360,7 @@ def _list_areas_command(args, asset_manager: AssetManager):
     if args.world:
         ids = [args.world]
     else:
-        ids = [i for i in asset_manager.all_asset_ids() if asset_manager.get_asset_type(i) == "MLVL"]
+        ids = list(asset_manager.all_asset_ids_of_type("MLVL"))
 
     for mlvl_id in ids:
         mlvl = asset_manager.get_file(mlvl_id, Mlvl)
@@ -478,7 +474,7 @@ def do_hash_command(args: argparse.Namespace) -> None:
                 content = f.read()
             print(f"    {hash_data(content)}")
 
-    mlvl_ids = [i for i in asset_manager.all_asset_ids() if asset_manager.get_asset_type(i) == "MLVL"]
+    mlvl_ids = list(asset_manager.all_asset_ids_of_type("MLVL"))
 
     print("Worlds:")
     for mlvl_id in mlvl_ids:
