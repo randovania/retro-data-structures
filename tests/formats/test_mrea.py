@@ -39,7 +39,15 @@ def compare_all_instances(
     mrea_asset_id: AssetId,
     all_instances: Callable[[Mrea], Iterator[ScriptInstance]],
     simple_construct: construct.Construct | None,
-):
+) -> None:
+    """
+    :param asset_manager:
+    :param mrea_asset_id: The mrea to compare.
+    :param all_instances: A callable for providing instances. See check_all_instances
+    :param simple_construct: When set, it's used to parse both the original resource and the re-built one,
+                             with the results compared. Used for byte-matching.
+    :return:
+    """
     resource = asset_manager.get_raw_asset(mrea_asset_id)
     decoded = check_all_instances(resource.data, asset_manager.target_game, all_instances)
 
