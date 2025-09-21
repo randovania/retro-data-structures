@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import construct
 import pytest
 from tests import test_lib
 
@@ -14,10 +15,39 @@ from retro_data_structures.formats.script_object import ScriptInstance
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId
 
 
-def _all_instances(mrea: Mrea):
+def check_all_instances(
+    encoded: bytes,
+    target_game: Game,
+    all_instances: Callable[[Mrea], Iterator[ScriptInstance]],
+):
+    decoded = Mrea.parse(encoded, target_game=target_game)
+    for instance in all_instances(decoded):
+        assert isinstance(instance, ScriptInstance)
+
+    return decoded
+
+
+def compare_all_instances(
+    asset_manager: AssetManager,
+    mrea_asset_id: AssetId,
+    all_instances: Callable[[Mrea], Iterator[ScriptInstance]],
+):
+    resource = asset_manager.get_raw_asset(mrea_asset_id)
+    decoded = check_all_instances(resource.data, asset_manager.target_game, all_instances)
+
+    encoded = decoded.build()
+    decoded2 = check_all_instances(encoded, asset_manager.target_game, all_instances)
+
+    assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+
+
+def _all_instances_p1_p2(mrea: Mrea):
     for layer in mrea.script_layers:
         yield from layer.instances
 
@@ -27,11 +57,7 @@ def _all_instances(mrea: Mrea):
 
 def test_parse_all_p1(prime1_asset_manager, mrea_asset_id: AssetId):
     resource = prime1_asset_manager.get_raw_asset(mrea_asset_id)
-    decoded = Mrea.parse(resource.data, target_game=prime1_asset_manager.target_game)
-    assert decoded is not None
-
-    for instance in _all_instances(decoded):
-        assert isinstance(instance, ScriptInstance)
+    check_all_instances(resource.data, prime1_asset_manager.target_game, _all_instances_p1_p2)
 
 
 def test_compare_p1(prime1_asset_manager):
@@ -44,42 +70,18 @@ def test_compare_p1(prime1_asset_manager):
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
-    resource = prime2_asset_manager.get_raw_asset(mrea_asset_id)
-
-    decoded = Mrea.parse(resource.data, target_game=prime2_asset_manager.target_game)
-    for instance in _all_instances(decoded):
-        assert isinstance(instance, ScriptInstance)
-
-    encoded = decoded.build()
-
-    decoded2 = Mrea.parse(encoded, target_game=prime2_asset_manager.target_game)
-
-    for instance in _all_instances(decoded2):
-        assert isinstance(instance, ScriptInstance)
-
-    assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2)
 
 
-@pytest.mark.skip(reason="Corruption MREA not implemented correctly")
+# @pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
     def _all_instances(mrea: Mrea):
         for layer in mrea.script_layers:
             yield from layer.instances
         yield from mrea.generated_objects_layer.instances
 
-    resource = prime3_asset_manager.get_raw_asset(mrea_asset_id)
-
-    decoded = Mrea.parse(resource.data, target_game=prime3_asset_manager.target_game)
-    for instance in _all_instances(decoded):
-        assert isinstance(instance, ScriptInstance)
-
-    encoded = decoded.build()
-
-    decoded2 = Mrea.parse(encoded, target_game=prime3_asset_manager.target_game)
-    for instance in _all_instances(decoded2):
-        assert isinstance(instance, ScriptInstance)
-
-    assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+    with pytest.raises(construct.ConstructError):
+        compare_all_instances(prime3_asset_manager, mrea_asset_id, _all_instances)
 
 
 def _compare_mrea_hashes(hash_file_name: str, encoded: bytes, asset_id: AssetId):
