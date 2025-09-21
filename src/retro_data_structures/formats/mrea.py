@@ -222,6 +222,50 @@ CompressedBlockHeader = Struct(
 )
 
 
+class MREACompressedBlock(construct.Construct):
+    def __init__(self, header_list):
+        super().__init__()
+        self.header_list = header_list
+
+    def _parse(self, stream, context, path) -> bytes:
+        header = self.header_list(context)[context._index]
+
+        if header.compressed_size:
+            subcon = PrefixedWithPaddingBefore(
+                construct.Computed(header.compressed_size), LZOCompressedBlock(header.uncompressed_size)
+            )
+        else:
+            subcon = DataSection(construct.GreedyBytes, size=lambda: construct.Computed(header.uncompressed_size))
+
+        result = subcon._parsereport(stream, context, path)
+        if len(result) != header.uncompressed_size:
+            raise construct.ConstructError(
+                f"Expected {header.uncompressed_size} bytes, got {len(result)}",
+                path,
+            )
+
+        return result
+
+    def _decode(self, obj, context, path):
+        # parse
+        raise NotImplementedError
+
+
+# This construct can
+MREAPrime2Simple = construct.Struct(
+    "header" / construct.Aligned(32, MREAHeader),
+    "data_section_sizes" / construct.Aligned(32, construct.Int32ub[construct.this.header.data_section_count]),
+    "_compressed_block_headers"
+    / construct.Aligned(32, CompressedBlockHeader[construct.this.header.compressed_block_count]),
+    "compressed_blocks"
+    / construct.Aligned(
+        32,
+        MREACompressedBlock(construct.this._compressed_block_headers),
+    )[construct.this.header.compressed_block_count],
+    construct.Terminated,
+)
+
+
 def _get_compressed_block_size(header):
     if not header.compressed_size:
         return header.uncompressed_size
@@ -292,10 +336,11 @@ class MREAConstruct(construct.Construct):
         # Decompress blocks into the data sections
         data_sections = ListContainer()
         for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
-            subcon = _get_compressed_block_subcon(
-                compressed_header.compressed_size, compressed_header.uncompressed_size
+            subcon = construct.Sequence(
+                _get_compressed_block_subcon(compressed_header.compressed_size, compressed_header.uncompressed_size),
+                construct.Terminated,
             )
-            decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)
+            decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)[0]
             if len(decompressed_block) != compressed_header.uncompressed_size:
                 raise construct.ConstructError(
                     f"Expected {compressed_header.uncompressed_size} bytes, got {len(decompressed_block)}",

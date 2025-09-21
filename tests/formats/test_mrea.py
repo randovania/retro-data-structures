@@ -9,6 +9,7 @@ import construct
 import pytest
 from tests import test_lib
 
+from retro_data_structures.formats import mrea
 from retro_data_structures.formats.mlvl import Mlvl
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_object import ScriptInstance
@@ -37,6 +38,7 @@ def compare_all_instances(
     asset_manager: AssetManager,
     mrea_asset_id: AssetId,
     all_instances: Callable[[Mrea], Iterator[ScriptInstance]],
+    simple_construct: construct.Construct | None,
 ):
     resource = asset_manager.get_raw_asset(mrea_asset_id)
     decoded = check_all_instances(resource.data, asset_manager.target_game, all_instances)
@@ -45,6 +47,10 @@ def compare_all_instances(
     decoded2 = check_all_instances(encoded, asset_manager.target_game, all_instances)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+    if simple_construct is not None:
+        assert test_lib.purge_hidden(simple_construct.parse(resource.data)) == test_lib.purge_hidden(
+            simple_construct.parse(encoded)
+        )
 
 
 def _all_instances_p1_p2(mrea: Mrea):
@@ -70,7 +76,7 @@ def test_compare_p1(prime1_asset_manager):
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
-    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2)
+    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREAPrime2Simple)
 
 
 # @pytest.mark.skip(reason="Corruption MREA not implemented correctly")
@@ -81,7 +87,7 @@ def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
         yield from mrea.generated_objects_layer.instances
 
     with pytest.raises(construct.ConstructError):
-        compare_all_instances(prime3_asset_manager, mrea_asset_id, _all_instances)
+        compare_all_instances(prime3_asset_manager, mrea_asset_id, _all_instances, None)
 
 
 def _compare_mrea_hashes(hash_file_name: str, encoded: bytes, asset_id: AssetId):
