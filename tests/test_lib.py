@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import construct
+from construct.lib import ListContainer
 from construct.lib.containers import Container
 
 if TYPE_CHECKING:
@@ -49,9 +50,15 @@ def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fal
     return (raw, encoded, data)
 
 
-def purge_hidden(data: Container) -> Container:
-    data = {k: v for k, v in data.items() if not k.startswith("_")}
-    return {k: purge_hidden(v) if isinstance(v, Container) else v for k, v in data.items()}
+def purge_hidden(data: Container | ListContainer) -> Container:
+    if isinstance(data, ListContainer):
+        return [purge_hidden(it) if isinstance(it, Container | ListContainer) else it for it in data]
+
+    return {
+        k: purge_hidden(v) if isinstance(v, Container | ListContainer) else v
+        for k, v in data.items()
+        if not k.startswith("_")
+    }
 
 
 def parse_and_build_compare_auto_manager(

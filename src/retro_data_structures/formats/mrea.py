@@ -222,16 +222,51 @@ CompressedBlockHeader = Struct(
 )
 
 
-def _get_compressed_block_size(header):
-    if not header.compressed_size:
-        return header.uncompressed_size
-    return header.compressed_size + (-header.compressed_size % 32)
+class MREACompressedBlock(construct.Construct):
+    """
+    Reads and decompresses a single compressed block in the MREA.
+    Expects a _index in the context to know which header to use.
+
+    No support for building.
+    """
+
+    def __init__(self, header_list):
+        super().__init__()
+        self.header_list = header_list
+
+    def _parse(self, stream, context, path) -> bytes:
+        header = self.header_list(context)[context._index]
+
+        if header.compressed_size:
+            subcon = PrefixedWithPaddingBefore(
+                construct.Computed(header.compressed_size), LZOCompressedBlock(header.uncompressed_size)
+            )
+        else:
+            subcon = DataSection(construct.GreedyBytes, size=lambda: construct.Computed(header.uncompressed_size))
+
+        result = subcon._parsereport(stream, context, path)
+        if len(result) != header.uncompressed_size:
+            raise construct.ConstructError(
+                f"Expected {header.uncompressed_size} bytes, got {len(result)}",
+                path,
+            )
+
+        return result
 
 
-def _get_compressed_block_subcon(compressed_size, uncompressed_size):
-    if compressed_size:
-        return PrefixedWithPaddingBefore(Computed(compressed_size), LZOCompressedBlock(uncompressed_size))
-    return DataSection(GreedyBytes, size=lambda: Computed(uncompressed_size))
+# This construct decodes the minimum necessary to read the whole file and decompress everything.
+MREAPrime2Simple = construct.Struct(
+    "header" / construct.Aligned(32, MREAHeader),
+    "data_section_sizes" / construct.Aligned(32, construct.Int32ub[construct.this.header.data_section_count]),
+    "_compressed_block_headers"
+    / construct.Aligned(32, CompressedBlockHeader[construct.this.header.compressed_block_count]),
+    "compressed_blocks"
+    / construct.Aligned(
+        32,
+        MREACompressedBlock(construct.this._compressed_block_headers),
+    )[construct.this.header.compressed_block_count],
+    construct.Terminated,
+)
 
 
 def _decode_category(category: list[bytes], subcon: construct.Construct, context, path):
@@ -278,32 +313,17 @@ class MREAConstruct(construct.Construct):
             Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
         )
 
-        # Read compressed blocks from stream
-        compressed_blocks = construct.ListContainer(
-            self._aligned_parse(
-                FixedSized(_get_compressed_block_size(header), GreedyBytes),
-                stream,
-                context,
-                path,
-            )
-            for header in compressed_block_headers
-        )
+        context.compressed_block_headers = compressed_block_headers
+        compressed_block_construct = Aligned(32, MREACompressedBlock(construct.this.compressed_block_headers))
 
         # Decompress blocks into the data sections
         data_sections = ListContainer()
-        for compressed_header, compressed_block in zip(compressed_block_headers, compressed_blocks):
-            subcon = _get_compressed_block_subcon(
-                compressed_header.compressed_size, compressed_header.uncompressed_size
-            )
-            decompressed_block = subcon._parsereport(io.BytesIO(compressed_block), context, path)
-            if len(decompressed_block) != compressed_header.uncompressed_size:
-                raise construct.ConstructError(
-                    f"Expected {compressed_header.uncompressed_size} bytes, got {len(decompressed_block)}",
-                    path,
-                )
-            offset = 0
+        for i, compressed_header in enumerate(compressed_block_headers):
+            context._index = i
+            decompressed_block = compressed_block_construct._parsereport(stream, context, path)
 
-            for i in range(compressed_header.data_section_count):
+            offset = 0
+            for _ in range(compressed_header.data_section_count):
                 section_size = data_section_sizes[len(data_sections)]
                 data = decompressed_block[offset : offset + section_size]
                 data_sections.append(data)
