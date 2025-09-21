@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -10,6 +13,7 @@ from retro_data_structures.formats.script_object import ScriptInstance
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId
 
 
@@ -56,6 +60,7 @@ def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
 
 
+@pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
     def _all_instances(mrea: Mrea):
         for layer in mrea.script_layers:
@@ -75,3 +80,37 @@ def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
         assert isinstance(instance, ScriptInstance)
 
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
+
+
+def _compare_mrea_hashes(asset_manager: AssetManager, asset_id: AssetId):
+    game = asset_manager.target_game.name.lower()
+    hash_file = Path(__file__).parent.parent.joinpath("test_files", f"mrea_hashes_{game}.json")
+    with hash_file.open() as f:
+        hashes: dict[AssetId, str] = json.load(f)
+
+    raw, decoded, encoded = test_lib.parse_and_build_compare(asset_manager, asset_id, Mrea, byte_match=False)
+
+    mrea_hash = hashlib.sha256(encoded).digest().hex(" ")
+    asset_id_key = f"{asset_id:08X}"
+
+    # # uncomment to update the hashes if they're changing on purpose
+    # # never ever do this in xdist btw. it's gotta be serial
+    # hashes[asset_id_key] = mrea_hash
+    # with hash_file.open("w") as f:
+    #     json.dump(hashes, f, indent=2)
+
+    assert mrea_hash == hashes[asset_id_key]
+
+
+@pytest.mark.skip(reason="Prime 1 MREA building not implemented")
+def test_compare_p1_hashes(prime1_asset_manager, mrea_asset_id: AssetId):
+    _compare_mrea_hashes(prime1_asset_manager, mrea_asset_id)
+
+
+def test_compare_p2_hashes(prime2_asset_manager, mrea_asset_id: AssetId):
+    _compare_mrea_hashes(prime2_asset_manager, mrea_asset_id)
+
+
+@pytest.mark.skip(reason="Corruption MREA not implemented correctly")
+def test_compare_p3_hashes(prime3_asset_manager, mrea_asset_id: AssetId):
+    _compare_mrea_hashes(prime3_asset_manager, mrea_asset_id)

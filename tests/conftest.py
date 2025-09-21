@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Generator
 from pathlib import Path
+from typing import TypeVar
 
 import pytest
 
@@ -10,6 +12,9 @@ from retro_data_structures.game_check import Game
 from tests import test_lib
 
 _FAIL_INSTEAD_OF_SKIP = False
+
+T = TypeVar("T")
+YieldFixture = Generator[T, None, None]
 
 
 def get_env_or_skip(env_name):
@@ -77,19 +82,19 @@ def internal_prime3_asset_manager(prime3_iso_provider):
 
 
 @pytest.fixture()
-def prime1_asset_manager(internal_prime1_asset_manager):
+def prime1_asset_manager(internal_prime1_asset_manager) -> YieldFixture[AssetManager]:
     yield internal_prime1_asset_manager
     internal_prime1_asset_manager._memory_files.clear()
 
 
 @pytest.fixture()
-def prime2_asset_manager(internal_prime2_asset_manager):
+def prime2_asset_manager(internal_prime2_asset_manager) -> YieldFixture[AssetManager]:
     yield internal_prime2_asset_manager
     internal_prime2_asset_manager._memory_files.clear()
 
 
 @pytest.fixture()
-def prime3_asset_manager(internal_prime3_asset_manager):
+def prime3_asset_manager(internal_prime3_asset_manager) -> YieldFixture[AssetManager]:
     yield internal_prime3_asset_manager
     internal_prime3_asset_manager._memory_files.clear()
 
