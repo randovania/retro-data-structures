@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING
 import pytest
 from tests import test_lib
 
+from retro_data_structures.formats.mlvl import Mlvl
 from retro_data_structures.formats.mrea import Mrea
 from retro_data_structures.formats.script_object import ScriptInstance
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
-    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId
 
 
@@ -82,13 +82,10 @@ def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
     assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
 
 
-def _compare_mrea_hashes(asset_manager: AssetManager, asset_id: AssetId):
-    game = asset_manager.target_game.name.lower()
-    hash_file = Path(__file__).parent.parent.joinpath("test_files", f"mrea_hashes_{game}.json")
+def _compare_mrea_hashes(hash_file_name: str, encoded: bytes, asset_id: AssetId):
+    hash_file = Path(__file__).parent.parent.joinpath("test_files", hash_file_name)
     with hash_file.open() as f:
         hashes: dict[AssetId, str] = json.load(f)
-
-    raw, decoded, encoded = test_lib.parse_and_build_compare(asset_manager, asset_id, Mrea, byte_match=False)
 
     mrea_hash = hashlib.sha256(encoded).digest().hex(" ")
     asset_id_key = f"{asset_id:08X}"
@@ -104,13 +101,39 @@ def _compare_mrea_hashes(asset_manager: AssetManager, asset_id: AssetId):
 
 @pytest.mark.skip(reason="Prime 1 MREA building not implemented")
 def test_compare_p1_hashes(prime1_asset_manager, mrea_asset_id: AssetId):
-    _compare_mrea_hashes(prime1_asset_manager, mrea_asset_id)
+    raw, decoded, encoded = test_lib.parse_and_build_compare(
+        prime1_asset_manager, mrea_asset_id, Mrea, byte_match=False
+    )
+    _compare_mrea_hashes("mrea_hashes_prime.json", encoded, mrea_asset_id)
 
 
 def test_compare_p2_hashes(prime2_asset_manager, mrea_asset_id: AssetId):
-    _compare_mrea_hashes(prime2_asset_manager, mrea_asset_id)
+    raw, decoded, encoded = test_lib.parse_and_build_compare(
+        prime2_asset_manager, mrea_asset_id, Mrea, byte_match=False
+    )
+    _compare_mrea_hashes("mrea_hashes_echoes.json", encoded, mrea_asset_id)
 
 
 @pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3_hashes(prime3_asset_manager, mrea_asset_id: AssetId):
-    _compare_mrea_hashes(prime3_asset_manager, mrea_asset_id)
+    raw, decoded, encoded = test_lib.parse_and_build_compare(
+        prime3_asset_manager, mrea_asset_id, Mrea, byte_match=False
+    )
+    _compare_mrea_hashes("mrea_hashes_corruption.json", encoded, mrea_asset_id)
+
+
+def test_compare_p2_add_layer_hashes(prime2_asset_manager, mlvl_asset_id: AssetId, mrea_asset_id: AssetId):
+    mlvl = prime2_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
+
+    try:
+        area = mlvl.get_area(mrea_asset_id)
+    except StopIteration:
+        return  # area isn't in this level
+
+    test_layer = area.add_layer("Test Layer")
+    test_layer.add_instance("TRGR")
+
+    mlvl_encoded = mlvl.build()
+    mrea_encoded = area.mrea.build()
+
+    _compare_mrea_hashes("mrea_hashes_echoes_add_layer.json", mlvl_encoded + mrea_encoded, mrea_asset_id)

@@ -124,13 +124,13 @@ def pytest_generate_tests(metafunc):
 
             for fixture_name in asset_id_fixtures:
                 asset_type = fixture_name[: -len("_asset_id")]
-                asset_ids = [
+                asset_id_params = [
                     pytest.param(asset.id, id=f"0x{asset.id:08x}")
                     for asset in asset_ids
                     if asset.type.lower() == asset_type
                 ]
-                if asset_ids:
-                    metafunc.parametrize(fixture_name, asset_ids)
+                if asset_id_params:
+                    metafunc.parametrize(fixture_name, asset_id_params)
 
 
 def pytest_addoption(parser):

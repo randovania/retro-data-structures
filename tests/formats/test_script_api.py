@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums
-
 from retro_data_structures.formats import script_object
 from retro_data_structures.formats.script_object import InstanceId
 
@@ -54,7 +54,6 @@ def prime2_area(prime2_mlvl: Mlvl) -> Area:
 
 
 # Area
-@pytest.mark.xfail(reason="This feature had never been tested and does not work")
 @pytest.mark.parametrize("active", (False, True))
 def test_add_layer(prime2_area: Area, active: bool):
     layer = prime2_area.add_layer("Test", active)

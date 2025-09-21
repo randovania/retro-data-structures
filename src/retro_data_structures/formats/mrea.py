@@ -702,7 +702,8 @@ class Area:
         return next(layer for layer in self.layers if layer.name == name)
 
     def add_layer(self, name: str, active: bool = True) -> ScriptLayer:
-        index = len(self._layer_names)
+        layers = list(self.layers)  # doing this has the side effect of ensuring the layer list exists
+        index = len(layers)
         self._layer_names.append(name)
         self._flags.append(active)
         self.module_dependencies.append([])
