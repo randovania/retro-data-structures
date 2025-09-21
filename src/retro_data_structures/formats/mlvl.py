@@ -32,6 +32,7 @@ from construct import (
 
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency, NameOrAssetId
 from retro_data_structures.common_types import AssetId32, AssetId64, Vector3
+from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.misc import PrefixedArrayWithExtra
 from retro_data_structures.exceptions import UnknownAssetId
 from retro_data_structures.formats import Mapw
@@ -219,6 +220,9 @@ def create(version: int, asset_id):
             ]
         )
     )
+
+    fields.append(AlignTo(32, b"\xff"))
+    fields.append(construct.Terminated)
 
     return Struct(*fields)
 
