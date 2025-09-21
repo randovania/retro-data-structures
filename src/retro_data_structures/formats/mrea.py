@@ -247,7 +247,7 @@ class MREACompressedBlock(construct.Construct):
         return result
 
 
-# This construct can
+# This construct decodes the minimum necessary to read the whole file and decompress everything.
 MREAPrime2Simple = construct.Struct(
     "header" / construct.Aligned(32, MREAHeader),
     "data_section_sizes" / construct.Aligned(32, construct.Int32ub[construct.this.header.data_section_count]),
