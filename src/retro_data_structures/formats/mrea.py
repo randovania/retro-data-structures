@@ -223,6 +223,13 @@ CompressedBlockHeader = Struct(
 
 
 class MREACompressedBlock(construct.Construct):
+    """
+    Reads and decompresses a single compressed block in the MREA.
+    Expects a _index in the context to know which header to use.
+
+    No support for building.
+    """
+
     def __init__(self, header_list):
         super().__init__()
         self.header_list = header_list
