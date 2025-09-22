@@ -76,8 +76,8 @@ def _compressed_resources():
 
 
 @pytest.mark.parametrize("pakfile", paks)
-def test_identical_when_keep_data(prime3_iso_provider, pakfile):
-    with prime3_iso_provider.open_binary(pakfile + ".pak") as f:
+def test_identical_when_keep_data(prime3_provider, pakfile):
+    with prime3_provider.open_binary(pakfile + ".pak") as f:
         raw = f.read()
 
     decoded = Pak.parse(raw, target_game=Game.CORRUPTION)
@@ -86,10 +86,10 @@ def test_identical_when_keep_data(prime3_iso_provider, pakfile):
     assert raw == encoded
 
 
-def test_compare_header_keep_data(prime3_iso_provider):
+def test_compare_header_keep_data(prime3_provider):
     game = Game.CORRUPTION
     for pakfile in paks:
-        with prime3_iso_provider.open_binary(pakfile + ".pak") as f:
+        with prime3_provider.open_binary(pakfile + ".pak") as f:
             raw = f.read()
 
         raw_header = PAKNoData.parse(raw, target_game=game)
