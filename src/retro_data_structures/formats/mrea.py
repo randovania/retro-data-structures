@@ -44,7 +44,7 @@ from retro_data_structures.formats.world_geometry import lazy_world_geometry
 from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Sequence
 
     from typing_extensions import Self
 
@@ -322,11 +322,13 @@ class MREAConstruct(construct.Construct):
     def _aligned_parse(self, conn: construct.Construct, stream, context, path):
         return Aligned(32, conn)._parsereport(stream, context, path)
 
-    def _decode_compressed_blocks(self, mrea_header, data_section_sizes, stream, context, path) -> list[bytes]:
-        compressed_block_headers = self._aligned_parse(
-            Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
-        )
-
+    def _decode_compressed_blocks(
+        self, compressed_block_headers: Sequence[Container], data_section_sizes: Sequence[int], stream, context, path
+    ) -> list[bytes]:
+        """
+        Reads and decodes a list of compressed blocks, described by the given headers,
+        and splits it into a list of data sections.
+        """
         context.compressed_block_headers = compressed_block_headers
         compressed_block_construct = Aligned(32, MREACompressedBlock(construct.this.compressed_block_headers))
 
@@ -350,7 +352,12 @@ class MREAConstruct(construct.Construct):
         data_section_sizes = self._aligned_parse(Array(mrea_header.data_section_count, Int32ub), stream, context, path)
 
         if mrea_header.compressed_block_count is not None:
-            data_sections = self._decode_compressed_blocks(mrea_header, data_section_sizes, stream, context, path)
+            compressed_block_headers = self._aligned_parse(
+                Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
+            )
+            data_sections = self._decode_compressed_blocks(
+                compressed_block_headers, data_section_sizes, stream, context, path
+            )
         else:
             data_sections = Array(
                 mrea_header.data_section_count,
