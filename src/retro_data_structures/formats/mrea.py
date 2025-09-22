@@ -13,7 +13,7 @@ from enum import IntEnum
 from functools import cached_property
 
 import construct
-from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Struct
+from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Struct, this
 from construct.core import (
     Array,
     Computed,
@@ -29,7 +29,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AssetId32, FourCC, String, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
-from retro_data_structures.construct_extensions.alignment import PrefixedWithPaddingBefore
+from retro_data_structures.construct_extensions.alignment import AlignTo, PrefixedWithPaddingBefore
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
@@ -185,32 +185,41 @@ MREAHeader = Aligned(
         "script_layer_count" / WithVersion(MREAVersion.Echoes, Int32ub),
         # Number of data sections in the file.
         "data_section_count" / Int32ub,
-        # Section index for world geometry data. Always 0; starts on materials.
-        "geometry_section" / Int32ub,
-        # Section index for script layer data.
-        "script_layers_section" / Int32ub,
-        # Section index for generated script object data.
-        "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-        # Section index for collision data.
-        "collision_section" / Int32ub,
-        # Section index for first unknown section.
-        "unknown_section_1" / Int32ub,
-        # Section index for light data.
-        "lights_section" / Int32ub,
-        # Section index for visibility tree data.
-        "visibility_tree_section" / Int32ub,
-        # Section index for path data.
-        "path_section" / Int32ub,
-        # Section index for area octree data.
-        "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
-        # Section index for second unknown section.
-        "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
-        # Section index for portal area data.
-        "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
-        # Section index for static geometry map data.
-        "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Index table for sections.
+        "section_index"
+        / BeforeVersion(
+            MREAVersion.Corruption,
+            Struct(
+                # Section index for world geometry data. Always 0; starts on materials.
+                "geometry_section" / Int32ub,
+                # Section index for script layer data.
+                "script_layers_section" / Int32ub,
+                # Section index for generated script object data.
+                "generated_script_objects_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for collision data.
+                "collision_section" / Int32ub,
+                # Section index for first unknown section.
+                "unknown_section_1" / Int32ub,
+                # Section index for light data.
+                "lights_section" / Int32ub,
+                # Section index for visibility tree data.
+                "visibility_tree_section" / Int32ub,
+                # Section index for path data.
+                "path_section" / Int32ub,
+                # Section index for area octree data.
+                "area_octree_section" / BeforeVersion(MREAVersion.EchoesDemo, Int32ub),
+                # Section index for second unknown section.
+                "unknown_section_2" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for portal area data.
+                "portal_area_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+                # Section index for static geometry map data.
+                "static_geometry_map_section" / WithVersion(MREAVersion.Echoes, Int32ub),
+            ),
+        ),
         # Number of compressed data blocks in the file.
         "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+        # Number of section numbers at the end of the header.
+        "section_number_count" / WithVersion(MREAVersion.Corruption, Int32ub),
     ),
 )
 
@@ -254,17 +263,22 @@ class MREACompressedBlock(construct.Construct):
         return result
 
 
+SectionIndex = Struct(
+    "type" / FourCC,
+    "index" / Int32ub,
+)
+
 # This construct decodes the minimum necessary to read the whole file and decompress everything.
-MREAPrime2Simple = construct.Struct(
-    "header" / construct.Aligned(32, MREAHeader),
-    "data_section_sizes" / construct.Aligned(32, construct.Int32ub[construct.this.header.data_section_count]),
-    "_compressed_block_headers"
-    / construct.Aligned(32, CompressedBlockHeader[construct.this.header.compressed_block_count]),
+# Not compatible with Prime 1
+MREASimple = Struct(
+    "header" / Aligned(32, MREAHeader),
+    "version" / Computed(this.header.version),
+    "data_section_sizes" / Aligned(32, Int32ub[this.header.data_section_count]),
+    "_compressed_block_headers" / Aligned(32, CompressedBlockHeader[this.header.compressed_block_count]),
+    "section_index" / WithVersion(MREAVersion.Corruption, Aligned(32, SectionIndex[this.header.section_number_count])),
     "compressed_blocks"
-    / construct.Aligned(
-        32,
-        MREACompressedBlock(construct.this._compressed_block_headers),
-    )[construct.this.header.compressed_block_count],
+    / Aligned(32, MREACompressedBlock(this._compressed_block_headers))[this.header.compressed_block_count],
+    WithVersion(MREAVersion.Corruption, AlignTo(64, b"\xff")),
     construct.Terminated,
 )
 
@@ -345,7 +359,9 @@ class MREAConstruct(construct.Construct):
 
         # Split data sections into the named sections
         categories = [
-            {"label": label, "value": mrea_header[label]} for label in _all_categories if mrea_header[label] is not None
+            {"label": label, "value": mrea_header.section_index[label]}
+            for label in _all_categories
+            if mrea_header.section_index[label] is not None
         ]
         categories.sort(key=lambda c: c["value"])
 
@@ -462,17 +478,18 @@ class MREAConstruct(construct.Construct):
 
         # Combine all sections into the data sections array
         data_sections = ListContainer()
+        mrea_header.section_index = Container()
 
         for category in _all_categories:
             if category in raw_sections:
-                mrea_header[category] = len(data_sections)
+                mrea_header.section_index[category] = len(data_sections)
                 data_sections.extend(raw_sections[category])
             else:
-                mrea_header[category] = None
+                mrea_header.section_index[category] = None
 
         # Compress the data sections
         if int(obj.version) >= MREAVersion.Echoes.value:
-            compressed_blocks = self._encode_compressed_blocks(data_sections, mrea_header, context, path)
+            compressed_blocks = self._encode_compressed_blocks(data_sections, mrea_header.section_index, context, path)
             mrea_header.compressed_block_count = len(compressed_blocks)
         else:
             compressed_blocks = None
@@ -483,6 +500,7 @@ class MREAConstruct(construct.Construct):
         mrea_header.world_model_count = obj.world_model_count
         mrea_header.script_layer_count = len(raw_sections.script_layers_section)
         mrea_header.data_section_count = len(data_sections)
+        mrea_header.section_number_count = len(mrea_header.section_index)
 
         MREAHeader._build(mrea_header, stream, context, path)
         Aligned(32, Array(mrea_header.data_section_count, Int32ub))._build(
