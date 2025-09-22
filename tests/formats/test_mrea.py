@@ -124,7 +124,6 @@ def test_compare_p2_hashes(prime2_asset_manager, mrea_asset_id: AssetId):
     _compare_mrea_hashes("mrea_hashes_echoes.json", encoded, mrea_asset_id)
 
 
-@pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3_hashes(prime3_asset_manager, mrea_asset_id: AssetId):
     raw, decoded, encoded = test_lib.parse_and_build_compare(
         prime3_asset_manager, mrea_asset_id, Mrea, byte_match=False
