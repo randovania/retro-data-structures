@@ -41,6 +41,7 @@ Homepage = "https://github.com/randovania/retro-data-structures"
 test = [
     "nod",
     "pytest",
+    "pytest-codspeed>=4.0.0",
     "pytest-cov",
     # "pytest-asyncio",
     # "pytest-mock",
