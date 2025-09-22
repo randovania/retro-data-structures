@@ -15,7 +15,6 @@ from functools import cached_property
 import construct
 from construct import Adapter, Aligned, If, Int32ub, PrefixedArray, Rebuild, Struct, this
 from construct.core import (
-    Array,
     Computed,
     Const,
     Enum,
@@ -171,6 +170,13 @@ _CATEGORY_ENCODINGS = {
     ),
 }
 
+CompressedBlockHeader = Struct(
+    buffer_size=Int32ub,
+    uncompressed_size=Int32ub,
+    compressed_size=Int32ub,
+    data_section_count=Int32ub,
+)
+
 MREAHeader = Struct(
     "magic" / Const(0xDEADBEEF, Int32ub),
     "version" / Enum(Int32ub, MREAVersion),
@@ -215,18 +221,14 @@ MREAHeader = Struct(
         ),
     ),
     # Number of compressed data blocks in the file.
-    "compressed_block_count" / WithVersion(MREAVersion.Echoes, Int32ub),
+    "compressed_block_count"
+    / WithVersion(MREAVersion.Echoes, Rebuild(Int32ub, construct.len_(this._compressed_block_headers))),
     # Number of section numbers at the end of the header.
     "section_number_count" / WithVersion(MREAVersion.Corruption, Int32ub),
     AlignTo(32),
     "data_section_sizes" / Aligned(32, Int32ub[this._data_section_count]),
-)
-
-CompressedBlockHeader = Struct(
-    buffer_size=Int32ub,
-    uncompressed_size=Int32ub,
-    compressed_size=Int32ub,
-    data_section_count=Int32ub,
+    "_compressed_block_headers"
+    / WithVersion(MREAVersion.Echoes, Aligned(32, CompressedBlockHeader[this.compressed_block_count])),
 )
 
 
@@ -272,10 +274,9 @@ SectionIndex = Struct(
 MREASimple = Struct(
     "header" / Aligned(32, MREAHeader),
     "version" / Computed(this.header.version),
-    "_compressed_block_headers" / Aligned(32, CompressedBlockHeader[this.header.compressed_block_count]),
     "section_index" / WithVersion(MREAVersion.Corruption, Aligned(32, SectionIndex[this.header.section_number_count])),
     "compressed_blocks"
-    / Aligned(32, MREACompressedBlock(this._compressed_block_headers))[this.header.compressed_block_count],
+    / Aligned(32, MREACompressedBlock(this.header._compressed_block_headers))[this.header.compressed_block_count],
     WithVersion(MREAVersion.Corruption, AlignTo(64, b"\xff")),
     construct.Terminated,
 )
@@ -348,12 +349,9 @@ class MREAConstruct(construct.Construct):
     def _parse(self, stream, context, path):
         mrea_header = MREAHeader._parsereport(stream, context, path)
 
-        if mrea_header.compressed_block_count is not None:
-            compressed_block_headers = self._aligned_parse(
-                Array(mrea_header.compressed_block_count, CompressedBlockHeader), stream, context, path
-            )
+        if mrea_header._compressed_block_headers is not None:
             data_sections = self._decode_compressed_blocks(
-                compressed_block_headers, mrea_header.data_section_sizes, stream, context, path
+                mrea_header._compressed_block_headers, mrea_header.data_section_sizes, stream, context, path
             )
         else:
             data_sections = []
@@ -493,7 +491,6 @@ class MREAConstruct(construct.Construct):
         # Compress the data sections
         if int(obj.version) >= MREAVersion.Echoes.value:
             compressed_blocks = self._encode_compressed_blocks(data_sections, mrea_header.section_index, context, path)
-            mrea_header.compressed_block_count = len(compressed_blocks)
         else:
             compressed_blocks = None
             raise NotImplementedError
@@ -504,15 +501,10 @@ class MREAConstruct(construct.Construct):
         mrea_header.script_layer_count = len(raw_sections.script_layers_section)
         mrea_header.section_number_count = len(mrea_header.section_index)
         mrea_header.data_section_sizes = [len(section) for section in data_sections]
+        mrea_header._compressed_block_headers = [block.header for block in compressed_blocks]
 
         MREAHeader._build(mrea_header, stream, context, path)
         if compressed_blocks is not None:
-            Aligned(32, Array(mrea_header.compressed_block_count, CompressedBlockHeader))._build(
-                [block.header for block in compressed_blocks],
-                stream,
-                context,
-                path,
-            )
             for compressed_block in compressed_blocks:
                 block_header = compressed_block.header
                 if block_header.compressed_size:
