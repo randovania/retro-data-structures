@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums
+
 from retro_data_structures.formats import script_object
 from retro_data_structures.formats.script_layer import SCLY
 from retro_data_structures.formats.script_object import InstanceId
