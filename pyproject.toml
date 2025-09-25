@@ -55,7 +55,7 @@ typing = [
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
 write_to = "src/retro_data_structures/version.py"
-git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
+scm.git.describe_command = "git describe --dirty --tags --long --match v[0-9]*"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
