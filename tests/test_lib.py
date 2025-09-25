@@ -89,9 +89,9 @@ def parse_and_build_compare(
     resource = asset_manager.get_raw_asset(asset_id)
     assert resource.type == resource_class.resource_type()
 
-    decoded = resource_class.parse(resource.data, target_game=asset_manager.target_game)
+    decoded = resource_class.parse(resource.data, target_game=asset_manager.target_game, asset_manager=asset_manager)
     if print_data:
-        print(decoded)
+        print(decoded.raw)
 
     encoded = decoded.build()
 
