@@ -251,7 +251,17 @@ class Txtr(BaseResource):
         return self._raw.header.mipmap_count
 
     @property
-    def image_data(self) -> list[Image.Image]:
+    def main_image_data(self) -> Image.Image:
+        """
+        Decodes the main image, ignoring all mipmaps.
+        """
+        return _extract_image(io.BytesIO(self._raw.image_data), self.width, self.height, self.format)
+
+    @property
+    def all_image_data(self) -> list[Image.Image]:
+        """
+        Decodes the texture data, including all mipmaps.
+        """
         result = []
 
         image_data = io.BytesIO(self._raw.image_data)
