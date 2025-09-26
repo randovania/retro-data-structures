@@ -7,6 +7,7 @@ from __future__ import annotations
 import enum
 import io
 import math
+import struct
 import typing
 
 import construct
@@ -89,13 +90,17 @@ def _get_blocks_ia8(image_data: io.BytesIO) -> Iterator[ColorTuple]:
         yield intensity, intensity, intensity, alpha
 
 
+def _decode_rgb565(value: int) -> ColorTuple:
+    red = value >> 11
+    green = (value >> 5) & 0b111111
+    blue = value & 0b11111
+    return red * 0x8, green * 0x4, blue * 0x8, 0xFF
+
+
 def _get_blocks_rgb565(image_data: io.BytesIO) -> Iterator[ColorTuple]:
     for _ in range(16):
         value = int.from_bytes(image_data.read(2), "big")
-        red = value >> 11
-        green = (value >> 5) & 0b111111
-        blue = value & 0b11111
-        yield red * 0x8, green * 0x4, blue * 0x8, 0xFF
+        yield _decode_rgb565(value)
 
 
 def _get_blocks_rgb5a3(image_data: io.BytesIO) -> Iterator[ColorTuple]:
@@ -115,6 +120,55 @@ def _get_blocks_rgb5a3(image_data: io.BytesIO) -> Iterator[ColorTuple]:
             yield red * 0x11, green * 0x11, blue * 0x11, alpha * 0x20
 
 
+def _interpolate(a: ColorTuple, b: ColorTuple, r: float) -> ColorTuple:
+    rev = 1 - r
+    return (
+        int(a[0] * r + b[0] * rev),
+        int(a[1] * r + b[1] * rev),
+        int(a[2] * r + b[2] * rev),
+        int(a[3] * r + b[3] * rev),
+    )
+
+
+def _get_sub_block_cmpr(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+    """"""
+    palette_a, palette_b = struct.unpack(">HH", image_data.read(4))
+    palettes = [_decode_rgb565(palette_a), _decode_rgb565(palette_b)]
+
+    if palette_a > palette_b:
+        palettes.append(_interpolate(palettes[0], palettes[1], 2 / 3))
+        palettes.append(_interpolate(palettes[0], palettes[1], 1 / 3))
+    else:
+        palettes.append(_interpolate(palettes[0], palettes[1], 1 / 2))
+        palettes.append((0, 0, 0, 0))
+
+    for y in range(4):
+        b = int.from_bytes(image_data.read(1))
+        for x in range(4):
+            shift = 6 - x * 2
+            yield palettes[(b >> shift) & 0x3]
+
+
+def _get_blocks_cmpr(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+    """
+    A CMPR block (of size 8x8) consists for 4 subblocks of size 4x4.
+    Read all these blocks, then reorder the results as expected from _get_block_data.
+    """
+    rows = [[] for _ in range(8)]
+
+    for y in range(2):
+        for x in range(2):
+            sub_block = list(_get_sub_block_cmpr(image_data))
+            rows[4 * y + 0].extend(sub_block[0:4])
+            rows[4 * y + 1].extend(sub_block[4:8])
+            rows[4 * y + 2].extend(sub_block[8:12])
+            rows[4 * y + 3].extend(sub_block[12:16])
+            assert len(sub_block) == 16
+
+    for row in rows:
+        yield from row
+
+
 _GET_BLOCKS_FUNCTIONS = {
     ImageFormat.I4: _get_blocks_i4,
     ImageFormat.I8: _get_blocks_i8,
@@ -122,10 +176,15 @@ _GET_BLOCKS_FUNCTIONS = {
     ImageFormat.IA8: _get_blocks_ia8,
     ImageFormat.RGB565: _get_blocks_rgb565,
     ImageFormat.RGB5A3: _get_blocks_rgb5a3,
+    ImageFormat.CMPR: _get_blocks_cmpr,
 }
 
 
 def _get_block_data(image_data: io.BytesIO, image_format: ImageFormat) -> list[list[ColorTuple]]:
+    """
+    Gets a two-dimensional structure of pixel colors.
+    Delegates to _GET_BLOCKS_FUNCTIONS to get a sequence of parsed blocks, then handles the width/height.
+    """
     block_generator = _GET_BLOCKS_FUNCTIONS[image_format](image_data)
 
     block_width, block_height = _BLOCK_SIZES[image_format]
