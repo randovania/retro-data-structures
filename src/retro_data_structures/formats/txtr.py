@@ -18,7 +18,7 @@ from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Sequence
 
     from retro_data_structures.game_check import Game
 
@@ -43,7 +43,7 @@ _BLOCK_SIZES = {
     ImageFormat.IA4: (8, 4),
     ImageFormat.IA8: (4, 4),
     ImageFormat.C4: (8, 8),
-    ImageFormat.C8: (8, 8),
+    ImageFormat.C8: (8, 4),
     ImageFormat.C14x2: (4, 4),
     ImageFormat.RGB565: (4, 4),
     ImageFormat.RGB5A3: (4, 4),
@@ -57,6 +57,11 @@ TXTRHeader = Struct(
     height=Int16ub,
     mipmap_count=Int32ub,
 )
+PaletteHeader = Struct(
+    format=Int32ub,
+    width=Int16ub,
+    height=Int16ub,
+)
 TXTR = Struct(
     header=TXTRHeader,
     image_data=GreedyBytes,
@@ -65,7 +70,30 @@ TXTR = Struct(
 ColorTuple = tuple[int, int, int, int]
 
 
-def _get_blocks_i4(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _read_palette(image_data: io.BytesIO) -> Sequence[ColorTuple]:
+    header = PaletteHeader.parse_stream(image_data)
+
+    match header.format:
+        case 0:  # IA8
+
+            def decode(d: bytes) -> ColorTuple:
+                intensity, alpha = d
+                return intensity, intensity, intensity, alpha
+        case 1:  # RGB565
+
+            def decode(d: bytes) -> ColorTuple:
+                return _decode_rgb565(int.from_bytes(d, "big"))
+        case 2:  # RGB5A3
+
+            def decode(d: bytes) -> ColorTuple:
+                return _decode_rgb5a3(int.from_bytes(d, "big"))
+        case _:
+            raise ValueError("Unexpected format")
+
+    return [decode(image_data.read(2)) for _ in range(header.width * header.height)]
+
+
+def _get_blocks_i4(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for value in image_data.read(32):
         intensity = (value >> 4) * 0x11
         yield intensity, intensity, intensity, 0xFF
@@ -73,19 +101,19 @@ def _get_blocks_i4(image_data: io.BytesIO) -> Iterator[ColorTuple]:
         yield intensity, intensity, intensity, 0xFF
 
 
-def _get_blocks_i8(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_i8(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for intensity in image_data.read(32):
         yield intensity, intensity, intensity, 0xFF
 
 
-def _get_blocks_ia4(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_ia4(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for value in image_data.read(32):
         intensity = 0x11 * (value & 0b00001111)
         alpha = 0x11 * ((value & 0b11110000) >> 4)
         yield intensity, intensity, intensity, alpha
 
 
-def _get_blocks_ia8(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_ia8(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for alpha, intensity in zip(*[iter(image_data.read(32))] * 2):
         yield intensity, intensity, intensity, alpha
 
@@ -97,30 +125,33 @@ def _decode_rgb565(value: int) -> ColorTuple:
     return red * 0x8, green * 0x4, blue * 0x8, 0xFF
 
 
-def _get_blocks_rgb565(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_rgb565(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for _ in range(16):
         value = int.from_bytes(image_data.read(2), "big")
         yield _decode_rgb565(value)
 
 
-def _get_blocks_rgb5a3(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _decode_rgb5a3(value: int) -> ColorTuple:
+    if value >> 15:
+        # no alpha
+        red = (value >> 10) & 0b11111
+        green = (value >> 5) & 0b11111
+        blue = value & 0b11111
+        return red * 0x8, green * 0x8, blue * 0x8, 0xFF
+    else:
+        alpha = (value >> 12) & 0b111
+        red = (value >> 8) & 0b1111
+        green = (value >> 4) & 0b1111
+        blue = value & 0b1111
+        return red * 0x11, green * 0x11, blue * 0x11, alpha * 0x20
+
+
+def _get_blocks_rgb5a3(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for _ in range(16):
-        value = int.from_bytes(image_data.read(2), "big")
-        if value >> 15:
-            # no alpha
-            red = (value >> 10) & 0b11111
-            green = (value >> 5) & 0b11111
-            blue = value & 0b11111
-            yield red * 0x8, green * 0x8, blue * 0x8, 0xFF
-        else:
-            alpha = (value >> 12) & 0b111
-            red = (value >> 8) & 0b1111
-            green = (value >> 4) & 0b1111
-            blue = value & 0b1111
-            yield red * 0x11, green * 0x11, blue * 0x11, alpha * 0x20
+        yield _decode_rgb5a3(int.from_bytes(image_data.read(2), "big"))
 
 
-def _get_blocks_rgba8(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_rgba8(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     alpha_red = zip(*([iter(image_data.read(32))] * 2))
     green_blue = zip(*([iter(image_data.read(32))] * 2))
     for (alpha, red), (green, blue) in zip(alpha_red, green_blue):
@@ -156,7 +187,7 @@ def _get_sub_block_cmpr(image_data: io.BytesIO) -> Iterator[ColorTuple]:
             yield palettes[(b >> shift) & 0x3]
 
 
-def _get_blocks_cmpr(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+def _get_blocks_cmpr(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     """
     A CMPR block (of size 8x8) consists for 4 subblocks of size 4x4.
     Read all these blocks, then reorder the results as expected from _get_block_data.
@@ -176,11 +207,26 @@ def _get_blocks_cmpr(image_data: io.BytesIO) -> Iterator[ColorTuple]:
         yield from row
 
 
+def _get_blocks_c4(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
+    assert palette is not None
+    for i in image_data.read(32):
+        yield palette[i >> 4]
+        yield palette[i & 0b1111]
+
+
+def _get_blocks_c8(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
+    assert palette is not None
+    for i in image_data.read(32):
+        yield palette[i]
+
+
 _GET_BLOCKS_FUNCTIONS = {
     ImageFormat.I4: _get_blocks_i4,
     ImageFormat.I8: _get_blocks_i8,
     ImageFormat.IA4: _get_blocks_ia4,
     ImageFormat.IA8: _get_blocks_ia8,
+    ImageFormat.C4: _get_blocks_c4,
+    ImageFormat.C8: _get_blocks_c8,
     ImageFormat.RGB565: _get_blocks_rgb565,
     ImageFormat.RGB5A3: _get_blocks_rgb5a3,
     ImageFormat.RGBA8: _get_blocks_rgba8,
@@ -188,14 +234,16 @@ _GET_BLOCKS_FUNCTIONS = {
 }
 
 
-def _get_block_data(image_data: io.BytesIO, image_format: ImageFormat) -> Iterator[tuple[int, int, ColorTuple]]:
+def _get_block_data(
+    image_data: io.BytesIO, image_format: ImageFormat, palette: Sequence[ColorTuple] | None
+) -> Iterator[tuple[int, int, ColorTuple]]:
     """
     Gets a two-dimensional structure of pixel colors.
     Delegates to _GET_BLOCKS_FUNCTIONS to get a sequence of parsed blocks, then handles the width/height.
     """
     block_width, block_height = _BLOCK_SIZES[image_format]
 
-    block_generator = _GET_BLOCKS_FUNCTIONS[image_format](image_data)
+    block_generator = _GET_BLOCKS_FUNCTIONS[image_format](image_data, palette)
     for pixel_y in range(block_height):
         for pixel_x in range(block_width):
             yield pixel_x, pixel_y, next(block_generator)
@@ -208,16 +256,22 @@ def _extract_image(
     blocks_per_row = math.ceil(image_width / block_width)
     num_rows = math.ceil(image_height / block_height)
 
+    palette = None
+    if image_format in {ImageFormat.C4, ImageFormat.C8, ImageFormat.C14x2}:
+        palette = _read_palette(image_data)
+
     img = Image.new("RGBA", (image_width, image_height), (0, 0, 0, 0))
     img_pixels = img.load()
 
+    flip_y = palette is None
+
     for row in range(num_rows):
         for column in range(blocks_per_row):
-            for pixel_x, pixel_y, pixel_data in _get_block_data(image_data, image_format):
+            for pixel_x, pixel_y, pixel_data in _get_block_data(image_data, image_format, palette):
                 x = pixel_x + column * block_width
                 y = pixel_y + row * block_height
                 if x < img.width and y < img.height:
-                    img_pixels[x, img.height - y - 1] = pixel_data
+                    img_pixels[x, (img.height - y - 1) if flip_y else y] = pixel_data
 
     return img
 
