@@ -120,6 +120,13 @@ def _get_blocks_rgb5a3(image_data: io.BytesIO) -> Iterator[ColorTuple]:
             yield red * 0x11, green * 0x11, blue * 0x11, alpha * 0x20
 
 
+def _get_blocks_rgba8(image_data: io.BytesIO) -> Iterator[ColorTuple]:
+    alpha_red = zip(*([iter(image_data.read(32))] * 2))
+    green_blue = zip(*([iter(image_data.read(32))] * 2))
+    for (alpha, red), (green, blue) in zip(alpha_red, green_blue):
+        yield red, green, blue, alpha
+
+
 def _interpolate(a: ColorTuple, b: ColorTuple, r: float) -> ColorTuple:
     rev = 1 - r
     return (
@@ -176,26 +183,22 @@ _GET_BLOCKS_FUNCTIONS = {
     ImageFormat.IA8: _get_blocks_ia8,
     ImageFormat.RGB565: _get_blocks_rgb565,
     ImageFormat.RGB5A3: _get_blocks_rgb5a3,
+    ImageFormat.RGBA8: _get_blocks_rgba8,
     ImageFormat.CMPR: _get_blocks_cmpr,
 }
 
 
-def _get_block_data(image_data: io.BytesIO, image_format: ImageFormat) -> list[list[ColorTuple]]:
+def _get_block_data(image_data: io.BytesIO, image_format: ImageFormat) -> Iterator[tuple[int, int, ColorTuple]]:
     """
     Gets a two-dimensional structure of pixel colors.
     Delegates to _GET_BLOCKS_FUNCTIONS to get a sequence of parsed blocks, then handles the width/height.
     """
-    block_generator = _GET_BLOCKS_FUNCTIONS[image_format](image_data)
-
     block_width, block_height = _BLOCK_SIZES[image_format]
-    result: list[list[ColorTuple]] = []
 
+    block_generator = _GET_BLOCKS_FUNCTIONS[image_format](image_data)
     for pixel_y in range(block_height):
-        result.append([])
         for pixel_x in range(block_width):
-            result[-1].append(next(block_generator))
-
-    return result
+            yield pixel_x, pixel_y, next(block_generator)
 
 
 def _extract_image(
@@ -210,14 +213,11 @@ def _extract_image(
 
     for row in range(num_rows):
         for column in range(blocks_per_row):
-            block_data = _get_block_data(image_data, image_format)
-
-            for pixel_y in range(block_height):
-                for pixel_x in range(block_width):
-                    x = pixel_x + column * block_width
-                    y = pixel_y + row * block_height
-                    if x < img.width and y < img.height:
-                        img_pixels[x, img.height - y - 1] = block_data[pixel_y][pixel_x]
+            for pixel_x, pixel_y, pixel_data in _get_block_data(image_data, image_format):
+                x = pixel_x + column * block_width
+                y = pixel_y + row * block_height
+                if x < img.width and y < img.height:
+                    img_pixels[x, img.height - y - 1] = pixel_data
 
     return img
 

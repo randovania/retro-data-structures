@@ -27,7 +27,7 @@ from retro_data_structures.formats import Txtr
         pytest.param(0x9B6D149A, "", id="C8"),
         pytest.param(0x860048C3, "e2078fe3f250488b2813f5194f271beca506bc3b69b5978a592d59bf7209ddb5", id="RGB565"),
         pytest.param(0x1940092C, "cc5d38f7f0f2cd6381c657540ba4b0faba146d35f8f1eb973aee7409193a853b", id="RGB5A3"),
-        pytest.param(0x6FC03D46, "", id="RGBA8"),
+        pytest.param(0x6FC03D46, "e61d3d9cb9ab05f16e666291bb4696f1037776264d1065a12dbba7a20e0885e9", id="RGBA8"),
         pytest.param(0x0151FA12, "5910604c977424a69b7dd9b9ff19823c0314c30600fa647e71b5db939c2a5e1a", id="CMPR"),
     ],
 )
