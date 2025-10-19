@@ -9,7 +9,7 @@ from setuptools import Command, setup
 from setuptools.command.build import build
 
 
-def generate_property_templates():
+def generate_property_templates() -> None:
     subprocess.run([sys.executable, os.fspath(Path(__file__).parent.joinpath("parse_pwe_templates.py"))], check=True)
 
 
@@ -18,13 +18,13 @@ class GenerateTemplateCommand(Command):
     Generate script templates code before building the package.
     """
 
-    def initialize_options(self):
+    def initialize_options(self) -> None:
         pass
 
-    def finalize_options(self):
+    def finalize_options(self) -> None:
         pass
 
-    def run(self):
+    def run(self) -> None:
         if Path(__file__).parent.joinpath("retro-script-object-templates").is_dir():
             generate_property_templates()
         else:
