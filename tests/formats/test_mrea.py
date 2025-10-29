@@ -84,7 +84,7 @@ def test_compare_p1(prime1_asset_manager):
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
-    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREAPrime2Simple)
+    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREASimple)
 
 
 # @pytest.mark.skip(reason="Corruption MREA not implemented correctly")
@@ -149,3 +149,10 @@ def test_compare_p2_add_layer_hashes(prime2_asset_manager, mrea_asset_id: AssetI
     mrea_encoded = area.mrea.build()
 
     _compare_mrea_hashes("mrea_hashes_echoes_add_layer.json", mlvl_encoded + mrea_encoded, mrea_asset_id)
+
+
+def test_p3_header(prime3_asset_manager, mrea_asset_id: AssetId):
+    raw = prime3_asset_manager.get_raw_asset(mrea_asset_id)
+    header = mrea.MREASimple.parse(raw.data)
+    assert header is not None
+    # decoded = Mrea.parse(raw.data, prime3_asset_manager.target_game, prime3_asset_manager)
