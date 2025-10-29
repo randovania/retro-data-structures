@@ -99,7 +99,7 @@ TXPN = Struct(
     "dim" / Vector2f,
     "vec" / Vector3,
     "font_id" / AssetId32,
-    "word_wrap" / Int8ub,  # can be 0 to 2, instead of bool
+    "word_wrap" / Int8ub,  # can be 0 to 2, instead of bool. TODO: figure out what each value means
     "unk3" / Int32ub,
     "font_info"
     / Struct(
