@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import construct
 import pytest
 from tests import test_lib
 
@@ -17,6 +16,8 @@ from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
+
+    import construct
 
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId
@@ -84,18 +85,11 @@ def test_compare_p1(prime1_asset_manager):
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
-    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREAPrime2Simple)
+    compare_all_instances(prime2_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREASimple)
 
 
-# @pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3(prime3_asset_manager, mrea_asset_id: AssetId):
-    def _all_instances(mrea: Mrea):
-        for layer in mrea.script_layers:
-            yield from layer.instances
-        yield from mrea.generated_objects_layer.instances
-
-    with pytest.raises(construct.ConstructError):
-        compare_all_instances(prime3_asset_manager, mrea_asset_id, _all_instances, None)
+    compare_all_instances(prime3_asset_manager, mrea_asset_id, _all_instances_p1_p2, mrea.MREASimple)
 
 
 def _compare_mrea_hashes(hash_file_name: str, encoded: bytes, asset_id: AssetId):
@@ -130,7 +124,6 @@ def test_compare_p2_hashes(prime2_asset_manager, mrea_asset_id: AssetId):
     _compare_mrea_hashes("mrea_hashes_echoes.json", encoded, mrea_asset_id)
 
 
-@pytest.mark.skip(reason="Corruption MREA not implemented correctly")
 def test_compare_p3_hashes(prime3_asset_manager, mrea_asset_id: AssetId):
     raw, decoded, encoded = test_lib.parse_and_build_compare(
         prime3_asset_manager, mrea_asset_id, Mrea, byte_match=False

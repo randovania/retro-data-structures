@@ -7,7 +7,7 @@ from typing import TypeVar
 
 import pytest
 
-from retro_data_structures.asset_manager import AssetManager, IsoFileProvider
+from retro_data_structures.asset_manager import AssetManager, FileProvider, IsoFileProvider, PathFileProvider
 from retro_data_structures.game_check import Game
 from tests import test_lib
 
@@ -62,7 +62,10 @@ def prime2_pal_iso_provider(prime2_pal_iso: Path) -> IsoFileProvider:
 
 
 @pytest.fixture(scope="module")
-def prime3_iso_provider(prime3_iso: Path) -> IsoFileProvider:
+def prime3_provider(prime3_iso: Path) -> FileProvider:
+    if "PRIME3_EXTRACTED_ISO" in os.environ:
+        return PathFileProvider(Path(os.environ["PRIME3_EXTRACTED_ISO"]))
+
     return IsoFileProvider(prime3_iso)
 
 
@@ -77,8 +80,8 @@ def internal_prime2_asset_manager(prime2_iso_provider):
 
 
 @pytest.fixture(scope="module")
-def internal_prime3_asset_manager(prime3_iso_provider):
-    return AssetManager(prime3_iso_provider, target_game=Game.CORRUPTION)
+def internal_prime3_asset_manager(prime3_provider):
+    return AssetManager(prime3_provider, target_game=Game.CORRUPTION)
 
 
 @pytest.fixture()

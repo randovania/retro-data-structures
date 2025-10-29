@@ -1,12 +1,12 @@
 [build-system]
 requires = [
-    "setuptools>=61.2",
-    "setuptools_scm[toml]>=3.4.3",
+    "hatchling",
+    "hatch-vcs",
     "construct>=2.10.0",
     "inflection>=0.5.1",
     "frozendict",
 ]
-build-backend = "setuptools.build_meta"
+build-backend = "hatchling.build"
 
 [project]
 name = "retro-data-structures"
@@ -18,12 +18,14 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 requires-python = ">=3.10"
 dependencies = [
     "construct>=2.10.0",
     "lzokay",
     "pycryptodome",
+    "Pillow",
     "typing-extensions>=4.0.0",
     "ppc-asm",
 ]
@@ -42,6 +44,7 @@ test = [
     "nod",
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     # "pytest-asyncio",
     # "pytest-mock",
 ]
@@ -52,10 +55,20 @@ typing = [
     "frozendict",
 ]
 
-[tool.setuptools_scm]
+[tool.hatch]
+version.source = "vcs"
+build.hooks.vcs.version-file = "src/retro_data_structures/version.py"
+
+[tool.hatch.version.raw-options]
 local_scheme = "no-local-version"
-write_to = "src/retro_data_structures/version.py"
-git_describe_command = "git describe --dirty --tags --long --match v[0-9]*"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "tools/",
+]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "invoke_templates.py"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
