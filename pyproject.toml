@@ -64,11 +64,10 @@ local_scheme = "no-local-version"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
-    "retro-script-object-templates/",
     "tools/",
 ]
 
-[tool.hatch.build.targets.sdist.hooks.custom]
+[tool.hatch.build.targets.wheel.hooks.custom]
 path = "invoke_templates.py"
 
 [tool.pytest.ini_options]

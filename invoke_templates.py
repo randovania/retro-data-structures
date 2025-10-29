@@ -4,6 +4,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 # https://discuss.python.org/t/custom-build-steps-moving-bokeh-off-setup-py/16128/3
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
@@ -14,5 +15,5 @@ def generate_property_templates() -> None:
 
 
 class CustomHook(BuildHookInterface):
-    def initialize(self, version, build_data):
+    def initialize(self, version: str, build_data: dict[str, Any]) -> None:
         generate_property_templates()
