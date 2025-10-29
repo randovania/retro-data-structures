@@ -89,6 +89,9 @@ jobs:
     runs-on: 'ubuntu-latest'
     needs:
       - test
+    
+    permissions:
+      id-token: write
 
     steps:
       - name: Download all the dists
