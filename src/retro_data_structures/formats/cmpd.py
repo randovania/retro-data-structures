@@ -19,8 +19,9 @@ CMPD = Struct(
     blocks=construct.Array(
         construct.this.block_count,
         IfThenElse(
-            lambda this: this.block_header[this._index].compressed_size
-            < this.block_header[this._index].uncompressed_size,
+            lambda this: (
+                this.block_header[this._index].compressed_size < this.block_header[this._index].uncompressed_size
+            ),
             FocusedSeq(
                 "block",
                 block=LZOCompressedBlockCorruption(lambda this: this._.block_header[this._index].uncompressed_size),

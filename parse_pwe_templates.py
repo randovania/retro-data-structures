@@ -1349,7 +1349,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         if raw_type == "Struct":
             archetype_path: str = prop["archetype"]
-            prop_type = archetype_path.split(".")[-1]
+            prop_type = archetype_path.rsplit(".", maxsplit=1)[-1]
             archetype_imports: set[str] = {prop_type}
             field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
