@@ -140,8 +140,9 @@ CompressedAnimation = Struct(
                                     create_bits_field(lambda this: get_descriptor(this).translation_keys),
                                 ),
                                 scale=If(
-                                    lambda this: game_check.is_prime2(this)
-                                    and get_descriptor(this).scale_keys_count > 0,
+                                    lambda this: (
+                                        game_check.is_prime2(this) and get_descriptor(this).scale_keys_count > 0
+                                    ),
                                     create_bits_field(lambda this: get_descriptor(this).scale_keys),
                                 ),
                             ),
