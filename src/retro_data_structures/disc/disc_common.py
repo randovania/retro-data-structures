@@ -120,7 +120,7 @@ class ShiftedInteger(construct.Adapter):
 
 
 ShiftedOnWii = construct.IfThenElse(construct.this.is_wii, ShiftedInteger(construct.Int32ub), construct.Int32ub)
-ShiftedOnWii._sizeof = lambda context, path: construct.Int32ub._sizeof(context, path)
+ShiftedOnWii._sizeof = construct.Int32ub._sizeof
 
 WII_MAGIC_WORD = 0x5D1C9EA300000000
 GC_MAGIC_WORD = 0x00000000C2339F3D
