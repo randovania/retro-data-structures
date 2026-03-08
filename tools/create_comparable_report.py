@@ -89,24 +89,84 @@ def _submit_asset(executor, raw_data: bytes, game_value: int, asset_type: str, a
         return executor.submit(_hash_bytes, raw_data)
 
 
-def _write_result(f, asset_id: int, custom_name: str | None, pak_name: str, asset_type: str, result, detailed: bool):
+def _write_result(
+    f,
+    asset_id: int,
+    custom_name: str | None,
+    pak_name: str,
+    asset_type: str,
+    result,
+    detailed: bool,
+    iso_label: str | None = None,
+):
     name_display = f"0x{asset_id:08X} ({custom_name})" if custom_name is not None else f"0x{asset_id:08X}"
+    iso_prefix = f"[{iso_label}] " if iso_label is not None else ""
+    prefix = f"{name_display} {iso_prefix}[{pak_name}]"
     if asset_type == "MREA":
         for section_name, section_index, h in result:
-            f.write(f"{name_display} [{pak_name}] MREA {section_name}[{section_index}] {h}\n")
+            f.write(f"{prefix} MREA {section_name}[{section_index}] {h}\n")
     elif asset_type == "STRG":
         for lang_code, h in result:
-            f.write(f"{name_display} [{pak_name}] STRG {lang_code} {h}\n")
+            f.write(f"{prefix} STRG {lang_code} {h}\n")
     elif asset_type == "SCAN" and detailed:
-        f.write(f"{name_display} [{pak_name}] SCAN\n{result}\n")
+        f.write(f"{prefix} SCAN\n{result}\n")
     else:
-        f.write(f"{name_display} [{pak_name}] {asset_type} {result}\n")
+        f.write(f"{prefix} {asset_type} {result}\n")
+
+
+def _process_iso(manager: AssetManager, game: Game, args, desc: str = "Submitting") -> dict:
+    """Returns {(asset_id, pak_name): (asset_type, result)} for all assets in the manager."""
+    futures: dict = {}
+
+    with ThreadPoolExecutor() as executor:
+        for asset_id in tqdm.tqdm(list(manager.all_asset_ids()), desc=desc, unit="asset"):
+            asset_type = manager.get_asset_type(asset_id)
+
+            for pak_name in sorted(manager.find_paks(asset_id)):
+                raw_data = manager.get_pak(pak_name).get_asset(asset_id).data
+                futures[asset_id, pak_name] = (
+                    asset_type,
+                    _submit_asset(executor, raw_data, game.value, asset_type, args),
+                )
+
+    return {key: (asset_type, future.result()) for key, (asset_type, future) in futures.items()}
+
+
+def _hash_raw_iso(manager: AssetManager, desc: str) -> dict:
+    """Returns {(asset_id, pak_name): (asset_type, raw_md5)} for all assets, without decoding."""
+    futures: dict = {}
+
+    with ThreadPoolExecutor() as executor:
+        for asset_id in tqdm.tqdm(list(manager.all_asset_ids()), desc=desc, unit="asset"):
+            asset_type = manager.get_asset_type(asset_id)
+
+            for pak_name in sorted(manager.find_paks(asset_id)):
+                raw_data = manager.get_pak(pak_name).get_asset(asset_id).data
+                futures[asset_id, pak_name] = (asset_type, executor.submit(_hash_bytes, raw_data))
+
+    return {key: (asset_type, future.result()) for key, (asset_type, future) in futures.items()}
+
+
+def _decode_iso_entries(manager: AssetManager, game: Game, args, keys: set, desc: str) -> dict:
+    """Returns {(asset_id, pak_name): (asset_type, result)} for the given subset of keys."""
+    futures: dict = {}
+
+    with ThreadPoolExecutor() as executor:
+        for asset_id, pak_name in tqdm.tqdm(keys, desc=desc, unit="asset"):
+            asset_type = manager.get_asset_type(asset_id)
+            raw_data = manager.get_pak(pak_name).get_asset(asset_id).data
+            futures[asset_id, pak_name] = (asset_type, _submit_asset(executor, raw_data, game.value, asset_type, args))
+
+    return {key: (asset_type, future.result()) for key, (asset_type, future) in futures.items()}
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--game", required=True, choices=[g.name for g in Game])
     parser.add_argument("iso", type=Path)
+    parser.add_argument(
+        "iso2", type=Path, nargs="?", help="Optional second ISO; when given only differences are written"
+    )
     parser.add_argument("output", type=Path)
     parser.add_argument("--engl-only", action="store_true", help="Only hash the ENGL language for STRG assets")
     parser.add_argument(
@@ -117,31 +177,52 @@ def main():
     game: Game = getattr(Game, args.game)
     manager = AssetManager(IsoFileProvider(args.iso), target_game=game)
 
-    output_path = args.output
+    # list of (asset_id, pak_name, asset_type, result, iso_label)
+    if args.iso2 is not None:
+        manager2 = AssetManager(IsoFileProvider(args.iso2), target_game=game)
+        raw1 = _hash_raw_iso(manager, "Hashing ISO1")
+        raw2 = _hash_raw_iso(manager2, "Hashing ISO2")
 
-    # (asset_id, pak_name) -> (asset_type, future)
-    futures: dict = {}
+        only_in_1 = {k for k in raw1 if k not in raw2}
+        only_in_2 = {k for k in raw2 if k not in raw1}
+        different = {k for k in raw1 if k in raw2 and raw1[k][1] != raw2[k][1]}
 
-    all_asset_ids = list(manager.all_asset_ids())
+        if args.engl_only:
+            strg_keys = {k for k in different if raw1[k][0] == "STRG"}
+            if strg_keys:
+                engl1 = _decode_iso_entries(manager, game, args, strg_keys, "Filtering STRG ENGL ISO1")
+                engl2 = _decode_iso_entries(manager2, game, args, strg_keys, "Filtering STRG ENGL ISO2")
+                different -= {k for k in strg_keys if engl1[k][1] == engl2[k][1]}
 
-    with ThreadPoolExecutor() as thread_executor:
-        for asset_id in tqdm.tqdm(all_asset_ids, desc="Submitting", unit="asset"):
-            asset_type = manager.get_asset_type(asset_id)
+        decoded1 = _decode_iso_entries(manager, game, args, different, "Decoding ISO1")
+        decoded2 = _decode_iso_entries(manager2, game, args, different, "Decoding ISO2")
 
-            for pak_name in sorted(manager.find_paks(asset_id)):
-                raw_data = manager.get_pak(pak_name).get_asset(asset_id).data
-                future = _submit_asset(thread_executor, raw_data, game.value, asset_type, args)
-                futures[asset_id, pak_name] = (asset_type, future)
+        entries = []
+        for key in raw1:
+            asset_id, pak_name = key
+            if key in only_in_1:
+                entries.append((asset_id, pak_name, raw1[key][0], raw1[key][1], "iso1-only"))
+            elif key in different:
+                entries.append((asset_id, pak_name, decoded1[key][0], decoded1[key][1], "iso1"))
+                entries.append((asset_id, pak_name, decoded2[key][0], decoded2[key][1], "iso2"))
+        for key in raw2:
+            asset_id, pak_name = key
+            if key in only_in_2:
+                entries.append((asset_id, pak_name, raw2[key][0], raw2[key][1], "iso2-only"))
+    else:
+        results = _process_iso(manager, game, args, desc="Submitting")
+        entries = [
+            (asset_id, pak_name, asset_type, result, None)
+            for (asset_id, pak_name), (asset_type, result) in results.items()
+        ]
 
-    with output_path.open("w") as f, tqdm.tqdm(total=len(futures), desc="Writing", unit="asset") as progress:
-        for (asset_id, pak_name), (asset_type, future) in futures.items():
-            _write_result(
-                f, asset_id, manager.get_custom_name_for(asset_id), pak_name, asset_type, future.result(), args.detailed
-            )
-
+    with args.output.open("w") as f, tqdm.tqdm(total=len(entries), desc="Writing", unit="asset") as progress:
+        for asset_id, pak_name, asset_type, result, iso_label in entries:
+            custom_name = manager.get_custom_name_for(asset_id)
+            _write_result(f, asset_id, custom_name, pak_name, asset_type, result, args.detailed, iso_label)
             progress.update(1)
 
-    print(f"Report written to {output_path}")
+    print(f"Report written to {args.output}")
 
 
 if __name__ == "__main__":
