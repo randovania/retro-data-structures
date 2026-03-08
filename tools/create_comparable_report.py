@@ -13,7 +13,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import pprint
-from concurrent.futures import InterpreterPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import tqdm
@@ -95,55 +95,40 @@ def main():
 
     output_path = args.output
 
-    mrea_futures: dict = {}
-    strg_futures: dict = {}
-    scan_futures: dict = {}
-    other_futures: dict = {}
+    futures: dict = {}
 
     all_asset_ids = list(manager.all_asset_ids())
 
-    with ThreadPoolExecutor() as thread_executor, InterpreterPoolExecutor() as interp_executor:
+    with ThreadPoolExecutor() as thread_executor:
         for asset_id in tqdm.tqdm(all_asset_ids, desc="Submitting", unit="asset"):
             asset_type = manager.get_asset_type(asset_id)
             raw_data = manager.get_raw_asset(asset_id).data
 
             if asset_type == "MREA":
-                mrea_futures[asset_id] = thread_executor.submit(_hash_mrea_sections, raw_data, game.value)
+                future = thread_executor.submit(_hash_mrea_sections, raw_data, game.value)
             elif asset_type == "STRG":
-                strg_futures[asset_id] = thread_executor.submit(
-                    _hash_strg_languages, raw_data, game.value, args.engl_only
-                )
+                future = thread_executor.submit(_hash_strg_languages, raw_data, game.value, args.engl_only)
             elif asset_type == "SCAN" and args.detailed:
-                scan_futures[asset_id] = thread_executor.submit(_decode_scan, raw_data, game.value)
+                future = thread_executor.submit(_decode_scan, raw_data, game.value)
             else:
-                other_futures[asset_id] = (
-                    asset_type,
-                    interp_executor.submit(_hash_bytes, raw_data),
-                )
+                future = thread_executor.submit(_hash_bytes, raw_data)
 
-    total = len(mrea_futures) + len(strg_futures) + len(scan_futures) + len(other_futures)
-    with output_path.open("w") as f, tqdm.tqdm(total=total, desc="Writing", unit="asset") as progress:
-        for asset_id in sorted(mrea_futures):
-            results = mrea_futures[asset_id].result()
-            for section_name, section_index, h in results:
-                f.write(f"0x{asset_id:08X} MREA {section_name}[{section_index}] {h}\n")
-            progress.update(1)
+            futures[asset_id] = (asset_type, future)
 
-        for asset_id in sorted(strg_futures):
-            results = strg_futures[asset_id].result()
-            for lang_code, h in results:
-                f.write(f"0x{asset_id:08X} STRG {lang_code} {h}\n")
-            progress.update(1)
+    with output_path.open("w") as f, tqdm.tqdm(total=len(futures), desc="Writing", unit="asset") as progress:
+        for asset_id in all_asset_ids:
+            asset_type, future = futures[asset_id]
+            result = future.result()
 
-        for asset_id in sorted(scan_futures):
-            text = scan_futures[asset_id].result()
-            f.write(f"0x{asset_id:08X} SCAN\n{text}\n")
-            progress.update(1)
+            if asset_type == "MREA":
+                for section_name, section_index, h in result:
+                    f.write(f"0x{asset_id:08X} MREA {section_name}[{section_index}] {h}\n")
+            elif asset_type == "STRG":
+                for lang_code, h in result:
+                    f.write(f"0x{asset_id:08X} STRG {lang_code} {h}\n")
+            else:
+                f.write(f"0x{asset_id:08X} {asset_type} {result}\n")
 
-        for asset_id in sorted(other_futures):
-            asset_type, future = other_futures[asset_id]
-            h = future.result()
-            f.write(f"0x{asset_id:08X} {asset_type} {h}\n")
             progress.update(1)
 
     print(f"Report written to {output_path}")
