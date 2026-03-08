@@ -74,9 +74,33 @@ def _decode_scan(raw_data: bytes, game_value: int) -> str:
 
 
 def _hash_bytes(data: bytes) -> str:
-    """Hash raw asset bytes. Runs in a subinterpreter."""
-
+    """Hash raw asset bytes."""
     return hashlib.md5(data).hexdigest()
+
+
+def _submit_asset(executor, raw_data: bytes, game_value: int, asset_type: str, args):
+    if asset_type == "MREA":
+        return executor.submit(_hash_mrea_sections, raw_data, game_value)
+    elif asset_type == "STRG":
+        return executor.submit(_hash_strg_languages, raw_data, game_value, args.engl_only)
+    elif asset_type == "SCAN" and args.detailed:
+        return executor.submit(_decode_scan, raw_data, game_value)
+    else:
+        return executor.submit(_hash_bytes, raw_data)
+
+
+def _write_result(f, asset_id: int, custom_name: str | None, pak_name: str, asset_type: str, result, detailed: bool):
+    name_display = f"0x{asset_id:08X} ({custom_name})" if custom_name is not None else f"0x{asset_id:08X}"
+    if asset_type == "MREA":
+        for section_name, section_index, h in result:
+            f.write(f"{name_display} [{pak_name}] MREA {section_name}[{section_index}] {h}\n")
+    elif asset_type == "STRG":
+        for lang_code, h in result:
+            f.write(f"{name_display} [{pak_name}] STRG {lang_code} {h}\n")
+    elif asset_type == "SCAN" and detailed:
+        f.write(f"{name_display} [{pak_name}] SCAN\n{result}\n")
+    else:
+        f.write(f"{name_display} [{pak_name}] {asset_type} {result}\n")
 
 
 def main():
@@ -95,6 +119,7 @@ def main():
 
     output_path = args.output
 
+    # (asset_id, pak_name) -> (asset_type, future)
     futures: dict = {}
 
     all_asset_ids = list(manager.all_asset_ids())
@@ -102,32 +127,17 @@ def main():
     with ThreadPoolExecutor() as thread_executor:
         for asset_id in tqdm.tqdm(all_asset_ids, desc="Submitting", unit="asset"):
             asset_type = manager.get_asset_type(asset_id)
-            raw_data = manager.get_raw_asset(asset_id).data
 
-            if asset_type == "MREA":
-                future = thread_executor.submit(_hash_mrea_sections, raw_data, game.value)
-            elif asset_type == "STRG":
-                future = thread_executor.submit(_hash_strg_languages, raw_data, game.value, args.engl_only)
-            elif asset_type == "SCAN" and args.detailed:
-                future = thread_executor.submit(_decode_scan, raw_data, game.value)
-            else:
-                future = thread_executor.submit(_hash_bytes, raw_data)
-
-            futures[asset_id] = (asset_type, future)
+            for pak_name in sorted(manager.find_paks(asset_id)):
+                raw_data = manager.get_pak(pak_name).get_asset(asset_id).data
+                future = _submit_asset(thread_executor, raw_data, game.value, asset_type, args)
+                futures[asset_id, pak_name] = (asset_type, future)
 
     with output_path.open("w") as f, tqdm.tqdm(total=len(futures), desc="Writing", unit="asset") as progress:
-        for asset_id in all_asset_ids:
-            asset_type, future = futures[asset_id]
-            result = future.result()
-
-            if asset_type == "MREA":
-                for section_name, section_index, h in result:
-                    f.write(f"0x{asset_id:08X} MREA {section_name}[{section_index}] {h}\n")
-            elif asset_type == "STRG":
-                for lang_code, h in result:
-                    f.write(f"0x{asset_id:08X} STRG {lang_code} {h}\n")
-            else:
-                f.write(f"0x{asset_id:08X} {asset_type} {result}\n")
+        for (asset_id, pak_name), (asset_type, future) in futures.items():
+            _write_result(
+                f, asset_id, manager.get_custom_name_for(asset_id), pak_name, asset_type, future.result(), args.detailed
+            )
 
             progress.update(1)
 
