@@ -66,16 +66,6 @@ def _hash_strg_languages(raw_data: bytes, game_value: int, engl_only: bool = Fal
     return results
 
 
-def _decode_scan(raw_data: bytes, game_value: int) -> str:
-    """Parse a SCAN and return a human-readable string representation."""
-    from retro_data_structures.formats.scan import Scan
-    from retro_data_structures.game_check import Game
-
-    game = Game(game_value)
-    scan = Scan.parse(raw_data, target_game=game)
-    return pprint.pformat(scan.scannable_object_info.get_properties().to_json())
-
-
 def _hash_bytes(data: bytes) -> str:
     """Hash raw asset bytes."""
     return hashlib.md5(data).hexdigest()
@@ -88,7 +78,12 @@ def _decode_file(raw_data: bytes, asset_type: str, game_value: int):
 
     parsed = formats.resource_type_for(asset_type).parse(raw_data, target_game=Game(game_value))
 
-    return pprint.pformat(convert_to_raw_python(parsed.raw), width=200)
+    if asset_type == "SCAN":
+        obj = parsed.scannable_object_info.get_properties().to_json()
+    else:
+        obj = convert_to_raw_python(parsed._raw)
+
+    return pprint.pformat(obj, width=200)
 
 
 def _submit_asset(executor, raw_data: bytes, game_value: int, asset_type: str, detailed: bool, args):
