@@ -427,7 +427,7 @@ class AssetManager:
         """
         return self.add_new_asset(new_name, self.get_raw_asset(asset_id), ())
 
-    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource, *, encode: bool = False) -> AssetId:
+    def replace_asset(self, asset_id: NameOrAssetId, new_data: Resource, *, keep_in_memory: bool = True) -> AssetId:
         """
         Replaces an existing asset.
 
@@ -435,7 +435,7 @@ class AssetManager:
 
         :param asset_id: The name or Asset ID for the asset being replaced.
         :param new_data: The new data, either in raw or parsed form.
-        :param encode: If `new_data` is a parsed resource, `build()` it.
+        :param keep_in_memory: If `new_data` is a parsed resource, keep it in memory.
 
         :return: The resolved Asset ID of the replaced asset.
         """
@@ -447,14 +447,14 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name)
 
         if isinstance(new_data, BaseResource):
-            if encode:
-                logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
-                raw_asset = RawResource(
-                    type=new_data.resource_type(),
-                    data=new_data.build(),
-                )
-                self._modified_resources[asset_id] = raw_asset
-            else:
+            logger.debug("Encoding %s (%s, %s)", asset_id, original_name, new_data.resource_type())
+            raw_asset = RawResource(
+                type=new_data.resource_type(),
+                data=new_data.build(),
+            )
+            self._modified_resources[asset_id] = raw_asset
+
+            if keep_in_memory:
                 self._memory_files[asset_id] = new_data
 
         else:
@@ -684,7 +684,7 @@ class AssetManager:
 
         with ThreadPoolExecutor() as executor:
             for name, resource in self._memory_files.items():
-                executor.submit(self.replace_asset, name, resource, encode=True)
+                executor.submit(self.replace_asset, name, resource, keep_in_memory=False)
         self._memory_files.clear()
 
     def _save_modified_paks(self, output: FileWriter) -> None:
