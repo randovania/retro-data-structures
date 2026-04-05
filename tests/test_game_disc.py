@@ -4,6 +4,7 @@ import hashlib
 from typing import TYPE_CHECKING
 
 from retro_data_structures.disc import game_disc
+from retro_data_structures.disc.gc_disc import GcDisc
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,3 +35,13 @@ def test_prime3_dol(prime3_iso: Path) -> None:
     assert hashlib.sha256(disc_dol).digest() == (
         b'kU\x0f"\x16\x02\x07GG\xa2\xe6\x1b\n\xa0d ?\xd4\x93\xf6\x86]\xfb;\x1a\x91&\x82\x06^a\x04'
     )
+
+
+def test_prime2_build(prime2_iso: Path) -> None:
+    disc = game_disc.GameDisc.parse(prime2_iso)
+    raw = prime2_iso.read_bytes()
+
+    encoded = GcDisc.build(disc._raw)
+    raw_part = raw[: len(encoded)]
+
+    assert encoded == raw_part
