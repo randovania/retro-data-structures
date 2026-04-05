@@ -29,7 +29,7 @@ class FileEntry:
 FileTree: typing.TypeAlias = dict[str, typing.Union[FileEntry, "FileTree"]]
 
 
-def decode_into_file_tree(fst) -> FileTree:
+def decode_into_file_tree(fst: construct.Container) -> FileTree:
     file_tree: dict = {}
     current_dir = file_tree
 
@@ -57,6 +57,66 @@ def decode_into_file_tree(fst) -> FileTree:
             )
 
     return file_tree
+
+
+def encode_from_file_tree(file_tree: FileTree) -> construct.Container:
+    file_entries = []
+    names_blob = bytearray(b"\x00")  # offset 0 = empty root name
+
+    def get_name_offset(name: str) -> int:
+        offset = len(names_blob)
+        names_blob.extend(name.encode("ascii") + b"\x00")
+        return offset
+
+    def add_entries(tree: FileTree, parent_index: int) -> None:
+        for name, item in tree.items():
+            name_offset = get_name_offset(name)
+            if isinstance(item, FileEntry):
+                file_entries.append(
+                    construct.Container(
+                        is_directory=False,
+                        file_name=name_offset,
+                        offset=item.offset,
+                        param=item.size,
+                    )
+                )
+            else:
+                dir_entry_index = len(file_entries)
+                file_entries.append(
+                    construct.Container(
+                        is_directory=True,
+                        file_name=name_offset,
+                        offset=parent_index,
+                        param=0,  # filled in after recursion
+                    )
+                )
+                add_entries(item, dir_entry_index)
+                file_entries[dir_entry_index].param = len(file_entries)
+
+    # Root entry at index 0
+    file_entries.append(
+        construct.Container(
+            is_directory=True,
+            file_name=0,
+            offset=0,
+            param=0,  # filled in after recursion
+        )
+    )
+    add_entries(file_tree, 0)
+    file_entries[0].param = len(file_entries)
+
+    root_entry = construct.Container(
+        is_directory=True,
+        file_name=0,
+        _offset=0,
+        num_entries=len(file_entries),
+    )
+
+    return construct.Container(
+        root_entry=root_entry,
+        file_entries=file_entries,
+        names=bytes(names_blob),
+    )
 
 
 MagicWordSeek = construct.Struct(construct.Seek(24), "magic_word" / construct.Int64ub)
