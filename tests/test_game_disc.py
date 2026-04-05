@@ -37,6 +37,22 @@ def test_prime3_dol(prime3_iso: Path) -> None:
     )
 
 
+def test_prime1_file_tree_roundtrip(prime1_iso: Path) -> None:
+    disc = game_disc.GameDisc.parse(prime1_iso)
+    fst = disc._raw.data_partition.fst
+    original_tree = game_disc.decode_into_file_tree(fst)
+    encoded_fst = game_disc.encode_from_file_tree(original_tree)
+    assert game_disc.decode_into_file_tree(encoded_fst) == original_tree
+
+
+def test_prime2_file_tree_roundtrip(prime2_iso: Path) -> None:
+    disc = game_disc.GameDisc.parse(prime2_iso)
+    fst = disc._raw.data_partition.fst
+    original_tree = game_disc.decode_into_file_tree(fst)
+    encoded_fst = game_disc.encode_from_file_tree(original_tree)
+    assert game_disc.decode_into_file_tree(encoded_fst) == original_tree
+
+
 def test_prime2_build(prime2_iso: Path) -> None:
     disc = game_disc.GameDisc.parse(prime2_iso)
     raw = prime2_iso.read_bytes()
