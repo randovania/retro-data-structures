@@ -6,7 +6,7 @@ import typing
 import construct
 from construct import Array, Bytes, OneOf, Padding, Rebuild, Struct
 
-from retro_data_structures.formats.txtr import ImageFormat, _extract_image
+from retro_data_structures.formats.txtr import ImageFormat, _build_image, _extract_image
 
 if typing.TYPE_CHECKING:
     from PIL import Image
@@ -94,3 +94,7 @@ class Banner:
     @property
     def image(self) -> Image.Image:
         return _extract_image(io.BytesIO(self._raw.image_data), 96, 32, ImageFormat.RGB5A3, force_flip=False)
+
+    @image.setter
+    def image(self, img: Image.Image) -> None:
+        self._raw.image_data = _build_image(img, ImageFormat.RGB5A3, force_flip=False)

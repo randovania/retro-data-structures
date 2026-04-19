@@ -146,6 +146,13 @@ def _decode_rgb5a3(value: int) -> ColorTuple:
         return red * 0x11, green * 0x11, blue * 0x11, alpha * 0x20
 
 
+def _encode_rgb5a3(r: int, g: int, b: int, a: int) -> int:
+    if a == 0xFF:
+        return 0x8000 | ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
+    else:
+        return ((a >> 5) << 12) | ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+
+
 def _get_blocks_rgb5a3(image_data: io.BytesIO, palette: Sequence[ColorTuple] | None) -> Iterator[ColorTuple]:
     for _ in range(16):
         yield _decode_rgb5a3(int.from_bytes(image_data.read(2), "big"))
@@ -286,6 +293,39 @@ def _extract_image(
                     img_pixels[x, (img.height - y - 1) if flip_y else y] = pixel_data
 
     return img
+
+
+def _build_image(
+    img: Image.Image,
+    image_format: ImageFormat,
+    *,
+    force_flip: bool | None = None,
+) -> bytes:
+    if image_format != ImageFormat.RGB5A3:
+        raise NotImplementedError(f"Building image data for {image_format} is not supported")
+
+    block_width, block_height = _BLOCK_SIZES[image_format]
+    blocks_per_row = math.ceil(img.width / block_width)
+    num_rows = math.ceil(img.height / block_height)
+
+    flip_y = force_flip if force_flip is not None else True
+
+    img_pixels = img.convert("RGBA").load()
+    result = bytearray()
+
+    for row in range(num_rows):
+        for column in range(blocks_per_row):
+            for pixel_y in range(block_height):
+                for pixel_x in range(block_width):
+                    x = pixel_x + column * block_width
+                    y = pixel_y + row * block_height
+                    if x < img.width and y < img.height:
+                        r, g, b, a = img_pixels[x, (img.height - y - 1) if flip_y else y]
+                    else:
+                        r, g, b, a = 0, 0, 0, 0
+                    result += _encode_rgb5a3(r, g, b, a).to_bytes(2, "big")
+
+    return bytes(result)
 
 
 class Txtr(BaseResource):

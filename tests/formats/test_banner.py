@@ -24,6 +24,11 @@ def test_decode_prime2_banner_ntsc(prime2_iso_provider: IsoFileProvider) -> None
     image_hash = hashlib.sha256(banner.image.tobytes("raw")).hexdigest()
     assert image_hash == "2330276caef433e6e5defed9af11c8831493527a57dc4dacbb99aad70fccab2d"
 
+    original_image_bytes = banner._raw.image_data
+    banner.image = banner.image  # Decodes, then re-encodes and saves to the orignal field
+    assert banner._raw.image_data is not original_image_bytes  # Should be a new bytes object, not the original
+    assert banner._raw.image_data == original_image_bytes  # But the content should be the same
+
     encoded = banner.build()
     assert data == encoded
 
