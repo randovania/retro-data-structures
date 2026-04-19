@@ -241,7 +241,7 @@ class AssetManager:
 
         self._custom_asset_ids = {}
         if self.provider.is_file("custom_names.json"):
-            custom_names_text = self.provider.read_binary("custom_names.json").decode("utf-8")
+            custom_names_text = self.provider.read_binary("custom_names.json").rstrip(b"\xff").decode("utf-8")
 
             self._custom_asset_ids.update(dict(json.loads(custom_names_text).items()))
 
@@ -393,6 +393,12 @@ class AssetManager:
 
     def get_custom_asset(self, name: str) -> AssetId | None:
         return self._custom_asset_ids.get(name)
+
+    def get_custom_name_for(self, asset_id: AssetId) -> str | None:
+        for name, id in self._custom_asset_ids.items():
+            if id == asset_id:
+                return name
+        return None
 
     def add_new_asset(self, name: str, new_data: Resource, in_paks: typing.Iterable[str] = ()) -> AssetId:
         """
