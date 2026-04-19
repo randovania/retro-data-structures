@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING
 
 from retro_data_structures.formats.banner import Banner
@@ -19,6 +20,9 @@ def test_decode_prime2_banner_ntsc(prime2_iso_provider: IsoFileProvider) -> None
         metadata[0].description
         == "Upon landing on planet Aether, Samus finds\nherself in a battle between Light and Dark."
     )
+
+    image_hash = hashlib.sha256(banner.image.tobytes("raw")).hexdigest()
+    assert image_hash == "2330276caef433e6e5defed9af11c8831493527a57dc4dacbb99aad70fccab2d"
 
     encoded = banner.build()
     assert data == encoded

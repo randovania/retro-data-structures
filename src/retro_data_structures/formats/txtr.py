@@ -250,8 +250,17 @@ def _get_block_data(
 
 
 def _extract_image(
-    image_data: io.BytesIO, image_width: int, image_height: int, image_format: ImageFormat
+    image_data: io.BytesIO,
+    image_width: int,
+    image_height: int,
+    image_format: ImageFormat,
+    *,
+    force_flip: bool | None = None,
 ) -> Image.Image:
+    """
+    Extracts image data from a TXTR file, returning a PIL Image.
+    :param force_flip: If set, overrides the vertical flip behavior.
+    """
     block_width, block_height = _BLOCK_SIZES[image_format]
     blocks_per_row = math.ceil(image_width / block_width)
     num_rows = math.ceil(image_height / block_height)
@@ -263,7 +272,10 @@ def _extract_image(
     img = Image.new("RGBA", (image_width, image_height), (0, 0, 0, 0))
     img_pixels = img.load()
 
-    flip_y = palette is None
+    if force_flip is None:
+        flip_y = palette is None
+    else:
+        flip_y = force_flip
 
     for row in range(num_rows):
         for column in range(blocks_per_row):

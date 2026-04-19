@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import io
 import typing
 
 import construct
 from construct import Array, Bytes, OneOf, Padding, Rebuild, Struct
 
+from retro_data_structures.formats.txtr import ImageFormat, _extract_image
+
 if typing.TYPE_CHECKING:
+    from PIL import Image
     from typing_extensions import Self
 
 _METADATA_COUNT = {b"BNR1": 1, b"BNR2": 6}
@@ -86,3 +90,7 @@ class Banner:
     @property
     def metadata(self) -> construct.Container:
         return self._raw.metadata
+
+    @property
+    def image(self) -> Image.Image:
+        return _extract_image(io.BytesIO(self._raw.image_data), 96, 32, ImageFormat.RGB5A3, force_flip=False)
