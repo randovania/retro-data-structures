@@ -44,6 +44,25 @@ def test_get_by_name(prime2_asset_manager):
     assert table.get_string_by_name("ChoiceDeleteCorruptedFile") == "Delete Incompatible File"
 
 
+def test_append_string(prime2_asset_manager):
+    table = prime2_asset_manager.get_parsed_asset(0x98E7E268, type_hint=Strg)
+
+    name_table_names = list(table._raw.name_table)
+    assert name_table_names == sorted(name_table_names)
+
+    new_name = "AAA_TestEntry"
+    new_string = "Test String Value"
+    table.append_string(new_string, name=new_name)
+
+    assert new_string in table.get_strings()
+    assert table.get_string_by_name(new_name) == new_string
+
+    reparsed = Strg.parse(table.build(), table.target_game)
+    reparsed_names = list(reparsed._raw.name_table)
+    assert reparsed_names == sorted(reparsed_names)
+    assert reparsed.get_string_by_name(new_name) == new_string
+
+
 def test_compare_p3(prime3_asset_manager):
     # with name table
     # Resources/strings/metroid3/gui/fesliderpopup.STRG
