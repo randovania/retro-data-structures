@@ -61,3 +61,23 @@ class Savw(BaseResource):
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []
+
+    def add_system_state_env_var(self, name: str, unk_a: int = 0, unk_b: int = 1, unk_c: int = 0) -> None:
+        self._raw.system_state_env_vars.append(
+            construct.Container(
+                name=name,
+                unk_a=unk_a,
+                unk_b=unk_b,
+                unk_c=unk_c,
+            )
+        )
+
+    def add_game_state_env_var(self, name: str, unk_a: int = 0, unk_b: int = 1, unk_c: int = 0) -> None:
+        self._raw.game_state_env_vars.append(
+            construct.Container(
+                name=name,
+                unk_a=unk_a,
+                unk_b=unk_b,
+                unk_c=unk_c,
+            )
+        )
