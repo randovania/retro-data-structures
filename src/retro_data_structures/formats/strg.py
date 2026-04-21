@@ -61,7 +61,7 @@ class NameTableConstruct(construct.Adapter):
         entries = []
 
         name_offset = Int32ub.sizeof() * 2 * len(obj)
-        for name, index in obj.items():
+        for name, index in sorted(obj.items()):
             raw_strings.append(name.encode("ascii") + b"\x00")
             entries.append(
                 Container(
@@ -335,9 +335,6 @@ class Strg(BaseResource):
             language_count=len(self._raw.languages),
             string_count=string_count,
         )
-
-        if self._raw.name_table is not None:
-            self._raw.name_table = dict(sorted(self._raw.name_table.items()))
 
         if self.target_game <= Game.ECHOES:
             return self._build_v1(header)
