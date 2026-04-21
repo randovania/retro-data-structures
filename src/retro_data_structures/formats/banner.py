@@ -58,7 +58,7 @@ BANNER = Struct(
             lambda ctx: next(key for key, value in _METADATA_COUNT.items() if value == len(ctx.metadata)),
         ),
     ),
-    # Raw GX-tiled RGB5A3 texture data — see txtr.py for format details
+    # Raw bytes for a GX-tiled RGB5A3 96x32 texture — see txtr.py for format details
     "image_data" / Bytes(96 * 32 * 2),
     "metadata" / Array(lambda ctx: _METADATA_COUNT[ctx._magic], MetadataBlock),
 )
