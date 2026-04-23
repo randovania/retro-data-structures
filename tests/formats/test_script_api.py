@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums
-
 from retro_data_structures.formats import script_object
 from retro_data_structures.formats.script_layer import SCLY
 from retro_data_structures.formats.script_object import InstanceId
@@ -178,7 +178,7 @@ def test_add_instance(prime2_area: Area):
             function=Function.Darkworld,
         )
     )
-    assert inst.type == SpecialFunction
+    assert inst.script_type == SpecialFunction
     assert prime2_area.mrea.build() is not None
 
 
@@ -222,7 +222,7 @@ def test_edit_connections(prime2_area: Area):
 
     original_connections = pickup.connections
 
-    pickup.remove_connections_from(relay)
+    pickup.remove_all_connections_to(relay)
     assert len(pickup.connections) == len(original_connections) - 1
 
     pickup.add_connection(State.Arrived, Message.SetToZero, relay)
