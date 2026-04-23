@@ -7,6 +7,7 @@ from tests import test_lib
 from retro_data_structures.formats.strg import Strg
 
 if TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId
 
 
@@ -25,7 +26,7 @@ _MALFORMED_NAME_TABLE = {
 }
 
 
-def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
+def test_compare_p2(prime2_asset_manager: AssetManager, strg_asset_id: AssetId) -> None:
     test_lib.parse_and_build_compare(
         prime2_asset_manager,
         strg_asset_id,
@@ -34,7 +35,7 @@ def test_compare_p2(prime2_asset_manager, strg_asset_id: AssetId):
     )
 
 
-def test_get_by_name(prime2_asset_manager):
+def test_get_by_name(prime2_asset_manager: AssetManager) -> None:
     table = prime2_asset_manager.get_parsed_asset(0x88E242D6, type_hint=Strg)
 
     assert table.get_string_by_name("CorruptedFile") == (
@@ -44,7 +45,59 @@ def test_get_by_name(prime2_asset_manager):
     assert table.get_string_by_name("ChoiceDeleteCorruptedFile") == "Delete Incompatible File"
 
 
-def test_compare_p3(prime3_asset_manager):
+_APPEND_STRING_ASSET = 0x98E7E268
+
+
+def test_append_string_with_name(prime2_asset_manager: AssetManager) -> None:
+    table = prime2_asset_manager.get_parsed_asset(_APPEND_STRING_ASSET, type_hint=Strg)
+
+    name_table_names = list(table._raw.name_table)
+    assert name_table_names == sorted(name_table_names)
+
+    table.append_string("Test String Value", name="AAA_TestEntry")
+
+    assert "Test String Value" in table.get_strings()
+    assert table.get_string_by_name("AAA_TestEntry") == "Test String Value"
+
+    reparsed = Strg.parse(table.build(), table.target_game)
+    reparsed_names = list(reparsed._raw.name_table)
+    assert reparsed_names == sorted(reparsed_names)
+    assert reparsed.get_string_by_name("AAA_TestEntry") == "Test String Value"
+
+
+def test_append_string_without_name(prime2_asset_manager: AssetManager) -> None:
+    table = prime2_asset_manager.get_parsed_asset(_APPEND_STRING_ASSET, type_hint=Strg)
+
+    count_before = len(table.get_strings())
+    name_table_size_before = len(table._raw.name_table)
+    table.append_string("Nameless String")
+
+    assert len(table.get_strings()) == count_before + 1
+    assert table.get_strings()[-1] == "Nameless String"
+    assert len(table._raw.name_table) == name_table_size_before
+
+    reparsed = Strg.parse(table.build(), table.target_game)
+    assert reparsed.get_strings()[-1] == "Nameless String"
+
+
+def test_append_string_with_dict(prime2_asset_manager: AssetManager) -> None:
+    table = prime2_asset_manager.get_parsed_asset(_APPEND_STRING_ASSET, type_hint=Strg)
+
+    languages = table.get_language_list()
+    dict_string = {lang: f"String for {lang}" for lang in languages}
+    table.append_string(dict_string, name="ZZZ_DictEntry")
+
+    for lang in languages:
+        assert table.get_string_by_name("ZZZ_DictEntry", lang) == f"String for {lang}"
+
+    reparsed = Strg.parse(table.build(), table.target_game)
+    for lang in languages:
+        assert reparsed.get_string_by_name("ZZZ_DictEntry", lang) == f"String for {lang}"
+    reparsed_names = list(reparsed._raw.name_table)
+    assert reparsed_names == sorted(reparsed_names)
+
+
+def test_compare_p3(prime3_asset_manager: AssetManager) -> None:
     # with name table
     # Resources/strings/metroid3/gui/fesliderpopup.STRG
     test_lib.parse_and_build_compare(
@@ -73,8 +126,8 @@ def test_compare_p3(prime3_asset_manager):
     )
 
 
-def test_change_table_length(prime2_asset_manager):
-    strg = prime2_asset_manager.get_parsed_asset(0x2E681FEF)
+def test_change_table_length(prime2_asset_manager: AssetManager) -> None:
+    strg = prime2_asset_manager.get_parsed_asset(0x2E681FEF, type_hint=Strg)
     strg.set_string_list([])
 
     assert strg.build() == (

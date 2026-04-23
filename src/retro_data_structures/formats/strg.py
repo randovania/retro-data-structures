@@ -14,7 +14,7 @@ from retro_data_structures.formats.room import GreedyBytes
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterator, Mapping
 
     from typing_extensions import Self
 
@@ -61,7 +61,7 @@ class NameTableConstruct(construct.Adapter):
         entries = []
 
         name_offset = Int32ub.sizeof() * 2 * len(obj)
-        for name, index in obj.items():
+        for name, index in sorted(obj.items()):
             raw_strings.append(name.encode("ascii") + b"\x00")
             entries.append(
                 Container(
@@ -336,8 +336,6 @@ class Strg(BaseResource):
             string_count=string_count,
         )
 
-        # FIXME: ensure name table is sorted
-
         if self.target_game <= Game.ECHOES:
             return self._build_v1(header)
         else:
@@ -423,3 +421,27 @@ class Strg(BaseResource):
     @property
     def strings(self) -> tuple[str, ...]:
         return self.get_strings("ENGL")
+
+    def append_string(self, new_string: str | Mapping[str, str], name: str | None = None) -> None:
+        """
+        Adds a new string to all languages, optionally updating the name table.
+
+        :param new_string: The string to add. If a mapping, the keys are the language codes
+                        and must have one value for each language.
+        :param name: When set, creates an entry in the name table.
+        :return:
+        """
+        new_index = None
+
+        for lang, string_list in self._raw_languages.items():
+            if isinstance(new_string, str):
+                new_entry = new_string
+            else:
+                new_entry = new_string[lang]
+
+            new_index = len(string_list)
+            string_list.append(new_entry)
+
+        if name is not None:
+            assert new_index is not None
+            self._raw.name_table[name] = new_index
