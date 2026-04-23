@@ -8,13 +8,13 @@ import time
 from pathlib import Path
 
 import construct
+from retro_data_structures.properties.prime import objects as prime_objects
 
 from retro_data_structures import properties
 from retro_data_structures.asset_manager import AssetManager, IsoFileProvider, PathFileProvider
 from retro_data_structures.formats import Mrea, Room
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
-from retro_data_structures.properties.prime import objects as prime_objects
 
 SerializedData = construct.Struct(
     game=construct.VarInt,
