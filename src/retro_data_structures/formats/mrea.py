@@ -939,7 +939,7 @@ class Area:
         for instance in self.generated_objects_layer.instances:
             layer = instance.id.layer
             if (not only_modified) or layers[layer].is_modified():
-                layer_rels[layer].extend(instance.type.modules())
+                layer_rels[layer].extend(instance.script_type.modules())
 
         layer_rels = [list(dict.fromkeys(layer)) for layer in layer_rels]
         self.module_dependencies = layer_rels
