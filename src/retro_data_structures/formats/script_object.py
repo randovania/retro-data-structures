@@ -29,7 +29,7 @@ from retro_data_structures.enums import helper as enum_helper
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Generator, Iterator
 
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
@@ -264,7 +264,8 @@ class ScriptInstance:
         return cls(raw, object_properties.game(), on_modify=layer.mark_modified)
 
     @property
-    def type(self) -> type[BaseObjectType]:
+    def script_type(self) -> type[BaseObjectType]:
+        """The class from `retro_data_structures.properties` for this object."""
         return properties.get_game_object(self.target_game, self.type_name)
 
     @property
@@ -300,12 +301,24 @@ class ScriptInstance:
 
     @property
     def raw_properties(self) -> bytes:
+        """The properties of this object, encoded."""
         return self._raw.base_property
 
     def get_properties(self) -> BaseObjectType:
-        return self.type.from_bytes(self._raw.base_property)
+        """
+        The properties of this object, decoded using the correct class.
+
+        See also `script_type` and `get_properties_as`.
+        """
+        return self.script_type.from_bytes(self._raw.base_property)
 
     def get_properties_as(self, type_cls: type[PropertyType]) -> PropertyType:
+        """
+        The properties of this object, decoded using the correct class and correct type hint result.
+
+        :param type_cls: The type to expect the object to have.
+        :return:
+        """
         props = self.get_properties()
         # hack to support using the shared_objects unions
         if hasattr(type_cls, "__args__"):
@@ -314,46 +327,73 @@ class ScriptInstance:
             raise TypeError(f"Expected {type_cls}, got {props}")
         return props
 
-    def set_properties(self, data: BaseObjectType):
-        if not isinstance(data, self.type):
+    def set_properties(self, data: BaseObjectType) -> None:
+        """
+        Updates the properties of this object. The data is encoded during this call and no reference is kept.
+        :param data:
+        :raises: ValueError, if the given object's type doesn't match this object's type
+        """
+        if not isinstance(data, self.script_type):
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type_name}")
 
         self._raw.base_property = data.to_bytes()
         self.on_modify()
 
     @contextlib.contextmanager
-    def edit_properties(self, type_cls: type[PropertyType]):
+    def edit_properties(self, type_cls: type[PropertyType]) -> Generator[PropertyType, None, None]:
+        """
+        Helper for calling get_properties_as followed by set_properties.
+
+        >>> with obj.edit_properties(SequenceTimer) as sequence_timer:
+        >>>     sequence_timer.editor_properties.active = False
+        """
         props = self.get_properties_as(type_cls)
         yield props
         self.set_properties(props)
 
     @property
     def connections(self) -> tuple[Connection, ...]:
+        """Gets a copy of all connections of this object."""
         return tuple(self._raw.connections)
 
     @connections.setter
-    def connections(self, value: typing.Iterable[Connection]):
+    def connections(self, value: typing.Iterable[Connection]) -> None:
+        """Updates the entire list of connections of this object."""
         self._raw.connections = tuple(value)
         self.on_modify()
 
-    def add_connection(self, state: str | State, message: str | Message, target: InstanceIdRef):
+    def add_connection(self, state: str | State, message: str | Message, target: InstanceIdRef) -> None:
+        """
+        Adds a new connection with the given parameters.
+        """
         correct_state = enum_helper.STATE_PER_GAME[self.target_game]
         correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
 
-        target = resolve_instance_id(target)
+        resolved_target = resolve_instance_id(target)
 
         self.connections = self.connections + (
             Connection(
                 state=_resolve_to_enum(correct_state, state),
                 message=_resolve_to_enum(correct_message, message),
-                target=target,
+                target=resolved_target,
             ),
         )
 
-    def remove_connection(self, connection: Connection):
-        self.connections = [c for c in self.connections if c != connection]
+    def remove_connection(self, connection: Connection) -> None:
+        """
+        Removes the given connection from self.
+        :param connection: The connection to remove.
+        :raise KeyError: if connection doesn't exist
+        """
+        old = self.connections
+        old_size = len(old)
+        new = [c for c in old if c != connection]
+        if old_size == len(new):
+            raise KeyError(f"Connection {connection} not found")
+        self.connections = new
 
-    def remove_connections_from(self, target: InstanceIdRef):
+    def remove_all_connections_to(self, target: InstanceIdRef) -> None:
+        """Remove all connections that goes from `self` to an object with id `target`."""
         target = resolve_instance_id(target)
         self.connections = [c for c in self.connections if c.target != target]
 

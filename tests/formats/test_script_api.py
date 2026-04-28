@@ -178,7 +178,7 @@ def test_add_instance(prime2_area: Area):
             function=Function.Darkworld,
         )
     )
-    assert inst.type == SpecialFunction
+    assert inst.script_type == SpecialFunction
     assert prime2_area.mrea.build() is not None
 
 
@@ -222,7 +222,7 @@ def test_edit_connections(prime2_area: Area):
 
     original_connections = pickup.connections
 
-    pickup.remove_connections_from(relay)
+    pickup.remove_all_connections_to(relay)
     assert len(pickup.connections) == len(original_connections) - 1
 
     pickup.add_connection(State.Arrived, Message.SetToZero, relay)
