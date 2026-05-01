@@ -15,7 +15,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.game_check import Game
 
 AssetType = str
-AssetId = int | uuid.UUID
+AssetId = int
 NameOrAssetId = str | AssetId
 
 
