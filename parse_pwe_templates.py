@@ -1811,6 +1811,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[{object_type}]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
+        # certain objects have a different name in Game.xml than in the struct's xml
+        # the difference causes errors in the code-gen, particularly in the shared_objects file
+        script_object["name"] = stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
 
         getter_func += f"from {base_import_path}{stem} import {stem}\n"
