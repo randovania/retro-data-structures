@@ -286,7 +286,7 @@ class Mlvl(BaseResource):
             yield Area(self, i)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
-        return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
+        return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager.resolve_asset_id(asset_id))
 
     def add_area(self, mrea_id: NameOrAssetId, name_id: NameOrAssetId, internal_name: str = "") -> Area:
         """
@@ -298,10 +298,10 @@ class Mlvl(BaseResource):
         area_index = len(self._raw.areas)
         self._raw.areas.append(
             Container(
-                area_name_id=self.asset_manager._resolve_asset_id(name_id),
+                area_name_id=self.asset_manager.resolve_asset_id(name_id),
                 area_transform=[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
                 area_bounding_box=[-1.0, -1.0, -1.0, 1.0, 1.0, 1.0],
-                area_mrea_id=self.asset_manager._resolve_asset_id(mrea_id),
+                area_mrea_id=self.asset_manager.resolve_asset_id(mrea_id),
                 internal_area_id=area_index,
                 attached_area_index=ListContainer(),
                 dependencies=AreaDependencies((), ()),
