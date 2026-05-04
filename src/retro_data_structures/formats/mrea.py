@@ -833,12 +833,17 @@ class Area:
 
     def move_instance(self, instance: InstanceRef, new_layer: str) -> None:
         """
-        Moves an instance from it's current layer to a new layer.
+        Moves an instance from it's current layer to a new layer and retargets all incoming connections.
         """
         old_inst = self.get_instance(instance)
         new_inst = self.get_layer(new_layer).add_instance_with(old_inst.get_properties())
         self.remove_instance(old_inst)
         new_inst.id = InstanceId.new(new_inst.id.layer, new_inst.id.area, old_inst.id.instance)
+        for inst in self.all_instances:
+            for connection in inst.connections:
+                if connection.target == old_inst.id:
+                    inst.add_connection(connection.state, connection.message, new_inst.id)
+                    inst.remove_connection(connection)
 
     def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]

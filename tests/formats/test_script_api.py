@@ -174,11 +174,17 @@ def test_move_instance(prime2_area: Area):
     old_len = len(list(prime2_area.all_instances))
     prime2_area.move_instance(idx, "!No Load")
     new_len = len(list(prime2_area.all_instances))
+
     # assert that the instance was not found on original layer and found on the layer it's moved to
     assert not prime2_area.get_layer("Default").has_instance(idx)
     assert prime2_area.get_layer("!No Load").has_instance(idx)
+
     # assert that we have the same number of instances before and after
     assert old_len == new_len
+
+    # assert that incoming connections point to the new InstanceID
+    relay = prime2_area.get_instance(0x0045006C)
+    assert relay.connections[0].target == prime2_area.get_instance(idx).id
 
 
 # Script Layer
