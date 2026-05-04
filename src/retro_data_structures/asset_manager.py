@@ -229,7 +229,7 @@ class AssetManager:
         self._cached_dependencies = {}
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
 
-    def _resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
+    def resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if value in self._custom_asset_ids:
             return self._custom_asset_ids[value]
         return resolve_asset_id(self.target_game, value)
@@ -272,7 +272,7 @@ class AssetManager:
 
     def find_paks(self, asset_id: NameOrAssetId) -> Iterator[str]:
         original_name = _get_name(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
         try:
             yield from self._paks_for_asset_id[asset_id]
         except KeyError:
@@ -282,7 +282,7 @@ class AssetManager:
         """
         Checks if a given asset id exists.
         """
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         if asset_id in self._modified_resources:
             return self._modified_resources[asset_id] is not None
@@ -296,7 +296,7 @@ class AssetManager:
         :return:
         """
         original_name = _get_name(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         if asset_id in self._modified_resources:
             result = self._modified_resources[asset_id]
@@ -320,7 +320,7 @@ class AssetManager:
         :raises ValueError if the asset doesn't exist.
         """
         original_name = _get_name(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         if asset_id in self._modified_resources:
             result = self._modified_resources[asset_id]
@@ -358,7 +358,7 @@ class AssetManager:
         Gets a file as from `get_parsed_asset` and keep it in memory.
         Modifications made to it are applied by `build_modified_files`.
         """
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
         if asset_id not in self._memory_files:
             self._memory_files[asset_id] = self.get_parsed_asset(asset_id, type_hint=type_hint)
         return self._memory_files[asset_id]
@@ -368,7 +368,7 @@ class AssetManager:
         Gets a file from memory if present, otherwise parses it but does not keep it in memory.
         Useful for a read-only view when you aren't sure whether the asset is currently in memory.
         """
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
         result = self._memory_files.get(asset_id)
         if result is not None:
             return result
@@ -405,7 +405,7 @@ class AssetManager:
         Adds an asset that doesn't already exist.
         :return: Asset id of the new asset.
         """
-        asset_id = self._resolve_asset_id(name)
+        asset_id = self.resolve_asset_id(name)
 
         if self.does_asset_exists(asset_id):
             raise ValueError(f"{name} already exists")
@@ -446,7 +446,7 @@ class AssetManager:
         :return: The resolved Asset ID of the replaced asset.
         """
         original_name = str(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
@@ -473,7 +473,7 @@ class AssetManager:
 
     def delete_asset(self, asset_id: NameOrAssetId) -> None:
         original_name = _get_name(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
@@ -516,7 +516,7 @@ class AssetManager:
             raise ValueError(f"Unknown pak_name: {pak_name}")
 
         original_name = _get_name(asset_id)
-        asset_id = self._resolve_asset_id(asset_id)
+        asset_id = self.resolve_asset_id(asset_id)
 
         # Test if the asset exists
         if not self.does_asset_exists(asset_id):
