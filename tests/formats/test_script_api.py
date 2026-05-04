@@ -246,9 +246,10 @@ def test_edit_connections(prime2_area: Area):
     pickup.add_connection(State.Arrived, Message.SetToZero, relay)
     assert set(pickup.connections) == set(original_connections)
 
+
 def test_replace_connections_to(prime2_asset_manager):
-    mlvl: Mlvl = prime2_asset_manager.get_parsed_asset(0x3BFA3EFF) # Temple Grounds
-    area: Area = mlvl.get_area(0x4B4E5911) # Temple Assembly Site
+    mlvl: Mlvl = prime2_asset_manager.get_parsed_asset(0x3BFA3EFF)  # Temple Grounds
+    area: Area = mlvl.get_area(0x4B4E5911)  # Temple Assembly Site
 
     timer = area.get_instance("PORTAL TO RIFT CONTROLLER")
     effect = area.get_instance("RIFT TO PORTAL")
