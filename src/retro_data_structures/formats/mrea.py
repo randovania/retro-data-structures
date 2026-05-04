@@ -53,8 +53,8 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.formats.mlvl import Mlvl
     from retro_data_structures.formats.script_object import (
-        InstanceRef,
         InstanceIdRef,
+        InstanceRef,
         ScriptInstance,
     )
 
@@ -832,7 +832,7 @@ class Area:
                 return
         raise KeyError(instance)
 
-    def move_instance(self, instance: InstanceIdRef, new_layer : str) -> None:
+    def move_instance(self, instance: InstanceIdRef, new_layer: str) -> None:
         """
         Moves an instance from it's current layer to a new layer.
         """
