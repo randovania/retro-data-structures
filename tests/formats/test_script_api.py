@@ -246,6 +246,32 @@ def test_edit_connections(prime2_area: Area):
     pickup.add_connection(State.Arrived, Message.SetToZero, relay)
     assert set(pickup.connections) == set(original_connections)
 
+def test_replace_connections_to(prime2_asset_manager):
+    mlvl: Mlvl = prime2_asset_manager.get_parsed_asset(0x3BFA3EFF) # Temple Grounds
+    area: Area = mlvl.get_area(0x4B4E5911) # Temple Assembly Site
+
+    timer = area.get_instance("PORTAL TO RIFT CONTROLLER")
+    effect = area.get_instance("RIFT TO PORTAL")
+    relay = area.get_instance("Stop Dark Rift Sounds")
+
+    original_connections = timer.connections
+    effect_targets_before = 0
+    for connection in original_connections:
+        if connection.target == relay.id:
+            effect_targets_before += 1
+
+    # run
+    timer.replace_connections_to(effect, relay)
+    effect_targets_after = 0
+    for connection in timer.connections:
+        if connection.target == relay.id:
+            effect_targets_after += 1
+
+    # assert
+    assert set(timer.connections) != set(original_connections)
+    assert len(timer.connections) == len(original_connections)
+    assert effect_targets_before == effect_targets_after - 2
+
 
 @pytest.mark.xfail(reason="Prime 1 SCLY building is incorrect")
 def test_roundtrip_prime1(prime1_scly_raw: bytes) -> None:

@@ -397,6 +397,29 @@ class ScriptInstance:
         target = resolve_instance_id(target)
         self.connections = [c for c in self.connections if c.target != target]
 
+    def replace_connections_to(self, original: InstanceIdRef, target: InstanceIdRef) -> None:
+        """
+        Replaces connections from original target to a new target while preserving order.
+        :param original: The original target InstanceIDRef.
+        :param target: The new target InstanceIDRef.
+        :return:
+        """
+        original_ = resolve_instance_id(original)
+        target_ = resolve_instance_id(target)
+
+        found = False
+
+        def _replace(c: Connection) -> Connection:
+            nonlocal found
+            if c.target == original_:
+                found = True
+                return dataclasses.replace(c, target=target_)
+            return c
+
+        new_conn = [_replace(c) for c in self.connections]
+        if found:
+            self.connections = new_conn
+
     def mlvl_dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         yield from self.get_properties().dependencies_for(asset_manager)
 
