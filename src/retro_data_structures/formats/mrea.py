@@ -49,7 +49,6 @@ if typing.TYPE_CHECKING:
 
     from typing_extensions import Self
 
-    from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.formats.mlvl import Mlvl
     from retro_data_structures.formats.script_object import (
         InstanceRef,
@@ -717,24 +716,14 @@ class Area:
     _layer_names: list[str]
     _index: int
 
-    _mrea: Mrea = None
-    _strg: Strg = None
+    _mrea: Mrea | None = None
+    _strg: Strg | None = None
 
-    # FIXME: since the whole Mlvl is now being passed, this function can have the other arguments removed
-    # FIXME: also every time i've tried to do this it breaks mlvl dependencies. good luck!
-    def __init__(
-        self,
-        raw: Container,
-        asset_manager: AssetManager,
-        flags: list[bool],
-        names: list[str],
-        index: int,
-        parent_mlvl: Mlvl,
-    ):
-        self._raw = raw
-        self.asset_manager = asset_manager
-        self._flags = flags
-        self._layer_names = names
+    def __init__(self, parent_mlvl: Mlvl, index: int):
+        self._raw = parent_mlvl._raw.areas[index]
+        self.asset_manager = parent_mlvl.asset_manager
+        self._flags = parent_mlvl._raw.area_layer_flags[index]
+        self._layer_names = parent_mlvl._raw.area_layer_names[index]
         self._index = index
         self._parent_mlvl = parent_mlvl
 

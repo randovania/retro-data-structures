@@ -282,11 +282,8 @@ class Mlvl(BaseResource):
 
     @property
     def areas(self) -> Iterator[Area]:
-        area_layer_flags: list[list[bool]] = self._raw.area_layer_flags
-        names: list[list[str]] = self._raw.area_layer_names
-
-        for i, area in enumerate(self._raw.areas):
-            yield Area(area, self.asset_manager, area_layer_flags[i], names[i], i, self)
+        for i in range(len(self._raw.areas)):
+            yield Area(self, i)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
         return next(area for area in self.areas if area.mrea_asset_id == self.asset_manager._resolve_asset_id(asset_id))
@@ -316,14 +313,7 @@ class Mlvl(BaseResource):
         self._raw.area_layer_flags.append([])
         self._raw.area_layer_names.append([])
 
-        return Area(
-            self._raw.areas[area_index],
-            self.asset_manager,
-            self._raw.area_layer_flags[area_index],
-            self._raw.area_layer_names[area_index],
-            area_index,
-            self,
-        )
+        return Area(self, area_index)
 
     _name_strg_cached: Strg = None
     _dark_strg_cached: Strg = None
