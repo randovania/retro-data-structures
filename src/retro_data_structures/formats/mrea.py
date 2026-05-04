@@ -39,6 +39,7 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
+from retro_data_structures.formats.script_object import InstanceId, resolve_instance_id
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
@@ -53,6 +54,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import Mlvl
     from retro_data_structures.formats.script_object import (
         InstanceRef,
+        InstanceIdRef,
         ScriptInstance,
     )
 
@@ -829,6 +831,16 @@ class Area:
             else:
                 return
         raise KeyError(instance)
+
+    def move_instance(self, instance: InstanceIdRef, new_layer : str) -> None:
+        """
+        Moves an instance from it's current layer to a new layer.
+        """
+        target_id = resolve_instance_id(instance)
+        old_inst = self.get_instance(target_id)
+        new_inst = self.get_layer(new_layer).add_instance_with(old_inst.get_properties())
+        self.remove_instance(old_inst)
+        new_inst.id = InstanceId.new(new_inst.id.layer, new_inst.id.area, target_id.instance)
 
     def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]
