@@ -286,7 +286,7 @@ class ScriptInstance:
         return self.id.area == other.area and self.id.instance == other.instance
 
     @property
-    def name(self) -> str | None:
+    def name(self) -> str:
         if self.target_game == Game.ECHOES:
             name = _try_quick_get_name(self._raw.base_property)
             if name is not None:
@@ -294,7 +294,7 @@ class ScriptInstance:
         return self.get_properties().get_name()
 
     @name.setter
-    def name(self, value: str):
+    def name(self, value: str) -> None:
         props = self.get_properties()
         props.set_name(value)
         self.set_properties(props)
