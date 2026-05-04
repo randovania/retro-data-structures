@@ -39,6 +39,7 @@ from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
+from retro_data_structures.formats.script_object import InstanceId
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
@@ -818,6 +819,17 @@ class Area:
             else:
                 return
         raise KeyError(instance)
+
+    def move_instance(self, instance: InstanceRef, new_layer: str) -> None:
+        """
+        Moves an instance from it's current layer to a new layer and retargets all incoming connections.
+        """
+        old_inst = self.get_instance(instance)
+        new_inst = self.get_layer(new_layer).add_instance_with(old_inst.get_properties())
+        new_inst.id = InstanceId.new(new_inst.id.layer, new_inst.id.area, old_inst.id.instance)
+        for inst in self.all_instances:
+            inst.replace_connections_to(old_inst, new_inst)
+        self.remove_instance(old_inst)
 
     def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]

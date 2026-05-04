@@ -169,6 +169,24 @@ def test_remove_instance(prime2_area: Area):
     assert len(list(prime2_area.all_instances)) == old_len - 1
 
 
+def test_move_instance(prime2_area: Area):
+    idx = 0x0045006B
+    old_len = len(list(prime2_area.all_instances))
+    prime2_area.move_instance(idx, "!No Load")
+    new_len = len(list(prime2_area.all_instances))
+
+    # assert that the instance was not found on original layer and found on the layer it's moved to
+    assert not prime2_area.get_layer("Default").has_instance(idx)
+    assert prime2_area.get_layer("!No Load").has_instance(idx)
+
+    # assert that we have the same number of instances before and after
+    assert old_len == new_len
+
+    # assert that incoming connections point to the new InstanceID
+    relay = prime2_area.get_instance(0x0045006C)
+    assert relay.connections[0].target == prime2_area.get_instance(idx).id
+
+
 # Script Layer
 def test_add_instance(prime2_area: Area):
     from retro_data_structures.properties.echoes.objects.SpecialFunction import Function, SpecialFunction
@@ -227,6 +245,33 @@ def test_edit_connections(prime2_area: Area):
 
     pickup.add_connection(State.Arrived, Message.SetToZero, relay)
     assert set(pickup.connections) == set(original_connections)
+
+
+def test_replace_connections_to(prime2_asset_manager):
+    mlvl: Mlvl = prime2_asset_manager.get_parsed_asset(0x3BFA3EFF)  # Temple Grounds
+    area: Area = mlvl.get_area(0x4B4E5911)  # Temple Assembly Site
+
+    timer = area.get_instance("PORTAL TO RIFT CONTROLLER")
+    effect = area.get_instance("RIFT TO PORTAL")
+    relay = area.get_instance("Stop Dark Rift Sounds")
+
+    original_connections = timer.connections
+    effect_targets_before = 0
+    for connection in original_connections:
+        if connection.target == relay.id:
+            effect_targets_before += 1
+
+    # run
+    timer.replace_connections_to(effect, relay)
+    effect_targets_after = 0
+    for connection in timer.connections:
+        if connection.target == relay.id:
+            effect_targets_after += 1
+
+    # assert
+    assert set(timer.connections) != set(original_connections)
+    assert len(timer.connections) == len(original_connections)
+    assert effect_targets_before == effect_targets_after - 2
 
 
 @pytest.mark.xfail(reason="Prime 1 SCLY building is incorrect")
