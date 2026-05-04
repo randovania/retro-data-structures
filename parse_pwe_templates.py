@@ -1681,22 +1681,24 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.class_code += f"        return Game.{_game_id_to_enum[game_id]}\n"
 
         if is_struct:
-            cls.class_code += "\n    def get_name(self) -> str | None:\n"
+            name_field = None
+            missing_name_field = '        raise RuntimeError(f"{self.__class__.__name__} does not have name")\n'
+
+            cls.class_code += "\n    def get_name(self) -> str:\n"
             if game_id == "Prime":
                 if "name" in cls.all_props:
                     name_field = "self.name"
-                else:
-                    name_field = "None"
             elif "editor_properties" in cls.all_props:
                 name_field = "self.editor_properties.name"
-            else:
-                name_field = "None"
 
-            cls.class_code += f"        return {name_field}\n"
+            if name_field is None:
+                cls.class_code += missing_name_field
+            else:
+                cls.class_code += f"        return {name_field}\n"
 
             cls.class_code += "\n    def set_name(self, name: str) -> None:\n"
-            if name_field == "None":
-                cls.class_code += '        raise RuntimeError(f"{self.__class__.__name__} does not have name")\n'
+            if name_field is None:
+                cls.class_code += missing_name_field
             else:
                 cls.class_code += f"        {name_field} = name\n"
 

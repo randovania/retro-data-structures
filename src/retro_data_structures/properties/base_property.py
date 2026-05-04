@@ -90,7 +90,7 @@ class BaseObjectType(BaseProperty, ABC):
     def modules(cls) -> list[str]:
         return []
 
-    def get_name(self) -> str | None:
+    def get_name(self) -> str:
         raise NotImplementedError
 
     def set_name(self, name: str) -> None:
