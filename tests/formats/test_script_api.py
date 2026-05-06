@@ -187,9 +187,8 @@ def test_move_instance(prime2_area: Area):
     # assert that incoming connections point to the new InstanceID
     relay = prime2_area.get_instance(0x0045006C)
     assert relay.connections[0].target == prime2_area.get_instance(idx).id
-    
-    assert prime2_area.get_instance(idx).connections == old_connections
 
+    assert prime2_area.get_instance(idx).connections == old_connections
 
 
 # Script Layer
