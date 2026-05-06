@@ -826,6 +826,7 @@ class Area:
         """
         old_inst = self.get_instance(instance)
         new_inst = self.get_layer(new_layer).add_instance_with(old_inst.get_properties())
+        new_inst.connections = old_inst.connections
         new_inst.id = InstanceId.new(new_inst.id.layer, new_inst.id.area, old_inst.id.instance)
         for inst in self.all_instances:
             inst.replace_connections_to(old_inst, new_inst)

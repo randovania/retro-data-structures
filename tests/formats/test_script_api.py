@@ -171,6 +171,8 @@ def test_remove_instance(prime2_area: Area):
 
 def test_move_instance(prime2_area: Area):
     idx = 0x0045006B
+    old_connections = prime2_area.get_instance(idx).connections
+
     old_len = len(list(prime2_area.all_instances))
     prime2_area.move_instance(idx, "!No Load")
     new_len = len(list(prime2_area.all_instances))
@@ -185,6 +187,9 @@ def test_move_instance(prime2_area: Area):
     # assert that incoming connections point to the new InstanceID
     relay = prime2_area.get_instance(0x0045006C)
     assert relay.connections[0].target == prime2_area.get_instance(idx).id
+    
+    assert prime2_area.get_instance(idx).connections == old_connections
+
 
 
 # Script Layer
