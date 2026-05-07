@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import TYPE_CHECKING
 
 from retro_data_structures import json_util
 
@@ -10,11 +10,9 @@ if TYPE_CHECKING:
 
     from retro_data_structures.properties.base_property import BaseProperty
 
-T = TypeVar("T")
-
 
 @dataclasses.dataclass(frozen=True)
-class FieldReflection(Generic[T]):
+class FieldReflection[T]:
     type: type[T]
     id: int
     original_name: str | None

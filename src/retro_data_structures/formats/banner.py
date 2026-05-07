@@ -9,8 +9,9 @@ from construct import Array, Bytes, OneOf, Rebuild, Struct
 from retro_data_structures.formats.txtr import ImageFormat, _build_image, _extract_image
 
 if typing.TYPE_CHECKING:
+    from typing import Self
+
     from PIL import Image
-    from typing_extensions import Self
 
 
 class _BannerString(construct.Adapter):

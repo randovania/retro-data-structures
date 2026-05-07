@@ -15,8 +15,7 @@ from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Mapping
-
-    from typing_extensions import Self
+    from typing import Self
 
     from retro_data_structures.asset_manager import AssetManager
 

@@ -9,7 +9,7 @@ from construct import Construct, Container
 from retro_data_structures.exceptions import DependenciesHandledElsewhere
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Self
+    from typing import Self
 
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.game_check import Game
