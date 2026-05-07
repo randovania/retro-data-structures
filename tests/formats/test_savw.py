@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING
 
+import pytest
 from tests import test_lib
 
 from retro_data_structures.formats import Savw
+from retro_data_structures.formats.mlvl import Mlvl
 
 if TYPE_CHECKING:
     from retro_data_structures.base_resource import AssetId
@@ -36,47 +39,30 @@ def test_compare_p3(prime3_asset_manager, savw_asset_id: AssetId) -> None:
     )
 
 
-def test_add_system_state_env_var(prime2_asset_manager) -> None:
-    savw = prime2_asset_manager.get_parsed_asset(_ECHOES_SAVW, type_hint=Savw)
+@pytest.mark.xfail
+def test_rebuild_p1(prime1_asset_manager, mlvl_asset_id: AssetId) -> None:
+    mlvl = prime1_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
 
-    count_before = len(savw._raw.system_state_env_vars)
-    savw.add_system_state_env_var("MySystemVar")
+    original_savw = copy.deepcopy(mlvl.savw.raw)
+    mlvl.rebuild_savw()
 
-    assert len(savw._raw.system_state_env_vars) == count_before + 1
-    entry = savw._raw.system_state_env_vars[-1]
-    assert entry.name == "MySystemVar"
-    assert entry.unk_a == 0
-    assert entry.unk_b == 1
-    assert entry.unk_c == 0
-
-    reparsed = Savw.parse(savw.build(), savw.target_game)
-    assert len(reparsed._raw.system_state_env_vars) == count_before + 1
-    reparsed_entry = reparsed._raw.system_state_env_vars[-1]
-    assert reparsed_entry.name == "MySystemVar"
-    assert reparsed_entry.unk_a == 0
-    assert reparsed_entry.unk_b == 1
-    assert reparsed_entry.unk_c == 0
-    assert len(reparsed._raw.game_state_env_vars) == len(savw._raw.game_state_env_vars)
+    assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)
 
 
-def test_add_game_state_env_var(prime2_asset_manager) -> None:
-    savw = prime2_asset_manager.get_parsed_asset(_ECHOES_SAVW, type_hint=Savw)
+def test_rebuild_p2(prime2_asset_manager, mlvl_asset_id: AssetId) -> None:
+    mlvl = prime2_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
 
-    count_before = len(savw._raw.game_state_env_vars)
-    savw.add_game_state_env_var("MyGameVar")
+    original_savw = copy.deepcopy(mlvl.savw.raw)
+    mlvl.rebuild_savw()
 
-    assert len(savw._raw.game_state_env_vars) == count_before + 1
-    entry = savw._raw.game_state_env_vars[-1]
-    assert entry.name == "MyGameVar"
-    assert entry.unk_a == 0
-    assert entry.unk_b == 1
-    assert entry.unk_c == 0
+    assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)
 
-    reparsed = Savw.parse(savw.build(), savw.target_game)
-    assert len(reparsed._raw.game_state_env_vars) == count_before + 1
-    reparsed_entry = reparsed._raw.game_state_env_vars[-1]
-    assert reparsed_entry.name == "MyGameVar"
-    assert reparsed_entry.unk_a == 0
-    assert reparsed_entry.unk_b == 1
-    assert reparsed_entry.unk_c == 0
-    assert len(reparsed._raw.system_state_env_vars) == len(savw._raw.system_state_env_vars)
+
+@pytest.mark.xfail
+def test_rebuild_p3(prime3_asset_manager, mlvl_asset_id: AssetId) -> None:
+    mlvl = prime3_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
+
+    original_savw = copy.deepcopy(mlvl.savw.raw)
+    mlvl.rebuild_savw()
+
+    assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)

@@ -3,13 +3,14 @@ from __future__ import annotations
 import dataclasses
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import construct
-from construct.lib import ListContainer
-from construct.lib.containers import Container
+from frozendict import frozendict
 
 if TYPE_CHECKING:
+    from construct.lib.containers import Container
+
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, RawResource
     from retro_data_structures.game_check import Game
@@ -50,15 +51,20 @@ def _parse_and_build_compare(module, game: Game, file_path: Path, print_data=Fal
     return (raw, encoded, data)
 
 
-def purge_hidden(data: Container | ListContainer) -> Container:
-    if isinstance(data, ListContainer):
-        return [purge_hidden(it) if isinstance(it, Container | ListContainer) else it for it in data]
+def purge_hidden(data: Any, *, ordered: bool = True) -> Any:
+    if isinstance(data, list):
+        res = [purge_hidden(it, ordered=ordered) for it in data]
+        if not ordered:
+            res = frozenset(res)
+        return res
 
-    return {
-        k: purge_hidden(v) if isinstance(v, Container | ListContainer) else v
-        for k, v in data.items()
-        if not k.startswith("_")
-    }
+    elif isinstance(data, dict):
+        res = {k: purge_hidden(v, ordered=ordered) for k, v in data.items() if not k.startswith("_")}
+        if not ordered:
+            res = frozendict(res)
+        return res
+
+    return data
 
 
 def parse_and_build_compare_auto_manager(

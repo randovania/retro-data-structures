@@ -208,7 +208,7 @@ def test_add_memory_relay(prime2_area: Area):
     relay = prime2_area.get_layer("Default").add_memory_relay("Test")
     save = prime2_area._parent_mlvl.savw
 
-    assert any(state["instance_id"] == relay.id for state in save.raw.memory_relays)
+    assert any(state.instance_id == relay.id for state in save.memory_relays)
 
 
 @pytest.mark.parametrize("name", ("Test1", "Test2"))

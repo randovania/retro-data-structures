@@ -571,6 +571,7 @@ dependencies = [
 
 [package.optional-dependencies]
 test = [
+    { name = "frozendict" },
     { name = "nod" },
     { name = "pytest" },
     { name = "pytest-cov" },
@@ -586,6 +587,7 @@ typing = [
 [package.metadata]
 requires-dist = [
     { name = "construct", specifier = ">=2.10.0" },
+    { name = "frozendict", marker = "extra == 'test'" },
     { name = "frozendict", marker = "extra == 'typing'" },
     { name = "inflection", marker = "extra == 'typing'", specifier = ">=0.5.1" },
     { name = "lzokay" },

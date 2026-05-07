@@ -24,6 +24,7 @@ from construct.lib.containers import Container
 from retro_data_structures import game_check
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
+from retro_data_structures.formats.savw import SavedStateDescriptor
 from retro_data_structures.formats.script_object import (
     ConstructScriptInstance,
     InstanceId,
@@ -182,7 +183,7 @@ class ScriptLayer:
     def add_memory_relay(self, name: str | None = None) -> ScriptInstance:
         relay = self.add_instance("MRLY", name)
         savw = self._parent_area._parent_mlvl.savw
-        savw.raw.memory_relays.append({"instance_id": relay.id})
+        savw.raw.memory_relays.append(SavedStateDescriptor(relay.id))
         return relay
 
     def remove_instance(self, instance: InstanceRef):

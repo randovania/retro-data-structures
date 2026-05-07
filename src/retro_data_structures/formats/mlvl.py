@@ -281,8 +281,12 @@ class Mlvl(BaseResource):
             return super().__repr__()
 
     @property
+    def area_count(self) -> int:
+        return len(self._raw.areas)
+
+    @property
     def areas(self) -> Iterator[Area]:
-        for i in range(len(self._raw.areas)):
+        for i in range(self.area_count):
             yield Area(self, i)
 
     def get_area(self, asset_id: NameOrAssetId) -> Area:
@@ -359,3 +363,10 @@ class Mlvl(BaseResource):
         if self._savw is None:
             self._savw = self.asset_manager.get_file(self.raw.world_save_info_id, type_hint=Savw)
         return self._savw
+
+    def rebuild_savw(self) -> None:
+        """
+        Rebuilds this world's SAVW from scratch, iterating through
+        the areas in this world to populate its various fields.
+        """
+        self.savw.rebuild(self)
