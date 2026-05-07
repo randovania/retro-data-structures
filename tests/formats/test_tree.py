@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from unittest.mock import ANY
 
+from retro_data_structures.properties.echoes.archetypes import EditorProperties
+from retro_data_structures.properties.echoes.objects import ScanTreeCategory
 from tests import test_lib
 
 from retro_data_structures.formats.tree import Tree
-from retro_data_structures.properties.echoes.archetypes import EditorProperties
-from retro_data_structures.properties.echoes.objects import ScanTreeCategory
 
 
 def test_compare_p2(prime2_asset_manager):
