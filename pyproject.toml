@@ -47,6 +47,7 @@ test = [
     "pytest-xdist",
     # "pytest-asyncio",
     # "pytest-mock",
+    "frozendict",
 ]
 typing = [
     "types-jsonschema",

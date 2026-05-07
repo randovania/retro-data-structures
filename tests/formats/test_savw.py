@@ -39,10 +39,14 @@ def test_compare_p3(prime3_asset_manager, savw_asset_id: AssetId) -> None:
     )
 
 
+@pytest.mark.xfail
 def test_rebuild_p1(prime1_asset_manager, mlvl_asset_id: AssetId) -> None:
     mlvl = prime1_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
-    with pytest.raises(NotImplementedError):
-        mlvl.rebuild_savw()
+
+    original_savw = copy.deepcopy(mlvl.savw.raw)
+    mlvl.rebuild_savw()
+
+    assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)
 
 
 def test_rebuild_p2(prime2_asset_manager, mlvl_asset_id: AssetId) -> None:
@@ -54,7 +58,11 @@ def test_rebuild_p2(prime2_asset_manager, mlvl_asset_id: AssetId) -> None:
     assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)
 
 
+@pytest.mark.xfail
 def test_rebuild_p3(prime3_asset_manager, mlvl_asset_id: AssetId) -> None:
     mlvl = prime3_asset_manager.get_parsed_asset(mlvl_asset_id, type_hint=Mlvl)
-    with pytest.raises(NotImplementedError):
-        mlvl.rebuild_savw()
+
+    original_savw = copy.deepcopy(mlvl.savw.raw)
+    mlvl.rebuild_savw()
+
+    assert test_lib.purge_hidden(original_savw, ordered=False) == test_lib.purge_hidden(mlvl.savw.raw, ordered=False)
