@@ -311,7 +311,15 @@ class AssetManager:
             raise UnknownAssetId(asset_id, original_name) from None
 
     def get_asset_format(self, asset_id: NameOrAssetId) -> type[BaseResource]:
+        """
+        Gets the BaseResource class that is associated with the given asset id in the PAKs.
+
+        """
         asset_type = self.get_asset_type(asset_id)
+
+        if asset_type == "DUMB":
+            return BaseResource
+
         return formats.resource_type_for(asset_type)
 
     def get_raw_asset(self, asset_id: NameOrAssetId) -> RawResource:
@@ -348,7 +356,14 @@ class AssetManager:
         Gets the resource with the given name and decodes it based on the extension.
         """
         format_class = self.get_asset_format(asset_id)
-        if type_hint is not BaseResource and type_hint != format_class:
+
+        if format_class is BaseResource:
+            if type_hint is BaseResource:
+                raise ValueError(f"pak listed {self.get_asset_type(asset_id)}, this case requires type_hint to be set")
+
+            format_class = type_hint
+
+        elif type_hint is not BaseResource and type_hint != format_class:
             raise ValueError(f"type_hint was {type_hint}, pak listed {format_class}")
 
         return format_class.parse(self.get_raw_asset(asset_id).data, target_game=self.target_game, asset_manager=self)
