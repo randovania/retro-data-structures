@@ -45,6 +45,20 @@ def test_get_by_name(prime2_asset_manager: AssetManager) -> None:
     assert table.get_string_by_name("ChoiceDeleteCorruptedFile") == "Delete Incompatible File"
 
 
+def test_set_string_by_name_dict(prime2_asset_manager: AssetManager) -> None:
+    table = prime2_asset_manager.get_parsed_asset(0x88E242D6, type_hint=Strg)
+
+    table.set_strings_by_name_dict(
+        {
+            "Foo": "AAAAAAAA",
+            "Bar": "BBBBBBBB",
+        }
+    )
+    assert table.get_string_by_name("Foo") == "AAAAAAAA"
+    assert table.get_string_by_name("Bar") == "BBBBBBBB"
+    assert table.strings == ("AAAAAAAA", "BBBBBBBB")
+
+
 _APPEND_STRING_ASSET = 0x98E7E268
 
 

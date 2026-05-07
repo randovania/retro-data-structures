@@ -418,6 +418,24 @@ class Strg(BaseResource):
             if language is None or lang == language:
                 self._raw_languages[lang] = list(string_list)
 
+    def set_strings_by_name_dict(self, string_dict: dict[str, str], language: str | None = None) -> None:
+        """
+        Replaces all the strings to the values of the given dict.
+        Also updates the name table to the keys of the given dict.
+
+        When changing the list length, make sure all languages have the same length.
+
+        :param string_dict:
+        :param language: The language to change, or all languages if None.
+        :return:
+        """
+
+        for lang in self._raw_languages.keys():
+            if language is None or lang == language:
+                self._raw_languages[lang] = list(string_dict.values())
+
+        self._raw.name_table = {name: index for index, name in enumerate(string_dict)}
+
     @property
     def strings(self) -> tuple[str, ...]:
         return self.get_strings("ENGL")
