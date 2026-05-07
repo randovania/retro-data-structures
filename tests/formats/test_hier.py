@@ -21,11 +21,11 @@ def test_compare_p2(prime2_asset_manager):
         string_table_id=0x3F341ABD, name="Sandbats", scan_id=0x609C0C44, parent_id=178
     )
     assert parsed2.entries[178] == HierEntry(
-        string_table_id=1060379325, name="Small Flyers", scan_id=4294967295, parent_id=184
+        string_table_id=0x3F341ABD, name="Small Flyers", scan_id=0xFFFFFFFF, parent_id=184
     )
     assert parsed2.entries[184] == HierEntry(
-        string_table_id=1060379325, name="Flying", scan_id=4294967295, parent_id=230
+        string_table_id=0x3F341ABD, name="Flying", scan_id=0xFFFFFFFF, parent_id=230
     )
     assert parsed2.entries[230] == HierEntry(
-        string_table_id=1060379325, name="Light World", scan_id=4294967295, parent_id=234
+        string_table_id=0x3F341ABD, name="Light World", scan_id=0xFFFFFFFF, parent_id=234
     )
