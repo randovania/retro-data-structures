@@ -26,7 +26,7 @@ class FileEntry:
     size: int
 
 
-FileTree: typing.TypeAlias = dict[str, typing.Union[FileEntry, "FileTree"]]
+FileTree = dict[str, typing.Union[FileEntry, "FileTree"]]
 
 
 def decode_into_file_tree(fst) -> FileTree:

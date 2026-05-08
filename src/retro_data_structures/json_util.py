@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import TypeAlias, TypeVar
+from typing import TypeVar
 
-JsonObject: TypeAlias = Mapping[str, "JsonValue"]
-JsonArray: TypeAlias = Sequence["JsonValue"]
-JsonValue: TypeAlias = str | int | float | JsonObject | JsonArray | None
+JsonObject = Mapping[str, "JsonValue"]
+JsonArray = Sequence["JsonValue"]
+JsonValue = str | int | float | JsonObject | JsonArray | None
 
 JsonValueT = TypeVar("JsonValueT", str, int, float, JsonObject, JsonArray, None)
 
 
-def identity(obj: JsonValueT) -> JsonValueT:
+def identity[T: (str, int, float, JsonObject, JsonArray, None)](obj: T) -> T:
     """For use when you need a to_json function, but the value is already JsonValue."""
     return obj

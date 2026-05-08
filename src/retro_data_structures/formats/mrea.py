@@ -47,8 +47,7 @@ from retro_data_structures.game_check import AssetIdCorrect, Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
-
-    from typing_extensions import Self
+    from typing import Self
 
     from retro_data_structures.formats.mlvl import Mlvl
     from retro_data_structures.formats.script_object import (

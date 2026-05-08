@@ -191,10 +191,8 @@ class _ConstructScriptInstance(construct.Construct):
 
 ConstructScriptInstance = _ConstructScriptInstance()
 
-E = typing.TypeVar("E", bound=enum.Enum)
 
-
-def _resolve_to_enum(correct_type: type[E], value: str | enum.Enum) -> E:
+def _resolve_to_enum[T: enum.Enum](correct_type: T, value: str | enum.Enum) -> T:
     # It's already the enum we want, just use it
     if isinstance(value, correct_type):
         return value
