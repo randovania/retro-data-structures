@@ -713,20 +713,16 @@ class AreaDependencies:
 
 
 class Area:
-    _flags: list[bool]
-    _layer_names: list[str]
     _index: int
 
     _mrea: Mrea | None = None
     _strg: Strg | None = None
 
     def __init__(self, parent_mlvl: Mlvl, index: int):
+        self._parent_mlvl = parent_mlvl
+        self._index = index
         self._raw = parent_mlvl._raw.areas[index]
         self.asset_manager = parent_mlvl.asset_manager
-        self._flags = parent_mlvl._raw.area_layer_flags[index]
-        self._layer_names = parent_mlvl._raw.area_layer_names[index]
-        self._index = index
-        self._parent_mlvl = parent_mlvl
 
     @property
     def id(self) -> int:
@@ -735,6 +731,18 @@ class Area:
     @property
     def index(self) -> int:
         return self._index
+
+    @property
+    def parent_mlvl(self) -> Mlvl:
+        return self._parent_mlvl
+
+    @property
+    def _flags(self) -> list[bool]:
+        return self._parent_mlvl._raw.area_layer_flags[self._index]
+
+    @property
+    def _layer_names(self) -> list[str]:
+        return self._parent_mlvl._raw.area_layer_names[self._index]
 
     @property
     def name(self) -> str:

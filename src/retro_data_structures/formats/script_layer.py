@@ -113,10 +113,10 @@ def dependencies_for_layer(
 
 class ScriptLayer:
     _parent_area: Area | None = None
-    _index: int
+    _index: int | None
     _modified: bool = False
 
-    def __init__(self, raw: Container, index: int, target_game: Game) -> None:
+    def __init__(self, raw: Container, index: int | None, target_game: Game) -> None:
         self._raw = raw
         self.target_game = target_game
         self._index = index
@@ -132,6 +132,8 @@ class ScriptLayer:
 
     @property
     def index(self) -> int:
+        self.assert_parent()
+        assert self._index is not None
         return self._index
 
     @property
@@ -181,11 +183,11 @@ class ScriptLayer:
             raise KeyError(name)
         return all_instances[0]
 
-    def _internal_add_instance(self, instance: ScriptInstance):
+    def _internal_add_instance(self, instance: ScriptInstance) -> ScriptInstance:
         if self.has_instance(instance):
             raise RuntimeError(f"Instance with id {instance.id} already exists.")
 
-        self._modified = True
+        self.mark_modified()
         self._raw.script_instances.append(instance._raw)
         return self._get_instance_by_id(instance.id)
 
@@ -205,7 +207,7 @@ class ScriptLayer:
         savw.raw.memory_relays.append(SavedStateDescriptor(relay.id))
         return relay
 
-    def remove_instance(self, instance: InstanceRef):
+    def remove_instance(self, instance: InstanceRef) -> None:
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)
         instance = resolve_instance_id(instance)
@@ -215,15 +217,15 @@ class ScriptLayer:
         if not matching_instances:
             raise KeyError(instance)
 
-        self._modified = True
+        self.mark_modified()
         for i in matching_instances:
             self._raw.script_instances.remove(i)
 
-    def remove_instances(self):
-        self._modified = True
+    def remove_instances(self) -> None:
+        self.mark_modified()
         self._raw.script_instances = []
 
-    def assert_parent(self):
+    def assert_parent(self) -> None:
         if self.has_parent:
             return
         if self._parent_area is None:
@@ -238,32 +240,32 @@ class ScriptLayer:
     @property
     def active(self) -> bool:
         self.assert_parent()
-        return self._parent_area._flags[self._index]
+        return self._parent_area._flags[self.index]
 
     @active.setter
     def active(self, value: bool):
         self.assert_parent()
         self._modified = True
-        self._parent_area._flags[self._index] = value
+        self._parent_area._flags[self.index] = value
 
     @property
     def name(self) -> str:
         self.assert_parent()
-        return self._parent_area._layer_names[self._index]
+        return self._parent_area._layer_names[self.index]
 
     @name.setter
-    def name(self, value: str):
+    def name(self, value: str) -> None:
         self.assert_parent()
         self._modified = True
-        self._parent_area._layer_names[self._index] = value
+        self._parent_area._layer_names[self.index] = value
 
     def new_instance_id(self) -> InstanceId:
-        return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
+        return InstanceId.new(self.index, self._parent_area.index, self._parent_area.next_instance_id)
 
     def is_modified(self) -> bool:
         return self._modified
 
-    def mark_modified(self):
+    def mark_modified(self) -> None:
         self._modified = True
 
     def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
@@ -273,7 +275,7 @@ class ScriptLayer:
     @property
     def dependencies(self) -> typing.Iterator[Dependency]:
         self.assert_parent()
-        yield from self._parent_area.dependencies.layers[self._index]
+        yield from self._parent_area.dependencies.layers[self.index]
 
     def build_module_dependencies(self) -> typing.Iterator[str]:
         # FIXME: this copies the original dependencies when calculating the new values,
@@ -287,4 +289,4 @@ class ScriptLayer:
     @property
     def module_dependencies(self) -> typing.Iterator[str]:
         self.assert_parent()
-        yield from self._parent_area.module_dependencies[self._index]
+        yield from self._parent_area.module_dependencies[self.index]
