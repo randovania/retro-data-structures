@@ -108,28 +108,16 @@ def dependencies_for_layer(
         yield dep
 
 
-class ScriptLayer:
-    _parent_area: Area | None = None
-    _index: int
+class PseudoScriptLayer:
+    """
+    Behaves almost like a ScriptLayer. Used by generated_objects_layer.
+    """
+
     _modified: bool = False
 
-    def __init__(self, raw: Container, index: int, target_game: Game) -> None:
+    def __init__(self, raw: Container, target_game: Game) -> None:
         self._raw = raw
         self.target_game = target_game
-        self._index = index
-
-    def __repr__(self) -> str:
-        if self.has_parent:
-            return f"{self.name} ({'Active' if self.active else 'Inactive'})"
-        return super().__repr__()
-
-    def with_parent(self, parent: Area) -> ScriptLayer:
-        self._parent_area = parent
-        return self
-
-    @property
-    def index(self):
-        return self._index
 
     @property
     def instances(self):
@@ -169,22 +157,6 @@ class ScriptLayer:
         self._raw.script_instances.append(instance._raw)
         return self._get_instance_by_id(instance.id)
 
-    def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
-        instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
-        if name is not None:
-            instance.name = name
-        return self._internal_add_instance(instance)
-
-    def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstance:
-        instance = ScriptInstance.new_from_properties(object_properties, self)
-        return self._internal_add_instance(instance)
-
-    def add_memory_relay(self, name: str | None = None) -> ScriptInstance:
-        relay = self.add_instance("MRLY", name)
-        savw = self._parent_area._parent_mlvl.savw
-        savw.raw.memory_relays.append({"instance_id": relay.id})
-        return relay
-
     def remove_instance(self, instance: InstanceRef):
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)
@@ -203,57 +175,81 @@ class ScriptLayer:
         self._modified = True
         self._raw.script_instances = []
 
-    def assert_parent(self):
-        if self.has_parent:
-            return
-        if self._parent_area is None:
-            raise AttributeError(f"{self} has no parent!")
-        if self._index is None:
-            raise AttributeError(f"{self} has no index!")
+    def is_modified(self) -> bool:
+        return self._modified
+
+    def mark_modified(self) -> None:
+        self._modified = True
+
+
+class ScriptLayer(PseudoScriptLayer):
+    """
+    A proper ScriptLayer for Area.
+    """
+
+    _parent_area: Area
+    _index: int
+
+    def __init__(self, raw: Container, parent_area: Area, index: int, target_game: Game) -> None:
+        super().__init__(raw, target_game)
+        self._parent_area = parent_area
+        self._index = index
+
+    def __repr__(self) -> str:
+        return f"{self.name} ({'Active' if self.active else 'Inactive'})"
+
+    def with_parent(self, parent: Area) -> ScriptLayer:
+        self._parent_area = parent
+        return self
 
     @property
-    def has_parent(self) -> bool:
-        return self._parent_area is not None and self._index is not None
+    def index(self) -> int:
+        return self._index
+
+    def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
+        instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
+        if name is not None:
+            instance.name = name
+        return self._internal_add_instance(instance)
+
+    def add_instance_with(self, object_properties: BaseObjectType) -> ScriptInstance:
+        instance = ScriptInstance.new_from_properties(object_properties, self)
+        return self._internal_add_instance(instance)
+
+    def add_memory_relay(self, name: str | None = None) -> ScriptInstance:
+        relay = self.add_instance("MRLY", name)
+        savw = self._parent_area._parent_mlvl.savw
+        savw.raw.memory_relays.append({"instance_id": relay.id})
+        return relay
 
     @property
     def active(self) -> bool:
-        self.assert_parent()
         return self._parent_area._flags[self._index]
 
     @active.setter
     def active(self, value: bool):
-        self.assert_parent()
         self._modified = True
         self._parent_area._flags[self._index] = value
 
     @property
     def name(self) -> str:
-        self.assert_parent()
         return self._parent_area._layer_names[self._index]
 
     @name.setter
-    def name(self, value: str):
-        self.assert_parent()
+    def name(self, value: str) -> None:
         self._modified = True
         self._parent_area._layer_names[self._index] = value
 
     def new_instance_id(self) -> InstanceId:
         return InstanceId.new(self._index, self._parent_area.index, self._parent_area.next_instance_id)
 
-    def is_modified(self) -> bool:
-        return self._modified
-
-    def mark_modified(self):
-        self._modified = True
+    @property
+    def dependencies(self) -> typing.Iterator[Dependency]:
+        yield from self._parent_area.dependencies.layers[self._index]
 
     def build_mlvl_dependencies(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         logging.debug("        Layer: %s", self.name)
         yield from dependencies_for_layer(asset_manager, self.instances)
-
-    @property
-    def dependencies(self) -> typing.Iterator[Dependency]:
-        self.assert_parent()
-        yield from self._parent_area.dependencies.layers[self._index]
 
     def build_module_dependencies(self) -> typing.Iterator[str]:
         # FIXME: this copies the original dependencies when calculating the new values,
@@ -266,5 +262,4 @@ class ScriptLayer:
 
     @property
     def module_dependencies(self) -> typing.Iterator[str]:
-        self.assert_parent()
         yield from self._parent_area.module_dependencies[self._index]

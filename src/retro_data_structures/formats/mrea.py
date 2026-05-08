@@ -38,7 +38,7 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
+from retro_data_structures.formats.script_layer import SCGN, SCLY, PseudoScriptLayer, ScriptLayer, new_layer
 from retro_data_structures.formats.script_object import InstanceId
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
@@ -669,14 +669,14 @@ class Mrea(BaseResource):
 
             yield from self._script_layer_helpers.values()
 
-    _generated_objects_layer: ScriptLayer | None = None
+    _generated_objects_layer: PseudoScriptLayer | None = None
 
     @property
-    def generated_objects_layer(self) -> ScriptLayer:
+    def generated_objects_layer(self) -> PseudoScriptLayer:
         assert self.target_game >= Game.ECHOES
         if self._generated_objects_layer is None:
-            self._generated_objects_layer = ScriptLayer(
-                self.get_section("generated_script_objects_section")[0], None, self.target_game
+            self._generated_objects_layer = PseudoScriptLayer(
+                self.get_section("generated_script_objects_section")[0], self.target_game
             )
         return self._generated_objects_layer
 
