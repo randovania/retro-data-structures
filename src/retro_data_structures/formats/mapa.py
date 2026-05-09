@@ -112,8 +112,8 @@ _MappableObjectConstruct = construct.Struct(
     type=construct.Switch(
         get_current_game,
         {
-            Game.PRIME: EnumAdapter(ObjectTypeMP1),
-            Game.ECHOES: EnumAdapter(ObjectTypeMP2),
+            Game.PRIME: EnumAdapter(ObjectTypeMP1, construct.Int32sb),
+            Game.ECHOES: EnumAdapter(ObjectTypeMP2, construct.Int32sb),
         },
         default=construct.Int32sb,
     ),
