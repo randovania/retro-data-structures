@@ -81,6 +81,12 @@ class Pak:
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
 
+    def get_pak_file_with_id(self, asset_id: AssetId) -> PakFile:
+        for file in self._raw.files:
+            if file.asset_id == asset_id:
+                return file
+        raise KeyError(f"Unknown asset id: {asset_id}")
+
     def recreate_file_list(self, asset_manager: AssetManager) -> None:
         """
         Recreates the file list for this Pak.
