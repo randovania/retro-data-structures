@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import collections
 import typing
 
 from retro_data_structures.base_resource import AssetId, RawResource
@@ -23,10 +24,18 @@ def _pak_for_game(game: Game):
 class Pak:
     _raw: PakBody
     target_game: Game
+    _file_indices_by_id: collections.defaultdict[AssetId, list[int]]
 
     def __init__(self, raw: PakBody, target_game: Game):
         self._raw = raw
         self.target_game = target_game
+        self._calculate_files_by_id()
+
+    def _calculate_files_by_id(self) -> None:
+        files_by_id = collections.defaultdict(list)
+        for i, file in enumerate(self._raw.files):
+            files_by_id[file.asset_id].append(i)
+        self._file_indices_by_id = files_by_id
 
     @staticmethod
     def header_for_game(game: Game):
@@ -61,20 +70,20 @@ class Pak:
         :param asset_id:
         :return:
         """
-        for file in self._raw.files:
-            if file.asset_id == asset_id:
-                return RawResource(file.asset_type, file.get_decompressed(self.target_game))
+        for index in self._file_indices_by_id[asset_id]:
+            file = self._raw.files[index]
+            return RawResource(file.asset_type, file.get_decompressed(self.target_game))
 
         return None
 
     def replace_asset(self, asset_id: AssetId, asset: RawResource):
         found = False
 
-        for file in self._raw.files:
-            if file.asset_id == asset_id:
-                file.asset_type = asset.type
-                file.set_new_data(asset.data)
-                found = True
+        for index in self._file_indices_by_id[asset_id]:
+            file = self._raw.files[index]
+            file.asset_type = asset.type
+            file.set_new_data(asset.data)
+            found = True
 
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
@@ -89,6 +98,7 @@ class Pak:
                 compressed_data=None,
             )
         )
+        self._file_indices_by_id[asset_id].append(len(self._raw.files))
 
     def remove_asset(self, asset_id: AssetId):
         for name, file in self._raw.named_resources.items():
@@ -96,10 +106,11 @@ class Pak:
                 raise ValueError(f"Asset id {asset_id:08x} is named {name}, can't be removed.")
 
         found = False
-        for file in list(self._raw.files):
-            if file.asset_id == asset_id:
-                self._raw.files.remove(file)
-                found = True
+        for index in reversed(self._file_indices_by_id[asset_id]):
+            self._raw.files.pop(index)
+            found = True
 
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
+
+        self._calculate_files_by_id()
