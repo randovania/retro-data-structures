@@ -10,6 +10,8 @@ from retro_data_structures.game_check import Game
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from retro_data_structures.asset_manager import AssetManager
+
 
 def _pak_for_game(game: Game):
     if game == Game.PRIME_REMASTER:
@@ -78,6 +80,45 @@ class Pak:
 
         if not found:
             raise ValueError(f"Unknown asset id: {asset_id}")
+
+    def recreate_file_list(self, asset_manager: AssetManager) -> None:
+        """
+        Recreates the file list for this Pak.
+
+        All named resources are kept and their dependencies are added before them.
+
+        :param asset_manager: Used for getting new assets and calculating dependencies.
+        :return:
+        """
+        id_order = []
+
+        seen = set()
+        for name, named_dep in self._raw.named_resources.items():
+            seen.add(named_dep.id)
+            for dep in asset_manager.get_dependencies_for_asset(named_dep.id):
+                if dep.id not in seen:
+                    seen.add(dep.id)
+                    id_order.append(dep.id)
+            id_order.append(named_dep.id)
+
+        files_by_id = {file.asset_id: file for file in self._raw.files}
+
+        new_files: list[PakFile] = []
+        for asset_id in id_order:
+            if asset_id in files_by_id:
+                new_file = files_by_id[asset_id]
+            else:
+                raw_file = asset_manager.get_raw_asset(asset_id)
+                new_file = PakFile(
+                    asset_id=asset_id,
+                    asset_type=raw_file.type,
+                    should_compress=False,
+                    uncompressed_data=raw_file.data if not raw_file.compressed else None,
+                    compressed_data=raw_file.data if raw_file.compressed else None,
+                )
+            new_files.append(new_file)
+
+        self._raw.files = new_files
 
     def add_asset(self, asset_id: AssetId, asset: RawResource):
         self._raw.files.append(

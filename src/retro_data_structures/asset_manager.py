@@ -708,7 +708,7 @@ class AssetManager:
                 executor.submit(self.replace_asset, name, resource, keep_in_memory=False)
         self._memory_files.clear()
 
-    def _save_modified_paks(self, output: FileWriter) -> None:
+    def _save_modified_paks(self, output: FileWriter, *, recreate_paks: bool = False) -> None:
         modified_paks = set()
         asset_ids_to_copy = {}
 
@@ -740,6 +740,10 @@ class AssetManager:
             # Add the files that were ensured to be present in this pak
             for asset_id in self._ensured_asset_ids[pak_name]:
                 pak.add_asset(asset_id, asset_ids_to_copy[asset_id])
+
+            if recreate_paks:
+                logger.info("Reordering %s", pak_name)
+                pak.recreate_file_list(self)
 
             # Write the data
             logger.info("Writing %s", pak_name)
