@@ -261,7 +261,7 @@ class ScriptLayer:
         #  meaning it will never remove an entry
         rels = list(self.module_dependencies)
         for instance in self.instances:
-            rels.extend(instance.get_properties().modules())
+            rels.extend(instance.script_type.modules())
 
         yield from list(dict.fromkeys(rels))
 
