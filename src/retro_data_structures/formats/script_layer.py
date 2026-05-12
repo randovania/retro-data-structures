@@ -152,7 +152,7 @@ class ScriptLayer:
     def _get_instance_by_id(self, instance_id: InstanceIdRef) -> ScriptInstance:
         instance_id = resolve_instance_id(instance_id)
         for instance in self.instances:
-            if instance.id_matches(instance_id):
+            if instance.id.matches(instance_id):
                 return instance
         raise KeyError(instance_id)
 

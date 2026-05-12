@@ -8,7 +8,7 @@ import retro_data_structures.enums.prime as _prime_enums
 
 from retro_data_structures.formats import script_object
 from retro_data_structures.formats.script_layer import SCLY
-from retro_data_structures.formats.script_object import InstanceId
+from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
@@ -276,6 +276,33 @@ def test_replace_connections_to(prime2_asset_manager):
     assert set(timer.connections) != set(original_connections)
     assert len(timer.connections) == len(original_connections)
     assert effect_targets_before == effect_targets_after - 2
+
+
+def test_compare_connection_without_layer_index(prime2_area: Area):
+    pickup = prime2_area.get_instance("Pickup Object")
+
+    assert len(pickup.connections) == 4
+
+    pickup.remove_connection(
+        Connection(
+            _echoes_enums.State.Arrived,
+            _echoes_enums.Message.SetToZero,
+            InstanceId(0x10450070),  # Post Pickup (wrong layer id)
+        )
+    )
+    assert len(pickup.connections) == 3
+
+    pickup.remove_all_connections_to(0x10450071)  # FadeIn/Out Long (wrong layer id)
+    assert len(pickup.connections) == 2
+
+    pickup.replace_connections_to(
+        original=0x1045006C,  # Deactivate Pickup (wrong layer id)
+        target=0x1045006D,  # Pickup Sound (wrong layer id)
+    )
+
+    pickup.connections
+    sound = prime2_area.get_instance("Pickup Sound")
+    assert all(conn.target.matches(sound.id) for conn in pickup.connections)
 
 
 @pytest.mark.xfail(reason="Prime 1 SCLY building is incorrect")
