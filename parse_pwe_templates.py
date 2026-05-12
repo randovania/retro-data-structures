@@ -42,6 +42,7 @@ _game_id_to_enum = {
 }
 
 _STRUCTS: set[tuple[typing.Literal[">", "<"], str]] = set()
+_DECODE_METHODS: dict[str, str] = {}
 _endianness_alias = {">": "BIG", "<": "LITTLE"}
 
 
@@ -786,9 +787,14 @@ class ClassDefinition:
                 suffix_size = len("(data, property_size)")
                 decode_names[prop_name] = prop.parse_code[:-suffix_size]
             else:
-                decode_names[prop_name] = f"_decode_{prop_name}"
-                self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
-                self.after_class_code += f"    return {prop.parse_code}\n\n\n"
+                if prop.parse_code.startswith("structs.") and prop.parse_code.endswith("[0]"):
+                    split_code = prop.parse_code.split(".", 2)
+                    _DECODE_METHODS["decode_" + split_code[1]] = f"return {split_code[1]}.{split_code[2]}"
+                    decode_names[prop_name] = f"structs.decode_{split_code[1]}"
+                else:
+                    decode_names[prop_name] = f"_decode_{prop_name}"
+                    self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
+                    self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
@@ -2027,9 +2033,12 @@ def write_shared_types_helpers(all_games: dict) -> None:
             for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
         },
     )
-    structs = "# Generated File\nimport struct\n\n"
+    structs = "# Generated File\nimport struct\nimport typing\n\n"
     for endianness, fmt_string in sorted(_STRUCTS):
-        structs += f'{_get_struct(endianness, fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
+        structs += f'{_get_struct(endianness, fmt=fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
+    for decode_name, decode_body in sorted(_DECODE_METHODS.items()):
+        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int):\n"
+        structs += f"    {decode_body}\n"
 
     path_to_props.joinpath("structs.py").write_text(structs)
 
