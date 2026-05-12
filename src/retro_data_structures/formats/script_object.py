@@ -76,6 +76,14 @@ class InstanceId(int):
     def instance(self) -> int:
         return self & 0xFFFF
 
+    @property
+    def without_layer(self) -> InstanceId:
+        return InstanceId.new(0, self.area, self.instance)
+
+    def matches(self, other: InstanceId) -> bool:
+        """Compare two `InstanceId`s, ignoring any differences in their layer index."""
+        return self.without_layer == other.without_layer
+
 
 @dataclasses.dataclass(frozen=True)
 class Connection:
@@ -97,6 +105,10 @@ class Connection:
             message=self.message.value,
             target=self.target,
         )
+
+    def matches(self, other: Connection) -> bool:
+        """Compare two `Connection`s, ignoring differences in their target's layer index."""
+        return self.state == other.state and self.message == other.message and self.target.matches(other.target)
 
 
 @dataclasses.dataclass()
@@ -279,10 +291,6 @@ class ScriptInstance:
         self._raw.id = InstanceId(value)
         self.on_modify()
 
-    def id_matches(self, other: InstanceIdRef) -> bool:
-        other = resolve_instance_id(other)
-        return self.id.area == other.area and self.id.instance == other.instance
-
     @property
     def name(self) -> str:
         if self.target_game == Game.ECHOES:
@@ -385,7 +393,7 @@ class ScriptInstance:
         """
         old = self.connections
         old_size = len(old)
-        new = [c for c in old if c != connection]
+        new = [c for c in old if not c.matches(connection)]
         if old_size == len(new):
             raise KeyError(f"Connection {connection} not found")
         self.connections = new
@@ -393,7 +401,7 @@ class ScriptInstance:
     def remove_all_connections_to(self, target: InstanceIdRef) -> None:
         """Remove all connections that goes from `self` to an object with id `target`."""
         target = resolve_instance_id(target)
-        self.connections = [c for c in self.connections if c.target != target]
+        self.connections = [c for c in self.connections if not c.target.matches(target)]
 
     def replace_connections_to(self, original: InstanceIdRef, target: InstanceIdRef) -> None:
         """
@@ -409,7 +417,7 @@ class ScriptInstance:
 
         def _replace(c: Connection) -> Connection:
             nonlocal found
-            if c.target == original_:
+            if c.target.matches(original_):
                 found = True
                 return dataclasses.replace(c, target=target_)
             return c
