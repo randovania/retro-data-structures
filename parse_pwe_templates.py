@@ -763,7 +763,7 @@ class ClassDefinition:
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
+            self.after_class_code += f"    0x{prop.id:08x}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
 
     def write_to_stream(self) -> None:
