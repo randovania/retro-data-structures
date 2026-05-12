@@ -925,7 +925,11 @@ class ClassDefinition:
         if self.keep_unknown_properties() or self.game_id not in {"Prime", "Echoes"}:
             return
 
-        has_dep = False
+        if not self.is_struct and not self.has_dependency_code():
+            return
+
+        self.typing_imports["collections.abc"] = "Iterator"
+
         method_name = {}
 
         for prop_name, prop in self.all_props.items():
@@ -945,9 +949,10 @@ class ClassDefinition:
                 method_name[prop_name] = f"self._dependencies_for_{prop_name}"
 
                 self.class_code += f"""
-    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         {prop_code}
 """
+
         self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
         self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
@@ -959,7 +964,7 @@ class ClassDefinition:
             )
 
             self.class_code += f"""
-    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         for method, field_name, field_type in [
 {method_list}
         ]:
@@ -977,7 +982,7 @@ class ClassDefinition:
                 single_method = f"return {list(method_name.values())[0]}(asset_manager)"
 
             self.class_code += f"""
-    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         {single_method}
 """
 
