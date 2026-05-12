@@ -469,6 +469,9 @@ def _get_default(field_params: dict) -> str:
     return default_value
 
 
+_ALL_CLASS_DEFS: dict[str, dict[str, ClassDefinition]] = collections.defaultdict(dict)
+
+
 @dataclasses.dataclass
 class ClassDefinition:
     game_id: str
@@ -493,6 +496,9 @@ class ClassDefinition:
     need_enums: bool = False
     local_enums: list[EnumDefinition] = dataclasses.field(default_factory=list)
     has_custom_cook_pref: bool = False
+
+    def __post_init__(self):
+        _ALL_CLASS_DEFS[self.game_id][self.raw_name] = self
 
     @property
     def atomic(self) -> bool:
@@ -912,6 +918,9 @@ class ClassDefinition:
 
         self.class_code += "        }\n"
 
+    def has_dependency_code(self) -> bool:
+        return any(prop.dependency_code is not None for prop in self.all_props.values())
+
     def write_dependencies(self) -> None:
         if self.keep_unknown_properties() or self.game_id not in {"Prime", "Echoes"}:
             return
@@ -923,8 +932,6 @@ class ClassDefinition:
             if prop.dependency_code is None:
                 continue
 
-            has_dep = True
-
             prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
             if prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
                 method_name[prop_name] = f"self.{prop_name}.dependencies_for"
@@ -933,7 +940,7 @@ class ClassDefinition:
                     self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
                     prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
                 else:
-                    prop_code = f"yield from {prop_code}"
+                    prop_code = f"return {prop_code}"
 
                 method_name[prop_name] = f"self._dependencies_for_{prop_name}"
 
@@ -944,7 +951,7 @@ class ClassDefinition:
         self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
         self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
-        if has_dep:
+        if len(method_name) > 1:
             method_list = "\n".join(
                 f'            ({method_name[prop_name]}, "{prop_name}", "{prop.prop_type}"),'
                 for prop_name, prop in self.all_props.items()
@@ -964,9 +971,14 @@ class ClassDefinition:
                 )
 """
         else:
-            self.class_code += """
+            if not method_name:
+                single_method = "yield from []"
+            else:
+                single_method = f"return {list(method_name.values())[0]}(asset_manager)"
+
+            self.class_code += f"""
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-        yield from []
+        {single_method}
 """
 
 
@@ -1320,6 +1332,20 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     _ensure_is_generated_dir(core_path)
     _add_default_types(core_path, game_id)
 
+    print("> Creating archetypes")
+    archetype_path = code_path.joinpath("archetypes")
+    _ensure_is_generated_dir(archetype_path)
+    archetype_all = []
+
+    def get_archetype(archetype_name: str) -> ClassDefinition | None:
+        if archetype_name in archetype_all:
+            return _ALL_CLASS_DEFS[game_id][archetype_name]
+
+        if parse_struct(archetype_name, property_archetypes[archetype_name], archetype_path, struct_fourcc=None):
+            archetype_all.append(archetype_name)
+            return _ALL_CLASS_DEFS[game_id][archetype_name]
+        return None
+
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop: dict) -> PropDetails:
@@ -1354,8 +1380,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
-            dependency_code = "{obj}.dependencies_for(asset_manager)"
             json_type = "json_util.JsonObject"
+
+            archetype = get_archetype(archetype_path)
+            if archetype is not None and not archetype.has_dependency_code():
+                dependency_code = None
+            else:
+                dependency_code = "{obj}.dependencies_for(asset_manager)"
 
             default_override = {}
             for inner_prop in prop["properties"]:
@@ -1829,18 +1860,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
-    print("> Creating archetypes")
-    path = code_path.joinpath("archetypes")
-    _ensure_is_generated_dir(path)
-
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.archetypes."
 
-    archetype_all = []
-    for archetype_name, archetype in property_archetypes.items():
-        if parse_struct(archetype_name, archetype, path, struct_fourcc=None):
-            archetype_all.append(archetype_name)
+    # Probably pointless?
+    for archetype_name in property_archetypes:
+        get_archetype(archetype_name)
 
-    create_all_file(path.joinpath("__init__.py"), base_import_path, archetype_all)
+    create_all_file(archetype_path.joinpath("__init__.py"), base_import_path, archetype_all)
 
     print("> Done.")
 
