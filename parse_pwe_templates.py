@@ -57,11 +57,11 @@ def _get_struct(endianness: typing.Literal[">", "<"], fmt: str) -> str:
 
 def struct_unpack(endianness: typing.Literal[">", "<"], fmt: str) -> str:
     final_fmt = endianness + fmt
-    return f'structs.{_get_struct(endianness, fmt)}.unpack(data.read({struct.calcsize(final_fmt)}))'
+    return f"structs.{_get_struct(endianness, fmt)}.unpack(data.read({struct.calcsize(final_fmt)}))"
 
 
 def struct_pack(endianness: typing.Literal[">", "<"], fmt: str, code: str) -> str:
-    return f'structs.{_get_struct(endianness, fmt)}.pack({code})'
+    return f"structs.{_get_struct(endianness, fmt)}.pack({code})"
 
 
 _CODE_PARSE_UINT16 = {
@@ -136,7 +136,7 @@ class EnumDefinition:
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
         code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
-        code += f'        data.write({struct_pack(endianness, "L", "self.value")})\n'
+        code += f"        data.write({struct_pack(endianness, 'L', 'self.value')})\n"
 
         code += "\n    @classmethod\n"
         code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
@@ -592,7 +592,7 @@ class ClassDefinition:
             if prop.known_size is None:
                 build_prop.append("after = data.tell()")
                 build_prop.append("data.seek(before)")
-                build_prop.append(f'data.write({struct_pack(endianness, "H", "after - before - 2")})')
+                build_prop.append(f"data.write({struct_pack(endianness, 'H', 'after - before - 2')})")
                 build_prop.append("data.seek(after)")
 
             if not prop.custom_cook_pref:
@@ -703,7 +703,7 @@ class ClassDefinition:
                 variable_name += "_"
 
             # yield "    data.read(6)"  # TODO: assert correct
-            yield f'    property_id, property_size = {struct_unpack(endianness, "LH")}'
+            yield f"    property_id, property_size = {struct_unpack(endianness, 'LH')}"
             yield f"    assert property_id == 0x{prop.id:08x}"
             yield f"    {variable_name} = {prop.parse_code}"
             yield ""
@@ -732,9 +732,7 @@ class ClassDefinition:
             return
 
         if self.is_struct:
-            self.class_code += (
-                f'        struct_id, size, property_count = {struct_unpack(endianness, "LHH")}\n'
-            )
+            self.class_code += f"        struct_id, size, property_count = {struct_unpack(endianness, 'LHH')}\n"
             self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
             self.class_code += "        root_size_start = data.tell() - 2\n\n"
         else:
@@ -786,15 +784,14 @@ class ClassDefinition:
             if prop.parse_code.endswith(".from_stream(data, property_size)"):
                 suffix_size = len("(data, property_size)")
                 decode_names[prop_name] = prop.parse_code[:-suffix_size]
+            elif prop.parse_code.startswith("structs.") and prop.parse_code.endswith("[0]"):
+                split_code = prop.parse_code.split(".", 2)
+                _DECODE_METHODS["decode_" + split_code[1]] = f"return {split_code[1]}.{split_code[2]}"
+                decode_names[prop_name] = f"structs.decode_{split_code[1]}"
             else:
-                if prop.parse_code.startswith("structs.") and prop.parse_code.endswith("[0]"):
-                    split_code = prop.parse_code.split(".", 2)
-                    _DECODE_METHODS["decode_" + split_code[1]] = f"return {split_code[1]}.{split_code[2]}"
-                    decode_names[prop_name] = f"structs.decode_{split_code[1]}"
-                else:
-                    decode_names[prop_name] = f"_decode_{prop_name}"
-                    self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
-                    self.after_class_code += f"    return {prop.parse_code}\n\n\n"
+                decode_names[prop_name] = f"_decode_{prop_name}"
+                self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
+                self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
@@ -1487,7 +1484,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 prop_type = "int"
                 field_params["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append(f'data.write({struct_pack(endianness, "L", "{obj}")})')
+                build_code.append(f"data.write({struct_pack(endianness, 'L', '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1520,7 +1517,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 comment = "Flagset"
                 field_params["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append(f'data.write({struct_pack(endianness, "L", "{obj}")})')
+                build_code.append(f"data.write({struct_pack(endianness, 'L', '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1555,7 +1552,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     format_specifier = "Q"
 
                 parse_code = struct_unpack(endianness, format_specifier) + "[0]"
-                build_code.append(f"data.write({struct_pack(endianness, format_specifier, "{obj}")})")
+                build_code.append(f"data.write({struct_pack(endianness, format_specifier, '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1655,7 +1652,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             format_specifier = literal_prop.struct_format
 
             parse_code = struct_unpack(endianness, format_specifier) + "[0]"
-            build_code.append(f'data.write({struct_pack(endianness, format_specifier, "{obj}")})')
+            build_code.append(f"data.write({struct_pack(endianness, format_specifier, '{obj}')})")
             from_json_code = "{obj}"
             to_json_code = "{obj}"
 
