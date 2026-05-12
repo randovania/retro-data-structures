@@ -41,14 +41,37 @@ _game_id_to_enum = {
     "PrimeRemastered": "PRIME_REMASTER",
 }
 
+_STRUCTS: set[tuple[typing.Literal[">", "<"], str]] = set()
+_endianness_alias = {">": "BIG", "<": "LITTLE"}
+
+
+def _get_struct(endianness: typing.Literal[">", "<"], fmt: str) -> str:
+    _STRUCTS.add((endianness, fmt))
+    assert ">" not in fmt and "<" not in fmt, "Format should not include endianness"
+
+    fmt = fmt.replace("?", "bool_")
+
+    return f"{_endianness_alias[endianness]}_" + fmt
+
+
+def struct_unpack(endianness: typing.Literal[">", "<"], fmt: str) -> str:
+    final_fmt = endianness + fmt
+    return f'structs.{_get_struct(endianness, fmt)}.unpack(data.read({struct.calcsize(final_fmt)}))'
+
+
+def struct_pack(endianness: typing.Literal[">", "<"], fmt: str, code: str) -> str:
+    return f'structs.{_get_struct(endianness, fmt)}.pack({code})'
+
+
 _CODE_PARSE_UINT16 = {
-    ">": 'struct.unpack(">H", data.read(2))[0]',
-    "<": 'struct.unpack("<H", data.read(2))[0]',
+    ">": struct_unpack(">", "H") + "[0]",
+    "<": struct_unpack("<", "H") + "[0]",
 }
 _CODE_PARSE_UINT32 = {
-    ">": 'struct.unpack(">L", data.read(4))[0]',
-    "<": 'struct.unpack("<L", data.read(4))[0]',
+    ">": struct_unpack(">", "L") + "[0]",
+    "<": struct_unpack("<", "L") + "[0]",
 }
+
 
 RawPropType = typing.Literal[
     "Sound",
@@ -72,7 +95,7 @@ RawPropType = typing.Literal[
 ]
 
 
-def get_endianness(game_id: str) -> str:
+def get_endianness(game_id: str) -> typing.Literal[">", "<"]:
     return ">" if game_id != "PrimeRemastered" else "<"
 
 
@@ -112,7 +135,7 @@ class EnumDefinition:
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
         code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
-        code += '        data.write(struct.pack("' + endianness + 'L", self.value))\n'
+        code += f'        data.write({struct_pack(endianness, "L", "self.value")})\n'
 
         code += "\n    @classmethod\n"
         code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
@@ -139,6 +162,7 @@ def _scrub_enum(string: str) -> str:
 def create_enums_file(game_id: str, enums: dict[EnumDefinition, list[str]]) -> str:
     code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
     code += "\nfrom retro_data_structures import json_util\n"
+    code += "from retro_data_structures.properties import structs\n"
 
     for e, classes in enums.items():
         if len(classes) != 1:
@@ -567,7 +591,7 @@ class ClassDefinition:
             if prop.known_size is None:
                 build_prop.append("after = data.tell()")
                 build_prop.append("data.seek(before)")
-                build_prop.append(f'data.write(struct.pack("{endianness}H", after - before - 2))')
+                build_prop.append(f'data.write({struct_pack(endianness, "H", "after - before - 2")})')
                 build_prop.append("data.seek(after)")
 
             if not prop.custom_cook_pref:
@@ -678,7 +702,7 @@ class ClassDefinition:
                 variable_name += "_"
 
             # yield "    data.read(6)"  # TODO: assert correct
-            yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
+            yield f'    property_id, property_size = {struct_unpack(endianness, "LH")}'
             yield f"    assert property_id == 0x{prop.id:08x}"
             yield f"    {variable_name} = {prop.parse_code}"
             yield ""
@@ -708,7 +732,7 @@ class ClassDefinition:
 
         if self.is_struct:
             self.class_code += (
-                '        struct_id, size, property_count = struct.unpack("' + endianness + 'LHH", data.read(8))\n'
+                f'        struct_id, size, property_count = {struct_unpack(endianness, "LHH")}\n'
             )
             self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
             self.class_code += "        root_size_start = data.tell() - 2\n\n"
@@ -727,7 +751,7 @@ class ClassDefinition:
 
         self.class_code += f"""        present_fields = default_override or {{}}{unknown_fields_declare}
         for _ in range(property_count):
-            property_id, property_size = struct.unpack("{endianness}LH", data.read(6))
+            property_id, property_size = {struct_unpack(endianness, "LH")}
             start = data.tell()
             try:
                 property_name, decoder = _property_decoder[property_id]
@@ -1457,7 +1481,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 prop_type = "int"
                 field_params["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
+                build_code.append(f'data.write({struct_pack(endianness, "L", "{obj}")})')
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1490,7 +1514,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 comment = "Flagset"
                 field_params["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
+                build_code.append(f'data.write({struct_pack(endianness, "L", "{obj}")})')
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1521,14 +1545,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 json_type = "int"
                 if game_id in ["Prime", "Echoes"]:
                     format_specifier = "L"
-                    known_size = 4
                 else:
                     format_specifier = "Q"
-                    known_size = 8
 
-                format_with_prefix = f'"{endianness}{format_specifier}"'
-                parse_code = f"struct.unpack({format_with_prefix}, data.read({known_size}))[0]"
-                build_code.append(f"data.write(struct.pack({format_with_prefix}, {{obj}}))")
+                parse_code = struct_unpack(endianness, format_specifier) + "[0]"
+                build_code.append(f"data.write({struct_pack(endianness, format_specifier, "{obj}")})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1627,8 +1648,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             struct_format = endianness + literal_prop.struct_format
             format_specifier = literal_prop.struct_format
 
-            parse_code = f"struct.unpack({repr(struct_format)}, data.read({literal_prop.byte_count}))[0]"
-            build_code.append(f"data.write(struct.pack({repr(struct_format)}, {{obj}}))")
+            parse_code = struct_unpack(endianness, format_specifier) + "[0]"
+            build_code.append(f'data.write({struct_pack(endianness, format_specifier, "{obj}")})')
             from_json_code = "{obj}"
             to_json_code = "{obj}"
 
@@ -1772,6 +1793,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         code_code += "\nfrom retro_data_structures import json_util\n"
         code_code += "from retro_data_structures.game_check import Game\n"
+        code_code += "from retro_data_structures.properties import structs\n"
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
         code_code += "from retro_data_structures.properties.field_reflection import FieldReflection\n"
 
@@ -2005,6 +2027,11 @@ def write_shared_types_helpers(all_games: dict) -> None:
             for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
         },
     )
+    structs = "# Generated File\nimport struct\n\n"
+    for endianness, fmt_string in sorted(_STRUCTS):
+        structs += f'{_get_struct(endianness, fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
+
+    path_to_props.joinpath("structs.py").write_text(structs)
 
 
 def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
