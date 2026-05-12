@@ -1557,7 +1557,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Color" or raw_type == "Vector":
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data)"
+            parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
