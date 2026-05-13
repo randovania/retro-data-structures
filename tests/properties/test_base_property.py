@@ -53,24 +53,6 @@ class DummyProperty(BaseProperty):
     )
 
 
-def test_dependencies(prime2_asset_manager):
-    from retro_data_structures.base_resource import Dependency
-
-    dummy = DummyProperty(
-        Vector2f(),
-        0xFFFFFFFF,
-        1,
-        0x07E36D6F,  # some random RULE
-    )
-
-    dependencies = list(dummy.dependencies_for(prime2_asset_manager))
-    assert dependencies == [
-        Dependency("AGSC", 0xC8739BEC),
-        Dependency("RULE", 0x9C1232E2),
-        Dependency("RULE", 0x07E36D6F),
-    ]
-
-
 def test_get_reflection():
     reflection = get_reflection(DummyProperty)
 

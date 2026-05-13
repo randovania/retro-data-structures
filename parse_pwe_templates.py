@@ -41,14 +41,38 @@ _game_id_to_enum = {
     "PrimeRemastered": "PRIME_REMASTER",
 }
 
+_STRUCTS: set[tuple[typing.Literal[">", "<"], str]] = set()
+_DECODE_METHODS: dict[str, str] = {}
+_endianness_alias = {">": "BIG", "<": "LITTLE"}
+
+
+def _get_struct(endianness: typing.Literal[">", "<"], fmt: str) -> str:
+    _STRUCTS.add((endianness, fmt))
+    assert ">" not in fmt and "<" not in fmt, "Format should not include endianness"
+
+    fmt = fmt.replace("?", "bool_")
+
+    return f"{_endianness_alias[endianness]}_" + fmt
+
+
+def struct_unpack(endianness: typing.Literal[">", "<"], fmt: str) -> str:
+    final_fmt = endianness + fmt
+    return f"structs.{_get_struct(endianness, fmt)}.unpack(data.read({struct.calcsize(final_fmt)}))"
+
+
+def struct_pack(endianness: typing.Literal[">", "<"], fmt: str, code: str) -> str:
+    return f"structs.{_get_struct(endianness, fmt)}.pack({code})"
+
+
 _CODE_PARSE_UINT16 = {
-    ">": 'struct.unpack(">H", data.read(2))[0]',
-    "<": 'struct.unpack("<H", data.read(2))[0]',
+    ">": struct_unpack(">", "H") + "[0]",
+    "<": struct_unpack("<", "H") + "[0]",
 }
 _CODE_PARSE_UINT32 = {
-    ">": 'struct.unpack(">L", data.read(4))[0]',
-    "<": 'struct.unpack("<L", data.read(4))[0]',
+    ">": struct_unpack(">", "L") + "[0]",
+    "<": struct_unpack("<", "L") + "[0]",
 }
+
 
 RawPropType = typing.Literal[
     "Sound",
@@ -72,7 +96,7 @@ RawPropType = typing.Literal[
 ]
 
 
-def get_endianness(game_id: str) -> str:
+def get_endianness(game_id: str) -> typing.Literal[">", "<"]:
     return ">" if game_id != "PrimeRemastered" else "<"
 
 
@@ -112,7 +136,7 @@ class EnumDefinition:
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
         code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
-        code += '        data.write(struct.pack("' + endianness + 'L", self.value))\n'
+        code += f"        data.write({struct_pack(endianness, 'L', 'self.value')})\n"
 
         code += "\n    @classmethod\n"
         code += "    def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:\n"
@@ -139,6 +163,7 @@ def _scrub_enum(string: str) -> str:
 def create_enums_file(game_id: str, enums: dict[EnumDefinition, list[str]]) -> str:
     code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
     code += "\nfrom retro_data_structures import json_util\n"
+    code += "from retro_data_structures.properties import structs\n"
 
     for e, classes in enums.items():
         if len(classes) != 1:
@@ -469,6 +494,9 @@ def _get_default(field_params: dict) -> str:
     return default_value
 
 
+_ALL_CLASS_DEFS: dict[str, dict[str, ClassDefinition]] = collections.defaultdict(dict)
+
+
 @dataclasses.dataclass
 class ClassDefinition:
     game_id: str
@@ -493,6 +521,9 @@ class ClassDefinition:
     need_enums: bool = False
     local_enums: list[EnumDefinition] = dataclasses.field(default_factory=list)
     has_custom_cook_pref: bool = False
+
+    def __post_init__(self):
+        _ALL_CLASS_DEFS[self.game_id][self.raw_name] = self
 
     @property
     def atomic(self) -> bool:
@@ -561,7 +592,7 @@ class ClassDefinition:
             if prop.known_size is None:
                 build_prop.append("after = data.tell()")
                 build_prop.append("data.seek(before)")
-                build_prop.append(f'data.write(struct.pack("{endianness}H", after - before - 2))')
+                build_prop.append(f"data.write({struct_pack(endianness, 'H', 'after - before - 2')})")
                 build_prop.append("data.seek(after)")
 
             if not prop.custom_cook_pref:
@@ -672,7 +703,7 @@ class ClassDefinition:
                 variable_name += "_"
 
             # yield "    data.read(6)"  # TODO: assert correct
-            yield f'    property_id, property_size = struct.unpack("{endianness}LH", data.read(6))'
+            yield f"    property_id, property_size = {struct_unpack(endianness, 'LH')}"
             yield f"    assert property_id == 0x{prop.id:08x}"
             yield f"    {variable_name} = {prop.parse_code}"
             yield ""
@@ -701,9 +732,7 @@ class ClassDefinition:
             return
 
         if self.is_struct:
-            self.class_code += (
-                '        struct_id, size, property_count = struct.unpack("' + endianness + 'LHH", data.read(8))\n'
-            )
+            self.class_code += f"        struct_id, size, property_count = {struct_unpack(endianness, 'LHH')}\n"
             self.class_code += "        assert struct_id == 0xFFFFFFFF\n"
             self.class_code += "        root_size_start = data.tell() - 2\n\n"
         else:
@@ -721,7 +750,7 @@ class ClassDefinition:
 
         self.class_code += f"""        present_fields = default_override or {{}}{unknown_fields_declare}
         for _ in range(property_count):
-            property_id, property_size = struct.unpack("{endianness}LH", data.read(6))
+            property_id, property_size = {struct_unpack(endianness, "LH")}
             start = data.tell()
             try:
                 property_name, decoder = _property_decoder[property_id]
@@ -755,6 +784,10 @@ class ClassDefinition:
             if prop.parse_code.endswith(".from_stream(data, property_size)"):
                 suffix_size = len("(data, property_size)")
                 decode_names[prop_name] = prop.parse_code[:-suffix_size]
+            elif prop.parse_code.startswith("structs.") and prop.parse_code.endswith("[0]"):
+                split_code = prop.parse_code.split(".", 2)
+                _DECODE_METHODS["decode_" + split_code[1]] = f"return {split_code[1]}.{split_code[2]}"
+                decode_names[prop_name] = f"structs.decode_{split_code[1]}"
             else:
                 decode_names[prop_name] = f"_decode_{prop_name}"
                 self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
@@ -763,7 +796,7 @@ class ClassDefinition:
         decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
         self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
-            self.after_class_code += f"    {hex(prop.id)}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
+            self.after_class_code += f"    0x{prop.id:08x}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
         self.after_class_code += "}\n"
 
     def write_to_stream(self) -> None:
@@ -912,18 +945,23 @@ class ClassDefinition:
 
         self.class_code += "        }\n"
 
+    def has_dependency_code(self) -> bool:
+        return any(prop.dependency_code is not None for prop in self.all_props.values())
+
     def write_dependencies(self) -> None:
         if self.keep_unknown_properties() or self.game_id not in {"Prime", "Echoes"}:
             return
 
-        has_dep = False
+        if not self.is_struct and not self.has_dependency_code():
+            return
+
+        self.typing_imports["collections.abc"] = "Iterator"
+
         method_name = {}
 
         for prop_name, prop in self.all_props.items():
             if prop.dependency_code is None:
                 continue
-
-            has_dep = True
 
             prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
             if prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
@@ -933,18 +971,19 @@ class ClassDefinition:
                     self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
                     prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
                 else:
-                    prop_code = f"yield from {prop_code}"
+                    prop_code = f"return {prop_code}"
 
                 method_name[prop_name] = f"self._dependencies_for_{prop_name}"
 
                 self.class_code += f"""
-    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         {prop_code}
 """
+
         self.typing_imports["retro_data_structures.asset_manager"] = "AssetManager"
         self.typing_imports["retro_data_structures.base_resource"] = "Dependency"
 
-        if has_dep:
+        if len(method_name) > 1:
             method_list = "\n".join(
                 f'            ({method_name[prop_name]}, "{prop_name}", "{prop.prop_type}"),'
                 for prop_name, prop in self.all_props.items()
@@ -952,7 +991,7 @@ class ClassDefinition:
             )
 
             self.class_code += f"""
-    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         for method, field_name, field_type in [
 {method_list}
         ]:
@@ -964,9 +1003,14 @@ class ClassDefinition:
                 )
 """
         else:
-            self.class_code += """
-    def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
-        yield from []
+            if not method_name:
+                single_method = "yield from []"
+            else:
+                single_method = f"return {list(method_name.values())[0]}(asset_manager)"
+
+            self.class_code += f"""
+    def dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
+        {single_method}
 """
 
 
@@ -1320,6 +1364,20 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     _ensure_is_generated_dir(core_path)
     _add_default_types(core_path, game_id)
 
+    print("> Creating archetypes")
+    archetype_path = code_path.joinpath("archetypes")
+    _ensure_is_generated_dir(archetype_path)
+    archetype_all = []
+
+    def get_archetype(archetype_name: str) -> ClassDefinition | None:
+        if archetype_name in archetype_all:
+            return _ALL_CLASS_DEFS[game_id][archetype_name]
+
+        if parse_struct(archetype_name, property_archetypes[archetype_name], archetype_path, struct_fourcc=None):
+            archetype_all.append(archetype_name)
+            return _ALL_CLASS_DEFS[game_id][archetype_name]
+        return None
+
     known_enums: dict[str, EnumDefinition] = {_scrub_enum(e.name): e for e in _enums_by_game[game_id]}
 
     def get_prop_details(prop: dict) -> PropDetails:
@@ -1354,8 +1412,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             field_params["default_factory"] = prop_type
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
-            dependency_code = "{obj}.dependencies_for(asset_manager)"
             json_type = "json_util.JsonObject"
+
+            archetype = get_archetype(archetype_path)
+            if archetype is not None and not archetype.has_dependency_code():
+                dependency_code = None
+            else:
+                dependency_code = "{obj}.dependencies_for(asset_manager)"
 
             default_override = {}
             for inner_prop in prop["properties"]:
@@ -1421,7 +1484,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 prop_type = "int"
                 field_params["default"] = repr(default_value)
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
+                build_code.append(f"data.write({struct_pack(endianness, 'L', '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1454,7 +1517,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 comment = "Flagset"
                 field_params["default"] = default_value
                 parse_code = _CODE_PARSE_UINT32[endianness]
-                build_code.append('data.write(struct.pack("' + endianness + 'L", {obj}))')
+                build_code.append(f"data.write({struct_pack(endianness, 'L', '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1485,14 +1548,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 json_type = "int"
                 if game_id in ["Prime", "Echoes"]:
                     format_specifier = "L"
-                    known_size = 4
                 else:
                     format_specifier = "Q"
-                    known_size = 8
 
-                format_with_prefix = f'"{endianness}{format_specifier}"'
-                parse_code = f"struct.unpack({format_with_prefix}, data.read({known_size}))[0]"
-                build_code.append(f"data.write(struct.pack({format_with_prefix}, {{obj}}))")
+                parse_code = struct_unpack(endianness, format_specifier) + "[0]"
+                build_code.append(f"data.write({struct_pack(endianness, format_specifier, '{obj}')})")
                 from_json_code = "{obj}"
                 to_json_code = "{obj}"
 
@@ -1557,7 +1617,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         elif raw_type == "Color" or raw_type == "Vector":
             prop_type = raw_type
             needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data)"
+            parse_code = f"{prop_type}.from_stream(data, property_size)"
             build_code.append("{obj}.to_stream(data)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
@@ -1591,8 +1651,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             struct_format = endianness + literal_prop.struct_format
             format_specifier = literal_prop.struct_format
 
-            parse_code = f"struct.unpack({repr(struct_format)}, data.read({literal_prop.byte_count}))[0]"
-            build_code.append(f"data.write(struct.pack({repr(struct_format)}, {{obj}}))")
+            parse_code = struct_unpack(endianness, format_specifier) + "[0]"
+            build_code.append(f"data.write({struct_pack(endianness, format_specifier, '{obj}')})")
             from_json_code = "{obj}"
             to_json_code = "{obj}"
 
@@ -1736,6 +1796,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         code_code += "\nfrom retro_data_structures import json_util\n"
         code_code += "from retro_data_structures.game_check import Game\n"
+        code_code += "from retro_data_structures.properties import structs\n"
         code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
         code_code += "from retro_data_structures.properties.field_reflection import FieldReflection\n"
 
@@ -1829,18 +1890,13 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
-    print("> Creating archetypes")
-    path = code_path.joinpath("archetypes")
-    _ensure_is_generated_dir(path)
-
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.archetypes."
 
-    archetype_all = []
-    for archetype_name, archetype in property_archetypes.items():
-        if parse_struct(archetype_name, archetype, path, struct_fourcc=None):
-            archetype_all.append(archetype_name)
+    # Probably pointless?
+    for archetype_name in property_archetypes:
+        get_archetype(archetype_name)
 
-    create_all_file(path.joinpath("__init__.py"), base_import_path, archetype_all)
+    create_all_file(archetype_path.joinpath("__init__.py"), base_import_path, archetype_all)
 
     print("> Done.")
 
@@ -1974,6 +2030,14 @@ def write_shared_types_helpers(all_games: dict) -> None:
             for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
         },
     )
+    structs = "# Generated File\nimport struct\nimport typing\n\n"
+    for endianness, fmt_string in sorted(_STRUCTS):
+        structs += f'{_get_struct(endianness, fmt=fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
+    for decode_name, decode_body in sorted(_DECODE_METHODS.items()):
+        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int):\n"
+        structs += f"    {decode_body}\n"
+
+    path_to_props.joinpath("structs.py").write_text(structs)
 
 
 def parse(game_ids: typing.Iterable[str] | None = None) -> dict:
