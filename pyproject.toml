@@ -115,6 +115,7 @@ max-complexity = 25
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+known-first-party = ["retro_data_structures"]
 
 [tool.mypy]
 files = [

@@ -3,10 +3,10 @@ from __future__ import annotations
 import typing
 
 import pytest
-from retro_data_structures.properties.echoes.objects import ScannableObjectInfo
 from tests import test_lib
 
 from retro_data_structures.formats.scan import Scan
+from retro_data_structures.properties.echoes.objects import ScannableObjectInfo
 
 
 def test_compare_p1(prime1_asset_manager):
