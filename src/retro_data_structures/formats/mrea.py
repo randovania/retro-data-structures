@@ -802,6 +802,12 @@ class Area:
             yield from layer.instances
 
     def get_instance(self, ref: InstanceRef) -> ScriptInstance:
+        """
+        Gets the instance with the given name or id.
+        :param ref:
+        :raises KeyError: if instance is not found, or if multiple instances have the given name.
+        :return:
+        """
         for layer in self.all_layers:
             try:
                 return layer.get_instance(ref)

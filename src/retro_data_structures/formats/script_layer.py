@@ -36,6 +36,8 @@ from retro_data_structures.formats.script_object import (
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Generator
+
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
     from retro_data_structures.formats.mlvl import Area
@@ -129,15 +131,18 @@ class ScriptLayer:
         return self
 
     @property
-    def index(self):
+    def index(self) -> int:
         return self._index
 
     @property
-    def instances(self):
+    def instances(self) -> Generator[ScriptInstance, None, None]:
         for instance in self._raw.script_instances:
             yield ScriptInstance(instance, self.target_game, on_modify=self.mark_modified)
 
     def has_instance(self, ref: InstanceRef) -> bool:
+        """
+        Return True if `ref` points to one, and only one, instance.
+        """
         try:
             self.get_instance(ref)
         except KeyError:
@@ -145,9 +150,21 @@ class ScriptLayer:
         return True
 
     def get_instance(self, ref: InstanceRef) -> ScriptInstance:
+        """
+        Gets the instance with the given name or id.
+        :param ref:
+        :raises KeyError: if instance is not found, or if multiple instances have the given name.
+        :return:
+        """
         if isinstance(ref, str):
             return self._get_instance_by_name(ref)
         return self._get_instance_by_id(ref)
+
+    def get_all_instances_with_name(self, name: str) -> list[ScriptInstance]:
+        """
+        Returns a list of all instances in this layer with the given name.
+        """
+        return [instance for instance in self.instances if instance.name == name]
 
     def _get_instance_by_id(self, instance_id: InstanceIdRef) -> ScriptInstance:
         instance_id = resolve_instance_id(instance_id)
@@ -157,10 +174,12 @@ class ScriptLayer:
         raise KeyError(instance_id)
 
     def _get_instance_by_name(self, name: str) -> ScriptInstance:
-        for instance in self.instances:
-            if instance.name == name:
-                return instance
-        raise KeyError(name)
+        all_instances = self.get_all_instances_with_name(name)
+        if len(all_instances) > 1:
+            raise KeyError(f"non-unique name `{name}`")
+        elif not all_instances:
+            raise KeyError(name)
+        return all_instances[0]
 
     def _internal_add_instance(self, instance: ScriptInstance):
         if self.has_instance(instance):
