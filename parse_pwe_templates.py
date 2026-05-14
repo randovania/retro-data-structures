@@ -522,7 +522,7 @@ class ClassDefinition:
     local_enums: list[EnumDefinition] = dataclasses.field(default_factory=list)
     has_custom_cook_pref: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         _ALL_CLASS_DEFS[self.game_id][self.raw_name] = self
 
     @property
@@ -2034,7 +2034,14 @@ def write_shared_types_helpers(all_games: dict) -> None:
     for endianness, fmt_string in sorted(_STRUCTS):
         structs += f'{_get_struct(endianness, fmt=fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
     for decode_name, decode_body in sorted(_DECODE_METHODS.items()):
-        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int):\n"
+        if "bool_" in decode_name:
+            decode_return_type = "bool"
+        elif "_f" in decode_name:
+            decode_return_type = "float"
+        else:
+            decode_return_type = "int"
+
+        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int) -> {decode_return_type}:\n"
         structs += f"    {decode_body}\n"
 
     path_to_props.joinpath("structs.py").write_text(structs)
