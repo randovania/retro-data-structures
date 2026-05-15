@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import enum
 import typing
+from dataclasses import dataclass
 
 import construct
-from attr import dataclass
 from construct import Const, If, Int32ub, PrefixedArray
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
