@@ -259,23 +259,34 @@ def test_replace_connections_to(prime2_asset_manager):
     effect = area.get_instance("RIFT TO PORTAL")
     relay = area.get_instance("Stop Dark Rift Sounds")
 
-    original_connections = timer.connections
-    effect_targets_before = 0
-    for connection in original_connections:
-        if connection.target == relay.id:
-            effect_targets_before += 1
-
     # run
     timer.replace_connections_to(effect, relay)
-    effect_targets_after = 0
-    for connection in timer.connections:
-        if connection.target == relay.id:
-            effect_targets_after += 1
 
     # assert
-    assert set(timer.connections) != set(original_connections)
-    assert len(timer.connections) == len(original_connections)
-    assert effect_targets_before == effect_targets_after - 2
+    sequence = _echoes_enums.State.Sequence
+    activate = _echoes_enums.Message.Activate
+    assert timer.connections == (
+        Connection(sequence, activate, InstanceId(0x001902D8)),
+        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902D8)),
+        Connection(sequence, activate, InstanceId(0x001902EE)),
+        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902EE)),
+        Connection(sequence, activate, InstanceId(0x00190272)),
+        Connection(sequence, _echoes_enums.Message.SetToZero, InstanceId(0x001902DC)),
+        Connection(sequence, _echoes_enums.Message.Play, InstanceId(0x001902E7)),
+        Connection(sequence, activate, InstanceId(0x001902E8)),
+        Connection(sequence, activate, InstanceId(0x001902DC)),
+        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902DC)),
+        Connection(sequence, activate, InstanceId(0x001902EF)),
+        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902EF)),
+        Connection(sequence, _echoes_enums.Message.SetToZero, InstanceId(0x001902E3)),
+        Connection(
+            _echoes_enums.State.MaxReached,
+            _echoes_enums.Message.Play,
+            InstanceId(0x001902F4),
+        ),
+        Connection(sequence, _echoes_enums.Message.Play, InstanceId(0x001902F4)),
+        Connection(sequence, _echoes_enums.Message.Stop, InstanceId(0x001902F4)),
+    )
 
 
 def test_compare_connection_without_layer_index(prime2_area: Area):

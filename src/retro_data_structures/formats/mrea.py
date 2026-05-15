@@ -34,12 +34,13 @@ from retro_data_structures.construct_extensions.alignment import AlignTo, Prefix
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
+from retro_data_structures.formats import script_object
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
 from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
-from retro_data_structures.formats.script_object import InstanceId
+from retro_data_structures.formats.script_object import Connection, InstanceId, InstanceIdRef
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
 from retro_data_structures.formats.world_geometry import lazy_world_geometry
@@ -836,6 +837,21 @@ class Area:
         for inst in self.all_instances:
             inst.replace_connections_to(old_inst, new_inst)
         self.remove_instance(old_inst)
+
+    def get_all_connections_to(self, target: InstanceIdRef) -> list[tuple[ScriptInstance, Connection]]:
+        """
+        Gets a list of all objects that have a connection to the target object.
+        """
+        target_id = script_object.resolve_instance_id(target)
+
+        result = []
+
+        for instance in self.all_instances:
+            for connection in instance.connections:
+                if connection.target == target_id:
+                    result.append((instance, connection))
+
+        return result
 
     def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
         source_dock = self._raw.docks[source_dock_number]
