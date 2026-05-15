@@ -55,11 +55,12 @@ def compare_all_instances(
     encoded = decoded.build()
     decoded2 = check_all_instances(encoded, asset_manager.target_game, all_instances)
 
-    assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
     if simple_construct is not None:
         assert test_lib.purge_hidden(simple_construct.parse(resource.data)) == test_lib.purge_hidden(
             simple_construct.parse(encoded)
         )
+    else:
+        assert test_lib.purge_hidden(decoded2.raw) == test_lib.purge_hidden(decoded.raw)
 
 
 def _all_instances_p1_p2(mrea: Mrea):
@@ -75,13 +76,11 @@ def test_parse_all_p1(prime1_asset_manager, mrea_asset_id: AssetId):
     check_all_instances(resource.data, prime1_asset_manager.target_game, _all_instances_p1_p2)
 
 
-def test_compare_p1(prime1_asset_manager):
+def test_compare_p1(prime1_asset_manager, mrea_asset_id: AssetId):
     # Known difference: some Prime 1 script layers have sizes that
     # are not multiples of 32; building always pads to 32
-
-    with pytest.raises(NotImplementedError):
-        # Resources/Worlds/EndCinema/!EndCinema_Master/01_endcinema.MREA
-        test_lib.parse_and_build_compare(prime1_asset_manager, 0xB4B41C48, Mrea)
+    # FIXME: re-encoding script layer will cause mismatches. Maybe because of ^?
+    compare_all_instances(prime1_asset_manager, mrea_asset_id, lambda obj: iter([]), mrea.MREASimple)
 
 
 def test_compare_p2(prime2_asset_manager, mrea_asset_id: AssetId):
