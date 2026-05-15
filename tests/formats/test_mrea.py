@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING
 import pytest
 from tests import test_lib
 
+from retro_data_structures.enums.echoes import Message, State
 from retro_data_structures.formats import mrea
 from retro_data_structures.formats.mlvl import Mlvl
-from retro_data_structures.formats.mrea import Mrea
-from retro_data_structures.formats.script_object import ScriptInstance
+from retro_data_structures.formats.mrea import Area, Mrea
+from retro_data_structures.formats.script_object import Connection, ScriptInstance
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
@@ -142,3 +143,18 @@ def test_compare_p2_add_layer_hashes(prime2_asset_manager, mrea_asset_id: AssetI
     mrea_encoded = area.mrea.build()
 
     _compare_mrea_hashes("mrea_hashes_echoes_add_layer.json", mlvl_encoded + mrea_encoded, mrea_asset_id)
+
+
+def test_get_all_connections_to(prime2_asset_manager):
+    mlvl: Mlvl = prime2_asset_manager.get_parsed_asset(0x3BFA3EFF)  # Temple Grounds
+    area: Area = mlvl.get_area(0x4B4E5911)  # Temple Assembly Site
+
+    # Run
+    target = area.get_instance("RIFT TO PORTAL")
+    result = area.get_all_connections_to(target)
+
+    # Assert
+    assert result == [
+        (area.get_instance(0x001902ED), Connection(State.Sequence, Message.Activate, target.id)),
+        (area.get_instance(0x001902ED), Connection(State.Sequence, Message.Deactivate, target.id)),
+    ]
