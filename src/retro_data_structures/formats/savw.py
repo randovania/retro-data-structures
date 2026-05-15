@@ -151,9 +151,9 @@ class EnvVar:
     def parse(cls, raw: construct.Container) -> typing.Self:
         return cls(
             name=raw.name,
-            unk_a=raw.unk_a,
-            unk_b=raw.unk_b,
-            unk_c=raw.unk_c,
+            _unk_a=raw.unk_a,
+            _unk_b=raw.unk_b,
+            _unk_c=raw.unk_c,
         )
 
     def build(self) -> construct.Container:
