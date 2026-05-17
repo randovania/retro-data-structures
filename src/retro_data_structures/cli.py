@@ -13,11 +13,12 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 from retro_data_structures import dependencies, formats
-from retro_data_structures.asset_manager import AssetManager, FileProvider, IsoFileProvider, PathFileProvider
+from retro_data_structures.asset_manager import AssetManager
 from retro_data_structures.construct_extensions.json import convert_to_raw_python
 from retro_data_structures.conversion import conversions
 from retro_data_structures.conversion.asset_converter import AssetConverter
 from retro_data_structures.exceptions import UnknownAssetId
+from retro_data_structures.file_provider import FileProvider, IsoFileProvider, PathFileProvider
 from retro_data_structures.formats import Mlvl, mlvl
 from retro_data_structures.game_check import Game
 

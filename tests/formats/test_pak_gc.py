@@ -4,7 +4,8 @@ import pytest
 
 from retro_data_structures.base_resource import Dependency
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_gc import PAK_GC, CompressedPakResource, PakBody, PakFile, PAKNoData
+from retro_data_structures.formats.pak_common import CompressedGcPakResource, PakBody, PakFile
+from retro_data_structures.formats.pak_gc import PAK_GC, PAKNoData
 from retro_data_structures.game_check import Game
 
 # ruff: noqa: E501
@@ -156,7 +157,7 @@ def _compressed_resource():
 
 
 def test_echoes_resource_decode(compressed_resource):
-    decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.ECHOES)
+    decoded = CompressedGcPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.ECHOES)
 
     assert len(decoded) == len(compressed_resource["contents"]["value"])
     assert decoded == compressed_resource["contents"]["value"]
@@ -164,8 +165,8 @@ def test_echoes_resource_decode(compressed_resource):
 
 def test_echoes_resource_encode_decode(compressed_resource):
     raw = compressed_resource["contents"]["value"]
-    decoded = CompressedPakResource.build(raw, target_game=Game.ECHOES)
-    encoded = CompressedPakResource.parse(decoded, target_game=Game.ECHOES)
+    decoded = CompressedGcPakResource.build(raw, target_game=Game.ECHOES)
+    encoded = CompressedGcPakResource.parse(decoded, target_game=Game.ECHOES)
     assert raw == encoded
 
 
@@ -202,12 +203,12 @@ def test_compare_from_build():
     game = Game.ECHOES
 
     source = PakBody(
-        named_resources={
-            "TXTR_ElevatorIcon_1": Dependency("TXTR", 201335801),
-            "TXTR_ElevatorIcon": Dependency("TXTR", 239414538),
-            "TXTR_QuaterCurve": Dependency("TXTR", 564256465),
-            "TXTR_SaveStationIcon_1": Dependency("TXTR", 568030977),
-        },
+        named_resources=[
+            ("TXTR_ElevatorIcon_1", Dependency("TXTR", 201335801)),
+            ("TXTR_ElevatorIcon", Dependency("TXTR", 239414538)),
+            ("TXTR_QuaterCurve", Dependency("TXTR", 564256465)),
+            ("TXTR_SaveStationIcon_1", Dependency("TXTR", 568030977)),
+        ],
         files=[
             PakFile(
                 asset_id=201335801,

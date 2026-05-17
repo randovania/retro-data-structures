@@ -7,7 +7,8 @@ from typing import TypeVar
 
 import pytest
 
-from retro_data_structures.asset_manager import AssetManager, FileProvider, IsoFileProvider, PathFileProvider
+from retro_data_structures.asset_manager import AssetManager
+from retro_data_structures.file_provider import FileProvider, IsoFileProvider, PathFileProvider
 from retro_data_structures.game_check import Game
 from tests import test_lib
 

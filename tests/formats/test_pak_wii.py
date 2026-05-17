@@ -3,8 +3,9 @@ from __future__ import annotations
 # The two following imports are only used by file tests
 import pytest
 
+from retro_data_structures.formats.cmpd import CompressedWiiPakResource
 from retro_data_structures.formats.pak import Pak
-from retro_data_structures.formats.pak_wii import PAK_WII, CompressedPakResource, PAKNoData
+from retro_data_structures.formats.pak_wii import PAK_WII, PAKNoData
 from retro_data_structures.game_check import Game
 
 # ruff: noqa: E501
@@ -109,7 +110,7 @@ def test_compare_header_keep_data(prime3_provider):
 
 def test_corruption_resource_decode(compressed_resources):
     for compressed_resource in compressed_resources:
-        decoded = CompressedPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.CORRUPTION)
+        decoded = CompressedWiiPakResource.parse(compressed_resource["contents"]["data"], target_game=Game.CORRUPTION)
 
         assert len(decoded) == len(compressed_resource["contents"]["value"])
         assert decoded == compressed_resource["contents"]["value"]
@@ -118,6 +119,6 @@ def test_corruption_resource_decode(compressed_resources):
 def test_corruption_resource_encode_decode(compressed_resources):
     for compressed_resource in compressed_resources:
         raw = compressed_resource["contents"]["value"]
-        decoded = CompressedPakResource.build(raw, target_game=Game.CORRUPTION)
-        encoded = CompressedPakResource.parse(decoded, target_game=Game.CORRUPTION)
+        decoded = CompressedWiiPakResource.build(raw, target_game=Game.CORRUPTION)
+        encoded = CompressedWiiPakResource.parse(decoded, target_game=Game.CORRUPTION)
         assert raw == encoded

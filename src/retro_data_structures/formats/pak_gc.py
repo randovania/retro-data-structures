@@ -1,19 +1,13 @@
 from __future__ import annotations
 
-import dataclasses
-from typing import TYPE_CHECKING
-
 import construct
-from construct import Const, FocusedSeq, IfThenElse, Int16ub, Int32ub, PascalString, PrefixedArray, Rebuild, Struct
+from construct import Const, Int16ub, Int32ub, PascalString, PrefixedArray, Struct
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetId, AssetType, Dependency
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import AssetId32, FourCC
-from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo
-
-if TYPE_CHECKING:
-    from retro_data_structures.game_check import Game
+from retro_data_structures.formats.pak_common import PakBody, PakFile
 
 PAKHeader = Struct(
     version_major=Const(3, Int16ub),
@@ -55,54 +49,6 @@ PAKNoData = Struct(
     resources=PrefixedArray(Int32ub, ConstructResourceHeader),
 ).compile()
 
-CompressedPakResource = FocusedSeq(
-    "data",
-    decompressed_size=Rebuild(Int32ub, construct.len_(construct.this.data)),
-    data=IfThenElse(
-        game_check.uses_lzo,
-        LZOCompressedBlock(construct.this.decompressed_size),
-        ZlibCompressedBlock,
-    ),
-)
-
-
-@dataclasses.dataclass
-class PakFile:
-    asset_id: AssetId
-    asset_type: AssetType
-    should_compress: bool
-    uncompressed_data: bytes | None
-    compressed_data: bytes | None
-    extra: construct.Container | None = None
-
-    def get_decompressed(self, target_game: Game) -> bytes:
-        if self.uncompressed_data is None:
-            self.uncompressed_data = CompressedPakResource.parse(
-                self.compressed_data,
-                target_game=target_game,
-            )
-
-        return self.uncompressed_data
-
-    def get_compressed(self, target_game: Game) -> bytes:
-        if self.compressed_data is None:
-            self.compressed_data = CompressedPakResource.build(
-                self.uncompressed_data,
-                target_game=target_game,
-            )
-
-        return self.compressed_data
-
-    def set_new_data(self, data: bytes):
-        self.uncompressed_data = data
-        self.compressed_data = None
-
-
-@dataclasses.dataclass
-class PakBody:
-    named_resources: dict[str, Dependency]
-    files: list[PakFile]
-
 
 class ConstructPakGc(construct.Construct):
     def _parse(self, stream, context, path) -> PakBody:
@@ -135,9 +81,9 @@ class ConstructPakGc(construct.Construct):
             )
 
         return PakBody(
-            named_resources={
-                named.name: Dependency(type=named.asset_type, id=named.asset_id) for named in header.named_resources
-            },
+            named_resources=[
+                (named.name, Dependency(type=named.asset_type, id=named.asset_id)) for named in header.named_resources
+            ],
             files=files,
         )
 
@@ -152,7 +98,7 @@ class ConstructPakGc(construct.Construct):
                     asset_id=dep.id,
                     name=name,
                 )
-                for name, dep in obj.named_resources.items()
+                for name, dep in obj.named_resources
             ),
             resources=construct.ListContainer(
                 construct.Container(
