@@ -141,9 +141,8 @@ class PakExportStrategyAppend(PakExportStrategy):
             raise UnknownAssetId(asset_id, original_name)
 
         # If the pak already has the given asset, do nothing
-        # if pak_name not in self._paks_for_asset_id[asset_id]:
-
-        self._ensured_asset_ids[pak_name].add(asset_id)
+        if pak_name not in self.manager.pak_group.find_paks(asset_id):
+            self._ensured_asset_ids[pak_name].add(asset_id)
 
     @override
     def export(self, output: FileWriter) -> None:
