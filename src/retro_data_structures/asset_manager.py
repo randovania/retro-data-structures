@@ -419,7 +419,7 @@ class AssetManager:
             logger.debug("Encoding %s (%s, %s)", asset_id, name, new_data.resource_type())
             raw_asset = RawResource(
                 type=new_data.resource_type(),
-                data=new_data.build(),
+                raw_data=new_data.build(),
             )
             self._modified_resources[asset_id] = raw_asset
 
@@ -479,6 +479,13 @@ class AssetManager:
             return self.replace_asset(name, new_data)
         else:
             return self.add_new_asset(name, new_data)
+
+    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
+        """
+        Ensures the given pak has the given assets, collecting from other paks if needed.
+        """
+
+        self.pak_strategy.ensure_present(pak_name, asset_id)
 
     def get_pak(self, pak_name: str) -> Pak:
         # FIXME: delete

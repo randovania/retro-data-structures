@@ -3,13 +3,14 @@ from __future__ import annotations
 import collections
 import typing
 
-from retro_data_structures.base_resource import AssetId, RawResource
 from retro_data_structures.formats import pak_gc, pak_wii, pak_wiiu
 from retro_data_structures.formats.pak_common import PakBody, PakFile
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from retro_data_structures.base_resource import AssetId, RawResource
 
 
 def _pak_for_game(game: Game):
@@ -62,7 +63,7 @@ class Pak:
 
     def get_all_assets(self) -> Iterator[tuple[AssetId, RawResource]]:
         for file in self._raw.files:
-            yield file.asset_id, RawResource(file.asset_type, file.get_decompressed(self.target_game))
+            yield file.asset_id, file.as_raw_resource(self.target_game)
 
     def get_asset(self, asset_id: AssetId) -> RawResource | None:
         """
@@ -72,7 +73,7 @@ class Pak:
         """
         for index in self._file_indices_by_id[asset_id]:
             file = self._raw.files[index]
-            return RawResource(file.asset_type, file.get_decompressed(self.target_game))
+            return file.as_raw_resource(self.target_game)
 
         return None
 
@@ -81,8 +82,7 @@ class Pak:
 
         for index in self._file_indices_by_id[asset_id]:
             file = self._raw.files[index]
-            file.asset_type = asset.type
-            file.set_new_data(asset.data)
+            file.set_new_data(asset)
             found = True
 
         if not found:
@@ -94,19 +94,26 @@ class Pak:
                 return file
         raise KeyError(f"Unknown asset id: {asset_id}")
 
-    def add_asset(self, asset_id: AssetId, asset: RawResource):
+    def add_asset(self, asset_id: AssetId, asset: RawResource) -> None:
+        if asset.decompressor is not None:
+            uncompressed_data = None
+            compressed_data = asset.raw_data
+        else:
+            uncompressed_data = asset.raw_data
+            compressed_data = None
+
         self._raw.files.append(
             PakFile(
                 asset_id=asset_id,
                 asset_type=asset.type,
-                should_compress=False,
-                uncompressed_data=asset.data,
-                compressed_data=None,
+                should_compress=asset.compressed,
+                uncompressed_data=uncompressed_data,
+                compressed_data=compressed_data,
             )
         )
         self._file_indices_by_id[asset_id].append(len(self._raw.files))
 
-    def remove_asset(self, asset_id: AssetId):
+    def remove_asset(self, asset_id: AssetId) -> None:
         for name, file in self._raw.named_resources:
             if file.id == asset_id:
                 raise ValueError(f"Asset id {asset_id:08x} is named {name}, can't be removed.")

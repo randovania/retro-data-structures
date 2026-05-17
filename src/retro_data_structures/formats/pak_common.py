@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import dataclasses
+import functools
 from typing import TYPE_CHECKING
 
 import construct
 from construct import FocusedSeq, IfThenElse, Int32ub, Rebuild
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import RawResource
 from retro_data_structures.compression import LZOCompressedBlock, ZlibCompressedBlock
 from retro_data_structures.formats.cmpd import CompressedWiiPakResource
 from retro_data_structures.game_check import Game
@@ -62,9 +64,29 @@ class PakFile:
 
         return self.compressed_data
 
-    def set_new_data(self, data: bytes):
-        self.uncompressed_data = data
-        self.compressed_data = None
+    def set_new_data(self, asset: RawResource) -> None:
+        self.asset_type = asset.type
+        if asset.decompressor is not None:
+            self.uncompressed_data = None
+            self.compressed_data = asset.raw_data
+        else:
+            self.uncompressed_data = asset.raw_data
+            self.compressed_data = None
+
+    def as_raw_resource(self, target_game: Game) -> RawResource:
+        if self.should_compress:
+            assert self.compressed_data is not None
+            return RawResource(
+                type=self.asset_type,
+                raw_data=self.compressed_data,
+                decompressor=functools.partial(_decompress, target_game=target_game),
+            )
+        else:
+            assert self.uncompressed_data is not None
+            return RawResource(
+                type=self.asset_type,
+                raw_data=self.uncompressed_data,
+            )
 
 
 @dataclasses.dataclass

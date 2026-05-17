@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 import typing
 import uuid
@@ -108,10 +109,22 @@ def resolve_asset_id(game: Game, value: NameOrAssetId) -> AssetId:
     return value
 
 
-class RawResource(typing.NamedTuple):
+@dataclasses.dataclass(frozen=True)
+class RawResource:
     type: AssetType
-    data: bytes
-    compressed: bool = False
+    raw_data: bytes
+    decompressor: typing.Callable[[bytes], bytes] | None = None
+
+    @property
+    def data(self) -> bytes:
+        if self.decompressor is not None:
+            return self.decompressor(self.raw_data)
+        else:
+            return self.raw_data
+
+    @property
+    def compressed(self) -> bool:
+        return self.decompressor is not None
 
 
 Resource = RawResource | BaseResource
