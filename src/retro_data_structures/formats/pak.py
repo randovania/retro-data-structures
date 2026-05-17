@@ -5,7 +5,7 @@ import typing
 
 from retro_data_structures.base_resource import AssetId, RawResource
 from retro_data_structures.formats import pak_gc, pak_wii, pak_wiiu
-from retro_data_structures.formats.pak_gc import PakBody, PakFile
+from retro_data_structures.formats.pak_common import PakBody, PakFile
 from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
@@ -107,7 +107,7 @@ class Pak:
         self._file_indices_by_id[asset_id].append(len(self._raw.files))
 
     def remove_asset(self, asset_id: AssetId):
-        for name, file in self._raw.named_resources.items():
+        for name, file in self._raw.named_resources:
             if file.id == asset_id:
                 raise ValueError(f"Asset id {asset_id:08x} is named {name}, can't be removed.")
 

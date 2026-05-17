@@ -1,20 +1,14 @@
 from __future__ import annotations
 
-import dataclasses
-from typing import TYPE_CHECKING
-
 import construct
 from construct import Bytes, Const, Int32ub, PrefixedArray, Struct
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetId, AssetType, Dependency
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.common_types import AssetId64, FourCC, String
 from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.dict import make_dict
-from retro_data_structures.formats.cmpd import CompressedPakResource
-
-if TYPE_CHECKING:
-    from retro_data_structures.game_check import Game
+from retro_data_structures.formats.pak_common import PakBody, PakFile
 
 PAKHeader = construct.Aligned(
     64,
@@ -69,37 +63,6 @@ PAKNoData = Struct(
     resources=construct.Aligned(64, PrefixedArray(Int32ub, ConstructResourceHeader)),
     _resources_end=construct.Tell,
 )
-
-
-@dataclasses.dataclass
-class PakFile:
-    asset_id: AssetId
-    asset_type: AssetType
-    should_compress: bool
-    uncompressed_data: bytes | None
-    compressed_data: bytes | None
-    extra: construct.Container | None = None
-
-    def get_decompressed(self, target_game: Game) -> bytes:
-        if self.uncompressed_data is None:
-            self.uncompressed_data = CompressedPakResource.parse(self.compressed_data, target_game=target_game)
-        return self.uncompressed_data
-
-    def get_compressed(self, target_game: Game) -> bytes:
-        if self.compressed_data is None:
-            self.compressed_data = CompressedPakResource.build(self.uncompressed_data, target_game=target_game)
-        return self.compressed_data
-
-    def set_new_data(self, data: bytes):
-        self.uncompressed_data = data
-        self.compressed_data = None
-
-
-@dataclasses.dataclass
-class PakBody:
-    md5_hash: bytes
-    named_resources: list[tuple[str, Dependency]]
-    files: list[PakFile]
 
 
 class ConstructPakWii(construct.Construct):

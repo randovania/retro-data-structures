@@ -68,4 +68,4 @@ class CMPDAdapter(construct.Adapter):
         return res
 
 
-CompressedPakResource = CMPDAdapter(CMPD)
+CompressedWiiPakResource = CMPDAdapter(CMPD)

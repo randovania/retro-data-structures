@@ -10,7 +10,7 @@ from retro_data_structures.construct_extensions.alignment import AlignTo
 from retro_data_structures.construct_extensions.misc import UntilEof
 from retro_data_structures.formats.chunk_descriptor import ChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor, FormDescriptorHeader
-from retro_data_structures.formats.pak_gc import PakFile
+from retro_data_structures.formats.pak_common import PakFile
 
 StringTableEntry = Struct(
     asset_type=FourCC,
