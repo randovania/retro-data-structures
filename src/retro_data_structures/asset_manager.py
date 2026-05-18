@@ -162,6 +162,9 @@ class PakExportStrategyAppend(PakExportStrategy):
 
         # Read all asset ids we need to copy somewhere else
         for pak_name, asset_ids in self._ensured_asset_ids.items():
+            if not asset_ids:
+                continue
+
             modified_paks.add(pak_name)
             for asset_id in asset_ids:
                 if asset_id not in asset_ids_to_copy:
