@@ -215,13 +215,19 @@ class AssetManager:
     _sound_id_to_agsc: dict[int, AssetId | None] | None = None
 
     def __init__(
-        self, provider: FileProvider, target_game: Game, pak_strategy: type[PakExportStrategy] = PakExportStrategyAppend
+        self,
+        provider: FileProvider,
+        target_game: Game,
+        pak_strategy: type[PakExportStrategy] = PakExportStrategyAppend,
+        *,
+        ignore_low_paks: bool = True,
     ):
         self.provider = provider
         self.target_game = target_game
         self._modified_resources = {}
         self._memory_files = {}
         self._next_generated_id = 0xFFFF0000
+        self._ignore_low_paks = ignore_low_paks
 
         self._update_headers()
 
@@ -248,6 +254,10 @@ class AssetManager:
             self._custom_asset_ids.update(dict(json.loads(custom_names_text).items()))
 
         self.all_paks = list(self.provider.rglob("*.pak"))
+
+        if self._ignore_low_paks:
+            self.all_paks = [it for it in self.all_paks if "Low" not in it]
+
         self.pak_group = PakGroup(self.provider, self.all_paks, self.target_game)
 
     def generate_asset_id(self) -> int:
