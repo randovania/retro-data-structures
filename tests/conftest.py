@@ -77,7 +77,7 @@ def internal_prime1_asset_manager(prime1_iso_provider):
 
 @pytest.fixture(scope="module")
 def internal_prime2_asset_manager(prime2_iso_provider):
-    return AssetManager(prime2_iso_provider, target_game=Game.ECHOES)
+    return AssetManager(prime2_iso_provider, target_game=Game.ECHOES, ignore_low_paks=False)
 
 
 @pytest.fixture(scope="module")
