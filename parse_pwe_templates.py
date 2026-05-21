@@ -44,6 +44,7 @@ _game_id_to_enum = {
 _STRUCTS: set[tuple[typing.Literal[">", "<"], str]] = set()
 _DECODE_METHODS: dict[str, str] = {}
 _endianness_alias = {">": "BIG", "<": "LITTLE"}
+_ENUMS_THAT_SUPPORTS_MISSING = {"InventorySlotEnum"}
 
 
 def _get_struct(endianness: typing.Literal[">", "<"], fmt: str) -> str:
@@ -130,6 +131,14 @@ class EnumDefinition:
         code += f"\n\nclass {_scrub_enum(self.name)}(enum.{self.enum_base}):\n"
         for name, value in self.values.items():
             code += f"    {_scrub_enum(name)} = {value}\n"
+
+        if self.name in _ENUMS_THAT_SUPPORTS_MISSING:
+            code += "\n    @classmethod\n"
+            code += f'    def _missing_(cls, value: object) -> "{_scrub_enum(self.name)}":\n'
+            code += "        obj = int.__new__(cls, value)  # type: ignore[call-overload]\n"
+            code += '        obj._name_ = f"Unknown_{value}"\n'
+            code += "        obj._value_ = value\n"
+            code += "        return obj\n"
 
         code += "\n    @classmethod\n"
         code += "    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:\n"
