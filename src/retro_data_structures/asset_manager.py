@@ -27,6 +27,7 @@ from retro_data_structures.formats import Dgrp, dependency_cheating
 from retro_data_structures.formats.audio_group import Agsc, Atbl
 from retro_data_structures.formats.ntwk import Ntwk
 from retro_data_structures.formats.pak import Pak
+from retro_data_structures.formats.pak_common import PakBody, PakFile
 from retro_data_structures.game_check import Game
 from retro_data_structures.pak_group import PakGroup
 
@@ -38,7 +39,6 @@ if typing.TYPE_CHECKING:
 
     from retro_data_structures.file_provider import FileProvider
     from retro_data_structures.formats.ancs import Ancs
-    from retro_data_structures.formats.pak import Pak
 
 T = typing.TypeVar("T", bound=BaseResource)
 logger = logging.getLogger(__name__)
@@ -93,6 +93,64 @@ class PathFileWriter(FileWriter):
         target_dol.write_bytes(data)
 
 
+class MemoryFileWriter(FileWriter):
+    """
+    A FileWriter that keeps everything written in RAM.
+    """
+
+    class MemoryStringIo(io.StringIO):
+        _data: str | None = None
+
+        @property
+        def data(self) -> str:
+            assert self._data is not None
+            return self._data
+
+        def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: typing.Any):
+            self._data = self.getvalue()
+            return super().__exit__(exc_type, exc_val, exc_tb)
+
+    class MemoryBytesIo(io.BytesIO):
+        _data: bytes | None = None
+
+        @property
+        def data(self) -> bytes:
+            assert self._data is not None
+            return self._data
+
+        def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: typing.Any):
+            self._data = self.getvalue()
+            return super().__exit__(exc_type, exc_val, exc_tb)
+
+    _files: dict[str, MemoryStringIo | MemoryBytesIo]
+    _dol: bytes | None
+
+    def __init__(self):
+        self._files = {}
+        self._dol = None
+
+    @typing.override
+    def open_text(self, name: str) -> typing.TextIO:
+        file = self._files.setdefault(name, MemoryFileWriter.MemoryStringIo())
+        assert isinstance(file, MemoryFileWriter.MemoryStringIo)
+        return file
+
+    @typing.override
+    def open_binary(self, name: str) -> typing.BinaryIO:
+        file = self._files.setdefault(name, MemoryFileWriter.MemoryBytesIo())
+        assert isinstance(file, MemoryFileWriter.MemoryBytesIo)
+        return file
+
+    def get_data(self, name: str) -> bytes:
+        """Get the bytes of the file with given name."""
+
+        file = self._files[name]
+        if isinstance(file, MemoryFileWriter.MemoryStringIo):
+            return file.data.encode("utf-8")
+        else:
+            return file.data
+
+
 def _get_name(asset_id: NameOrAssetId) -> str | None:
     if isinstance(asset_id, str):
         return asset_id
@@ -105,7 +163,8 @@ class PakExportStrategy(ABC):
         self.pak_name = pak_name
 
     @abstractmethod
-    def ensure_present(self, asset_id: NameOrAssetId) -> None:
+    def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
+        """Ensures the given asset_id is present on this pak, and as a named resource."""
         raise NotImplementedError
 
     @abstractmethod
@@ -132,7 +191,7 @@ class PakExportStrategyAppend(PakExportStrategy):
         self._ensured_asset_ids = set()
 
     @override
-    def ensure_present(self, asset_id: NameOrAssetId) -> None:
+    def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
@@ -177,10 +236,100 @@ class PakExportStrategyAppend(PakExportStrategy):
         for asset_id in self._ensured_asset_ids:
             pak.add_asset(asset_id, manager.get_raw_asset(asset_id))
 
+        # TODO: add to the named resources dict
+
         # Write the data
         logger.info("Writing %s", self.pak_name)
         with output.open_binary(self.pak_name) as f:
             pak.build_stream(f)
+
+
+class PakExportStrategyCreate(PakExportStrategy):
+    """
+    Creates the Paks entirely from scratch, using named resources and their dependencies.
+    """
+
+    named_files: dict[str, AssetId]
+
+    def __init__(self, manager: AssetManager, pak_name: str):
+        super().__init__(manager, pak_name)
+
+        self.named_files = dict(manager.pak_group.get_named_resources_of_pak(pak_name))
+
+    @override
+    def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
+        # We ignore these calls for non-named resources
+
+        if as_named_resource is not None:
+            self.named_files[as_named_resource] = self.manager.resolve_asset_id(asset_id)
+
+    def _get_pak_file(self, asset_id: AssetId) -> PakFile:
+        """
+
+        :param asset_id:
+        :return:
+        """
+
+        if asset_id in self.manager._modified_resources:
+            # This file was changed, create PakFile entry from scratch.
+            raw = self.manager._modified_resources[asset_id]
+
+            # FIXME: handle should_compress better
+
+            return PakFile(
+                asset_id=asset_id,
+                asset_type=raw.type,
+                should_compress=False,
+                uncompressed_data=raw.data,
+                compressed_data=None,
+            )
+        else:
+            pak_group = self.manager.pak_group
+            for pak_name in pak_group.find_paks(asset_id):
+                pak = pak_group.get_pak(pak_name)
+                return pak.get_pak_file_with_id(asset_id)
+
+        raise KeyError(f"Unknown asset_id: {asset_id}")
+
+    @override
+    def should_export(self) -> bool:
+        # TODO: figure out if the dependencies changed
+        return True
+
+    @override
+    def export(self, output: FileWriter) -> None:
+        manager = self.manager
+
+        # Create the order of assets in the pak
+        # FIXME: this is wrong for mlvl paks
+        id_order = []
+        seen = set()
+        for name, asset_id in self.named_files.items():
+            seen.add(asset_id)
+            for dep in self.manager.get_dependencies_for_asset(asset_id):
+                if dep.id not in seen:
+                    seen.add(dep.id)
+                    id_order.append(dep.id)
+            id_order.append(asset_id)
+
+        files_by_id = {}
+        for asset_id in id_order:
+            if asset_id not in files_by_id:
+                files_by_id[asset_id] = self._get_pak_file(asset_id)
+
+        # Create the new Pak
+        body = PakBody(
+            named_resources=[
+                (name, Dependency(self.manager.get_asset_type(asset_id), asset_id))
+                for name, asset_id in self.named_files.items()
+            ],
+            files=[files_by_id[asset_id] for asset_id in id_order],
+        )
+
+        # Write the data
+        logger.info("Writing %s", self.pak_name)
+        with output.open_binary(self.pak_name) as f:
+            Pak(body, manager.target_game).build_stream(f)
 
 
 class PakExportStrategyFactory(typing.Protocol):

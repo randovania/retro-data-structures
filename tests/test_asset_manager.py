@@ -5,8 +5,15 @@ from typing import TYPE_CHECKING
 
 import nod
 
-from retro_data_structures.asset_manager import AssetManager
+from retro_data_structures.asset_manager import (
+    AssetManager,
+    MemoryFileWriter,
+    PakExportStrategy,
+    PakExportStrategyAppend,
+    PakExportStrategyCreate,
+)
 from retro_data_structures.file_provider import IsoFileProvider, PathFileProvider
+from retro_data_structures.formats import Pak
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
@@ -43,3 +50,25 @@ def test_get_custom_name(prime2_iso_provider):
 
     assert asset_manager.get_custom_asset("MyUglyAsset") is None
     assert asset_manager.get_custom_name_for(0xFFFFF000) is None
+
+
+def _pak_strategy_factory(manager: AssetManager, pak_name: str) -> PakExportStrategy:
+    if pak_name == "LogBook.pak":
+        return PakExportStrategyCreate(manager, pak_name)
+    else:
+        return PakExportStrategyAppend(manager, pak_name)
+
+
+def test_strategy_create(prime2_iso_provider, tmp_path):
+    asset_manager = AssetManager(
+        prime2_iso_provider,
+        target_game=Game.ECHOES,
+        pak_strategy_factory=_pak_strategy_factory,
+    )
+
+    writer = MemoryFileWriter()
+    asset_manager._pak_strategy["LogBook.pak"].export(writer)
+
+    pak = Pak.parse(writer.get_data("LogBook.pak"), target_game=asset_manager.target_game)
+    file_count = len(pak._raw.files)
+    assert file_count == 1995
