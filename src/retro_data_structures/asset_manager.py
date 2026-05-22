@@ -100,11 +100,17 @@ def _get_name(asset_id: NameOrAssetId) -> str | None:
 
 
 class PakExportStrategy(ABC):
-    def __init__(self, manager: AssetManager):
+    def __init__(self, manager: AssetManager, pak_name: str):
         self.manager = manager
+        self.pak_name = pak_name
 
     @abstractmethod
-    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
+    def ensure_present(self, asset_id: NameOrAssetId) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def should_export(self) -> bool:
+        """Should this pak be exported?"""
         raise NotImplementedError
 
     @abstractmethod
@@ -117,22 +123,19 @@ class PakExportStrategyAppend(PakExportStrategy):
     Edits the existing paks, by appending the new resources as ensured.
     """
 
-    _ensured_asset_ids: dict[str, set[AssetId]]
+    _ensured_asset_ids: set[AssetId]
     """Mapping of pak name to assets we'll copy into it when saving."""
 
-    def __init__(self, manager: AssetManager):
-        super().__init__(manager)
+    def __init__(self, manager: AssetManager, pak_name: str):
+        super().__init__(manager, pak_name)
 
-        self._ensured_asset_ids = {pak_name: set() for pak_name in self.manager.all_paks}
+        self._ensured_asset_ids = set()
 
     @override
-    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
+    def ensure_present(self, asset_id: NameOrAssetId) -> None:
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
-        if pak_name not in self._ensured_asset_ids:
-            raise ValueError(f"Unknown pak_name: {pak_name}")
-
         original_name = _get_name(asset_id)
         asset_id = self.manager.resolve_asset_id(asset_id)
 
@@ -141,8 +144,20 @@ class PakExportStrategyAppend(PakExportStrategy):
             raise UnknownAssetId(asset_id, original_name)
 
         # If the pak already has the given asset, do nothing
-        if pak_name not in self.manager.pak_group.find_paks(asset_id):
-            self._ensured_asset_ids[pak_name].add(asset_id)
+        if not self.manager.pak_group.does_pak_contains_id(self.pak_name, asset_id):
+            self._ensured_asset_ids.add(asset_id)
+
+    @override
+    def should_export(self) -> bool:
+        if self._ensured_asset_ids:
+            return True
+
+        pak_group = self.manager.pak_group
+        for asset_id in self.manager._modified_resources.keys():
+            if pak_group.does_pak_contains_id(self.pak_name, asset_id):
+                return True
+
+        return False
 
     @override
     def export(self, output: FileWriter) -> None:
@@ -150,45 +165,30 @@ class PakExportStrategyAppend(PakExportStrategy):
         pak_group = manager.pak_group
         modified_resources = manager._modified_resources
 
-        modified_paks = set()
-        asset_ids_to_copy = {}
-
-        for asset_id in modified_resources.keys():
-            modified_paks.update(pak_group.find_paks(asset_id))
-
-        # Make sure all paks were loaded
-        for pak_name in modified_paks:
-            pak_group.get_pak(pak_name)
-
-        # Read all asset ids we need to copy somewhere else
-        for pak_name, asset_ids in self._ensured_asset_ids.items():
-            if not asset_ids:
-                continue
-
-            modified_paks.add(pak_name)
-            for asset_id in asset_ids:
-                if asset_id not in asset_ids_to_copy:
-                    asset_ids_to_copy[asset_id] = manager.get_raw_asset(asset_id)
-
         # Update the PAKs
-        for pak_name in modified_paks:
-            logger.info("Updating %s", pak_name)
-            pak = pak_group.get_pak(pak_name)
+        logger.info("Updating %s", self.pak_name)
+        pak = pak_group.get_pak(self.pak_name)
 
-            for asset_id, raw_asset in modified_resources.items():
-                if pak_name in pak_group.find_paks(asset_id):
-                    pak.replace_asset(asset_id, raw_asset)
+        for asset_id, raw_asset in modified_resources.items():
+            if pak_group.does_pak_contains_id(self.pak_name, asset_id):
+                pak.replace_asset(asset_id, raw_asset)
 
-            # Add the files that were ensured to be present in this pak
-            for asset_id in self._ensured_asset_ids[pak_name]:
-                pak.add_asset(asset_id, asset_ids_to_copy[asset_id])
+        # Add the files that were ensured to be present in this pak
+        for asset_id in self._ensured_asset_ids:
+            pak.add_asset(asset_id, manager.get_raw_asset(asset_id))
 
-            # Write the data
-            logger.info("Writing %s", pak_name)
-            with output.open_binary(pak_name) as f:
-                pak.build_stream(f)
+        # Write the data
+        logger.info("Writing %s", self.pak_name)
+        with output.open_binary(self.pak_name) as f:
+            pak.build_stream(f)
 
-        pak_group.release_in_memory_paks()
+
+class PakExportStrategyFactory(typing.Protocol):
+    def __call__(self, manager: AssetManager, pak_name: str) -> PakExportStrategy: ...
+
+
+def _default_pak_strategy_factory(manager: AssetManager, pak_name: str) -> PakExportStrategy:
+    return PakExportStrategyAppend(manager, pak_name)
 
 
 class AssetManager:
@@ -206,6 +206,8 @@ class AssetManager:
     _dol: MemoryDol | None = None
     _tweaks: Ntwk | None = None
     _mrea_to_mlvl: dict[AssetId, AssetId] | None = None
+    _pak_strategy_factory: PakExportStrategyFactory
+    _pak_strategy: dict[str, PakExportStrategy]
 
     _custom_asset_ids: dict[str, AssetId]
     _audio_group_dependency: tuple[Dgrp, ...] | None = None
@@ -218,7 +220,7 @@ class AssetManager:
         self,
         provider: FileProvider,
         target_game: Game,
-        pak_strategy: type[PakExportStrategy] = PakExportStrategyAppend,
+        pak_strategy_factory: PakExportStrategyFactory = _default_pak_strategy_factory,
         *,
         ignore_low_paks: bool = True,
     ):
@@ -229,6 +231,7 @@ class AssetManager:
         self._next_generated_id = 0xFFFF0000
         self._ignore_low_paks = ignore_low_paks
 
+        self._pak_strategy_factory = pak_strategy_factory
         self._update_headers()
 
         if target_game in [Game.PRIME, Game.ECHOES]:
@@ -239,7 +242,6 @@ class AssetManager:
 
         self._cached_dependencies = {}
         self._cached_ancs_per_char_dependencies = defaultdict(dict)
-        self.pak_strategy = pak_strategy(self)
 
     def resolve_asset_id(self, value: NameOrAssetId) -> AssetId:
         if value in self._custom_asset_ids:
@@ -259,6 +261,12 @@ class AssetManager:
             self.all_paks = [it for it in self.all_paks if "Low" not in it]
 
         self.pak_group = PakGroup(self.provider, self.all_paks, self.target_game)
+        self._pak_strategy = {pak_name: self._pak_strategy_factory(self, pak_name) for pak_name in self.all_paks}
+
+    def get_pak_export_strategy(self, pak_name: str) -> PakExportStrategy:
+        """Gets the PakExportStrategy being used for the given pak."""
+
+        return self._pak_strategy[pak_name]
 
     def generate_asset_id(self) -> int:
         result = self._next_generated_id
@@ -497,7 +505,7 @@ class AssetManager:
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
 
-        self.pak_strategy.ensure_present(pak_name, asset_id)
+        self._pak_strategy[pak_name].ensure_present(asset_id)
 
     def get_pak(self, pak_name: str) -> Pak:
         # FIXME: delete
@@ -657,6 +665,11 @@ class AssetManager:
                 executor.submit(self.replace_asset, name, resource, keep_in_memory=False)
         self._memory_files.clear()
 
+    def _export_paks(self, output: FileWriter) -> None:
+        strategies = [strategy for strategy in self._pak_strategy.values() if strategy.should_export()]
+        for strategy in strategies:
+            strategy.export(output)
+
     def _save_dol(self, output: FileWriter) -> None:
         if self.dol is not None:
             output.write_dol(self.dol.dol_file.getvalue())
@@ -676,10 +689,12 @@ class AssetManager:
             )
 
     def save_modifications(self, output: FileWriter) -> None:
-        self.pak_strategy.export(output)
+        self._export_paks(output)
         self._save_dol(output)
         self._save_tweaks(output)
         self._write_custom_names(output)
+
+        self.pak_group.release_in_memory_paks()
         self._modified_resources = {}
         self._update_headers()
 
