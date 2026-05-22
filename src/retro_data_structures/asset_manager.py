@@ -141,6 +141,10 @@ class MemoryFileWriter(FileWriter):
         assert isinstance(file, MemoryFileWriter.MemoryBytesIo)
         return file
 
+    @typing.override
+    def write_dol(self, data: bytes) -> None:
+        self._dol = data
+
     def get_data(self, name: str) -> bytes:
         """Get the bytes of the file with given name."""
 
@@ -649,12 +653,12 @@ class AssetManager:
         else:
             return self.add_new_asset(name, new_data)
 
-    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId) -> None:
+    def ensure_present(self, pak_name: str, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
         """
         Ensures the given pak has the given assets, collecting from other paks if needed.
         """
 
-        self._pak_strategy[pak_name].ensure_present(asset_id)
+        self._pak_strategy[pak_name].ensure_present(asset_id, as_named_resource)
 
     def get_pak(self, pak_name: str) -> Pak:
         # FIXME: delete

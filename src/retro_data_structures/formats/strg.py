@@ -324,6 +324,9 @@ class Strg(BaseResource):
             else:
                 assert string_count == len(language_strings)
 
+        if string_count is None:
+            string_count = 0
+
         game_to_version = {
             Game.PRIME: "prime1",
             Game.ECHOES: "prime2",

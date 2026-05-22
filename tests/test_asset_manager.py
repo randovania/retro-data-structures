@@ -4,6 +4,7 @@ import os
 from typing import TYPE_CHECKING
 
 import nod
+from construct import Container
 
 from retro_data_structures.asset_manager import (
     AssetManager,
@@ -13,7 +14,7 @@ from retro_data_structures.asset_manager import (
     PakExportStrategyCreate,
 )
 from retro_data_structures.file_provider import IsoFileProvider, PathFileProvider
-from retro_data_structures.formats import Pak
+from retro_data_structures.formats import Pak, Strg
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
@@ -59,16 +60,30 @@ def _pak_strategy_factory(manager: AssetManager, pak_name: str) -> PakExportStra
         return PakExportStrategyAppend(manager, pak_name)
 
 
-def test_strategy_create(prime2_iso_provider, tmp_path):
+def test_save_modifications(prime2_iso_provider, tmp_path):
     asset_manager = AssetManager(
         prime2_iso_provider,
         target_game=Game.ECHOES,
         pak_strategy_factory=_pak_strategy_factory,
     )
 
+    new_id = asset_manager.add_new_asset(
+        "EmptyString.STRG",
+        Strg(
+            Container(
+                languages={},
+                name_table={},
+            ),
+            asset_manager.target_game,
+            asset_manager,
+        ),
+    )
+    asset_manager.ensure_present("LogBook.pak", new_id, "FunnyName")
+    asset_manager.ensure_present("GGuiSys.pak", new_id)
+
     writer = MemoryFileWriter()
-    asset_manager._pak_strategy["LogBook.pak"].export(writer)
+    asset_manager.save_modifications(writer)
 
     pak = Pak.parse(writer.get_data("LogBook.pak"), target_game=asset_manager.target_game)
     file_count = len(pak._raw.files)
-    assert file_count == 1995
+    assert file_count == 1996
