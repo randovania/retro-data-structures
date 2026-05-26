@@ -262,7 +262,8 @@ class PakExportStrategyCreate(PakExportStrategy):
 
     @override
     def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
-        # We ignore these calls for non-named resources
+        # In a correctly built pak, the only assets present are the name resources and their dependencies.
+        # So this function does nothing for non-named resources.
 
         if as_named_resource is not None:
             self.named_files[as_named_resource] = self.manager.resolve_asset_id(asset_id)
