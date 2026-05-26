@@ -3,6 +3,7 @@ from __future__ import annotations
 import collections
 import typing
 
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.formats import pak_gc, pak_wii, pak_wiiu
 from retro_data_structures.formats.pak_common import PakBody, PakFile
 from retro_data_structures.game_check import Game
@@ -127,3 +128,20 @@ class Pak:
             raise ValueError(f"Unknown asset id: {asset_id}")
 
         self._calculate_files_by_id()
+
+    def add_named_resource(self, name: str, asset_id: AssetId) -> None:
+        """Adds a name to the given asset id. Must already be a resource of this pak."""
+        existing_asset = self.get_asset(asset_id)
+
+        if existing_asset is None:
+            raise KeyError(f"Unknown asset id: {asset_id}")
+
+        self._raw.named_resources.append(
+            (
+                name,
+                Dependency(
+                    type=existing_asset.type,
+                    id=asset_id,
+                ),
+            )
+        )

@@ -183,13 +183,16 @@ class PakExportStrategyAppend(PakExportStrategy):
     Edits the existing paks, by appending the new resources as ensured.
     """
 
-    _ensured_asset_ids: set[AssetId]
-    """Mapping of pak name to assets we'll copy into it when saving."""
+    _ensured_asset_ids: dict[AssetId, str | None]
+    """
+    Collection of assets we'll copy into this pak when saving.
+    The dict value indicates this asset should be named.
+    """
 
     def __init__(self, manager: AssetManager, pak_name: str):
         super().__init__(manager, pak_name)
 
-        self._ensured_asset_ids = set()
+        self._ensured_asset_ids = {}
 
     @override
     def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
@@ -204,8 +207,8 @@ class PakExportStrategyAppend(PakExportStrategy):
             raise UnknownAssetId(asset_id, original_name)
 
         # If the pak already has the given asset, do nothing
-        if not self.manager.pak_group.does_pak_contains_id(self.pak_name, asset_id):
-            self._ensured_asset_ids.add(asset_id)
+        if as_named_resource is not None or not self.manager.pak_group.does_pak_contains_id(self.pak_name, asset_id):
+            self._ensured_asset_ids[asset_id] = as_named_resource
 
     @override
     def should_export(self) -> bool:
@@ -234,10 +237,10 @@ class PakExportStrategyAppend(PakExportStrategy):
                 pak.replace_asset(asset_id, raw_asset)
 
         # Add the files that were ensured to be present in this pak
-        for asset_id in self._ensured_asset_ids:
+        for asset_id, potential_name in self._ensured_asset_ids.items():
             pak.add_asset(asset_id, manager.get_raw_asset(asset_id))
-
-        # TODO: add to the named resources dict
+            if potential_name is not None:
+                pak.add_named_resource(potential_name, asset_id)
 
         # Write the data
         logger.info("Writing %s", self.pak_name)
