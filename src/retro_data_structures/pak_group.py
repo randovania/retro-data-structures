@@ -57,6 +57,12 @@ class PakGroup:
         """
         yield from self._paks_for_asset_id[asset_id]
 
+    def does_pak_contains_id(self, pak_name: str, asset_id: AssetId) -> bool:
+        """
+        Checks if the given pak contains the given asset id
+        """
+        return pak_name in self._paks_for_asset_id[asset_id]
+
     def does_asset_exists(self, asset_id: AssetId) -> bool:
         """
         Checks if a given asset id exists.
