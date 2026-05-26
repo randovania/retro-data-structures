@@ -87,3 +87,5 @@ def test_save_modifications(prime2_iso_provider, tmp_path):
     pak = Pak.parse(writer.get_data("LogBook.pak"), target_game=asset_manager.target_game)
     file_count = len(pak._raw.files)
     assert file_count == 1996
+
+    assert writer.get_data("GGuiSys.pak") is not None
