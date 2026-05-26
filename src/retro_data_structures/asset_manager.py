@@ -98,31 +98,28 @@ class MemoryFileWriter(FileWriter):
     A FileWriter that keeps everything written in RAM.
     """
 
-    class MemoryStringIo(io.StringIO):
-        _data: str | None = None
+    class _MemoryIoMixin[T: (str, bytes)]:
+        _data: T | None = None
 
         @property
-        def data(self) -> str:
+        def data(self) -> T:
             assert self._data is not None
             return self._data
 
-        def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: typing.Any):
+        def __exit__(
+            self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: typing.Any
+        ) -> bool:
+            assert isinstance(self, io.BytesIO | io.StringIO)
             self._data = self.getvalue()
             return super().__exit__(exc_type, exc_val, exc_tb)
 
-    class MemoryBytesIo(io.BytesIO):
-        _data: bytes | None = None
+    class MemoryStringIO(_MemoryIoMixin[str], io.StringIO):
+        pass
 
-        @property
-        def data(self) -> bytes:
-            assert self._data is not None
-            return self._data
+    class MemoryBytesIO(_MemoryIoMixin[bytes], io.BytesIO):
+        pass
 
-        def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: typing.Any):
-            self._data = self.getvalue()
-            return super().__exit__(exc_type, exc_val, exc_tb)
-
-    _files: dict[str, MemoryStringIo | MemoryBytesIo]
+    _files: dict[str, MemoryStringIO | MemoryBytesIO]
     _dol: bytes | None
 
     def __init__(self):
@@ -131,14 +128,14 @@ class MemoryFileWriter(FileWriter):
 
     @typing.override
     def open_text(self, name: str) -> typing.TextIO:
-        file = self._files.setdefault(name, MemoryFileWriter.MemoryStringIo())
-        assert isinstance(file, MemoryFileWriter.MemoryStringIo)
+        file = self._files.setdefault(name, MemoryFileWriter.MemoryStringIO())
+        assert isinstance(file, MemoryFileWriter.MemoryStringIO)
         return file
 
     @typing.override
     def open_binary(self, name: str) -> typing.BinaryIO:
-        file = self._files.setdefault(name, MemoryFileWriter.MemoryBytesIo())
-        assert isinstance(file, MemoryFileWriter.MemoryBytesIo)
+        file = self._files.setdefault(name, MemoryFileWriter.MemoryBytesIO())
+        assert isinstance(file, MemoryFileWriter.MemoryBytesIO)
         return file
 
     @typing.override
@@ -149,7 +146,7 @@ class MemoryFileWriter(FileWriter):
         """Get the bytes of the file with given name."""
 
         file = self._files[name]
-        if isinstance(file, MemoryFileWriter.MemoryStringIo):
+        if isinstance(file, MemoryFileWriter.MemoryStringIO):
             return file.data.encode("utf-8")
         else:
             return file.data
