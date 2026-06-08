@@ -6,7 +6,7 @@ import logging
 import typing
 from abc import ABC, abstractmethod
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import override
 
 import ppc_asm.dol_file
@@ -32,7 +32,7 @@ from retro_data_structures.game_check import Game
 from retro_data_structures.pak_group import PakGroup
 
 if typing.TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
     from pathlib import Path
 
     import construct
@@ -40,8 +40,14 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.file_provider import FileProvider
     from retro_data_structures.formats.ancs import Ancs
 
+    type StatusUpdate = Callable[[str, float], None]
+
 T = typing.TypeVar("T", bound=BaseResource)
 logger = logging.getLogger(__name__)
+
+
+def empty_status_update(s: str, p: float) -> None:
+    pass
 
 
 class MemoryDol(ppc_asm.dol_file.DolEditor):
@@ -807,22 +813,49 @@ class AssetManager:
     ###########
     # Exporting
 
-    def build_modified_files(self):
+    def build_modified_files(self, status_update: StatusUpdate | None = None):
         """"""
+        if status_update is None:
+            status_update = empty_status_update
+
+        _last_percent = None
+
+        def _write_callback(files_built: int, total_files: int) -> None:
+            nonlocal _last_percent
+            percent = int(100 * (files_built / total_files))
+            if percent != _last_percent:
+                status_update(f"Building modified files: {percent}%", files_built / total_files)
+                _last_percent = percent
 
         # flush dependencies before building to prevent inaccuracy
         self._cached_dependencies.clear()
         self._cached_ancs_per_char_dependencies.clear()
 
+        status_update("Building modified files", 0.0)
+        total_files = len(self._memory_files)
+
         with ThreadPoolExecutor() as executor:
+            futures = []
+
             for name, resource in self._memory_files.items():
-                executor.submit(self.replace_asset, name, resource, keep_in_memory=False)
+                future = executor.submit(self.replace_asset, name, resource, keep_in_memory=False)
+                futures.append(future)
+
+            for i, _ in enumerate(as_completed(futures)):
+                _write_callback(i, total_files)
+
+        status_update("Finalizing modification", 1.0)
+
         self._memory_files.clear()
 
-    def _export_paks(self, output: FileWriter) -> None:
-        strategies = [strategy for strategy in self._pak_strategy.values() if strategy.should_export()]
-        for strategy in strategies:
+    def _export_paks(self, output: FileWriter, status_update: StatusUpdate) -> None:
+        strategies = {name: strategy for name, strategy in self._pak_strategy.items() if strategy.should_export()}
+        num_strategies = len(strategies)
+
+        for i, (name, strategy) in enumerate(strategies.items()):
+            status_update(f"Building {name}", i / num_strategies)
             strategy.export(output)
+        status_update("Built PAKs", 1.0)
 
     def _save_dol(self, output: FileWriter) -> None:
         if self.dol is not None:
@@ -842,8 +875,15 @@ class AssetManager:
                 indent=4,
             )
 
-    def save_modifications(self, output: FileWriter) -> None:
-        self._export_paks(output)
+    def save_modifications(
+        self,
+        output: FileWriter,
+        pak_status_update: StatusUpdate | None = None,
+    ) -> None:
+        if pak_status_update is None:
+            pak_status_update = empty_status_update
+
+        self._export_paks(output, pak_status_update)
         self._save_dol(output)
         self._save_tweaks(output)
         self._write_custom_names(output)
