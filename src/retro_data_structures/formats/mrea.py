@@ -753,11 +753,20 @@ class Area:
 
     @name.setter
     def name(self, value):
-        self.strg.set_string(0, value)
+        self.strg.set_single_string(0, value)
 
     @property
     def internal_name(self) -> str:
         return self._raw.get("internal_area_name", "Unknown")
+
+    @property
+    def name_strg_id(self) -> AssetId:
+        return self._raw.area_name_id
+
+    @name_strg_id.setter
+    def name_strg_id(self, value: AssetId) -> None:
+        self._raw.area_name_id = value
+        self._strg = None  # reset cached STRG
 
     @property
     def strg(self) -> Strg:
