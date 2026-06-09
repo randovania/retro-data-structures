@@ -77,7 +77,7 @@ class Field[T]:
     def __get__(self, obj: FieldsMixin | None, owner: type[FieldsMixin] | None = None) -> T:
         if obj is None:
             raise AttributeError(
-                f"Cannot access field '{self.name}' on class {owner} (must be accessed on an instance)"
+                f"Cannot access field '{self.name}' on class {owner.__name__} (must be accessed on an instance)"
             )
         result = getattr(self._data(obj), self.name)
         if self.factory is not None:
@@ -88,7 +88,7 @@ class Field[T]:
         setattr(self._data(obj), self.name, value)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__} location='{self.location}'>"
+        return f"<{self.__class__.__name__} location='{self.location}' factory='{self.factory}'>"
 
 
 def field[T](

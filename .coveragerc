@@ -28,3 +28,4 @@ exclude_lines =
 
     # don't complain about overload definitions
     @overload
+    @typing.overload
