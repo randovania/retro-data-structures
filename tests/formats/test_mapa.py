@@ -5,6 +5,7 @@ from tests import test_lib
 
 from retro_data_structures.formats.mapa import AreaVisibility, Mapa, MappableObject, ObjectTypeMP2, ObjectVisibility
 from retro_data_structures.game_check import Game
+from retro_data_structures.transform import Transform
 
 # Area Map
 
@@ -61,7 +62,7 @@ def test_add_mappable_object_p2(prime2_asset_manager):
         object_type=ObjectTypeMP2.TranslatorGate,
         visibility_mode=ObjectVisibility.AreaVisitOrMapStation,
         editor_id=0x00000000,
-        transform=[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
+        transform=Transform.unflatten([1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0]),
     )
     mapa.mappable_objects.append(mappable_obj)
 

@@ -6,6 +6,8 @@ import math
 import struct
 import typing
 
+import numpy as np
+
 from retro_data_structures.properties.base_property import BaseProperty
 
 if typing.TYPE_CHECKING:
@@ -36,6 +38,16 @@ class BaseVector(BaseProperty):
 
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from []
+
+    def __array__(
+        self, dtype: np.dtype | None = None, copy: bool | None = None
+    ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+        if dtype is not None and dtype != np.float32:
+            raise ValueError("BaseVector only supports float32")
+        return np.array([self.x, self.y, self.z, 1.0], dtype=np.float32, copy=copy)
+
+    def __iter__(self) -> typing.Iterator[float]:
+        return iter((self.x, self.y, self.z))
 
     def __add__(self, other: BaseVector) -> typing_extensions.Self:
         if not isinstance(other, BaseVector):

@@ -26,6 +26,7 @@ dependencies = [
     "Pillow",
     "typing-extensions>=4.0.0",
     "ppc-asm",
+    "numpy",
 ]
 dynamic = ["version"]
 license = "GPL-3.0"
@@ -121,6 +122,8 @@ known-first-party = ["retro_data_structures"]
 files = [
     "src/retro_data_structures/properties/",
     "src/retro_data_structures/enums/",
+    "src/retro_data_structures/construct_extensions/wrapper_classes.py",
+    "src/retro_data_structures/transform.py",
     "tests/properties/",
     "parse_pwe_templates.py",
 ]
