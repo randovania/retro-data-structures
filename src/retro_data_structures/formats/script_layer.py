@@ -217,7 +217,7 @@ class ScriptLayer:
             instance = self._get_instance_by_name(instance)
         instance = resolve_instance_id(instance)
 
-        matching_instances = [i for i in self._raw.script_instances if i.id == instance]
+        matching_instances = [i for i in self._raw.script_instances if instance.matches(i.id)]
 
         if not matching_instances:
             raise KeyError(instance)

@@ -169,6 +169,9 @@ def test_remove_instance(prime2_area: Area):
     prime2_area.remove_instance("Pickup Object")
     assert len(list(prime2_area.all_instances)) == old_len - 1
 
+    prime2_area.remove_instance(0x1045006C)  # Deactivate Pickup (incorrect layer ID)
+    assert len(list(prime2_area.all_instances)) == old_len - 2
+
 
 def test_move_instance(prime2_area: Area):
     idx = 0x0045006B
