@@ -16,11 +16,10 @@ from PIL import Image
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
+from retro_data_structures.game_check import Game
 
 if typing.TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
-
-    from retro_data_structures.game_check import Game
 
 
 class ImageFormat(enum.IntEnum):
@@ -380,3 +379,47 @@ class Txtr(BaseResource):
             image_height = math.floor(image_height / 2)
 
         return result
+
+
+def _main() -> None:
+    import argparse
+    from pathlib import Path
+
+    parser = argparse.ArgumentParser(description="Converts an image to/from TXTR")
+    parser.add_argument(
+        "input", type=Path, help="Path to the input file (either .txtr or an image format supported by PIL)"
+    )
+    parser.add_argument(
+        "output", type=Path, help="Path to the output file (either .txtr or an image format supported by PIL)"
+    )
+    args = parser.parse_args()
+
+    input_path: Path = args.input
+    output_path: Path = args.output
+
+    if input_path.suffix.lower() == ".txtr":
+        txtr = Txtr.parse(input_path.read_bytes(), Game.PRIME)
+        image = txtr.main_image_data
+        image.save(output_path)
+
+    else:
+        image = Image.open(input_path)
+        image_data = _build_image(image, ImageFormat.RGB5A3)
+
+        txtr = Txtr(
+            construct.Container(
+                header=construct.Container(
+                    format=ImageFormat.RGB5A3,
+                    width=image.width,
+                    height=image.height,
+                    mipmap_count=1,
+                ),
+                image_data=image_data,
+            ),
+            Game.PRIME,
+        )
+        output_path.write_bytes(txtr.build())
+
+
+if __name__ == "__main__":
+    _main()
