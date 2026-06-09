@@ -76,6 +76,7 @@ class Field[T]:
 
     def __get__(self, obj: FieldsMixin | None, owner: type[FieldsMixin] | None = None) -> T:
         if obj is None:
+            assert owner is not None
             raise AttributeError(
                 f"Cannot access field '{self.name}' on class {owner.__name__} (must be accessed on an instance)"
             )
