@@ -39,8 +39,12 @@ class BaseVector(BaseProperty):
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from []
 
-    def __array__(self, dtype=None, copy=None):
-        return np.array([self.x, self.y, self.z, 1.0], np.float32)
+    def __array__(
+        self, dtype: np.dtype | None = None, copy: bool | None = None
+    ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
+        if dtype is not None and dtype != np.float32:
+            raise ValueError("BaseVector only supports float32")
+        return np.array([self.x, self.y, self.z, 1.0], dtype=np.float32, copy=copy)
 
     def __iter__(self) -> typing.Iterator[float]:
         return iter((self.x, self.y, self.z))

@@ -44,7 +44,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         """Creates a Transform from a flat list of 12 floats."""
 
         if len(data) != 12:
-            raise ValueError
+            raise ValueError("Transform requires a list of exactly 12 floats")
 
         return cls(
             np.array(
@@ -62,7 +62,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     def from_rows(cls, row0: Sequence[float], row1: Sequence[float], row2: Sequence[float]) -> Self:
         """Creates a Transform from 3 rows of 4 floats each."""
         if any(len(L) != 4 for L in (row0, row1, row2)):
-            raise ValueError
+            raise ValueError("Transform requires three lists of exactly 4 floats each")
 
         return cls.unflatten([*row0, *row1, *row2])
 
