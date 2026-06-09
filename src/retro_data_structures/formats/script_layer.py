@@ -95,6 +95,10 @@ SCLY = IfThenElse(
 SCGN = ConstructScriptLayer("SCGN")
 
 
+class MultipleInstances(Exception):
+    pass
+
+
 def dependencies_for_layer(
     asset_manager: AssetManager, instances: typing.Iterable[ScriptInstance]
 ) -> typing.Iterator[Dependency]:
@@ -183,7 +187,7 @@ class ScriptLayer:
     def _get_instance_by_name(self, name: str) -> ScriptInstance:
         all_instances = self.get_all_instances_with_name(name)
         if len(all_instances) > 1:
-            raise KeyError(f"non-unique name `{name}`")
+            raise MultipleInstances(f"non-unique name `{name}`")
         elif not all_instances:
             raise KeyError(name)
         return all_instances[0]
@@ -212,13 +216,15 @@ class ScriptLayer:
         savw.raw.memory_relays.append(SavedStateDescriptor(relay.id))
         return relay
 
-    def remove_instance(self, instance: InstanceRef) -> None:
+    def _remove_instances(self, instance: InstanceRef, *, allow_multiple: bool) -> None:
         if isinstance(instance, str):
             instance = self._get_instance_by_name(instance)
         instance = resolve_instance_id(instance)
 
         matching_instances = [i for i in self._raw.script_instances if instance.matches(i.id)]
 
+        if not allow_multiple and len(matching_instances) > 1:
+            raise MultipleInstances(f"Instance is not unique: {instance}")
         if not matching_instances:
             raise KeyError(instance)
 
@@ -226,7 +232,15 @@ class ScriptLayer:
         for i in matching_instances:
             self._raw.script_instances.remove(i)
 
-    def remove_instances(self) -> None:
+    def remove_instance(self, instance: InstanceRef) -> None:
+        """Remove the given instance from this layer."""
+        self._remove_instances(instance, allow_multiple=False)
+
+    def remove_instances(self, instance: InstanceRef) -> None:
+        """Remove all matching instances from this layer."""
+        self._remove_instances(instance, allow_multiple=True)
+
+    def remove_all_instances(self) -> None:
         self.mark_modified()
         self._raw.script_instances = []
 
