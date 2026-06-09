@@ -27,6 +27,7 @@ from retro_data_structures import game_check, properties
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.enums import helper as enum_helper
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties.base_property import ObjectWithEditorProperties
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterator
@@ -36,6 +37,7 @@ if TYPE_CHECKING:
     from retro_data_structures.enums.shared_enums import Message, State
     from retro_data_structures.formats.script_layer import ScriptLayer
     from retro_data_structures.properties.base_property import BaseObjectType
+    from retro_data_structures.properties.shared_archetypes import EditorProperties
 
     PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
 
@@ -303,6 +305,19 @@ class ScriptInstance:
     def name(self, value: str) -> None:
         props = self.get_properties()
         props.set_name(value)
+        self.set_properties(props)
+
+    @property
+    def editor_properties(self) -> EditorProperties:
+        props = self.get_properties()
+        assert isinstance(props, ObjectWithEditorProperties)
+        return props.editor_properties
+
+    @editor_properties.setter
+    def editor_properties(self, value: EditorProperties):
+        props = self.get_properties()
+        assert isinstance(props, ObjectWithEditorProperties)
+        props.editor_properties = value
         self.set_properties(props)
 
     @property
