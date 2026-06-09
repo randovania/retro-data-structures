@@ -87,11 +87,9 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     def translation(cls, x: float, y: float, z: float) -> Self:
         """Returns a Transform representing a translation."""
         return Transform.from_rows(
-            [
-                [1.0, 0.0, 0.0, x],
-                [0.0, 1.0, 0.0, y],
-                [0.0, 0.0, 1.0, z],
-            ]
+            [1.0, 0.0, 0.0, x],
+            [0.0, 1.0, 0.0, y],
+            [0.0, 0.0, 1.0, z],
         )
 
     @classmethod
@@ -130,9 +128,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     def __array__(self, dtype: np.dtype | None = None, copy: bool | None = None) -> NDTransformMatrix:
         if dtype is not None and dtype != np.float32:
             raise ValueError("Transform only supports float32")
-        if copy:
-            raise ValueError("Transform does not support copy construction")
-        return self._data
+        return np.array(self._data, dtype=np.float32, copy=copy)
 
     def __eq__(self, other: Any) -> Any:
         if isinstance(other, Transform):
