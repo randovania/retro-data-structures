@@ -12,6 +12,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
     from retro_data_structures.game_check import Game
+    from retro_data_structures.properties.shared_archetypes import EditorProperties
 
 
 @dataclasses.dataclass()
@@ -62,3 +63,8 @@ class BaseObjectType(BaseProperty, ABC):
 
     def dependencies_for(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         raise NotImplementedError
+
+
+@typing.runtime_checkable
+class ObjectWithEditorProperties(typing.Protocol):
+    editor_properties: EditorProperties

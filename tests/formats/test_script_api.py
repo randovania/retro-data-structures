@@ -10,6 +10,7 @@ from retro_data_structures.formats import script_object
 from retro_data_structures.formats.script_layer import SCLY
 from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties.echoes.core import Vector
 
 if TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import Area, Mlvl
@@ -234,6 +235,24 @@ def test_edit_properties(prime2_area: Area):
 
     with inst.edit_properties(Pickup) as pickup:
         pickup.amount = 2
+
+
+def test_get_editor_properties(prime2_area: Area):
+    inst = prime2_area.get_instance("Pickup Object")
+    editor_properties = inst.editor_properties
+    assert editor_properties.name == "Pickup Object"
+    assert editor_properties.transform.position == Vector(
+        x=555.4319458007812, y=-138.4424591064453, z=34.31318664550781
+    )
+
+
+def test_set_editor_properties(prime2_area: Area):
+    inst = prime2_area.get_instance("Pickup Object")
+    editor_properties = inst.editor_properties
+    editor_properties.name = "Funny Name"
+    inst.editor_properties = editor_properties
+
+    assert inst.name == "Funny Name"
 
 
 def test_edit_connections(prime2_area: Area):

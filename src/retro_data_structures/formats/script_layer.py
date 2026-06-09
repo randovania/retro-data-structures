@@ -137,6 +137,11 @@ class ScriptLayer:
         return self._index
 
     @property
+    def parent_area(self) -> Area:
+        assert self._parent_area is not None
+        return self._parent_area
+
+    @property
     def instances(self) -> Generator[ScriptInstance, None, None]:
         for instance in self._raw.script_instances:
             yield ScriptInstance(instance, self.target_game, on_modify=self.mark_modified)
