@@ -8,12 +8,11 @@ import construct
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AABox, Transform4f, Vector3
+from retro_data_structures.construct_extensions import wrapper_classes
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage
+from retro_data_structures.formats.script_object import InstanceId
 from retro_data_structures.game_check import Game, current_game_at_least_else, get_current_game
-
-if typing.TYPE_CHECKING:
-    from retro_data_structures.formats.script_object import InstanceId
-    from retro_data_structures.transform import Transform
+from retro_data_structures.transform import Transform
 
 Vec3 = tuple[float, float, float]
 
@@ -110,7 +109,7 @@ class GXPrimitive(IntEnum):
 
 
 _MappableObjectConstruct = construct.Struct(
-    type=construct.Switch(
+    object_type=construct.Switch(
         get_current_game,
         {
             Game.PRIME: EnumAdapter(ObjectTypeMP1, construct.Int32sb),
@@ -126,30 +125,14 @@ _MappableObjectConstruct = construct.Struct(
 )
 
 
-class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)]:
+class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)](wrapper_classes.FieldsMixin):
     def __init__(self, raw: construct.Container):
         self._raw = raw
 
-    def __repr__(self) -> str:
-        object_type = self.object_type
-        visibility_mode = self.visibility_mode
-        editor_id = self.editor_id
-        transform = self.transform
-
-        return f"{self.__class__.__qualname__}({object_type=}, {visibility_mode=}, {editor_id=}, {transform=})"
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, MappableObject):
-            return False
-
-        return (
-            self.object_type == other.object_type
-            and self.visibility_mode == other.visibility_mode
-            and self.editor_id == other.editor_id
-            and self.transform == other.transform
-        )
-
-    __hash__ = None
+    object_type = wrapper_classes.field(T)
+    visibility_mode = wrapper_classes.field(ObjectVisibility)
+    editor_id = wrapper_classes.field(InstanceId, factory=InstanceId)
+    transform = wrapper_classes.field(Transform)
 
     @classmethod
     def create(
@@ -173,53 +156,8 @@ class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)]:
         obj.transform = transform
         return obj
 
-    @property
-    def object_type(self) -> T:
-        return self._raw.type
 
-    @object_type.setter
-    def object_type(self, value: T) -> None:
-        self._raw.type = value
-
-    @property
-    def visibility_mode(self) -> ObjectVisibility:
-        return self._raw.visibility_mode
-
-    @visibility_mode.setter
-    def visibility_mode(self, value: ObjectVisibility) -> None:
-        self._raw.visibility_mode = value
-
-    @property
-    def editor_id(self) -> InstanceId:
-        from retro_data_structures.formats.script_object import InstanceId
-
-        return InstanceId(self._raw.editor_id)
-
-    @editor_id.setter
-    def editor_id(self, value: InstanceId) -> None:
-        self._raw.editor_id = value
-
-    @property
-    def transform(self) -> Transform:
-        return self._raw.transform
-
-    @transform.setter
-    def transform(self, value: Transform):
-        self._raw.transform = value
-
-
-class MappableObjectAdapter(construct.Adapter):
-    def __init__(self):
-        super().__init__(_MappableObjectConstruct)
-
-    def _decode(self, obj: construct.Container, context: construct.Container, path: str) -> MappableObject:
-        return MappableObject(obj)
-
-    def _encode(self, obj: MappableObject, context: construct.Container, path: str) -> construct.Container:
-        return obj._raw
-
-
-MappableObjectConstruct = MappableObjectAdapter()
+MappableObjectConstruct = wrapper_classes.WrapperClassAdapter(_MappableObjectConstruct, MappableObject)
 
 
 class Vec3TupleAdapter(construct.Adapter):

@@ -134,6 +134,16 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
             raise ValueError("Transform does not support copy construction")
         return self._data
 
+    def __eq__(self, other: Any) -> Any:
+        if isinstance(other, Transform):
+            return np.array_equal(self, other)
+        return super().__eq__(other)
+
+    def __ne__(self, other: Any) -> Any:
+        return not self == other
+
+    __hash__ = None
+
     @typing.overload
     def __truediv__(self, other: Transform) -> Transform: ...
     def __truediv__(self, other: object) -> Any:
