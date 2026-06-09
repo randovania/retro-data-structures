@@ -14,6 +14,9 @@ class FieldsMixin:
     _raw: Container
     _fields: ClassVar[tuple[tuple[str, Field], ...]] = ()
 
+    def __init__(self, raw: Container):
+        self._raw = raw
+
     def __init_subclass__(cls, default_field_location: FieldLocation = (), **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
 
@@ -36,15 +39,11 @@ class FieldsMixin:
 
         for field_name, field in self.__class__._fields:
             if getattr(self, field_name, None) != getattr(other, field_name, None):
-                print(field_name)
-                print(getattr(self, field_name, None))
-                print(getattr(other, field_name, None))
-                print(getattr(self, field_name, None) != getattr(other, field_name, None))
                 return False
 
         return True
 
-    __hash__ = None
+    __hash__ = None  # type: ignore[assignment]
 
 
 type FieldLocation = tuple[str, ...]
@@ -70,6 +69,7 @@ class Field[T]:
 
     def _data(self, obj: FieldsMixin) -> Container:
         data = obj._raw
+        assert self.location is not None
         for loc in self.location:
             data = getattr(data, loc)
         return data

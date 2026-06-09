@@ -77,7 +77,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     @classmethod
     def identity(cls) -> Self:
         """Returns a Transform representing the identity matrix."""
-        return Transform.from_rows(
+        return cls.from_rows(
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
@@ -86,7 +86,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     @classmethod
     def translation(cls, x: float, y: float, z: float) -> Self:
         """Returns a Transform representing a translation."""
-        return Transform.from_rows(
+        return cls.from_rows(
             [1.0, 0.0, 0.0, x],
             [0.0, 1.0, 0.0, y],
             [0.0, 0.0, 1.0, z],
@@ -99,17 +99,17 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         y = np.deg2rad(y)
         z = np.deg2rad(z)
 
-        x_rot = Transform.from_rows(
+        x_rot = cls.from_rows(
             [1.0, 0.0, 0.0, 0.0],
             [0.0, np.cos(x), np.sin(x), 0.0],
             [0.0, -np.sin(x), np.cos(x), 0.0],
         )
-        y_rot = Transform.from_rows(
+        y_rot = cls.from_rows(
             [np.cos(y), 0.0, -np.sin(y), 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [np.sin(y), 0.0, np.cos(y), 0.0],
         )
-        z_rot = Transform.from_rows(
+        z_rot = cls.from_rows(
             [np.cos(z), -np.sin(z), 0.0, 0.0],
             [np.sin(z), np.cos(z), 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
@@ -119,7 +119,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     @classmethod
     def scale(cls, x: float, y: float, z: float) -> Self:
         """Returns a Transform representing a scale."""
-        return Transform.from_rows(
+        return cls.from_rows(
             [x, 0.0, 0.0, 0.0],
             [0.0, y, 0.0, 0.0],
             [0.0, 0.0, z, 0.0],
@@ -138,10 +138,13 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     def __ne__(self, other: Any) -> Any:
         return not self == other
 
-    __hash__ = None
+    __hash__ = None  # type: ignore[assignment]
 
     @typing.overload
-    def __truediv__(self, other: Transform) -> Transform: ...
+    def __truediv__(self, other: Transform) -> Self: ...
+    @typing.overload
+    def __truediv__(self, other: Any) -> Any: ...
+
     def __truediv__(self, other: object) -> Any:
         if isinstance(other, Transform):
             # matrix multiply by the inverse of the other transform
@@ -149,22 +152,31 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         return super().__truediv__(other)
 
     @typing.overload
-    def __itruediv__(self, other: Transform) -> Transform: ...
-    def __itruediv__(self, other: object) -> Any:
+    def __itruediv__(self, other: Transform) -> Self: ...
+    @typing.overload
+    def __itruediv__(self, other: Any) -> Any: ...
+    # https://github.com/python/mypy/issues/6225
+    def __itruediv__(self, other: object) -> Any:  # type: ignore[misc]
         return self.__truediv__(other)
 
     @typing.overload
-    def __matmul__(self, other: Transform) -> Transform: ...
+    def __matmul__(self, other: Transform) -> Self: ...
     @typing.overload
     def __matmul__[T: BaseVector](self, other: T) -> T: ...
+    @typing.overload
+    def __matmul__(self, other: Any) -> Any: ...
+
     def __matmul__(self, other: object) -> Any:
         return super().__matmul__(other)
 
     @typing.overload
-    def __imatmul__(self, other: Transform) -> Transform: ...
+    def __imatmul__(self, other: Transform) -> Self: ...
     @typing.overload
     def __imatmul__[T: BaseVector](self, other: T) -> T: ...
-    def __imatmul__(self, other: object) -> Any:
+    @typing.overload
+    def __imatmul__(self, other: Any) -> Any: ...
+
+    def __imatmul__(self, other: object) -> Any:  # type: ignore[misc]
         return self.__matmul__(other)
 
     def __array_ufunc__(self, ufunc: np.ufunc, method: str, /, *inputs: Any, **kwargs: Any) -> Any:
@@ -193,7 +205,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
             kwargs["out"] = tuple(x._data if isinstance(x, Transform) else x for x in out)
         result = getattr(ufunc, method)(*inputs, **kwargs)
 
-        def _wrap_res(res):
+        def _wrap_res(res: Any) -> Any:
             if isinstance(res, np.ndarray):
                 if res.shape == (4, 4):
                     return type(self)(res)

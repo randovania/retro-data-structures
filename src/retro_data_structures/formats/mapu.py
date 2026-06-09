@@ -10,9 +10,6 @@ from retro_data_structures.construct_extensions import wrapper_classes
 from retro_data_structures.game_check import Game
 from retro_data_structures.transform import Transform
 
-if typing.TYPE_CHECKING:
-    from construct.lib import Container
-
 _WorldConstruct = Struct(
     "name" / String,
     "mlvl" / AssetId32,
@@ -23,9 +20,6 @@ _WorldConstruct = Struct(
 
 
 class MAPUWorld(wrapper_classes.FieldsMixin):
-    def __init__(self, raw: Container):
-        self._raw = raw
-
     name = wrapper_classes.field(str)
     mlvl = wrapper_classes.field(AssetId)
     transform = wrapper_classes.field(Transform)

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+import pytest
+
 from retro_data_structures.properties.echoes.core import Vector
 from retro_data_structures.transform import Transform
 
@@ -56,8 +59,54 @@ def test_transform_division():
     xfm /= other
     assert xfm == Transform.identity()
 
+    assert (xfm / 2.0) == Transform(
+        np.array(
+            [
+                [0.5, 0.0, 0.0, 0.0],
+                [0.0, 0.5, 0.0, 0.0],
+                [0.0, 0.0, 0.5, 0.0],
+                [0.0, 0.0, 0.0, 0.5],
+            ]
+        )
+    )
+
 
 def test_transform_flatten():
     xfm = Transform.identity()
 
     assert xfm == Transform.unflatten(xfm.flatten())
+
+
+def test_invalid_cases():
+    with pytest.raises(ValueError, match="Transform requires a list of exactly 12 floats"):
+        xfm = Transform.unflatten([0.0])
+
+    with pytest.raises(ValueError, match="Transform requires three lists of exactly 4 floats each"):
+        xfm = Transform.from_rows([0.0], [1.0], [2.0])
+
+    with pytest.raises(ValueError, match="Transform only supports float32"):
+        xfm = Transform.identity()
+        np.array(xfm, dtype=np.float64)
+
+
+def test_equality():
+    identity = Transform.identity()
+
+    assert (identity == Transform.identity()) is True
+    assert np.array_equal(identity == np.asarray(identity), np.array([[True] * 4] * 4))
+
+
+def test_print():
+    xfm = Transform.identity()
+
+    assert repr(xfm) == (
+        "array([[1., 0., 0., 0.],\n"
+        "       [0., 1., 0., 0.],\n"
+        "       [0., 0., 1., 0.],\n"
+        "       [0., 0., 0., 1.]], dtype=float32)"
+    )
+    assert str(xfm) == ("[[1. 0. 0. 0.]\n [0. 1. 0. 0.]\n [0. 0. 1. 0.]\n [0. 0. 0. 1.]]")
+
+
+# test suite for __array_ufunc__ :
+# https://github.com/numpy/numpy/blob/main/numpy/lib/tests/test_mixins.py

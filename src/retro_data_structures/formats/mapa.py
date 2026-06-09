@@ -126,9 +126,6 @@ _MappableObjectConstruct = construct.Struct(
 
 
 class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)](wrapper_classes.FieldsMixin):
-    def __init__(self, raw: construct.Container):
-        self._raw = raw
-
     object_type = wrapper_classes.field(T)
     visibility_mode = wrapper_classes.field(ObjectVisibility)
     editor_id = wrapper_classes.field(InstanceId, factory=InstanceId)
