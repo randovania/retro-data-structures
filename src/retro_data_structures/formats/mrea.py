@@ -34,7 +34,7 @@ from retro_data_structures.construct_extensions.alignment import AlignTo, Prefix
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
 from retro_data_structures.data_section import DataSection
 from retro_data_structures.exceptions import DependenciesHandledElsewhere, UnknownAssetId
-from retro_data_structures.formats import script_object
+from retro_data_structures.formats import Mapa, script_object
 from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
@@ -715,9 +715,6 @@ class AreaDependencies:
 class Area:
     _index: int
 
-    _mrea: Mrea | None = None
-    _strg: Strg | None = None
-
     def __init__(self, parent_mlvl: Mlvl, index: int):
         self._parent_mlvl = parent_mlvl
         self._index = index
@@ -735,6 +732,12 @@ class Area:
     @property
     def parent_mlvl(self) -> Mlvl:
         return self._parent_mlvl
+
+    @property
+    def mapa(self) -> Mapa:
+        """Gets the Mapa object associated with this area, via the index"""
+        mapa_id = self._parent_mlvl.mapw.get_mapa_id(self.index)
+        return self.asset_manager.get_file(mapa_id, Mapa)
 
     @property
     def _flags(self) -> list[bool]:
@@ -766,19 +769,14 @@ class Area:
     @name_strg_id.setter
     def name_strg_id(self, value: AssetId) -> None:
         self._raw.area_name_id = value
-        self._strg = None  # reset cached STRG
 
     @property
     def strg(self) -> Strg:
-        if self._strg is None:
-            self._strg = self.asset_manager.get_file(self._raw.area_name_id, type_hint=Strg)
-        return self._strg
+        return self.asset_manager.get_file(self._raw.area_name_id, type_hint=Strg)
 
     @property
     def mrea(self) -> Mrea:
-        if self._mrea is None:
-            self._mrea = self.asset_manager.get_file(self.mrea_asset_id, type_hint=Mrea)
-        return self._mrea
+        return self.asset_manager.get_file(self.mrea_asset_id, type_hint=Mrea)
 
     @property
     def mrea_asset_id(self) -> int:
