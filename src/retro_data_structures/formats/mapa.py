@@ -13,6 +13,7 @@ from retro_data_structures.game_check import Game, current_game_at_least_else, g
 
 if typing.TYPE_CHECKING:
     from retro_data_structures.formats.script_object import InstanceId
+    from retro_data_structures.transform import Transform
 
 Vec3 = tuple[float, float, float]
 
@@ -156,7 +157,7 @@ class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)]:
         object_type: T,
         visibility_mode: ObjectVisibility,
         editor_id: InstanceId,
-        transform: list[float],
+        transform: Transform,
     ) -> typing.Self:
         obj = cls(
             construct.Container(
@@ -199,13 +200,11 @@ class MappableObject[T: (ObjectTypeMP1, ObjectTypeMP2)]:
         self._raw.editor_id = value
 
     @property
-    def transform(self) -> list[float]:
+    def transform(self) -> Transform:
         return self._raw.transform
 
     @transform.setter
-    def transform(self, value: list[float]):
-        if len(value) != 12:
-            raise ValueError("Invalid transform")
+    def transform(self, value: Transform):
         self._raw.transform = value
 
 

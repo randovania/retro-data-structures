@@ -26,6 +26,7 @@ dependencies = [
     "Pillow",
     "typing-extensions>=4.0.0",
     "ppc-asm",
+    "numpy",
 ]
 dynamic = ["version"]
 license = "GPL-3.0"
