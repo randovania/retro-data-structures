@@ -39,7 +39,7 @@ from retro_data_structures.formats.area_collision import AreaCollision
 from retro_data_structures.formats.arot import AROT
 from retro_data_structures.formats.cmdl import dependencies_for_material_set
 from retro_data_structures.formats.lights import Lights
-from retro_data_structures.formats.script_layer import SCGN, SCLY, ScriptLayer, new_layer
+from retro_data_structures.formats.script_layer import SCGN, SCLY, MultipleInstances, ScriptLayer, new_layer
 from retro_data_structures.formats.script_object import Connection, InstanceId, InstanceIdRef
 from retro_data_structures.formats.strg import Strg
 from retro_data_structures.formats.visi import VISI
@@ -821,25 +821,47 @@ class Area:
         """
         Gets the instance with the given name or id.
         :param ref:
-        :raises KeyError: if instance is not found, or if multiple instances have the given name.
+        :raises KeyError: if instance is not found
+        :raises MultipleInstances: if multiple instances have the given name
         :return:
         """
+        results: list[ScriptInstance] = []
         for layer in self.all_layers:
             try:
-                return layer.get_instance(ref)
+                results.append(layer.get_instance(ref))
             except KeyError:
                 pass
-        raise KeyError(ref)
+        if not results:
+            raise KeyError(ref)
+        if len(results) > 1:
+            raise MultipleInstances(f"non-unique name {ref}")
+        return results[0]
 
-    def remove_instance(self, instance: InstanceRef):
+    def _remove_instances(self, instance: InstanceRef, *, allow_multiple: bool) -> None:
+        try:
+            instance = self.get_instance(instance)
+        except MultipleInstances:
+            if not allow_multiple:
+                raise MultipleInstances(f"non-unique name {instance}")
+        except KeyError:
+            raise KeyError(instance)
+
         for layer in self.all_layers:
             try:
-                layer.remove_instance(instance)
+                if allow_multiple:
+                    layer.remove_instances(instance)
+                else:
+                    layer.remove_instance(instance)
             except KeyError:
                 pass
-            else:
-                return
-        raise KeyError(instance)
+
+    def remove_instance(self, instance: InstanceRef) -> None:
+        """Remove the given instance from this area."""
+        self._remove_instances(instance, allow_multiple=False)
+
+    def remove_instances(self, instance: InstanceRef) -> None:
+        """Remove all matching instances from this area."""
+        self._remove_instances(instance, allow_multiple=True)
 
     def move_instance(self, instance: InstanceRef, new_layer: str) -> None:
         """
@@ -851,7 +873,10 @@ class Area:
         new_inst.id = InstanceId.new(new_inst.id.layer, new_inst.id.area, old_inst.id.instance)
         for inst in self.all_instances:
             inst.replace_connections_to(old_inst, new_inst)
-        self.remove_instance(old_inst)
+
+        # remove the instance from the old layer specifically
+        old_layer = next(layer for layer in self.all_layers if any(inst.id == old_inst.id for inst in layer.instances))
+        old_layer.remove_instance(old_inst)
 
     def get_all_connections_to(self, target: InstanceIdRef) -> list[tuple[ScriptInstance, Connection]]:
         """

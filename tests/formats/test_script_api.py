@@ -6,14 +6,14 @@ import pytest
 
 import retro_data_structures.enums.echoes as _echoes_enums
 import retro_data_structures.enums.prime as _prime_enums
-from retro_data_structures.formats import script_object
-from retro_data_structures.formats.script_layer import SCLY
+from retro_data_structures.formats import Mlvl, script_object
+from retro_data_structures.formats.script_layer import SCLY, MultipleInstances
 from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.echoes.core import Vector
 
 if TYPE_CHECKING:
-    from retro_data_structures.formats.mlvl import Area, Mlvl
+    from retro_data_structures.formats.mlvl import Area
 
 
 @pytest.fixture()
@@ -163,6 +163,9 @@ def test_get_instance(prime2_area: Area):
     inst = prime2_area.get_instance(name)
     assert inst.id == idx
 
+    with pytest.raises(KeyError):
+        inst = prime2_area.get_instance(0)
+
 
 def test_remove_instance(prime2_area: Area):
     old_len = len(list(prime2_area.all_instances))
@@ -171,6 +174,16 @@ def test_remove_instance(prime2_area: Area):
 
     prime2_area.remove_instance(0x1045006C)  # Deactivate Pickup (incorrect layer ID)
     assert len(list(prime2_area.all_instances)) == old_len - 2
+
+    with pytest.raises(KeyError):
+        prime2_area.remove_instance(0)
+
+
+def test_remove_all_instances(prime2_area):
+    for layer in prime2_area.all_layers:
+        layer.remove_all_instances()
+
+    assert not list(prime2_area.all_instances)
 
 
 def test_move_instance(prime2_area: Area):
@@ -345,3 +358,27 @@ def test_roundtrip_prime1(prime1_scly_raw: bytes) -> None:
     encoded = SCLY.build(decoded, target_game=Game.PRIME)
 
     assert prime1_scly_raw == encoded
+
+
+def test_multiple_instances(prime2_asset_manager):
+    # Trooper Security Station
+    area = prime2_asset_manager.get_file(0x3BFA3EFF, Mlvl).get_area(0x55EE6DC3)
+
+    # same layer
+    with pytest.raises(MultipleInstances):
+        area.get_instance("Sound - Missile")
+
+    with pytest.raises(MultipleInstances):
+        area.remove_instance("Sound - Missile")
+
+    # different layers
+    with pytest.raises(MultipleInstances):
+        area.get_instance("Music Player For Area")
+
+    with pytest.raises(MultipleInstances):
+        area.remove_instance("Music Player For Area")
+
+    old_len = len(list(area.all_instances))
+    area.remove_instances("Music Player For Area")
+
+    assert len(list(area.all_instances)) == old_len - 3
