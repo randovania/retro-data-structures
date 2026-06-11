@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retro_data_structures.properties.base_spline import BaseSpline
+from retro_data_structures.properties.spline import Spline
 
 
 def test_base_spline_json_roundtrip():
@@ -21,6 +21,6 @@ def test_base_spline_json_roundtrip():
         "minimum_amplitude": 0.0,
         "maximum_amplitude": 0.0,
     }
-    spline = BaseSpline.from_json(json_data)
+    spline = Spline.from_json(json_data)
 
     assert spline.to_json() == json_data
