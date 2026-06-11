@@ -1918,18 +1918,16 @@ def write_shared_type_with_common_import(
 def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]) -> None:
     imports = []
     declarations = []
-    base = "import retro_data_structures.properties."
+    base = "from retro_data_structures.properties."
 
     for object_name, games in sorted(all_objects.items()):
         if len(games) < 2:
             continue
 
         for game in games:
-            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{object_name} as _{object_name}_{game}")
+            imports.append(f"{base}{_game_id_to_file[game]}.{kind} import {object_name} as _{object_name}_{game}")
         declarations.append(
-            "{} = typing.Union[\n{}\n]".format(
-                object_name, ",\n".join(f"    _{object_name}_{game}.{object_name}" for game in games)
-            )
+            "{} = typing.Union[\n{}\n]".format(object_name, ",\n".join(f"    _{object_name}_{game}" for game in games))
         )
 
     output_file.write_text(
@@ -1982,14 +1980,6 @@ def write_shared_types_helpers(all_games: dict) -> None:
         path_to_props.joinpath("shared_archetypes.py"),
         "archetypes",
         all_archetypes,
-    )
-    write_shared_type(
-        path_to_props.joinpath("shared_core.py"),
-        "core",
-        {
-            name: ["Prime", "Echoes", "Corruption"]
-            for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
-        },
     )
     structs = "# Generated File\nimport struct\nimport typing\n\n"
     structs += "from retro_data_structures.game_check import Game\n\n"
