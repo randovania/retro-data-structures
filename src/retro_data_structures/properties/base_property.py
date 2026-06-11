@@ -12,7 +12,7 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
     from retro_data_structures.game_check import Game
-    from retro_data_structures.properties.common.archetypes import EditorProperties
+    from retro_data_structures.properties.common.archetypes.EditorProperties import EditorProperties
 
 
 @dataclasses.dataclass()
