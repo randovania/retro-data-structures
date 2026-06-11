@@ -16,13 +16,21 @@ if typing.TYPE_CHECKING:
     from retro_data_structures import json_util
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
+    from retro_data_structures.game_check import Game
 
 
 @dataclasses.dataclass()
-class BaseVector(BaseProperty):
+class Vector(BaseProperty):
     x: float = 0.0
     y: float = 0.0
     z: float = 0.0
+
+    @classmethod
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:
+        return cls(*struct.unpack(game.struct_endianness + "fff", data.read(12)))
+
+    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
+        data.write(struct.pack(game.struct_endianness + "fff", self.x, self.y, self.z))
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
@@ -43,41 +51,41 @@ class BaseVector(BaseProperty):
         self, dtype: np.dtype | None = None, copy: bool | None = None
     ) -> np.ndarray[tuple[int], np.dtype[np.float32]]:
         if dtype is not None and dtype != np.float32:
-            raise ValueError("BaseVector only supports float32")
+            raise ValueError("Vector only supports float32")
         return np.array([self.x, self.y, self.z, 1.0], dtype=np.float32, copy=copy)
 
     def __iter__(self) -> typing.Iterator[float]:
         return iter((self.x, self.y, self.z))
 
-    def __add__(self, other: BaseVector) -> typing_extensions.Self:
-        if not isinstance(other, BaseVector):
+    def __add__(self, other: Vector) -> typing_extensions.Self:
+        if not isinstance(other, Vector):
             return NotImplemented
         return self.__class__(self.x + other.x, self.y + other.y, self.z + other.z)
 
-    def __sub__(self, other: BaseVector) -> typing_extensions.Self:
-        if not isinstance(other, BaseVector):
+    def __sub__(self, other: Vector) -> typing_extensions.Self:
+        if not isinstance(other, Vector):
             return NotImplemented
         return self.__class__(self.x - other.x, self.y - other.y, self.z - other.z)
 
-    def __mul__(self, other: int | float | BaseVector) -> typing_extensions.Self:
-        if isinstance(other, BaseVector):
+    def __mul__(self, other: int | float | Vector) -> typing_extensions.Self:
+        if isinstance(other, Vector):
             return self.__class__(self.x * other.x, self.y * other.y, self.z * other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x * other, self.y * other, self.z * other)
         return NotImplemented
 
-    def __rmul__(self, other: int | float | BaseVector) -> typing_extensions.Self:
+    def __rmul__(self, other: int | float | Vector) -> typing_extensions.Self:
         return self.__mul__(other)  # commutative property
 
-    def __truediv__(self, other: int | float | BaseVector) -> typing_extensions.Self:
-        if isinstance(other, BaseVector):
+    def __truediv__(self, other: int | float | Vector) -> typing_extensions.Self:
+        if isinstance(other, Vector):
             return self.__class__(self.x / other.x, self.y / other.y, self.z / other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x / other, self.y / other, self.z / other)
         return NotImplemented
 
-    def __floordiv__(self, other: int | float | BaseVector) -> typing_extensions.Self:
-        if isinstance(other, BaseVector):
+    def __floordiv__(self, other: int | float | Vector) -> typing_extensions.Self:
+        if isinstance(other, Vector):
             return self.__class__(self.x // other.x, self.y // other.y, self.z // other.z)
         if isinstance(other, int | float):
             return self.__class__(self.x // other, self.y // other, self.z // other)
@@ -97,7 +105,7 @@ class BaseVector(BaseProperty):
 
         return self.__class__(truncate(self.x), truncate(self.y), truncate(self.z))
 
-    def rotate(self, rotation: BaseVector, center: BaseVector | None = None) -> typing_extensions.Self:
+    def rotate(self, rotation: Vector, center: Vector | None = None) -> typing_extensions.Self:
         """
         Rotates the vector on all three axes, around a center point.
 
@@ -107,7 +115,7 @@ class BaseVector(BaseProperty):
         """
 
         if center is None:
-            center = BaseVector()
+            center = Vector()
 
         pos = [self.x - center.x, self.y - center.y, self.z - center.z]
         rot = [rotation.x, rotation.y, rotation.z]

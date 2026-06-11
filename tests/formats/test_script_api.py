@@ -10,7 +10,7 @@ from retro_data_structures.formats import Mlvl, script_object
 from retro_data_structures.formats.script_layer import SCLY, MultipleInstances
 from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.echoes.core import Vector
+from retro_data_structures.properties.vector import Vector
 
 if TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import Area

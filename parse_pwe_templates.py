@@ -1039,46 +1039,6 @@ def _add_default_types(core_path: Path, game_id: str) -> None:
 
     get_endianness(game_id)
 
-    core_path.joinpath("Color.py").write_text(
-        """# Generated file
-import struct
-import typing
-import typing_extensions
-
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_color import BaseColor
-
-
-class Color(BaseColor):
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:
-        return cls(*struct.unpack(game.struct_endianness + 'ffff', data.read(16)))
-
-    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
-        data.write(struct.pack(game.struct_endianness + 'ffff', self.r, self.g, self.b, self.a))
-"""
-    )
-    modules.append("Color")
-    core_path.joinpath("Vector.py").write_text(
-        """# Generated file
-import struct
-import typing
-import typing_extensions
-
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_vector import BaseVector
-
-
-class Vector(BaseVector):
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:
-        return cls(*struct.unpack(game.struct_endianness + 'fff', data.read(12)))
-
-    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
-        data.write(struct.pack(game.struct_endianness + 'fff', self.x, self.y, self.z))
-"""
-    )
-    modules.append("Vector")
     if game_id == "PrimeRemastered":
         asset_code = "import uuid\n\nAssetId = uuid.UUID\ndefault_asset_id = uuid.UUID(int=0)\n"
     else:
@@ -1621,7 +1581,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif raw_type == "Color" or raw_type == "Vector":
             prop_type = raw_type
-            needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
+            needed_imports[f"retro_data_structures.properties.{raw_type.lower()}"] = prop_type
             parse_code = f"{prop_type}.from_stream(data, game, property_size)"
             build_code.append("{obj}.to_stream(data, game)")
             from_json_code = f"{prop_type}.from_json({{obj}})"

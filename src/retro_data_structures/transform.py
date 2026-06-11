@@ -10,7 +10,7 @@ import numpy as np
 if typing.TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from retro_data_structures.properties.base_vector import BaseVector
+    from retro_data_structures.properties.vector import Vector
 
 type NDTransformMatrix = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 
@@ -19,9 +19,9 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     _data: NDTransformMatrix
 
     def __init__(self, data: NDTransformMatrix) -> None:
-        from retro_data_structures.properties.base_vector import BaseVector
+        from retro_data_structures.properties.vector import Vector
 
-        self._HANDLED_TYPES = (np.ndarray, numbers.Number, list, BaseVector)
+        self._HANDLED_TYPES = (np.ndarray, numbers.Number, list, Vector)
 
         self._data = data
 
@@ -32,7 +32,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         return str(self._data)
 
     @classmethod
-    def from_vectors(cls, position: BaseVector, rotation: BaseVector, scale: BaseVector) -> Self:
+    def from_vectors(cls, position: Vector, rotation: Vector, scale: Vector) -> Self:
         pos_xfm = cls.translation(position.x, position.y, position.z)
         rot_xfm = cls.rotation(rotation.x, rotation.y, rotation.z)
         scale_xfm = cls.scale(scale.x, scale.y, scale.z)
@@ -162,7 +162,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     @typing.overload
     def __matmul__(self, other: Transform) -> Self: ...
     @typing.overload
-    def __matmul__[T: BaseVector](self, other: T) -> T: ...
+    def __matmul__[T: Vector](self, other: T) -> T: ...
     @typing.overload
     def __matmul__(self, other: Any) -> Any: ...
 
@@ -172,7 +172,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     @typing.overload
     def __imatmul__(self, other: Transform) -> Self: ...
     @typing.overload
-    def __imatmul__[T: BaseVector](self, other: T) -> T: ...
+    def __imatmul__[T: Vector](self, other: T) -> T: ...
     @typing.overload
     def __imatmul__(self, other: Any) -> Any: ...
 
@@ -184,7 +184,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         Taken from https://numpy.org/doc/stable/reference/generated/numpy.lib.mixins.NDArrayOperatorsMixin.html
         """
 
-        from retro_data_structures.properties.base_vector import BaseVector
+        from retro_data_structures.properties.vector import Vector
 
         out: tuple = kwargs.get("out", ())
 
@@ -210,8 +210,8 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
                 if res.shape == (4, 4):
                     return type(self)(res)
                 if res.shape == (4,):
-                    if all((x is self) or isinstance(x, BaseVector) for x in all_inputs):
-                        restype = type(next(x for x in all_inputs if isinstance(x, BaseVector)))
+                    if all((x is self) or isinstance(x, Vector) for x in all_inputs):
+                        restype = type(next(x for x in all_inputs if isinstance(x, Vector)))
                         return restype(float(res[0]), float(res[1]), float(res[2]))
             return res
 
