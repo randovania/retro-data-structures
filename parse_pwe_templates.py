@@ -170,8 +170,9 @@ def _scrub_enum(string: str) -> str:
 
 
 def create_enums_file(game_id: str, enums: dict[EnumDefinition, list[str]]) -> str:
-    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport typing_extensions\n'
     code += "\nfrom retro_data_structures import json_util\n"
+    code += "from retro_data_structures.game_check import Game\n"
     code += "from retro_data_structures.properties import structs\n"
 
     for e, classes in enums.items():
@@ -1786,13 +1787,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
-    base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.archetypes."
-
     # Probably pointless?
     for archetype_name in property_archetypes:
         get_archetype(archetype_name)
-
-    create_all_file(archetype_path.joinpath("__init__.py"), base_import_path, archetype_all)
 
     print("> Done.")
 
@@ -1863,6 +1860,7 @@ def group_identical_archetypes(properties_dir: Path, all_objects: dict[str, list
 
     common_dir = properties_dir.joinpath("common", "archetypes")
     found_at_least_one = True
+    common_list = set()
 
     while found_at_least_one:
         found_at_least_one = False
@@ -1880,6 +1878,7 @@ def group_identical_archetypes(properties_dir: Path, all_objects: dict[str, list
             if len(file_data) == 1:
                 found_at_least_one = True
                 all_objects[object_name] = []
+                common_list.add(object_name)
 
                 print(f"{object_name}: Is identical across {games}, moving to common")
                 common_dir.joinpath(f"{object_name}.py").write_text(next(iter(file_data)))
@@ -1890,6 +1889,24 @@ def group_identical_archetypes(properties_dir: Path, all_objects: dict[str, list
                         f"from retro_data_structures.properties.{_game_id_to_file[game]}.archetypes.{object_name} import",
                         f"from retro_data_structures.properties.common.archetypes.{object_name} import",
                     )
+
+    archetypes_for_game = collections.defaultdict(list)
+
+    for object_name, games in sorted(all_objects.items()):
+        for game in games:
+            archetypes_for_game[game].append(object_name)
+
+    create_all_file(
+        common_dir.joinpath("__init__.py"),
+        "retro_data_structures.properties.common.archetypes.",
+        sorted(common_list),
+    )
+    for game, archetypes in archetypes_for_game.items():
+        create_all_file(
+            properties_dir.joinpath(_game_id_to_file[game], "archetypes", "__init__.py"),
+            f"retro_data_structures.properties.{_game_id_to_file[game]}.archetypes.",
+            archetypes,
+        )
 
 
 def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]) -> None:

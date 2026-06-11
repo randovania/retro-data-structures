@@ -5,7 +5,7 @@ from unittest.mock import ANY
 from tests import test_lib
 
 from retro_data_structures.formats.tree import Tree
-from retro_data_structures.properties.echoes.archetypes import EditorProperties
+from retro_data_structures.properties.common.archetypes import EditorProperties
 from retro_data_structures.properties.echoes.objects import ScanTreeCategory
 
 
