@@ -199,11 +199,11 @@ class RDSPropertyAdapter(construct.Adapter):
             property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
         except KeyError:
             return obj
-        return property_class.from_bytes(obj)
+        return property_class.from_bytes(obj, property_class.game())
 
     def _encode(self, obj: BaseProperty | bytes, context, path):
         if isinstance(obj, BaseProperty):
-            return obj.to_bytes()
+            return obj.to_bytes(obj.game())
         return obj
 
 

@@ -97,7 +97,7 @@ def do_dump_properties_room(game: Game, args):
             if not isinstance(instance.data, BaseProperty):
                 continue
 
-            body = instance.data.to_bytes()
+            body = instance.data.to_bytes(game)
             header.append(
                 {
                     "identifier": f"{i} property of room {asset_id} ({instance.data.__class__.__name__})",
@@ -147,7 +147,7 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
 
         before = data.tell()
         try:
-            the_property = property_class.from_stream(data)
+            the_property = property_class.from_stream(data, game)
         except Exception as e:
             data.seek(before)
             data.read(instance.size)
@@ -169,7 +169,7 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
             )
 
         if build:
-            new_encoded = the_property.to_bytes()
+            new_encoded = the_property.to_bytes(game)
             if report:
                 decoded_results.append(
                     {

@@ -59,7 +59,7 @@ class Tree(BaseResource):
                 type=properties.object_type(),
                 id=InstanceId(new_id),
                 connections=(),
-                base_property=properties.to_bytes(),
+                base_property=properties.to_bytes(self.target_game),
             )
         )
         return self.get_node_by_id(new_id)

@@ -22,20 +22,20 @@ class BaseProperty:
         raise NotImplementedError
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing.Self:
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing.Self:
         raise NotImplementedError
 
     @classmethod
-    def from_bytes(cls, data: bytes) -> typing.Self:
+    def from_bytes(cls, data: bytes, game: Game) -> typing.Self:
         stream = io.BytesIO(data)
-        return cls.from_stream(stream, len(data))
+        return cls.from_stream(stream, game, len(data))
 
-    def to_stream(self, data: typing.BinaryIO) -> None:
+    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
         raise NotImplementedError
 
-    def to_bytes(self) -> bytes:
+    def to_bytes(self, game: Game) -> bytes:
         stream = io.BytesIO()
-        self.to_stream(stream)
+        self.to_stream(stream, game)
         return stream.getvalue()
 
     @classmethod
