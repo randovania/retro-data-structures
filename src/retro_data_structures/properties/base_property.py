@@ -18,10 +18,6 @@ if typing.TYPE_CHECKING:
 @dataclasses.dataclass()
 class BaseProperty:
     @classmethod
-    def game(cls) -> Game:
-        raise NotImplementedError
-
-    @classmethod
     def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing.Self:
         raise NotImplementedError
 

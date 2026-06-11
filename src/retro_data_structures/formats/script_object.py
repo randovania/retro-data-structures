@@ -254,10 +254,8 @@ class ScriptInstance:
     __hash__ = None
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
-        game = layer.parent_area.asset_manager.target_game
-        assert game == target_game
-
+    def new_instance(cls, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
+        target_game = layer.parent_area.asset_manager.target_game
         property_type = properties.get_game_object(target_game, instance_type)
 
         raw = ScriptInstanceRaw(
@@ -271,8 +269,6 @@ class ScriptInstance:
     @classmethod
     def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayer) -> ScriptInstance:
         game = layer.parent_area.asset_manager.target_game
-        assert object_properties.game() == game
-
         raw = ScriptInstanceRaw(
             type=object_properties.object_type(),
             id=layer.new_instance_id(),

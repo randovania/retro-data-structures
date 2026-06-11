@@ -11,12 +11,12 @@ from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor
+from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 
 if typing.TYPE_CHECKING:
     import uuid
 
-    from retro_data_structures.game_check import Game
     from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
 
 GreedyBytes = typing.cast("construct.Construct", construct.GreedyBytes)
@@ -199,11 +199,11 @@ class RDSPropertyAdapter(construct.Adapter):
             property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
         except KeyError:
             return obj
-        return property_class.from_bytes(obj, property_class.game())
+        return property_class.from_bytes(obj, Game.PRIME_REMASTER)
 
     def _encode(self, obj: BaseProperty | bytes, context, path):
         if isinstance(obj, BaseProperty):
-            return obj.to_bytes(obj.game())
+            return obj.to_bytes(Game.PRIME_REMASTER)
         return obj
 
 

@@ -1037,12 +1037,6 @@ def _add_default_types(core_path: Path, game_id: str) -> None:
     modules = []
     base_import = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.core."
 
-    game_code = f"""
-    @classmethod
-    def game(cls) -> Game:
-        return Game.{_game_id_to_enum[game_id]}
-"""
-
     get_endianness(game_id)
 
     core_path.joinpath("Color.py").write_text(
@@ -1062,9 +1056,7 @@ class Color(BaseColor):
 
     def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
         data.write(struct.pack(game.struct_endianness + 'ffff', self.r, self.g, self.b, self.a))
-
 """
-        + game_code
     )
     modules.append("Color")
     core_path.joinpath("Vector.py").write_text(
@@ -1085,7 +1077,6 @@ class Vector(BaseVector):
     def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
         data.write(struct.pack(game.struct_endianness + 'fff', self.x, self.y, self.z))
 """
-        + game_code
     )
     modules.append("Vector")
     if game_id == "PrimeRemastered":
@@ -1159,7 +1150,6 @@ class PooledString(BaseProperty):
             "size_or_str": size_or_str,
         }
 """
-            + game_code
         )
         modules.append("PooledString")
         create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
@@ -1229,7 +1219,6 @@ class AnimationParameters(BaseProperty):
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from asset_manager.get_dependencies_for_ancs(self.ancs, self.character_index)
 """
-        + game_code
     )
     modules.append("AnimationParameters")
     core_path.joinpath("Spline.py").write_text(
@@ -1300,7 +1289,6 @@ class Spline(BaseSpline):
         ), data)
 
 """
-        + game_code
     )
     modules.append("Spline")
 
@@ -1753,10 +1741,6 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             )
         cls.finalize_props()
 
-        cls.class_code += "\n    @classmethod\n"
-        cls.class_code += "    def game(cls) -> Game:\n"
-        cls.class_code += f"        return Game.{_game_id_to_enum[game_id]}\n"
-
         if is_struct:
             name_field = None
             missing_name_field = '        raise RuntimeError(f"{self.__class__.__name__} does not have name")\n'
@@ -2048,6 +2032,8 @@ def write_shared_types_helpers(all_games: dict) -> None:
         },
     )
     structs = "# Generated File\nimport struct\nimport typing\n\n"
+    structs += "from retro_data_structures.game_check import Game\n\n"
+
     for endianness, fmt_string in sorted(_STRUCTS):
         structs += f'{_get_struct(endianness, fmt=fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
     for decode_name, decode_body in sorted(_DECODE_METHODS.items()):
@@ -2058,7 +2044,9 @@ def write_shared_types_helpers(all_games: dict) -> None:
         else:
             decode_return_type = "int"
 
-        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int) -> {decode_return_type}:\n"
+        structs += (
+            f"\n\ndef {decode_name}(data: typing.BinaryIO, game: Game, property_size: int) -> {decode_return_type}:\n"
+        )
         structs += f"    {decode_body}\n"
 
     path_to_props.joinpath("structs.py").write_text(structs)
