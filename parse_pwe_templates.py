@@ -1915,6 +1915,48 @@ def write_shared_type_with_common_import(
     )
 
 
+def replace_in_file_tree(file_root: Path, original: str, new: str) -> None:
+    for f in file_root.rglob("*.py"):
+        if f.is_file():
+            contents = f.read_text()
+            if original in contents:
+                replaced = contents.replace(original, new)
+                f.write_text(replaced)
+
+
+def group_identical_archetypes(properties_dir: Path, all_objects: dict[str, list[str]]) -> None:
+
+    common_dir = properties_dir.joinpath("common", "archetypes")
+    found_at_least_one = True
+
+    while found_at_least_one:
+        found_at_least_one = False
+        print("* Checking for identical archetypes")
+
+        for object_name, games in sorted(all_objects.items()):
+            if len(games) < 2:
+                continue
+
+            file_data = set()
+            for game in games:
+                path = properties_dir.joinpath(_game_id_to_file[game], "archetypes", f"{object_name}.py")
+                file_data.add(path.read_text())
+
+            if len(file_data) == 1:
+                found_at_least_one = True
+                all_objects[object_name] = []
+
+                print(f"{object_name}: Is identical across {games}, moving to common")
+                common_dir.joinpath(f"{object_name}.py").write_text(next(iter(file_data)))
+                for game in games:
+                    properties_dir.joinpath(_game_id_to_file[game], "archetypes", f"{object_name}.py").unlink()
+                    replace_in_file_tree(
+                        properties_dir.joinpath(_game_id_to_file[game]),
+                        f"from retro_data_structures.properties.{_game_id_to_file[game]}.archetypes.{object_name} import",
+                        f"from retro_data_structures.properties.common.archetypes.{object_name} import",
+                    )
+
+
 def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]) -> None:
     imports = []
     declarations = []
@@ -1927,7 +1969,9 @@ def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[
         for game in games:
             imports.append(f"{base}{_game_id_to_file[game]}.{kind} import {object_name} as _{object_name}_{game}")
         declarations.append(
-            "{} = typing.Union[\n{}\n]".format(object_name, ",\n".join(f"    _{object_name}_{game}" for game in games))
+            "type {} = typing.Union[\n{}\n]".format(
+                object_name, ",\n".join(f"    _{object_name}_{game}" for game in games)
+            )
         )
 
     output_file.write_text(
@@ -1962,6 +2006,11 @@ def write_shared_types_helpers(all_games: dict) -> None:
             assert isinstance(enum_def, EnumDefinition)
             if len(enum_uses) == 0 and "Unknown" not in enum_def.name:
                 all_enums[_scrub_enum(enum_def.name)].append(game_id)
+
+    group_identical_archetypes(
+        rds_root.joinpath("properties"),
+        all_archetypes,
+    )
 
     write_shared_type_with_common_import(
         rds_root.joinpath("enums", "shared_enums.py"),
