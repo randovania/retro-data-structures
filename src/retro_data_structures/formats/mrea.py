@@ -55,6 +55,7 @@ if typing.TYPE_CHECKING:
         InstanceRef,
         ScriptInstance,
     )
+    from retro_data_structures.properties import BaseObjectType
 
 
 class MREAVersion(IntEnum):
@@ -816,6 +817,12 @@ class Area:
     def all_instances(self) -> Iterator[ScriptInstance]:
         for layer in self.all_layers:
             yield from layer.instances
+
+    def find_instances_of_type(self, script_type: type[BaseObjectType]) -> Iterator[ScriptInstance]:
+        """Find all instances that have the given script type."""
+        for instance in self.all_instances:
+            if instance.script_type == script_type:
+                yield instance
 
     def get_instance(self, ref: InstanceRef) -> ScriptInstance:
         """

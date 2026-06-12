@@ -228,6 +228,16 @@ def test_add_memory_relay(prime2_area: Area):
     assert any(state.instance_id == relay.id for state in save.memory_relays)
 
 
+# Script Object
+def test_find_instances_of_type(prime2_area: Area):
+    from retro_data_structures.properties.echoes.objects import Dock
+
+    inst = list(prime2_area.find_instances_of_type(Dock))
+    assert len(inst) == 1
+    assert inst[0].id == 0x00450011
+    assert inst[0].script_type == Dock
+
+
 @pytest.mark.parametrize("name", ("Test1", "Test2"))
 @pytest.mark.parametrize("active", (False, True))
 def test_edit_layer(prime2_area: Area, name: str, active: bool):
