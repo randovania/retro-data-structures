@@ -254,26 +254,28 @@ class ScriptInstance:
     __hash__ = None
 
     @classmethod
-    def new_instance(cls, target_game: Game, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
+    def new_instance(cls, instance_type: str, layer: ScriptLayer) -> ScriptInstance:
+        target_game = layer.parent_area.asset_manager.target_game
         property_type = properties.get_game_object(target_game, instance_type)
 
         raw = ScriptInstanceRaw(
             type=instance_type,
             id=layer.new_instance_id(),
             connections=(),
-            base_property=property_type().to_bytes(),
+            base_property=property_type().to_bytes(target_game),
         )
         return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
     def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayer) -> ScriptInstance:
+        game = layer.parent_area.asset_manager.target_game
         raw = ScriptInstanceRaw(
             type=object_properties.object_type(),
             id=layer.new_instance_id(),
             connections=(),
-            base_property=object_properties.to_bytes(),
+            base_property=object_properties.to_bytes(game),
         )
-        return cls(raw, object_properties.game(), on_modify=layer.mark_modified)
+        return cls(raw, game, on_modify=layer.mark_modified)
 
     @property
     def script_type(self) -> type[BaseObjectType]:
@@ -331,7 +333,7 @@ class ScriptInstance:
 
         See also `script_type` and `get_properties_as`.
         """
-        return self.script_type.from_bytes(self._raw.base_property)
+        return self.script_type.from_bytes(self._raw.base_property, self.target_game)
 
     def get_properties_as(self, type_cls: type[PropertyType]) -> PropertyType:
         """
@@ -357,7 +359,7 @@ class ScriptInstance:
         if not isinstance(data, self.script_type):
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type_name}")
 
-        self._raw.base_property = data.to_bytes()
+        self._raw.base_property = data.to_bytes(self.target_game)
         self.on_modify()
 
     @contextlib.contextmanager

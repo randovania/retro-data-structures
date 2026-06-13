@@ -50,20 +50,28 @@ class Game(Enum):
         return NotImplemented
 
     @property
-    def uses_asset_id_32(self):
+    def uses_asset_id_32(self) -> bool:
         return self <= Game.ECHOES
 
     @property
-    def uses_asset_id_64(self):
+    def uses_asset_id_64(self) -> bool:
         return self == Game.CORRUPTION
 
     @property
-    def uses_guid_as_asset_id(self):
+    def uses_guid_as_asset_id(self) -> bool:
         return self == Game.PRIME_REMASTER
 
     @property
-    def uses_lzo(self):
+    def uses_lzo(self) -> bool:
         return self in {Game.ECHOES, Game.CORRUPTION}
+
+    @property
+    def uses_big_endian(self) -> bool:
+        return self < Game.PRIME_REMASTER
+
+    @property
+    def struct_endianness(self) -> typing.Literal[">", "<"]:
+        return ">" if self.uses_big_endian else "<"
 
     @property
     def invalid_asset_id(self) -> int | uuid.UUID:
