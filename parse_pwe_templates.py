@@ -141,10 +141,10 @@ class EnumDefinition:
             code += "        return obj\n"
 
         code += "\n    @classmethod\n"
-        code += "    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:\n"
+        code += "    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:\n"
         code += f"        return cls({_CODE_PARSE_UINT32[endianness]})\n"
 
-        code += "\n    def to_stream(self, data: typing.BinaryIO) -> None:\n"
+        code += "\n    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:\n"
         code += f"        data.write({struct_pack(endianness, 'L', 'self.value')})\n"
 
         code += "\n    @classmethod\n"
@@ -170,8 +170,9 @@ def _scrub_enum(string: str) -> str:
 
 
 def create_enums_file(game_id: str, enums: dict[EnumDefinition, list[str]]) -> str:
-    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport struct\nimport typing_extensions\n'
+    code = '"""\nGenerated file.\n"""\nimport enum\nimport typing\nimport typing_extensions\n'
     code += "\nfrom retro_data_structures import json_util\n"
+    code += "from retro_data_structures.game_check import Game\n"
     code += "from retro_data_structures.properties import structs\n"
 
     for e, classes in enums.items():
@@ -727,7 +728,7 @@ class ClassDefinition:
 
         self.class_code += """
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None, default_override: dict | None = None) -> typing_extensions.Self:
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None, default_override: dict | None = None) -> typing_extensions.Self:
 """
         if self.atomic or game_id == "Prime":
             self.class_code += "        property_size = None  # Atomic\n"
@@ -747,7 +748,7 @@ class ClassDefinition:
         else:
             self.class_code += f"        property_count = {_CODE_PARSE_UINT16[endianness]}\n"
 
-        self.class_code += "        if (result := cls._fast_decode(data, property_count)) is not None:\n"
+        self.class_code += "        if (result := cls._fast_decode(data, game, property_count)) is not None:\n"
         self.class_code += "            return result\n\n"
 
         if self.keep_unknown_properties():
@@ -763,7 +764,7 @@ class ClassDefinition:
             start = data.tell()
             try:
                 property_name, decoder = _property_decoder[property_id]
-                present_fields[property_name] = decoder(data, property_size)
+                present_fields[property_name] = decoder(data, game, property_size)
             except KeyError:
                 {read_unknown}
             assert data.tell() - start == property_size\n
@@ -774,9 +775,7 @@ class ClassDefinition:
         self.class_code += "        return cls(**present_fields)\n"
 
         self.class_code += "\n    @classmethod\n"
-        self.class_code += (
-            "    def _fast_decode(cls, data: typing.BinaryIO, property_count: int) -> typing_extensions.Self | None:\n"
-        )
+        self.class_code += "    def _fast_decode(cls, data: typing.BinaryIO, game: Game, property_count: int) -> typing_extensions.Self | None:\n"
         if self._can_fast_decode():
             for fast_decode in self._create_fast_decode_body():
                 self.class_code += f"    {fast_decode}\n"
@@ -786,7 +785,7 @@ class ClassDefinition:
 
         # Defining the _decode_X methods and _property_decoder
 
-        signature = "data: typing.BinaryIO, property_size: int"
+        signature = "data: typing.BinaryIO, game: Game, property_size: int"
         decode_names = {}
 
         for prop_name, prop in self.all_props.items():
@@ -802,7 +801,7 @@ class ClassDefinition:
                 self.after_class_code += f"def _decode_{prop_name}({signature}) -> {prop.prop_type}:\n"
                 self.after_class_code += f"    return {prop.parse_code}\n\n\n"
 
-        decoder_type = "typing.Callable[[typing.BinaryIO, int], typing.Any]"
+        decoder_type = "typing.Callable[[typing.BinaryIO, Game, int], typing.Any]"
         self.after_class_code += f"_property_decoder: dict[int, tuple[str, {decoder_type}]] = {{\n"
         for prop_name, prop in self.all_props.items():
             self.after_class_code += f"    0x{prop.id:08x}: ({repr(prop_name)}, {decode_names[prop_name]}),\n"
@@ -810,7 +809,7 @@ class ClassDefinition:
 
     def write_to_stream(self) -> None:
         self.class_code += """
-    def to_stream(self, data: typing.BinaryIO, default_override: dict | None = None) -> None:
+    def to_stream(self, data: typing.BinaryIO, game: Game, default_override: dict | None = None) -> None:
         default_override = default_override or {}
 """
         endianness = get_endianness(self.game_id)
@@ -1039,57 +1038,8 @@ def _add_default_types(core_path: Path, game_id: str) -> None:
     modules = []
     base_import = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.core."
 
-    game_code = f"""
-    @classmethod
-    def game(cls) -> Game:
-        return Game.{_game_id_to_enum[game_id]}
-"""
+    get_endianness(game_id)
 
-    endianness = get_endianness(game_id)
-
-    core_path.joinpath("Color.py").write_text(
-        f"""# Generated file
-import struct
-import typing
-import typing_extensions
-
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_color import BaseColor
-
-
-class Color(BaseColor):
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
-        return cls(*struct.unpack('{endianness}ffff', data.read(16)))
-
-    def to_stream(self, data: typing.BinaryIO) -> None:
-        data.write(struct.pack('{endianness}ffff', self.r, self.g, self.b, self.a))
-
-"""
-        + game_code
-    )
-    modules.append("Color")
-    core_path.joinpath("Vector.py").write_text(
-        f"""# Generated file
-import struct
-import typing
-import typing_extensions
-
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_vector import BaseVector
-
-
-class Vector(BaseVector):
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
-        return cls(*struct.unpack('{endianness}fff', data.read(12)))
-
-    def to_stream(self, data: typing.BinaryIO) -> None:
-        data.write(struct.pack('{endianness}fff', self.x, self.y, self.z))
-"""
-        + game_code
-    )
-    modules.append("Vector")
     if game_id == "PrimeRemastered":
         asset_code = "import uuid\n\nAssetId = uuid.UUID\ndefault_asset_id = uuid.UUID(int=0)\n"
     else:
@@ -1103,7 +1053,7 @@ class Vector(BaseVector):
 
     if game_id == "PrimeRemastered":
         core_path.joinpath("PooledString.py").write_text(
-            f"""# Generated file
+            """# Generated file
 import dataclasses
 import struct
 import typing
@@ -1126,18 +1076,18 @@ class PooledString(BaseProperty):
     size_or_str: int | bytes = b""
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
-        a, b = struct.unpack('{endianness}lL', data.read(8))
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:
+        a, b = struct.unpack(game.struct_endianness + 'lL', data.read(8))
         if a == -1:
             b = data.read(b)
         return cls(a, b)
 
-    def to_stream(self, data: typing.BinaryIO) -> None:
+    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
         a, b = self.index, self.size_or_str
         if a == -1:
             assert isinstance(b, bytes)
             b = len(b)
-        data.write(struct.pack('{endianness}lL', a, b))
+        data.write(struct.pack(game.struct_endianness + 'lL', a, b))
         if a == -1:
             assert isinstance(self.size_or_str, bytes)
             data.write(self.size_or_str)
@@ -1156,26 +1106,18 @@ class PooledString(BaseProperty):
             size_or_str: int | str = self.size_or_str.decode('utf-8')
         else:
             size_or_str = self.size_or_str
-        return {{
+        return {
             "index": self.index,
             "size_or_str": size_or_str,
-        }}
+        }
 """
-            + game_code
         )
         modules.append("PooledString")
         create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
         return
 
-    if game_id in ["Prime", "Echoes"]:
-        format_specifier = "L"
-        known_size = 12
-    else:
-        format_specifier = "Q"
-        known_size = 16
-
     core_path.joinpath("AnimationParameters.py").write_text(
-        f"""# Generated file
+        """# Generated file
 from __future__ import annotations
 
 import dataclasses
@@ -1195,16 +1137,28 @@ if typing.TYPE_CHECKING:
 
 @dataclasses.dataclass()
 class AnimationParameters(BaseProperty):
-    ancs: AssetId = dataclasses.field(metadata={{'asset_types': ['ANCS']}}, default=default_asset_id)
+    ancs: AssetId = dataclasses.field(metadata={'asset_types': ['ANCS']}, default=default_asset_id)
     character_index: int = 0
     initial_anim: int = 0
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
-        return cls(*struct.unpack('{endianness}{format_specifier}LL', data.read({known_size})))
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing_extensions.Self:
+        if game.uses_asset_id_32:
+            format_specifier = "L"
+            known_size = 12
+        else:
+            format_specifier = "Q"
+            known_size = 16
 
-    def to_stream(self, data: typing.BinaryIO) -> None:
-        data.write(struct.pack('{endianness}{format_specifier}LL', self.ancs, self.character_index, self.initial_anim))
+        return cls(*struct.unpack(f'{game.struct_endianness}{format_specifier}LL', data.read(known_size)))
+
+    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
+        if game.uses_asset_id_32:
+            format_specifier = "L"
+        else:
+            format_specifier = "Q"
+
+        data.write(struct.pack(f'{game.struct_endianness}{format_specifier}LL', self.ancs, self.character_index, self.initial_anim))
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
@@ -1212,89 +1166,17 @@ class AnimationParameters(BaseProperty):
         return cls(data_json["ancs"], data_json["character_index"], data_json["initial_anim"])
 
     def to_json(self) -> json_util.JsonObject:
-        return {{
+        return {
             "ancs": self.ancs,
             "character_index": self.character_index,
             "initial_anim": self.initial_anim,
-        }}
+        }
 
     def dependencies_for(self, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
         yield from asset_manager.get_dependencies_for_ancs(self.ancs, self.character_index)
 """
-        + game_code
     )
     modules.append("AnimationParameters")
-    core_path.joinpath("Spline.py").write_text(
-        """# Generated file
-import dataclasses
-import struct
-import typing
-import typing_extensions
-
-import construct
-
-from retro_data_structures.common_types import MayaSpline
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_spline import BaseSpline, Knot
-
-
-def _read_knot(data: typing.BinaryIO) -> Knot:
-    header = typing.cast(tuple[float, float, int, int], struct.unpack(">ffBB", data.read(10)))
-    cached_tangents_a = None
-    cached_tangents_b = None
-    if header[2] == 5:
-        cached_tangents_a = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
-    if header[3] == 5:
-        cached_tangents_b = typing.cast(tuple[float, float], struct.unpack(">ff", data.read(8)))
-
-    return Knot(*header, cached_tangents_a=cached_tangents_a, cached_tangents_b=cached_tangents_b)
-
-
-@dataclasses.dataclass()
-class Spline(BaseSpline):
-
-    @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing_extensions.Self:
-        pre_infinity, post_infinity, knot_count = struct.unpack(">BBL", data.read(6))
-        knots = [
-            _read_knot(data)
-            for _ in range(knot_count)
-        ]
-        clamp_mode, minimum_amplitude, maximum_amplitude = struct.unpack(">Bff", data.read(9))
-
-        return cls(
-            pre_infinity=pre_infinity,
-            post_infinity=post_infinity,
-            knots=knots,
-            clamp_mode=clamp_mode,
-            minimum_amplitude=minimum_amplitude,
-            maximum_amplitude=maximum_amplitude,
-        )
-
-    def to_stream(self, data: typing.BinaryIO) -> None:
-        MayaSpline.build_stream(construct.Container(
-            pre_infinity=self.pre_infinity,
-            post_infinity=self.post_infinity,
-            knots=[
-                construct.Container(
-                    time=knot.time,
-                    amplitude=knot.amplitude,
-                    unk_a=knot.unk_a,
-                    unk_b=knot.unk_b,
-                    cached_tangents_a=knot.cached_tangents_a,
-                    cached_tangents_b=knot.cached_tangents_b,
-                )
-                for knot in self.knots
-            ],
-            clamp_mode=self.clamp_mode,
-            minimum_amplitude=self.minimum_amplitude,
-            maximum_amplitude=self.maximum_amplitude,
-        ), data)
-
-"""
-        + game_code
-    )
-    modules.append("Spline")
 
     create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
 
@@ -1451,11 +1333,11 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
             if default_override:
                 override = ", ".join(f"{repr(key)}: {value}" for key, value in default_override.items())
-                parse_code = f"{prop_type}.from_stream(data, property_size, default_override={{{override}}})"
-                build_code.append(f"{{obj}}.to_stream(data, default_override={{{override}}})")
+                parse_code = f"{prop_type}.from_stream(data, game, property_size, default_override={{{override}}})"
+                build_code.append(f"{{obj}}.to_stream(data, game, default_override={{{override}}})")
             else:
-                parse_code = f"{prop_type}.from_stream(data, property_size)"
-                build_code.append("{obj}.to_stream(data)")
+                parse_code = f"{prop_type}.from_stream(data, game, property_size)"
+                build_code.append("{obj}.to_stream(data, game)")
 
             needed_imports[f"{import_base}.archetypes.{archetype_path}"] = ", ".join(sorted(archetype_imports))
 
@@ -1479,8 +1361,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     local_enum = enum_def
 
                 prop_type = f"{enum_prefix}{enum_name}"
-                parse_code = f"{enum_prefix}{enum_name}.from_stream(data)"
-                build_code.append("{obj}.to_stream(data)")
+                parse_code = f"{enum_prefix}{enum_name}.from_stream(data, game)"
+                build_code.append("{obj}.to_stream(data, game)")
                 from_json_code = f"{prop_type}.from_json({{obj}})"
                 to_json_code = "{obj}.to_json()"
 
@@ -1517,8 +1399,8 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
                 prop_type = enum_prefix + enum_name
                 field_params["default"] = f"{prop_type}({default_value})"
-                parse_code = f"{prop_type}.from_stream(data)"
-                build_code.append("{obj}.to_stream(data)")
+                parse_code = f"{prop_type}.from_stream(data, game)"
+                build_code.append("{obj}.to_stream(data, game)")
                 from_json_code = f"{prop_type}.from_json({{obj}})"
                 to_json_code = "{obj}.to_json()"
             else:
@@ -1571,9 +1453,14 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 dependency_code = "{obj}.dependencies_for(asset_manager)"
             else:
                 prop_type = raw_type
-            needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data, property_size)"
-            build_code.append("{obj}.to_stream(data)")
+
+            if raw_type == "Spline":
+                needed_imports[f"retro_data_structures.properties.{raw_type.lower()}"] = prop_type
+            else:
+                needed_imports[f"{import_base}.core.{prop_type}"] = prop_type
+
+            parse_code = f"{prop_type}.from_stream(data, game, property_size)"
+            build_code.append("{obj}.to_stream(data, game)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
             field_params["default_factory"] = prop_type
@@ -1625,9 +1512,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
 
         elif raw_type == "Color" or raw_type == "Vector":
             prop_type = raw_type
-            needed_imports[f"{import_base}.core.{raw_type}"] = prop_type
-            parse_code = f"{prop_type}.from_stream(data, property_size)"
-            build_code.append("{obj}.to_stream(data)")
+            needed_imports[f"retro_data_structures.properties.{raw_type.lower()}"] = prop_type
+            parse_code = f"{prop_type}.from_stream(data, game, property_size)"
+            build_code.append("{obj}.to_stream(data, game)")
             from_json_code = f"{prop_type}.from_json({{obj}})"
             to_json_code = "{obj}.to_json()"
             json_type = "json_util.JsonValue"
@@ -1744,10 +1631,6 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 get_prop_details(prop), final_prop_name, prop["name"] or property_names.get(prop["id"], str(prop["id"]))
             )
         cls.finalize_props()
-
-        cls.class_code += "\n    @classmethod\n"
-        cls.class_code += "    def game(cls) -> Game:\n"
-        cls.class_code += f"        return Game.{_game_id_to_enum[game_id]}\n"
 
         if is_struct:
             name_field = None
@@ -1899,13 +1782,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
-    base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.archetypes."
-
     # Probably pointless?
     for archetype_name in property_archetypes:
         get_archetype(archetype_name)
-
-    create_all_file(archetype_path.joinpath("__init__.py"), base_import_path, archetype_all)
 
     print("> Done.")
 
@@ -1963,20 +1842,82 @@ def write_shared_type_with_common_import(
     )
 
 
+def replace_in_file_tree(file_root: Path, original: str, new: str) -> None:
+    for f in file_root.rglob("*.py"):
+        if f.is_file():
+            contents = f.read_text()
+            if original in contents:
+                replaced = contents.replace(original, new)
+                f.write_text(replaced)
+
+
+def group_identical_archetypes(properties_dir: Path, all_objects: dict[str, list[str]]) -> None:
+
+    common_dir = properties_dir.joinpath("common", "archetypes")
+    found_at_least_one = True
+    common_list = set()
+
+    while found_at_least_one:
+        found_at_least_one = False
+        print("* Checking for identical archetypes")
+
+        for object_name, games in sorted(all_objects.items()):
+            if len(games) < 2:
+                continue
+
+            file_data = set()
+            for game in games:
+                path = properties_dir.joinpath(_game_id_to_file[game], "archetypes", f"{object_name}.py")
+                file_data.add(path.read_text())
+
+            if len(file_data) == 1:
+                found_at_least_one = True
+                all_objects[object_name] = []
+                common_list.add(object_name)
+
+                print(f"{object_name}: Is identical across {games}, moving to common")
+                common_dir.joinpath(f"{object_name}.py").write_text(next(iter(file_data)))
+                for game in games:
+                    properties_dir.joinpath(_game_id_to_file[game], "archetypes", f"{object_name}.py").unlink()
+                    replace_in_file_tree(
+                        properties_dir.joinpath(_game_id_to_file[game]),
+                        f"from retro_data_structures.properties.{_game_id_to_file[game]}.archetypes.{object_name} import",
+                        f"from retro_data_structures.properties.common.archetypes.{object_name} import",
+                    )
+
+    archetypes_for_game = collections.defaultdict(list)
+
+    for object_name, games in sorted(all_objects.items()):
+        for game in games:
+            archetypes_for_game[game].append(object_name)
+
+    create_all_file(
+        common_dir.joinpath("__init__.py"),
+        "retro_data_structures.properties.common.archetypes.",
+        sorted(common_list),
+    )
+    for game, archetypes in archetypes_for_game.items():
+        create_all_file(
+            properties_dir.joinpath(_game_id_to_file[game], "archetypes", "__init__.py"),
+            f"retro_data_structures.properties.{_game_id_to_file[game]}.archetypes.",
+            archetypes,
+        )
+
+
 def write_shared_type(output_file: Path, kind: str, all_objects: dict[str, list[str]]) -> None:
     imports = []
     declarations = []
-    base = "import retro_data_structures.properties."
+    base = "from retro_data_structures.properties."
 
     for object_name, games in sorted(all_objects.items()):
         if len(games) < 2:
             continue
 
         for game in games:
-            imports.append(f"{base}{_game_id_to_file[game]}.{kind}.{object_name} as _{object_name}_{game}")
+            imports.append(f"{base}{_game_id_to_file[game]}.{kind} import {object_name} as _{object_name}_{game}")
         declarations.append(
-            "{} = typing.Union[\n{}\n]".format(
-                object_name, ",\n".join(f"    _{object_name}_{game}.{object_name}" for game in games)
+            "type {} = typing.Union[\n{}\n]".format(
+                object_name, ",\n".join(f"    _{object_name}_{game}" for game in games)
             )
         )
 
@@ -2013,6 +1954,11 @@ def write_shared_types_helpers(all_games: dict) -> None:
             if len(enum_uses) == 0 and "Unknown" not in enum_def.name:
                 all_enums[_scrub_enum(enum_def.name)].append(game_id)
 
+    group_identical_archetypes(
+        rds_root.joinpath("properties"),
+        all_archetypes,
+    )
+
     write_shared_type_with_common_import(
         rds_root.joinpath("enums", "shared_enums.py"),
         "enums",
@@ -2031,15 +1977,9 @@ def write_shared_types_helpers(all_games: dict) -> None:
         "archetypes",
         all_archetypes,
     )
-    write_shared_type(
-        path_to_props.joinpath("shared_core.py"),
-        "core",
-        {
-            name: ["Prime", "Echoes", "Corruption"]
-            for name in ["AnimationParameters", "AssetId", "Color", "Spline", "Vector"]
-        },
-    )
     structs = "# Generated File\nimport struct\nimport typing\n\n"
+    structs += "from retro_data_structures.game_check import Game\n\n"
+
     for endianness, fmt_string in sorted(_STRUCTS):
         structs += f'{_get_struct(endianness, fmt=fmt_string)} = struct.Struct("{endianness}{fmt_string}")\n'
     for decode_name, decode_body in sorted(_DECODE_METHODS.items()):
@@ -2050,7 +1990,9 @@ def write_shared_types_helpers(all_games: dict) -> None:
         else:
             decode_return_type = "int"
 
-        structs += f"\n\ndef {decode_name}(data: typing.BinaryIO, property_size: int) -> {decode_return_type}:\n"
+        structs += (
+            f"\n\ndef {decode_name}(data: typing.BinaryIO, game: Game, property_size: int) -> {decode_return_type}:\n"
+        )
         structs += f"    {decode_body}\n"
 
     path_to_props.joinpath("structs.py").write_text(structs)

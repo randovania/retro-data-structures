@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from retro_data_structures.properties.echoes.core import Vector
+from retro_data_structures.properties.vector import Vector
 from retro_data_structures.transform import Transform
 
 

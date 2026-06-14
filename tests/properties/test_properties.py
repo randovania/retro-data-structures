@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from retro_data_structures.properties.base_property import BaseProperty
 
 
-def perform_module_checks(path: Path):
+def perform_module_checks(path: Path, game: Game) -> None:
     module_name = path.with_suffix("").as_posix().replace("/", ".")
     module = importlib.import_module(module_name)
 
@@ -23,11 +23,11 @@ def perform_module_checks(path: Path):
     obj = module_class()
 
     stream = io.BytesIO()
-    obj.to_stream(stream)
+    obj.to_stream(stream, game)
     size = stream.tell()
 
     stream.seek(0)
-    decode = module_class.from_stream(stream, size)
+    decode = module_class.from_stream(stream, game, size)
 
     assert decode == obj
 
@@ -50,22 +50,22 @@ def _parametrize_for_game(game: str):
 
 @pytest.mark.parametrize("path", _parametrize_for_game("prime"))
 def test_import_and_create_prime(path: Path):
-    perform_module_checks(path)
+    perform_module_checks(path, Game.PRIME)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("echoes"))
 def test_import_and_create_echoes(path: Path):
-    perform_module_checks(path)
+    perform_module_checks(path, Game.ECHOES)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("corruption"))
 def test_import_and_create_corruption(path: Path):
-    perform_module_checks(path)
+    perform_module_checks(path, Game.CORRUPTION)
 
 
 @pytest.mark.parametrize("path", _parametrize_for_game("prime_remastered"))
 def test_import_and_create_prime_remastered(path: Path):
-    perform_module_checks(path)
+    perform_module_checks(path, Game.PRIME_REMASTER)
 
 
 def test_door():
@@ -133,11 +133,11 @@ def test_door():
         b"\x01\x00\x9e\xc6'\x12\x00\x0c\x00\x01\xb9N\x9b\xe7\x00\x04\xff\xff\xff\xff"
     )
 
+    from retro_data_structures.properties.color import Color
     from retro_data_structures.properties.echoes.archetypes.WeaponVulnerability import Effect, WeaponVulnerability
-    from retro_data_structures.properties.echoes.core.Color import Color
     from retro_data_structures.properties.echoes.objects import Door
 
-    door = Door.from_stream(io.BytesIO(data))
+    door = Door.from_stream(io.BytesIO(data), Game.ECHOES)
     assert door.editor_properties.name == "Door"
     assert door.shell_color == Color(0.0, 1.0, 1.0, 1.0)
     assert door.vulnerability.boost_ball == WeaponVulnerability(0.0, Effect.Normal, True)
@@ -158,12 +158,13 @@ def test_p1r_world_teleporter():
         b"\x00\x00\x00\x00\x11\x89"
     )
 
+    game = Game.PRIME_REMASTER
     from retro_data_structures.properties.prime_remastered.objects import WorldTeleporterTooMP1
 
-    teleporter = WorldTeleporterTooMP1.from_bytes(data)
+    teleporter = WorldTeleporterTooMP1.from_bytes(data, game)
 
-    encoded = teleporter.to_bytes()
-    teleporter2 = WorldTeleporterTooMP1.from_bytes(encoded)
+    encoded = teleporter.to_bytes(game)
+    teleporter2 = WorldTeleporterTooMP1.from_bytes(encoded, game)
 
     assert teleporter == teleporter2
     assert encoded == data

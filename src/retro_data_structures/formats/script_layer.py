@@ -201,7 +201,7 @@ class ScriptLayer:
         return self._get_instance_by_id(instance.id)
 
     def add_instance(self, instance_type: str, name: str | None = None) -> ScriptInstance:
-        instance = ScriptInstance.new_instance(self.target_game, instance_type, self)
+        instance = ScriptInstance.new_instance(instance_type, self)
         if name is not None:
             instance.name = name
         return self._internal_add_instance(instance)

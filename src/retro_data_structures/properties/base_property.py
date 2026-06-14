@@ -12,30 +12,26 @@ if typing.TYPE_CHECKING:
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
     from retro_data_structures.game_check import Game
-    from retro_data_structures.properties.shared_archetypes import EditorProperties
+    from retro_data_structures.properties.common.archetypes.EditorProperties import EditorProperties
 
 
 @dataclasses.dataclass()
 class BaseProperty:
     @classmethod
-    def game(cls) -> Game:
+    def from_stream(cls, data: typing.BinaryIO, game: Game, size: int | None = None) -> typing.Self:
         raise NotImplementedError
 
     @classmethod
-    def from_stream(cls, data: typing.BinaryIO, size: int | None = None) -> typing.Self:
-        raise NotImplementedError
-
-    @classmethod
-    def from_bytes(cls, data: bytes) -> typing.Self:
+    def from_bytes(cls, data: bytes, game: Game) -> typing.Self:
         stream = io.BytesIO(data)
-        return cls.from_stream(stream, len(data))
+        return cls.from_stream(stream, game, len(data))
 
-    def to_stream(self, data: typing.BinaryIO) -> None:
+    def to_stream(self, data: typing.BinaryIO, game: Game) -> None:
         raise NotImplementedError
 
-    def to_bytes(self) -> bytes:
+    def to_bytes(self, game: Game) -> bytes:
         stream = io.BytesIO()
-        self.to_stream(stream)
+        self.to_stream(stream, game)
         return stream.getvalue()
 
     @classmethod
