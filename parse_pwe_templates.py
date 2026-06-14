@@ -1116,11 +1116,6 @@ class PooledString(BaseProperty):
         create_all_file(core_path.joinpath("__init__.py"), base_import, modules)
         return
 
-    if game_id in ["Prime", "Echoes"]:
-        pass
-    else:
-        pass
-
     core_path.joinpath("AnimationParameters.py").write_text(
         """# Generated file
 from __future__ import annotations
