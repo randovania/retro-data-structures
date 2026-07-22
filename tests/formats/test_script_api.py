@@ -10,6 +10,7 @@ from retro_data_structures.formats import Mlvl, script_object
 from retro_data_structures.formats.script_layer import SCLY, MultipleInstances
 from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
+from retro_data_structures.properties.echoes.objects import Dock
 from retro_data_structures.properties.vector import Vector
 
 if TYPE_CHECKING:
@@ -392,3 +393,10 @@ def test_multiple_instances(prime2_asset_manager):
     area.remove_instances("Music Player For Area")
 
     assert len(list(area.all_instances)) == old_len - 3
+
+
+def test_get_dock(prime2_area: Area):
+    dock = prime2_area.get_dock("West")
+
+    assert dock.script_type == Dock
+    assert dock.id == 0x00450011
