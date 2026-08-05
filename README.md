@@ -67,10 +67,8 @@ PAK_GC.build_file({
 
 ## Setup
 
-Before installing the project, make sure to clone the 
-[retro script objects templates](github.com/henriquegemignani/retro-script-object-templates/tree/4d2bf6d7ed2588e833d8b8f2de09ad9d2dc36d4a) 
-subrepository and to set it to the commit displayed on this repository's
-page. This can be done from the subrepository root using `git checkout <hash-of-commit>`
+Make sure to clone this repository using the `--recursive` option (or running `git submodule update --init` if already cloned),
+as the project needs those files to build
 
 Once this has been done, the project and its extras can be installed
 
