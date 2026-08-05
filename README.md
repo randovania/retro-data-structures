@@ -64,3 +64,36 @@ PAK_GC.build_file({
 }, "Game.pak")
 
 ```
+
+## Setup
+
+Before installing the project, make sure to clone the 
+[retro script objects templates](github.com/henriquegemignani/retro-script-object-templates/tree/4d2bf6d7ed2588e833d8b8f2de09ad9d2dc36d4a) 
+subrepository and to set it to the commit displayed on this repository's
+page. This can be done from the subrepository root using `git checkout <hash-of-commit>`
+
+Once this has been done, the project and its extras can be installed
+
+```
+uv sync --all-groups --all-extras
+```
+
+Use `python -m retro_data_structures -h` to see available arguments
+
+### Testing
+
+Tests rely on user-provided ISO files for Metroid Prime, Metroid Prime 2: Echoes, and Metroid Prime 3: Corruption. Create a `.env` file in 
+the repository root:
+
+```
+PRIME1_ISO = /path/to/prime1.iso
+PRIME2_ISO = /path/to/prime2_ntsc.iso
+PRIME2_PAL_ISO = /path/to/prime2_pal.iso
+PRIME3_ISO = /path/to/prime3.iso
+```
+
+Tests can be run locally using 
+
+```
+uv run pytest -n 2
+```
