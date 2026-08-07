@@ -68,15 +68,15 @@ PAK_GC.build_file({
 ## Setup
 
 Make sure to clone this repository using the `--recursive` option (or running `git submodule update --init` if already cloned),
-as the project needs those files to build
+as the project needs those files to build.
 
-Once this has been done, the project and its extras can be installed
+Once this has been done, the project and its extras can be installed:
 
 ```
 uv sync --all-groups --all-extras
 ```
 
-Use `python -m retro_data_structures -h` to see available arguments
+Use `python -m retro_data_structures -h` to see available arguments.
 
 ### Testing
 
@@ -90,7 +90,7 @@ PRIME2_PAL_ISO = /path/to/prime2_pal.iso
 PRIME3_ISO = /path/to/prime3.iso
 ```
 
-Tests can be run locally using 
+Tests can be run locally using:
 
 ```
 uv run pytest -n 2
