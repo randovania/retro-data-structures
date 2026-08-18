@@ -31,10 +31,12 @@ def test_compare_p2(prime2_asset_manager):
     assert strg.strings == (
         "Morphology: Brizgee\nVenomous insectoid.",
         "Poisoned stinger concealed in back-mounted shell. Finish it off quickly once the stinger is exposed.",
-        ("The Brizgee's tail ends in a venomous barb, which it conceals underneath a "
-        "hard-packed layer of fused sand. A series of sharpened ridges along its body "
-        "discourages most predators; those foolish enough to harass the Brizgee are "
-        "quickly introduced to its deadly sting."),
+        (
+            "The Brizgee's tail ends in a venomous barb, which it conceals underneath a "
+            "hard-packed layer of fused sand. A series of sharpened ridges along its body "
+            "discourages most predators; those foolish enough to harass the Brizgee are "
+            "quickly introduced to its deadly sting."
+        ),
     )
 
 
