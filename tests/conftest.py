@@ -103,7 +103,7 @@ def prime3_asset_manager(internal_prime3_asset_manager) -> YieldFixture[AssetMan
     internal_prime3_asset_manager._memory_files.clear()
 
 
-def pytest_generate_tests(metafunc):
+def pytest_generate_tests(metafunc: pytest.Metafunc):
     fixture_names: list[str] = list(metafunc.fixturenames)
     asset_manager_fixtures = [
         fixture

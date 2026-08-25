@@ -67,9 +67,6 @@ exclude = [
     "tools/",
 ]
 
-[tool.hatch.build.targets.wheel.hooks.custom]
-path = "invoke_templates.py"
-
 [tool.pytest.ini_options]
 minversion = "6.0"
 # asyncio_mode = "auto"
@@ -150,4 +147,9 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 disable_error_code = [
     "method-assign",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.4",
 ]

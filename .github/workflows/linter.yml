@@ -70,3 +70,38 @@ jobs:
           level: warning
           fail_on_error: false
           install_types: false
+
+  templates:
+    runs-on: 'ubuntu-latest'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.9.3"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+
+      - name: Install Python packages
+        run: uv sync --locked --all-extras
+
+      - name: Generate templates
+        run: uv run parse_pwe_templates.py
+
+      - name: Format templates
+        # check can make unformatted code, but it can complain about line-length so format first
+        run: uv run ruff format && uv run ruff check --fix --unsafe-fixes && uv run ruff format
+
+      - name: Check differences
+        run: |
+          # Stage untracked files as empty so `git diff` reports them too
+          git add --intent-to-add .
+          git diff --exit-code

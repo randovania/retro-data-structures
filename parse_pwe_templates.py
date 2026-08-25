@@ -434,7 +434,6 @@ def _filter_property_name(n: str) -> str:
 
 def _ensure_is_generated_dir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    path.joinpath(".gitignore").write_text("*")
     init = path.joinpath("__init__.py")
     if not init.is_file():
         init.write_text("")
@@ -563,7 +562,6 @@ class ClassDefinition:
         dataclass_metadata.append(f"'reflection': FieldReflection[{prop.prop_type}](")
         self.class_code += ", ".join(dataclass_metadata)
 
-        # from retro_data_structures.json_util import JsonValue
         reflection_fields = [
             prop.prop_type,
             f"id=0x{prop.id:08x}",
@@ -571,8 +569,13 @@ class ClassDefinition:
         ]
         if (from_json := prop.get_from_json(prop_name)) != "json_util.identity":
             reflection_fields.append(f"from_json={from_json}")
+        # else:
+        #     self.needed_imports["retro_data_structures"] = "json_util"
+
         if (to_json := prop.get_to_json(prop_name)) != "json_util.identity":
             reflection_fields.append(f"to_json={to_json}")
+        # else:
+        #     self.needed_imports["retro_data_structures"] = "json_util"
 
         self.class_code += "\n            " + ", ".join(reflection_fields) + "\n        ),\n    })"
         if prop.comment is not None:
@@ -1024,9 +1027,10 @@ class ClassDefinition:
 
 def create_all_file(path: Path, prefix: str, modules: list[str]) -> None:
     code = "# Generated File\n"
+    code += "from __future__ import annotations\n\n"
 
     all_list = []
-    for name in modules:
+    for name in sorted(modules):
         code += f"from {prefix}{name} import {name}\n"
         all_list.append(f'    "{name}",')
 
@@ -1048,23 +1052,26 @@ def _add_default_types(core_path: Path, game_id: str) -> None:
         else:
             invalid_id = "0xFFFFFFFFFFFFFFFF"
         asset_code = f"AssetId = int\ndefault_asset_id = {invalid_id}\n"
-    core_path.joinpath("AssetId.py").write_text(asset_code)
+    core_path.joinpath("AssetId.py").write_text("# Generated File\nfrom __future__ import annotations\n\n" + asset_code)
     modules.append("AssetId")
 
     if game_id == "PrimeRemastered":
         core_path.joinpath("PooledString.py").write_text(
             """# Generated file
+from __future__ import annotations
 import dataclasses
 import struct
 import typing
+
 import typing_extensions
 
-from retro_data_structures import json_util
-from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
 from .AssetId import AssetId, default_asset_id
 
 if typing.TYPE_CHECKING:
+    from retro_data_structures import json_util
+    from retro_data_structures.game_check import Game
+
     class PooledStringJson(typing_extensions.TypedDict):
         index: int
         size_or_str: int | str
@@ -1123,16 +1130,18 @@ from __future__ import annotations
 import dataclasses
 import struct
 import typing
+
 import typing_extensions
 
-from retro_data_structures import json_util
-from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import BaseProperty
+
 from .AssetId import AssetId, default_asset_id
 
 if typing.TYPE_CHECKING:
+    from retro_data_structures import json_util
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
+    from retro_data_structures.game_check import Game
 
 
 @dataclasses.dataclass()
@@ -1158,11 +1167,16 @@ class AnimationParameters(BaseProperty):
         else:
             format_specifier = "Q"
 
-        data.write(struct.pack(f'{game.struct_endianness}{format_specifier}LL', self.ancs, self.character_index, self.initial_anim))
+        data.write(struct.pack(
+            f'{game.struct_endianness}{format_specifier}LL',
+            self.ancs,
+            self.character_index,
+            self.initial_anim,
+        ))
 
     @classmethod
     def from_json(cls, data: json_util.JsonValue) -> typing_extensions.Self:
-        data_json = typing.cast(dict[str, int], data)
+        data_json = typing.cast('dict[str, int]', data)
         return cls(data_json["ancs"], data_json["character_index"], data_json["initial_anim"])
 
     def to_json(self) -> json_util.JsonObject:
@@ -1480,6 +1494,7 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                 parse_code = f"list(struct.unpack({specifier}, data.read(count * {inner_prop.known_size})))"
             else:
                 parse_code = f"[{inner_prop.parse_code} for _ in range({_CODE_PARSE_UINT32[endianness]})]"
+
             build_code.extend(
                 [
                     "array = {obj}",
@@ -1488,8 +1503,15 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     *["    " + inner.format(obj="item") for inner in inner_prop.build_code],
                 ]
             )
-            from_json_code = "[{inner} for item in {{obj}}]".format(inner=inner_prop.from_json_code.format(obj="item"))
-            to_json_code = "[{inner} for item in {{obj}}]".format(inner=inner_prop.to_json_code.format(obj="item"))
+
+            def create_list(inner_expr: str) -> str:
+                if inner_expr == "item":
+                    return "list({obj})"
+                else:
+                    return f"[{inner_expr} for item in {{obj}}]"
+
+            from_json_code = create_list(inner_prop.from_json_code.format(obj="item"))
+            to_json_code = create_list(inner_prop.to_json_code.format(obj="item"))
             needed_imports.update(inner_prop.needed_imports)
 
         elif raw_type == "String":
@@ -1680,17 +1702,20 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         cls.write_dependencies()
 
         code_code = "# Generated File\n"
+        code_code += "# ruff: noqa: F841, E501, PLR0915, PLW0603, PLR0912\n"
         code_code += "from __future__ import annotations\n\n"
         code_code += "import dataclasses\n"
         if cls.local_enums:
             code_code += "import enum\n"
-        code_code += "import struct\nimport typing\nimport typing_extensions\n"
+        code_code += "import struct\nimport typing\n\nimport typing_extensions\n"
 
-        code_code += "\nfrom retro_data_structures import json_util\n"
-        code_code += "from retro_data_structures.game_check import Game\n"
-        code_code += "from retro_data_structures.properties import structs\n"
-        code_code += f"from retro_data_structures.properties.base_property import {base_class}\n"
-        code_code += "from retro_data_structures.properties.field_reflection import FieldReflection\n"
+        code_code += "\n"
+
+        cls.typing_imports["retro_data_structures"] = "json_util"
+        cls.typing_imports["retro_data_structures.game_check"] = "Game"
+        cls.needed_imports["retro_data_structures.properties"] = "structs"
+        cls.needed_imports["retro_data_structures.properties.base_property"] = base_class
+        cls.needed_imports["retro_data_structures.properties.field_reflection"] = "FieldReflection"
 
         if cls.need_enums:
             code_code += f"import retro_data_structures.enums.{_game_id_to_file[game_id]} as enums\n"
@@ -1709,6 +1734,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
                     code_code += f"    import {import_path}\n"
                 else:
                     code_code += f"    from {import_path} import {code_import}\n"
+
+                if import_path == "collections.abc":
+                    code_code += "\n"
 
             if typing_imports:
                 code_code += "\n"
@@ -1759,11 +1787,14 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         object_type = "BaseObjectType"
 
     getter_func = "# Generated File\n"
+    getter_func += "# ruff: noqa: I001\n"
+    getter_func += "from __future__ import annotations\n"
     getter_func += "import functools\nimport typing\n\n"
-    getter_func += f"from retro_data_structures.properties.base_property import {object_type}\n"
+
+    included_imports = set()
 
     base_import_path = f"retro_data_structures.properties.{_game_id_to_file[game_id]}.objects."
-    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, typing.Type[{object_type}]] = {{\n"
+    fourcc_mapping = f"\n_FOUR_CC_MAPPING: dict[{four_cc_type}, type[{object_type}]] = {{\n"
     for object_fourcc, script_object in script_objects.items():
         stem = Path(script_objects_paths[object_fourcc]).stem
         # certain objects have a different name in Game.xml than in the struct's xml
@@ -1771,14 +1802,21 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
         script_object["name"] = stem
         parse_struct(stem, script_object, path, struct_fourcc=object_fourcc)
 
-        getter_func += f"from {base_import_path}{stem} import {stem}\n"
+        if stem not in included_imports:
+            getter_func += f"from {base_import_path}{stem} import {stem}\n"
+            # Prime 1 for weird reasons has two objects named WorldTeleporter
+            included_imports.add(stem)
+
         fourcc_mapping += f"    {four_cc_wrap(object_fourcc)}: {stem},\n"
+
+    getter_func += "\nif typing.TYPE_CHECKING:\n"
+    getter_func += f"   from retro_data_structures.properties.base_property import {object_type}\n"
 
     getter_func += fourcc_mapping
     getter_func += "}\n\n\n"
 
-    getter_func += "@functools.lru_cache(maxsize=None)\n"
-    getter_func += f"def get_object(four_cc: {four_cc_type}) -> typing.Type[{object_type}]:\n"
+    getter_func += "@functools.cache\n"
+    getter_func += f"def get_object(four_cc: {four_cc_type}) -> type[{object_type}]:\n"
     getter_func += "    return _FOUR_CC_MAPPING[four_cc]\n"
     path.joinpath("__init__.py").write_text(getter_func)
 
@@ -1821,9 +1859,7 @@ def write_shared_type_with_common_import(
 
         used_games.update(games)
         declarations.append(
-            "{} = typing.Union[\n{}\n]".format(
-                object_name, ",\n".join(f"    _{_game_id_to_file[game]}_{kind}.{type_name}" for game in games)
-            )
+            "{} = {}".format(object_name, " | ".join(f"_{_game_id_to_file[game]}_{kind}.{type_name}" for game in games))
         )
 
     if kind == "enums":
@@ -1832,7 +1868,7 @@ def write_shared_type_with_common_import(
         left_kind = f".{kind}"
 
     output_file.write_text(
-        "# Generated File\nimport typing\n\n{imports}\n\n{declarations}\n".format(
+        "# Generated File\nfrom __future__ import annotations\n\n{imports}\n\n{declarations}\n".format(
             imports="\n".join(
                 f"{base}{_game_id_to_file[game]}{left_kind} as _{_game_id_to_file[game]}_{kind}"
                 for game in sorted(used_games)
@@ -2029,5 +2065,5 @@ def persist_data(parse_result: dict[str, typing.Any]) -> None:
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    # persist_data(parse(["PrimeRemastered"]))
+    # persist_data(parse(["Prime"]))
     persist_data(parse(_game_id_to_file.keys()))
