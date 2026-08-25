@@ -1,0 +1,228 @@
+# Generated File
+
+from __future__ import annotations
+
+from retro_data_structures.properties.corruption.archetypes import ActorParameters as _ActorParameters_Corruption
+from retro_data_structures.properties.corruption.archetypes import CameraShakerData as _CameraShakerData_Corruption
+from retro_data_structures.properties.corruption.archetypes import ConditionalTest as _ConditionalTest_Corruption
+from retro_data_structures.properties.corruption.archetypes import Connection as _Connection_Corruption
+from retro_data_structures.properties.corruption.archetypes import DamageInfo as _DamageInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    DamageVulnerability as _DamageVulnerability_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import FlareDef as _FlareDef_Corruption
+from retro_data_structures.properties.corruption.archetypes import HealthInfo as _HealthInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import LayerInfo as _LayerInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import LightParameters as _LightParameters_Corruption
+from retro_data_structures.properties.corruption.archetypes import MysteryFlyerData as _MysteryFlyerData_Corruption
+from retro_data_structures.properties.corruption.archetypes import PatternedAITypedef as _PatternedAITypedef_Corruption
+from retro_data_structures.properties.corruption.archetypes import PlasmaBeamInfo as _PlasmaBeamInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    PlatformMotionProperties as _PlatformMotionProperties_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import PlayerActorStruct as _PlayerActorStruct_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    ScanInfoSecondaryModel as _ScanInfoSecondaryModel_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    ScannableParameters as _ScannableParameters_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import ShockWaveInfo as _ShockWaveInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    SpacePirateWeaponData as _SpacePirateWeaponData_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import SurroundPan as _SurroundPan_Corruption
+from retro_data_structures.properties.corruption.archetypes import TextProperties as _TextProperties_Corruption
+from retro_data_structures.properties.corruption.archetypes import TriggerInfo as _TriggerInfo_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakAutoMapper_Base as _TweakAutoMapper_Base_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakAutoMapper_DoorColors as _TweakAutoMapper_DoorColors_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import TweakBall_Misc as _TweakBall_Misc_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakBall_ScrewAttack as _TweakBall_ScrewAttack_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import TweakGui_Misc as _TweakGui_Misc_Corruption
+from retro_data_structures.properties.corruption.archetypes import TweakGui_ScanVisor as _TweakGui_ScanVisor_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakGuiColors_HUDColorsTypedef as _TweakGuiColors_HUDColorsTypedef_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakGuiColors_Misc as _TweakGuiColors_Misc_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayer_AimStuff as _TweakPlayer_AimStuff_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayer_Grapple as _TweakPlayer_Grapple_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import TweakPlayer_Misc as _TweakPlayer_Misc_Corruption
+from retro_data_structures.properties.corruption.archetypes import TweakPlayer_Motion as _TweakPlayer_Motion_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayer_ScanVisor as _TweakPlayer_ScanVisor_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayer_SuitDamageReduction as _TweakPlayer_SuitDamageReduction_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerGun_Beam_Misc as _TweakPlayerGun_Beam_Misc_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerGun_Misc as _TweakPlayerGun_Misc_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerGun_RicochetDamage_Factor as _TweakPlayerGun_RicochetDamage_Factor_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerGun_Weapons as _TweakPlayerGun_Weapons_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerRes_AutoMapperIcons as _TweakPlayerRes_AutoMapperIcons_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import (
+    TweakPlayerRes_MapScreenIcons as _TweakPlayerRes_MapScreenIcons_Corruption,
+)
+from retro_data_structures.properties.corruption.archetypes import Vector2f as _Vector2f_Corruption
+from retro_data_structures.properties.corruption.archetypes import VisorParameters as _VisorParameters_Corruption
+from retro_data_structures.properties.corruption.archetypes import (
+    WeaponVulnerability as _WeaponVulnerability_Corruption,
+)
+from retro_data_structures.properties.echoes.archetypes import ActorParameters as _ActorParameters_Echoes
+from retro_data_structures.properties.echoes.archetypes import BehaveChance as _BehaveChance_Echoes
+from retro_data_structures.properties.echoes.archetypes import CameraShakerData as _CameraShakerData_Echoes
+from retro_data_structures.properties.echoes.archetypes import ConditionalTest as _ConditionalTest_Echoes
+from retro_data_structures.properties.echoes.archetypes import Connection as _Connection_Echoes
+from retro_data_structures.properties.echoes.archetypes import DamageInfo as _DamageInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import DamageVulnerability as _DamageVulnerability_Echoes
+from retro_data_structures.properties.echoes.archetypes import FlareDef as _FlareDef_Echoes
+from retro_data_structures.properties.echoes.archetypes import GrappleParameters as _GrappleParameters_Echoes
+from retro_data_structures.properties.echoes.archetypes import HealthInfo as _HealthInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import LayerInfo as _LayerInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import LayerSwitch as _LayerSwitch_Echoes
+from retro_data_structures.properties.echoes.archetypes import LightParameters as _LightParameters_Echoes
+from retro_data_structures.properties.echoes.archetypes import MysteryFlyerData as _MysteryFlyerData_Echoes
+from retro_data_structures.properties.echoes.archetypes import PatternedAITypedef as _PatternedAITypedef_Echoes
+from retro_data_structures.properties.echoes.archetypes import PlasmaBeamInfo as _PlasmaBeamInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    PlatformMotionProperties as _PlatformMotionProperties_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import ScanInfoSecondaryModel as _ScanInfoSecondaryModel_Echoes
+from retro_data_structures.properties.echoes.archetypes import ScannableParameters as _ScannableParameters_Echoes
+from retro_data_structures.properties.echoes.archetypes import ShockWaveInfo as _ShockWaveInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import SpacePirateWeaponData as _SpacePirateWeaponData_Echoes
+from retro_data_structures.properties.echoes.archetypes import SpindleCameraStruct as _SpindleCameraStruct_Echoes
+from retro_data_structures.properties.echoes.archetypes import SurroundPan as _SurroundPan_Echoes
+from retro_data_structures.properties.echoes.archetypes import TextProperties as _TextProperties_Echoes
+from retro_data_structures.properties.echoes.archetypes import TriggerInfo as _TriggerInfo_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakAutoMapper_Base as _TweakAutoMapper_Base_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakAutoMapper_DoorColors as _TweakAutoMapper_DoorColors_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import TweakBall_Misc as _TweakBall_Misc_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakBall_ScrewAttack as _TweakBall_ScrewAttack_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakGui_Misc as _TweakGui_Misc_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakGui_ScanVisor as _TweakGui_ScanVisor_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakGuiColors_HUDColorsTypedef as _TweakGuiColors_HUDColorsTypedef_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import TweakGuiColors_Misc as _TweakGuiColors_Misc_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakPlayer_AimStuff as _TweakPlayer_AimStuff_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakPlayer_Grapple as _TweakPlayer_Grapple_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakPlayer_Misc as _TweakPlayer_Misc_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakPlayer_Motion as _TweakPlayer_Motion_Echoes
+from retro_data_structures.properties.echoes.archetypes import TweakPlayer_ScanVisor as _TweakPlayer_ScanVisor_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakPlayer_SuitDamageReduction as _TweakPlayer_SuitDamageReduction_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakPlayerGun_Beam_Misc as _TweakPlayerGun_Beam_Misc_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import TweakPlayerGun_Misc as _TweakPlayerGun_Misc_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakPlayerGun_RicochetDamage_Factor as _TweakPlayerGun_RicochetDamage_Factor_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import TweakPlayerGun_Weapons as _TweakPlayerGun_Weapons_Echoes
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakPlayerRes_AutoMapperIcons as _TweakPlayerRes_AutoMapperIcons_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import (
+    TweakPlayerRes_MapScreenIcons as _TweakPlayerRes_MapScreenIcons_Echoes,
+)
+from retro_data_structures.properties.echoes.archetypes import Vector2f as _Vector2f_Echoes
+from retro_data_structures.properties.echoes.archetypes import VisorParameters as _VisorParameters_Echoes
+from retro_data_structures.properties.echoes.archetypes import WeaponVulnerability as _WeaponVulnerability_Echoes
+from retro_data_structures.properties.prime.archetypes import ActorParameters as _ActorParameters_Prime
+from retro_data_structures.properties.prime.archetypes import BehaveChance as _BehaveChance_Prime
+from retro_data_structures.properties.prime.archetypes import DamageInfo as _DamageInfo_Prime
+from retro_data_structures.properties.prime.archetypes import DamageVulnerability as _DamageVulnerability_Prime
+from retro_data_structures.properties.prime.archetypes import FlareDef as _FlareDef_Prime
+from retro_data_structures.properties.prime.archetypes import GrappleParameters as _GrappleParameters_Prime
+from retro_data_structures.properties.prime.archetypes import HealthInfo as _HealthInfo_Prime
+from retro_data_structures.properties.prime.archetypes import LayerSwitch as _LayerSwitch_Prime
+from retro_data_structures.properties.prime.archetypes import LightParameters as _LightParameters_Prime
+from retro_data_structures.properties.prime.archetypes import PatternedAITypedef as _PatternedAITypedef_Prime
+from retro_data_structures.properties.prime.archetypes import PlayerActorStruct as _PlayerActorStruct_Prime
+from retro_data_structures.properties.prime.archetypes import ScannableParameters as _ScannableParameters_Prime
+from retro_data_structures.properties.prime.archetypes import SpindleCameraStruct as _SpindleCameraStruct_Prime
+from retro_data_structures.properties.prime.archetypes import Vector2f as _Vector2f_Prime
+from retro_data_structures.properties.prime.archetypes import VisorParameters as _VisorParameters_Prime
+
+type ActorParameters = _ActorParameters_Prime | _ActorParameters_Echoes | _ActorParameters_Corruption
+type BehaveChance = _BehaveChance_Prime | _BehaveChance_Echoes
+type CameraShakerData = _CameraShakerData_Echoes | _CameraShakerData_Corruption
+type ConditionalTest = _ConditionalTest_Echoes | _ConditionalTest_Corruption
+type Connection = _Connection_Echoes | _Connection_Corruption
+type DamageInfo = _DamageInfo_Prime | _DamageInfo_Echoes | _DamageInfo_Corruption
+type DamageVulnerability = _DamageVulnerability_Prime | _DamageVulnerability_Echoes | _DamageVulnerability_Corruption
+type FlareDef = _FlareDef_Prime | _FlareDef_Echoes | _FlareDef_Corruption
+type GrappleParameters = _GrappleParameters_Prime | _GrappleParameters_Echoes
+type HealthInfo = _HealthInfo_Prime | _HealthInfo_Echoes | _HealthInfo_Corruption
+type LayerInfo = _LayerInfo_Echoes | _LayerInfo_Corruption
+type LayerSwitch = _LayerSwitch_Prime | _LayerSwitch_Echoes
+type LightParameters = _LightParameters_Prime | _LightParameters_Echoes | _LightParameters_Corruption
+type MysteryFlyerData = _MysteryFlyerData_Echoes | _MysteryFlyerData_Corruption
+type PatternedAITypedef = _PatternedAITypedef_Prime | _PatternedAITypedef_Echoes | _PatternedAITypedef_Corruption
+type PlasmaBeamInfo = _PlasmaBeamInfo_Echoes | _PlasmaBeamInfo_Corruption
+type PlatformMotionProperties = _PlatformMotionProperties_Echoes | _PlatformMotionProperties_Corruption
+type PlayerActorStruct = _PlayerActorStruct_Prime | _PlayerActorStruct_Corruption
+type ScanInfoSecondaryModel = _ScanInfoSecondaryModel_Echoes | _ScanInfoSecondaryModel_Corruption
+type ScannableParameters = _ScannableParameters_Prime | _ScannableParameters_Echoes | _ScannableParameters_Corruption
+type ShockWaveInfo = _ShockWaveInfo_Echoes | _ShockWaveInfo_Corruption
+type SpacePirateWeaponData = _SpacePirateWeaponData_Echoes | _SpacePirateWeaponData_Corruption
+type SpindleCameraStruct = _SpindleCameraStruct_Prime | _SpindleCameraStruct_Echoes
+type SurroundPan = _SurroundPan_Echoes | _SurroundPan_Corruption
+type TextProperties = _TextProperties_Echoes | _TextProperties_Corruption
+type TriggerInfo = _TriggerInfo_Echoes | _TriggerInfo_Corruption
+type TweakAutoMapper_Base = _TweakAutoMapper_Base_Echoes | _TweakAutoMapper_Base_Corruption
+type TweakAutoMapper_DoorColors = _TweakAutoMapper_DoorColors_Echoes | _TweakAutoMapper_DoorColors_Corruption
+type TweakBall_Misc = _TweakBall_Misc_Echoes | _TweakBall_Misc_Corruption
+type TweakBall_ScrewAttack = _TweakBall_ScrewAttack_Echoes | _TweakBall_ScrewAttack_Corruption
+type TweakGuiColors_HUDColorsTypedef = (
+    _TweakGuiColors_HUDColorsTypedef_Echoes | _TweakGuiColors_HUDColorsTypedef_Corruption
+)
+type TweakGuiColors_Misc = _TweakGuiColors_Misc_Echoes | _TweakGuiColors_Misc_Corruption
+type TweakGui_Misc = _TweakGui_Misc_Echoes | _TweakGui_Misc_Corruption
+type TweakGui_ScanVisor = _TweakGui_ScanVisor_Echoes | _TweakGui_ScanVisor_Corruption
+type TweakPlayerGun_Beam_Misc = _TweakPlayerGun_Beam_Misc_Echoes | _TweakPlayerGun_Beam_Misc_Corruption
+type TweakPlayerGun_Misc = _TweakPlayerGun_Misc_Echoes | _TweakPlayerGun_Misc_Corruption
+type TweakPlayerGun_RicochetDamage_Factor = (
+    _TweakPlayerGun_RicochetDamage_Factor_Echoes | _TweakPlayerGun_RicochetDamage_Factor_Corruption
+)
+type TweakPlayerGun_Weapons = _TweakPlayerGun_Weapons_Echoes | _TweakPlayerGun_Weapons_Corruption
+type TweakPlayerRes_AutoMapperIcons = (
+    _TweakPlayerRes_AutoMapperIcons_Echoes | _TweakPlayerRes_AutoMapperIcons_Corruption
+)
+type TweakPlayerRes_MapScreenIcons = _TweakPlayerRes_MapScreenIcons_Echoes | _TweakPlayerRes_MapScreenIcons_Corruption
+type TweakPlayer_AimStuff = _TweakPlayer_AimStuff_Echoes | _TweakPlayer_AimStuff_Corruption
+type TweakPlayer_Grapple = _TweakPlayer_Grapple_Echoes | _TweakPlayer_Grapple_Corruption
+type TweakPlayer_Misc = _TweakPlayer_Misc_Echoes | _TweakPlayer_Misc_Corruption
+type TweakPlayer_Motion = _TweakPlayer_Motion_Echoes | _TweakPlayer_Motion_Corruption
+type TweakPlayer_ScanVisor = _TweakPlayer_ScanVisor_Echoes | _TweakPlayer_ScanVisor_Corruption
+type TweakPlayer_SuitDamageReduction = (
+    _TweakPlayer_SuitDamageReduction_Echoes | _TweakPlayer_SuitDamageReduction_Corruption
+)
+type Vector2f = _Vector2f_Prime | _Vector2f_Echoes | _Vector2f_Corruption
+type VisorParameters = _VisorParameters_Prime | _VisorParameters_Echoes | _VisorParameters_Corruption
+type WeaponVulnerability = _WeaponVulnerability_Echoes | _WeaponVulnerability_Corruption

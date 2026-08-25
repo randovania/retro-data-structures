@@ -32,37 +32,39 @@ def read_file(path):
         return f.read()
 
 
-PAK_GC.build_file({
-    'named_resources': [
-        {"asset": {"type": 'TXTR', "id": 201335801}, "name": 'TXTR_ElevatorIcon_1'},
-        {"asset": {"type": 'TXTR', "id": 239414538}, "name": 'TXTR_ElevatorIcon'},
-        {"asset": {"type": 'TXTR', "id": 564256465}, "name": 'TXTR_QuaterCurve'},
-        {"asset": {"type": 'TXTR', "id": 568030977}, "name": 'TXTR_SaveStationIcon_1'},
-    ],
-    'resources': [
-        {
-            "asset": {"type": 'TXTR', "id": 201335801},
-            "compressed": 1,
-            "contents": {"value": read_file("ElevatorIcon_1.TXTR")},
-        },
-        {
-            "asset": {"type": 'TXTR', "id": 201335801},
-            "compressed": 1,
-            "contents": {"value": read_file("ElevatorIcon.TXTR")},
-        },
-        {
-            "asset": {"type": 'TXTR', "id": 201335801},
-            "compressed": 1,
-            "contents": {"value": read_file("QuaterCurve.TXTR")},
-        },
-        {
-            "asset": {"type": 'TXTR', "id": 201335801},
-            "compressed": 1,
-            "contents": {"value": read_file("SaveStationIcon_1.TXTR")},
-        },
-    ]
-}, "Game.pak")
-
+PAK_GC.build_file(
+    {
+        "named_resources": [
+            {"asset": {"type": "TXTR", "id": 201335801}, "name": "TXTR_ElevatorIcon_1"},
+            {"asset": {"type": "TXTR", "id": 239414538}, "name": "TXTR_ElevatorIcon"},
+            {"asset": {"type": "TXTR", "id": 564256465}, "name": "TXTR_QuaterCurve"},
+            {"asset": {"type": "TXTR", "id": 568030977}, "name": "TXTR_SaveStationIcon_1"},
+        ],
+        "resources": [
+            {
+                "asset": {"type": "TXTR", "id": 201335801},
+                "compressed": 1,
+                "contents": {"value": read_file("ElevatorIcon_1.TXTR")},
+            },
+            {
+                "asset": {"type": "TXTR", "id": 201335801},
+                "compressed": 1,
+                "contents": {"value": read_file("ElevatorIcon.TXTR")},
+            },
+            {
+                "asset": {"type": "TXTR", "id": 201335801},
+                "compressed": 1,
+                "contents": {"value": read_file("QuaterCurve.TXTR")},
+            },
+            {
+                "asset": {"type": "TXTR", "id": 201335801},
+                "compressed": 1,
+                "contents": {"value": read_file("SaveStationIcon_1.TXTR")},
+            },
+        ],
+    },
+    "Game.pak",
+)
 ```
 
 ## Setup
