@@ -9,8 +9,9 @@ AppLoader = construct.Struct(
     date=construct.Aligned(16, construct.Bytes(10)),
     entry_point=construct.Hex(construct.Int32ub),
     size=construct.Rebuild(construct.Int32ub, construct.len_(construct.this.code)),
-    trailer_size=construct.Int32ub,
+    _trailer_size=construct.Rebuild(construct.Int32ub, construct.len_(construct.this.trailer)),
     code=construct.Bytes(construct.this.size),
+    trailer=construct.Bytes(construct.this._trailer_size),
 )
 
 
