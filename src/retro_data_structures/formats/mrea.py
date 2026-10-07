@@ -900,7 +900,7 @@ class Area:
 
         return result
 
-    def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
+    def _raw_connect_to(self, source_dock_number: int, target_area: Area, target_dock_number: int) -> None:
         source_dock = self._raw.docks[source_dock_number]
         assert len(source_dock.connecting_dock) == 1, "Only docks with one connection supported"
         source_dock.connecting_dock[0].area_index = target_area._index
@@ -913,9 +913,22 @@ class Area:
                     attached_area_index.append(c.area_index)
         self._raw.attached_area_index = construct.ListContainer(attached_area_index)
 
-    def connect_dock_to(self, source_dock_number: int, target_area: Area, target_dock_number: int):
+    def connect_dock_to(
+        self, source_dock_number: int, target_area: Area, target_dock_number: int, *, forward_only: bool = False
+    ) -> None:
         self._raw_connect_to(source_dock_number, target_area, target_dock_number)
-        target_area._raw_connect_to(target_dock_number, self, source_dock_number)
+        if not forward_only:
+            target_area._raw_connect_to(target_dock_number, self, source_dock_number)
+
+    def get_dock(self, dock_name: str) -> ScriptInstance:
+        """Gets the script object of type Dock with the given name."""
+        from retro_data_structures.properties.shared_objects import Dock
+
+        for instance in self.all_instances:
+            if instance.name == dock_name and instance.script_type in Dock.__args__:
+                return instance
+
+        raise KeyError(f"No object of type Dock and name {dock_name} found.")
 
     def build_non_layer_dependencies(self) -> typing.Iterator[Dependency]:
         if self.asset_manager.target_game <= Game.ECHOES:
@@ -936,7 +949,9 @@ class Area:
         if valid_asset(path := self.mrea.get_path()):
             yield Dependency("PATH", path)
 
-    def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
+    def build_scgn_dependencies(
+        self, layer_deps: list[list[Dependency]], only_modified: bool = False
+    ) -> list[list[Dependency]]:
         layer_deps = list(layer_deps)
 
         layers = list(self.layers)
@@ -947,7 +962,7 @@ class Area:
 
         return [list(dict.fromkeys(deps)) for deps in layer_deps]
 
-    def build_mlvl_dependencies(self, only_modified: bool = False):
+    def build_mlvl_dependencies(self, only_modified: bool = False) -> None:
         layer_deps = [
             list(
                 layer.build_mlvl_dependencies(self.asset_manager)
@@ -980,12 +995,12 @@ class Area:
 
         self.dependencies = AreaDependencies.from_iterables(layer_deps, non_layer)
 
-    def dependencies_for(self):
+    def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from self.dependencies.all_dependencies
         yield from self.asset_manager.get_dependencies_for_asset(self.mrea_asset_id)
         yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
 
-    def ensure_dependencies_in_paks(self):
+    def ensure_dependencies_in_paks(self) -> None:
         asset_manager = self._parent_mlvl.asset_manager
         paks = list(asset_manager.find_paks(self.mrea_asset_id))
 
@@ -993,7 +1008,7 @@ class Area:
             for pak in paks:
                 asset_manager.ensure_present(pak, dep.id)
 
-    def build_module_dependencies(self, only_modified: bool = False):
+    def build_module_dependencies(self, only_modified: bool = False) -> None:
         if self._parent_mlvl.asset_manager.target_game == Game.PRIME:
             return
         layers = list(self.layers)
