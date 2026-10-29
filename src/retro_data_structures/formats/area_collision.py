@@ -69,15 +69,15 @@ _prime1_materials = dict(
     _shared_materials,
     **{
         "Lava": 0x00000200,
-        "unknown_1": 0x00000400,
+        "Lava Stone": 0x00000400,
         "Slow Mud": 0x00001000,
         "Mud": 0x00004000,
         "Glass": 0x00008000,
         "Shoot Thru": 0x00040000,
         "Solid": 0x00080000,
-        "unknown_2": 0x00100000,
-        "unknown_3": 0x01000000,
-        "Redundant Edge/Flipped Tri": 0x02000000,
+        "No Platform Collision": 0x00100000,
+        "No Edge Collision": 0x01000000,
+        "Flipped Tri": 0x02000000,
     },
 )
 
@@ -87,11 +87,12 @@ _prime23_materials = dict(
         "SP_Metal": 0x00000200,
         "Glass": 0x00000400,
         "Fabric": 0x00001000,
-        "unused_1": 0x00004000,
-        "unused_2": 0x00008000,
+        "Plastic": 0x00004000,
+        "Wire": 0x00008000,
         "Moth Organics/Seed Organics": 0x00040000,
         "Web": 0x00080000,
         "Shoot Thru": 0x00100000,
+        # On triangles, this flag means the triangle is flipped. On edges and vertices, it means no edge collision.
         "Redundant Edge/Flipped Tri": 0x01000000,
         "Rubber": 0x02000000,
         "Jump Not Allowed": 0x0400000000000000,
@@ -136,7 +137,7 @@ _prime23_materials_all = dict(_prime23_materials, **_internal_materials)
 
 _material_types = {
     "prime1": FlagsEnum(Int32ub, **_prime1_materials),
-    "prime23": FlagsEnum(Int64ub, **_prime23_materials),
+    "prime23": FlagsEnum(Int64ub, **_prime23_materials_all),
 }
 
 
