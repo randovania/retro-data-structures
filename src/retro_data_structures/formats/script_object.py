@@ -121,22 +121,22 @@ class ScriptInstanceRaw:
     base_property: bytes
 
 
-def _raw_script_instance_construct(obj_type_con, obj_len_con):
+def _raw_script_instance_construct(obj_type_con, obj_len_con, state_message_con):
     header = construct.Struct(
         type=obj_type_con,
         raw_data=construct.Prefixed(obj_len_con, construct.GreedyBytes),
     ).compile()
     body = construct.Struct(
         instance_id=Int32ub,
-        connections=PrefixedArray(obj_len_con, ConstructConnection(obj_type_con)),
+        connections=PrefixedArray(obj_len_con, ConstructConnection(state_message_con)),
         base_property=construct.GreedyBytes,
     ).compile()
 
     return header, body
 
 
-_PrimeRawScript = _raw_script_instance_construct(Int8ub, Int32ub)
-_EchoesRawScript = _raw_script_instance_construct(FourCC, Int16ub)
+_PrimeRawScript = _raw_script_instance_construct(Int8ub, Int32ub, Int32ub)
+_EchoesRawScript = _raw_script_instance_construct(FourCC, Int16ub, FourCC)
 
 
 class _ConstructScriptInstance(construct.Construct):

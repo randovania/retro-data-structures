@@ -506,6 +506,16 @@ def _get_default(field_params: dict) -> str:
 
 _ALL_CLASS_DEFS: dict[str, dict[str, ClassDefinition]] = collections.defaultdict(dict)
 
+# Prime properties that are only present when another (bool) property is set
+# Maps class name -> property -> the property that controls it.
+_PRIME_CONDITIONAL_PROPERTIES: dict[str, dict[str, str]] = {
+    # The game also reads a bitset after these when it's set, which isn't supported.
+    "Water": {
+        "ignore_0x0000003d": "unknown_will_crash_if_on",
+        "ignore_0x0000003e": "unknown_will_crash_if_on",
+    },
+}
+
 
 @dataclasses.dataclass
 class ClassDefinition:
@@ -732,11 +742,15 @@ class ClassDefinition:
 """
         if self.atomic or game_id == "Prime":
             self.class_code += "        property_size = None  # Atomic\n"
-            if game_id == "Prime" and self.is_struct:
+            if game_id == "Prime" and not self.atomic:
                 self.class_code += f"        property_count = {_CODE_PARSE_UINT32[endianness]}\n"
 
+            conditions = _PRIME_CONDITIONAL_PROPERTIES.get(self.raw_name, {}) if game_id == "Prime" else {}
             for prop_name, prop in self.all_props.items():
-                self.class_code += f"        {prop_name} = {prop.parse_code}\n"
+                if prop_name in conditions:
+                    self.class_code += f"        {prop_name} = {prop.parse_code} if {conditions[prop_name]} else 0\n"
+                else:
+                    self.class_code += f"        {prop_name} = {prop.parse_code}\n"
 
             self.class_code += f"        return cls({', '.join(prop_name for prop_name in self.all_props)})\n"
             return
@@ -820,14 +834,19 @@ class ClassDefinition:
         if self.atomic or self.game_id == "Prime":
             assert not self.has_custom_cook_pref
 
-            if self.game_id == "Prime" and self.is_struct:
+            if self.game_id == "Prime" and not self.atomic:
                 num_props = len(self.all_props)
                 prop_count_repr = repr(struct.pack(endianness + "L", num_props))
                 self.class_code += f"        data.write({prop_count_repr})  # {num_props} properties\n"
 
+            conditions = _PRIME_CONDITIONAL_PROPERTIES.get(self.raw_name, {}) if self.game_id == "Prime" else {}
             for prop_name, prop in self.all_props.items():
+                indent = "        "
+                if prop_name in conditions:
+                    self.class_code += f"        if self.{conditions[prop_name]}:\n"
+                    indent += "    "
                 for build in prop.build_code:
-                    self.class_code += f"        {build.format(obj=f'self.{prop_name}')}\n"
+                    self.class_code += f"{indent}{build.format(obj=f'self.{prop_name}')}\n"
             return
 
         # After here we don't need to worry about Prime (or atomic)

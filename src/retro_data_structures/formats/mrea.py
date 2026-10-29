@@ -819,7 +819,8 @@ class Area:
     @property
     def all_layers(self) -> Iterator[ScriptLayer]:
         yield from self.layers
-        yield self.generated_objects_layer
+        if self.mrea.target_game >= Game.ECHOES:
+            yield self.generated_objects_layer
 
     def get_layer(self, name: str) -> ScriptLayer:
         return next(layer for layer in self.layers if layer.name == name)

@@ -157,3 +157,18 @@ def test_get_all_connections_to(prime2_asset_manager):
         (area.get_instance(0x001902ED), Connection(State.Sequence, Message.Activate, target.id)),
         (area.get_instance(0x001902ED), Connection(State.Sequence, Message.Deactivate, target.id)),
     ]
+
+
+def test_prime1_properties_round_trip(prime1_asset_manager):
+    # Phendrana Shorelines: has objects with connections and nested structs, including Water
+    mrea = prime1_asset_manager.get_parsed_asset(0xF7285979, type_hint=Mrea)
+
+    connection_count = 0
+    for layer in mrea.script_layers:
+        for instance in layer.instances:
+            assert instance.get_properties().to_bytes(Game.PRIME) == instance._raw.base_property
+            connection_count += len(instance.connections)
+            for connection in instance.connections:
+                assert connection.target.area == instance.id.area
+
+    assert connection_count > 0
