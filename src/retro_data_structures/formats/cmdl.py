@@ -36,7 +36,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import AABox, AssetId32, AssetId64, Color4f, FourCC, Vector2f, Vector3
 from retro_data_structures.construct_extensions.alignment import AlignTo
-from retro_data_structures.construct_extensions.misc import ErrorWithMessage, Skip
+from retro_data_structures.construct_extensions.misc import ErrorWithMessage
 from retro_data_structures.data_section import DataSection, DataSectionSizes
 from retro_data_structures.game_check import Game
 
@@ -337,7 +337,9 @@ CMDL = Struct(
     _surface_header=DataSection(
         Struct(
             num_surfaces=Rebuild(Int32ub, construct.len_(construct.this["_"].surfaces)),
-            end_offsets=Skip(construct.this.num_surfaces, Int32ub),
+            # Written when building the surfaces. Can't be skipped, as data sections are built separately and
+            # seeking past the end doesn't grow them.
+            end_offsets=construct.Padding(construct.this.num_surfaces * Int32ub.length),
         )
     ),
     _surfaces_start=Tell,
