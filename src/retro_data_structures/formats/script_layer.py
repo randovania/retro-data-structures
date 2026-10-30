@@ -301,7 +301,7 @@ class ScriptLayer:
         #  meaning it will never remove an entry
         rels = list(self.module_dependencies)
         for instance in self.instances:
-            rels.extend(instance.script_type.modules())
+            rels.extend(instance.script_type.modules(instance.target_game))
 
         yield from list(dict.fromkeys(rels))
 

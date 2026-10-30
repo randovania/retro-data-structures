@@ -4,9 +4,11 @@ from unittest.mock import ANY
 
 from tests import test_lib
 
+from retro_data_structures.enums import MiscEditorFlags
 from retro_data_structures.formats.tree import Tree
-from retro_data_structures.properties.common.archetypes import EditorProperties
-from retro_data_structures.properties.echoes.objects import ScanTreeCategory
+from retro_data_structures.game_check import Game
+from retro_data_structures.properties.archetypes.EditorProperties import EditorProperties
+from retro_data_structures.properties.objects.ScanTreeCategory import ScanTreeCategory
 
 
 def test_compare_p2(prime2_asset_manager):
@@ -24,7 +26,8 @@ def test_compare_p2(prime2_asset_manager):
         assert i == instance.id
 
     assert parsed2.get_node_by_id(320).get_properties() == ScanTreeCategory(
-        editor_properties=EditorProperties(name="Visors", transform=ANY, active=True, unknown=3),
-        name_string_table=0x892CB671,
-        name_string_name="Visors",
+        editor_properties=EditorProperties(name="Visors", transform=ANY, active=True, misc_flags=MiscEditorFlags(3)),
+        node_name=0x892CB671,
+        string_name="Visors",
+        game=Game.ECHOES,
     )

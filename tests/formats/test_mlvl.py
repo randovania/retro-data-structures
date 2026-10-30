@@ -32,7 +32,7 @@ _EXPECTED_DEPENDENCY = {
         "Ruined Alcove": {"missing": {}, "extra": {"1st Pass": {("PART", "0x28747f78")}}},
         "Undertemple": {"missing": {}, "extra": {"Ingsporb battle": {("AGSC", "0xfa61924c")}}},
     },
-    "Sanctuary Fortress": {"Entrance Defense Hall": {"missing": {}, "extra": {"1st pass": {("AGSC", "0xc8739bec")}}}},
+    "Sanctuary Fortress": {},
     "Temple Grounds": {
         "Hive Chamber A": {"missing": {}, "extra": {"Default": {("TXTR", "0xbf916e5a")}}},
         "Trooper Security Station": {

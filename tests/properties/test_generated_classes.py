@@ -27,7 +27,11 @@ def _all_classes() -> list[type[BaseStruct]]:
 
 
 ALL_CLASSES = _all_classes()
-CASES = [pytest.param(cls, game, id=f"{cls.__name__}-{game.name}") for cls in ALL_CLASSES for game in cls.games()]
+CASES = [
+    pytest.param(cls, game, id=f"{cls.__name__}-{game.name}")
+    for cls in ALL_CLASSES
+    for game in sorted(cls.games(), key=lambda g: g.value)
+]
 
 
 def test_there_are_classes() -> None:

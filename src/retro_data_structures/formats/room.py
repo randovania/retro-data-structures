@@ -11,13 +11,12 @@ from retro_data_structures.common_types import GUID
 from retro_data_structures.construct_extensions.misc import ErrorWithMessage, UntilEof
 from retro_data_structures.formats.chunk_descriptor import SingleTypeChunkDescriptor
 from retro_data_structures.formats.form_descriptor import FormDescriptor
-from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
 
 if typing.TYPE_CHECKING:
     import uuid
 
-    from retro_data_structures.properties.prime_remastered.core.PooledString import PooledString
+    from retro_data_structures.game_check import Game
+
 
 GreedyBytes = typing.cast("construct.Construct", construct.GreedyBytes)
 
@@ -186,35 +185,10 @@ SizeofAllocationsForActionPayloadSLdrFromStream = SizeofAllocationsForEventCrite
 SizeofAllocationsForLinkDataSLdrFromStream = SizeofAllocationsForEventCriteriaSLdrFromStream
 
 
-class RDSPropertyAdapter(construct.Adapter):
-    def __init__(self, type_id):
-        super().__init__(GreedyBytes)
-        self.type_id = type_id
-
-    def _decode(self, obj: bytes, context, path):
-        import retro_data_structures.properties.prime_remastered.objects
-
-        type_id = self.type_id(context)
-        try:
-            property_class = retro_data_structures.properties.prime_remastered.objects.get_object(type_id)
-        except KeyError:
-            return obj
-        return property_class.from_bytes(obj, Game.PRIME_REMASTER)
-
-    def _encode(self, obj: BaseProperty | bytes, context, path):
-        if isinstance(obj, BaseProperty):
-            return obj.to_bytes(Game.PRIME_REMASTER)
-        return obj
-
-
 class ComponentTypeName(int):
+    # TODO(prime_remastered): the property classes were removed, so the type name is just the hash.
     def __str__(self) -> str:
-        import retro_data_structures.properties.prime_remastered.objects
-
-        try:
-            return retro_data_structures.properties.prime_remastered.objects.get_object(self).__name__
-        except KeyError:
-            return f"0x{self:08x}"
+        return f"0x{self:08x}"
 
 
 class ComponentType(Hex):
@@ -224,7 +198,8 @@ class ComponentType(Hex):
 
 Property = Struct(
     type_id=ComponentType(Int32ul),
-    data=RDSPropertyAdapter(construct.this.type_id),
+    # TODO(prime_remastered): kept as raw bytes, as there are no generated property classes for it
+    data=GreedyBytes,
 )
 
 ScriptData = Struct(
@@ -319,13 +294,11 @@ ROOM = FormDescriptor(
     ),
 )
 
-T = typing.TypeVar("T")
-
 
 @dataclass(frozen=True)
 class Instance:
     guid: uuid.UUID
-    properties: BaseProperty | Container
+    properties: bytes | Container
 
 
 class Room(BaseResource):
@@ -340,16 +313,13 @@ class Room(BaseResource):
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from []
 
-    def get_pooled_string(self, pooled_string: PooledString) -> bytes:
-        if pooled_string.index == -1:
-            return pooled_string.size_or_str
+    def get_pooled_string(self, index: int, size_or_str: int | bytes) -> bytes:
+        if index == -1:
+            assert isinstance(size_or_str, bytes)
+            return size_or_str
         else:
-            return self.raw.strp.pools[0][pooled_string.index : pooled_string.index + pooled_string.size_or_str]
-
-    def properties_of_type(self, t: type[T]) -> typing.Iterator[T]:
-        for prop in self.raw.script_data.properties:
-            if isinstance(prop.data, t):
-                yield prop.data
+            assert isinstance(size_or_str, int)
+            return self.raw.strp.pools[0][index : index + size_or_str]
 
     def test(self):
         sdhr = self.raw.script_data.sdhr

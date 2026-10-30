@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 from tests import test_lib
 
-from retro_data_structures.enums.echoes import Message, State
+from retro_data_structures.enums import Message, State
 from retro_data_structures.formats import mrea
 from retro_data_structures.formats.mlvl import Mlvl
 from retro_data_structures.formats.mrea import Area, Mrea

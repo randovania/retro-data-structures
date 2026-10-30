@@ -6,7 +6,7 @@ import pytest
 from tests import test_lib
 
 from retro_data_structures.formats.scan import Scan
-from retro_data_structures.properties.echoes.objects import ScannableObjectInfo
+from retro_data_structures.properties.objects.ScannableObjectInfo import ScannableObjectInfo
 
 
 def test_compare_p1(prime1_asset_manager):
@@ -27,7 +27,7 @@ def test_compare_p2(prime2_asset_manager):
     )
     scan = typing.cast("Scan", obj)
     prop = scan.scannable_object_info.get_properties_as(ScannableObjectInfo)
-    strg = prime2_asset_manager.get_parsed_asset(prop.string)
+    strg = prime2_asset_manager.get_parsed_asset(prop.scan_info_text_string_table)
     assert strg.strings == (
         "Morphology: Brizgee\nVenomous insectoid.",
         "Poisoned stinger concealed in back-mounted shell. Finish it off quickly once the stinger is exposed.",

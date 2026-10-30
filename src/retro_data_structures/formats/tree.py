@@ -56,7 +56,7 @@ class Tree(BaseResource):
         new_id = len(self._raw.nodes)
         self._raw.nodes.append(
             ScriptInstanceRaw(
-                type=properties.object_type(),
+                type=properties.object_type(self.target_game),
                 id=InstanceId(new_id),
                 connections=(),
                 base_property=properties.to_bytes(self.target_game),

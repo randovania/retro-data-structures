@@ -11,11 +11,9 @@ import construct
 
 from retro_data_structures import properties
 from retro_data_structures.asset_manager import AssetManager
-from retro_data_structures.file_provider import IsoFileProvider, PathFileProvider
-from retro_data_structures.formats import Mrea, Room
+from retro_data_structures.file_provider import IsoFileProvider
+from retro_data_structures.formats import Mrea
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.base_property import BaseProperty
-from retro_data_structures.properties.prime import objects as prime_objects
 
 SerializedData = construct.Struct(
     game=construct.VarInt,
@@ -57,57 +55,13 @@ def do_dump_properties_mrea(game: Game, args):
                     }
                 )
                 if game == Game.PRIME:
-                    name = prime_objects.get_object(instance.type_name).__name__
+                    name = properties.get_game_object(game, instance.type_name).__name__
                 else:
                     name = instance.type_name
                 data.append(name.encode("ascii"))
                 data.append(instance.raw_properties)
 
         print(f"Wrote properties for {asset_id:08x}")
-
-    data_to_dump = {
-        "game": game.value,
-        "header": header,
-        "data": b"".join(data),
-    }
-    path = Path(__file__).parent.joinpath(f"properties_{game.name}.bin")
-    SerializedData.build_file(
-        data_to_dump,
-        path,
-    )
-
-
-def do_dump_properties_room(game: Game, args):
-    manager = AssetManager(PathFileProvider(args.root), target_game=game)
-
-    header = []
-    data = []
-
-    for asset_id in manager.all_asset_ids():
-        if manager.get_asset_type(asset_id) != Room.resource_type():
-            continue
-
-        try:
-            room = manager.get_parsed_asset(asset_id, type_hint=Room)
-        except construct.ConstructError as e:
-            print(f"Unable to parse {asset_id}: {e}")
-            continue
-
-        for i, instance in enumerate(room.raw.script_data.properties):
-            if not isinstance(instance.data, BaseProperty):
-                continue
-
-            body = instance.data.to_bytes(game)
-            header.append(
-                {
-                    "identifier": f"{i} property of room {asset_id} ({instance.data.__class__.__name__})",
-                    "instance_id": instance.type_id,
-                    "size": len(body),
-                }
-            )
-            data.append(body)
-
-        print(f"Wrote properties for {asset_id}")
 
     data_to_dump = {
         "game": game.value,
@@ -134,9 +88,7 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
     data = io.BytesIO(property_data.data)
     for instance in property_data.header:
         try:
-            if game == Game.PRIME_REMASTER:
-                property_class = properties.get_game_object(game, instance.instance_id)
-            elif game == Game.PRIME:
+            if game == Game.PRIME:
                 property_class = properties.get_game_object(game, data.read(1)[0])
             else:
                 property_class = properties.get_game_object(game, data.read(4).decode("ascii"))
@@ -183,7 +135,7 @@ def _parse_properties(  # noqa: PLR0912 Too many branches
                 data.seek(before)
                 original = data.read(after - before)
                 if new_encoded != original:
-                    re_decode = the_property.from_bytes(new_encoded)
+                    re_decode = the_property.from_bytes(new_encoded, game)
                     if re_decode != the_property:
                         print(f"Comparing instance {instance.identifier} of type {type_name} failed")
                     elif len(new_encoded) > len(original):
@@ -221,8 +173,6 @@ def main():
     sub_parser = parser.add_subparsers(dest="tool", required=True)
     dump_properties = sub_parser.add_parser("dump-properties-mrea")
     dump_properties.add_argument("iso", type=Path)
-    dump_properties = sub_parser.add_parser("dump-properties-room")
-    dump_properties.add_argument("root", type=Path)
     parse_properties = sub_parser.add_parser("parse-properties")
     parse_properties.add_argument("--repeat", default=1, type=int, help="Perform the decoding this many times")
     parse_properties.add_argument("--build", action="store_true", help="re-build and discard the result")
@@ -234,8 +184,6 @@ def main():
 
     if args.tool == "dump-properties-mrea":
         do_dump_properties_mrea(game, args)
-    elif args.tool == "dump-properties-room":
-        do_dump_properties_room(game, args)
     elif args.tool == "parse-properties":
         do_parse_properties(game, args)
 

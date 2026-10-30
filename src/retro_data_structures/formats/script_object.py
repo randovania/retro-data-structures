@@ -25,7 +25,8 @@ from construct.core import (
 
 from retro_data_structures import game_check, properties
 from retro_data_structures.common_types import FourCC
-from retro_data_structures.enums import helper as enum_helper
+from retro_data_structures.enums import Message, State
+from retro_data_structures.enums import merged as enum_support
 from retro_data_structures.game_check import Game
 from retro_data_structures.properties.base_property import ObjectWithEditorProperties
 
@@ -34,10 +35,9 @@ if TYPE_CHECKING:
 
     from retro_data_structures.asset_manager import AssetManager
     from retro_data_structures.base_resource import Dependency
-    from retro_data_structures.enums.shared_enums import Message, State
     from retro_data_structures.formats.script_layer import ScriptLayer
+    from retro_data_structures.properties.archetypes.EditorProperties import EditorProperties
     from retro_data_structures.properties.base_property import BaseObjectType
-    from retro_data_structures.properties.shared_archetypes import EditorProperties
 
     PropertyType = typing.TypeVar("PropertyType", bound=BaseObjectType)
 
@@ -96,15 +96,15 @@ class Connection:
     @classmethod
     def from_construct(cls, game: Game, obj: dict) -> Connection:
         return cls(
-            state=enum_helper.STATE_PER_GAME[game](obj["state"]),
-            message=enum_helper.MESSAGE_PER_GAME[game](obj["message"]),
+            state=enum_support.from_game_value(State, obj["state"], game),
+            message=enum_support.from_game_value(Message, obj["message"], game),
             target=InstanceId(obj["target"]),
         )
 
-    def as_construct(self) -> construct.Container:
+    def as_construct(self, game: Game) -> construct.Container:
         return construct.Container(
-            state=self.state.value,
-            message=self.message.value,
+            state=enum_support.to_game_value(self.state, game),
+            message=enum_support.to_game_value(self.message, game),
             target=self.target,
         )
 
@@ -184,7 +184,7 @@ class _ConstructScriptInstance(construct.Construct):
         body_construct._build(
             construct.Container(
                 instance_id=obj.id,
-                connections=[conn.as_construct() for conn in obj.connections],
+                connections=[conn.as_construct(game) for conn in obj.connections],
                 base_property=obj.base_property,
             ),
             sub_stream,
@@ -206,17 +206,16 @@ class _ConstructScriptInstance(construct.Construct):
 ConstructScriptInstance = _ConstructScriptInstance()
 
 
-def _resolve_to_enum[T: enum.Enum](correct_type: T, value: str | enum.Enum) -> T:
-    # It's already the enum we want, just use it
-    if isinstance(value, correct_type):
+def _resolve_to_enum[T: enum.Enum](enum_type: type[T], value: str | T, game: Game) -> T:
+    # It's already the enum we want, just use it. The merged enums are the same class for every game.
+    if isinstance(value, enum_type):
         return value
 
-    # If passing a string, assume it's a raw FourCC value
+    # If passing a string, assume it's a raw FourCC value of the game
     if isinstance(value, str):
-        return correct_type(value)
+        return enum_support.from_game_value(enum_type, value, game)
 
-    # Otherwise, assume it's a proper enum but for the wrong game, so switch around
-    return correct_type[value.name]
+    raise TypeError(f"Expected {enum_type.__name__} or str, got {type(value).__name__}")
 
 
 def _try_quick_get_name(data: bytes) -> str | None:
@@ -262,18 +261,20 @@ class ScriptInstance:
             type=instance_type,
             id=layer.new_instance_id(),
             connections=(),
-            base_property=property_type().to_bytes(target_game),
+            base_property=property_type(game=target_game).to_bytes(target_game),
         )
         return cls(raw, target_game, on_modify=layer.mark_modified)
 
     @classmethod
     def new_from_properties(cls, object_properties: BaseObjectType, layer: ScriptLayer) -> ScriptInstance:
         game = layer.parent_area.asset_manager.target_game
+        # Binds the object to the game of the layer if it has none; raises GameMismatch if it has another game.
+        base_property = object_properties.to_bytes(game)
         raw = ScriptInstanceRaw(
-            type=object_properties.object_type(),
+            type=object_properties.object_type(game),
             id=layer.new_instance_id(),
             connections=(),
-            base_property=object_properties.to_bytes(game),
+            base_property=base_property,
         )
         return cls(raw, game, on_modify=layer.mark_modified)
 
@@ -343,9 +344,6 @@ class ScriptInstance:
         :return:
         """
         props = self.get_properties()
-        # hack to support using the shared_objects unions
-        if hasattr(type_cls, "__args__"):
-            type_cls = type_cls.__args__
         if not isinstance(props, type_cls):
             raise TypeError(f"Expected {type_cls}, got {props}")
         return props
@@ -353,8 +351,12 @@ class ScriptInstance:
     def set_properties(self, data: BaseObjectType) -> None:
         """
         Updates the properties of this object. The data is encoded during this call and no reference is kept.
+
+        If `data` has no game yet, it is bound to the game of this object.
         :param data:
         :raises: ValueError, if the given object's type doesn't match this object's type
+        :raises: GameMismatch, if `data` is bound to another game
+        :raises: FieldNotInGame, if `data` has a value for a field that doesn't exist in this object's game
         """
         if not isinstance(data, self.script_type):
             raise ValueError(f"Got property of type {type(data).__name__}, expected {self.type_name}")
@@ -389,15 +391,14 @@ class ScriptInstance:
         """
         Adds a new connection with the given parameters.
         """
-        correct_state = enum_helper.STATE_PER_GAME[self.target_game]
-        correct_message = enum_helper.MESSAGE_PER_GAME[self.target_game]
+        game = self.target_game
 
         resolved_target = resolve_instance_id(target)
 
         self.connections = self.connections + (
             Connection(
-                state=_resolve_to_enum(correct_state, state),
-                message=_resolve_to_enum(correct_message, message),
+                state=_resolve_to_enum(State, state, game),
+                message=_resolve_to_enum(Message, message, game),
                 target=resolved_target,
             ),
         )

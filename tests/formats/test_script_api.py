@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-import retro_data_structures.enums.echoes as _echoes_enums
-import retro_data_structures.enums.prime as _prime_enums
+from retro_data_structures import enums as _enums
 from retro_data_structures.formats import Mlvl, script_object
 from retro_data_structures.formats.script_layer import SCLY, MultipleInstances
 from retro_data_structures.formats.script_object import Connection, InstanceId
 from retro_data_structures.game_check import Game
-from retro_data_structures.properties.vector import Vector
+from retro_data_structures.properties.core.vector import Vector
+from retro_data_structures.properties.errors import FieldNotInGame, GameMismatch, MemberNotInGame
 
 if TYPE_CHECKING:
     from retro_data_structures.formats.mlvl import Area
@@ -122,17 +122,54 @@ def test_instance_id_new(layer, area, instance, expected):
 
 
 @pytest.mark.parametrize(
-    ["correct_type", "value", "expected"],
+    ["game", "value", "expected"],
     [
-        (_prime_enums.State, _prime_enums.State.Exited, _prime_enums.State.Exited),
-        (_prime_enums.State, _echoes_enums.State.Exited, _prime_enums.State.Exited),
-        (_echoes_enums.State, _prime_enums.State.Exited, _echoes_enums.State.Exited),
-        (_echoes_enums.State, "EXIT", _echoes_enums.State.Exited),
-        (_echoes_enums.State, _echoes_enums.State.Exited, _echoes_enums.State.Exited),
+        (Game.PRIME, _enums.State.Exited, _enums.State.Exited),
+        (Game.ECHOES, _enums.State.Exited, _enums.State.Exited),
+        (Game.ECHOES, "EXIT", _enums.State.Exited),
+        (Game.CORRUPTION, "EXIT", _enums.State.Exited),
     ],
 )
-def test_resolve_to_enum(correct_type, value, expected):
-    assert script_object._resolve_to_enum(correct_type, value) == expected
+def test_resolve_to_enum(game, value, expected):
+    assert script_object._resolve_to_enum(_enums.State, value, game) == expected
+
+
+def test_resolve_to_enum_invalid_type():
+    with pytest.raises(TypeError):
+        script_object._resolve_to_enum(_enums.State, 4, Game.PRIME)  # type: ignore[arg-type]
+
+
+def test_merged_enum_game_values():
+    # The same Python member, with the value that each game uses
+    state = _enums.State.Exited
+    assert script_object.enum_support.to_game_value(state, Game.PRIME) == 4
+    assert script_object.enum_support.to_game_value(state, Game.ECHOES) == "EXIT"
+    assert script_object.enum_support.from_game_value(_enums.State, 4, Game.PRIME) is state
+    assert script_object.enum_support.from_game_value(_enums.State, "EXIT", Game.ECHOES) is state
+
+    message = _enums.Message.Activate
+    assert script_object.enum_support.to_game_value(message, Game.PRIME) == 1
+    assert script_object.enum_support.to_game_value(message, Game.CORRUPTION) == "ACTV"
+
+
+def test_connection_conversion_per_game():
+    connection = Connection(_enums.State.Exited, _enums.Message.Activate, InstanceId(5))
+
+    prime = connection.as_construct(Game.PRIME)
+    assert (prime.state, prime.message) == (4, 1)
+    assert Connection.from_construct(Game.PRIME, prime) == connection
+
+    echoes = connection.as_construct(Game.ECHOES)
+    assert (echoes.state, echoes.message) == ("EXIT", "ACTV")
+    assert Connection.from_construct(Game.ECHOES, echoes) == connection
+
+
+def test_connection_member_not_in_game():
+    # A state that only exists in Echoes
+    connection = Connection(_enums.State.AILogicState1, _enums.Message.Activate, InstanceId(5))
+    connection.as_construct(Game.ECHOES)
+    with pytest.raises(MemberNotInGame):
+        connection.as_construct(Game.PRIME)
 
 
 @pytest.fixture
@@ -209,12 +246,86 @@ def test_move_instance(prime2_area: Area):
 
 
 # Script Layer
+def test_add_instance_binds_game(prime2_area: Area):
+    from retro_data_structures.properties.objects.Door import Door
+
+    layer = prime2_area.get_layer("Default")
+    door = Door()
+    assert door.game is None
+
+    inst = layer.add_instance_with(door)
+
+    assert door.game is Game.ECHOES  # bound in place
+    assert inst.script_type == Door
+    assert inst.get_properties().game is Game.ECHOES
+
+
+def test_add_instance_field_not_in_game(prime2_area: Area):
+    from retro_data_structures.properties.objects.Door import Door
+
+    layer = prime2_area.get_layer("Default")
+    old_count = len(list(layer.instances))
+
+    door = Door()
+    door.is_morphball_door = True  # only exists in Prime
+    with pytest.raises(FieldNotInGame):
+        layer.add_instance_with(door)
+
+    assert len(list(layer.instances)) == old_count
+
+
+def test_add_instance_game_mismatch(prime2_area: Area):
+    from retro_data_structures.properties.objects.Door import Door
+
+    layer = prime2_area.get_layer("Default")
+    with pytest.raises(GameMismatch):
+        layer.add_instance_with(Door(game=Game.PRIME))
+
+    layer.add_instance_with(Door(game=Game.ECHOES))
+
+
+def test_add_instance_by_type_has_game(prime2_area: Area):
+    inst = prime2_area.get_layer("Default").add_instance("DOOR", "New Door")
+    assert inst.name == "New Door"
+    assert inst.get_properties().game is Game.ECHOES
+
+
+def test_set_properties_binds_game(prime2_area: Area):
+    from retro_data_structures.properties.objects.Door import Door
+
+    inst = prime2_area.get_instance("Pickup Object")
+    props = inst.get_properties()
+    with pytest.raises(ValueError, match="expected"):
+        inst.set_properties(Door())
+
+    props.editor_properties.name = "Other"
+    inst.set_properties(props)
+    assert inst.name == "Other"
+
+
+def test_set_properties_game_mismatch(prime2_area: Area):
+    from retro_data_structures.properties.objects.Pickup import Pickup
+
+    inst = prime2_area.get_instance("Pickup Object")
+    with pytest.raises(GameMismatch):
+        inst.set_properties(Pickup(game=Game.PRIME))
+
+
+def test_new_instance_no_game_is_bound(prime2_area: Area):
+    from retro_data_structures.properties.objects.SpecialFunction import Function, SpecialFunction
+
+    props = SpecialFunction(function=Function.WorldSwapper)
+    inst = script_object.ScriptInstance.new_from_properties(props, prime2_area.get_layer("Default"))
+    assert props.game is Game.ECHOES
+    assert inst.get_properties_as(SpecialFunction).function is Function.WorldSwapper
+
+
 def test_add_instance(prime2_area: Area):
-    from retro_data_structures.properties.echoes.objects.SpecialFunction import Function, SpecialFunction
+    from retro_data_structures.properties.objects.SpecialFunction import Function, SpecialFunction
 
     inst = prime2_area.get_layer("Default").add_instance_with(
         SpecialFunction(
-            function=Function.Darkworld,
+            function=Function.WorldSwapper,
         )
     )
     assert inst.script_type == SpecialFunction
@@ -230,7 +341,7 @@ def test_add_memory_relay(prime2_area: Area):
 
 # Script Object
 def test_find_instances_of_type(prime2_area: Area):
-    from retro_data_structures.properties.echoes.objects import Dock
+    from retro_data_structures.properties.objects.Dock import Dock
 
     inst = list(prime2_area.find_instances_of_type(Dock))
     assert len(inst) == 1
@@ -252,7 +363,7 @@ def test_edit_layer(prime2_area: Area, name: str, active: bool):
 
 # Script Object
 def test_edit_properties(prime2_area: Area):
-    from retro_data_structures.properties.echoes.objects.Pickup import Pickup
+    from retro_data_structures.properties.objects.Pickup import Pickup
 
     inst = prime2_area.get_instance("Pickup Object")
 
@@ -282,7 +393,7 @@ def test_set_editor_properties(prime2_area: Area):
 
 
 def test_edit_connections(prime2_area: Area):
-    from retro_data_structures.enums.echoes import Message, State
+    from retro_data_structures.enums import Message, State
 
     pickup = prime2_area.get_instance("Pickup Object")
     relay = prime2_area.get_instance("Post Pickup")
@@ -308,29 +419,29 @@ def test_replace_connections_to(prime2_asset_manager):
     timer.replace_connections_to(effect, relay)
 
     # assert
-    sequence = _echoes_enums.State.Sequence
-    activate = _echoes_enums.Message.Activate
+    sequence = _enums.State.Sequence
+    activate = _enums.Message.Activate
     assert timer.connections == (
         Connection(sequence, activate, InstanceId(0x001902D8)),
-        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902D8)),
+        Connection(sequence, _enums.Message.Deactivate, InstanceId(0x001902D8)),
         Connection(sequence, activate, InstanceId(0x001902EE)),
-        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902EE)),
+        Connection(sequence, _enums.Message.Deactivate, InstanceId(0x001902EE)),
         Connection(sequence, activate, InstanceId(0x00190272)),
-        Connection(sequence, _echoes_enums.Message.SetToZero, InstanceId(0x001902DC)),
-        Connection(sequence, _echoes_enums.Message.Play, InstanceId(0x001902E7)),
+        Connection(sequence, _enums.Message.SetToZero, InstanceId(0x001902DC)),
+        Connection(sequence, _enums.Message.Play, InstanceId(0x001902E7)),
         Connection(sequence, activate, InstanceId(0x001902E8)),
         Connection(sequence, activate, InstanceId(0x001902DC)),
-        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902DC)),
+        Connection(sequence, _enums.Message.Deactivate, InstanceId(0x001902DC)),
         Connection(sequence, activate, InstanceId(0x001902EF)),
-        Connection(sequence, _echoes_enums.Message.Deactivate, InstanceId(0x001902EF)),
-        Connection(sequence, _echoes_enums.Message.SetToZero, InstanceId(0x001902E3)),
+        Connection(sequence, _enums.Message.Deactivate, InstanceId(0x001902EF)),
+        Connection(sequence, _enums.Message.SetToZero, InstanceId(0x001902E3)),
         Connection(
-            _echoes_enums.State.MaxReached,
-            _echoes_enums.Message.Play,
+            _enums.State.MaxReached,
+            _enums.Message.Play,
             InstanceId(0x001902F4),
         ),
-        Connection(sequence, _echoes_enums.Message.Play, InstanceId(0x001902F4)),
-        Connection(sequence, _echoes_enums.Message.Stop, InstanceId(0x001902F4)),
+        Connection(sequence, _enums.Message.Play, InstanceId(0x001902F4)),
+        Connection(sequence, _enums.Message.Stop, InstanceId(0x001902F4)),
     )
 
 
@@ -341,8 +452,8 @@ def test_compare_connection_without_layer_index(prime2_area: Area):
 
     pickup.remove_connection(
         Connection(
-            _echoes_enums.State.Arrived,
-            _echoes_enums.Message.SetToZero,
+            _enums.State.Arrived,
+            _enums.Message.SetToZero,
             InstanceId(0x10450070),  # Post Pickup (wrong layer id)
         )
     )

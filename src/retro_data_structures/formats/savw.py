@@ -323,9 +323,11 @@ class Savw(BaseResource):
         raise NotImplementedError
 
     def _rebuild_p2(self, mlvl: Mlvl) -> None:
-        from retro_data_structures.properties.echoes.objects import Camera, Door, MemoryRelay, SpecialFunction
-        from retro_data_structures.properties.echoes.objects.Camera import FlagsCinematicCamera
-        from retro_data_structures.properties.echoes.objects.SpecialFunction import Function
+        from retro_data_structures.enums import CinematicCameraFlags
+        from retro_data_structures.properties.objects.Camera import Camera
+        from retro_data_structures.properties.objects.Door import Door
+        from retro_data_structures.properties.objects.MemoryRelay import MemoryRelay
+        from retro_data_structures.properties.objects.SpecialFunction import Function, SpecialFunction
 
         self.cinematic_skips = []
         self.memory_relays = []
@@ -347,8 +349,8 @@ class Savw(BaseResource):
             for instance in area.all_instances:
                 # cinematic skips
                 if instance.script_type == Camera:
-                    flags = instance.get_properties_as(Camera).flags_cinematic_camera
-                    if flags & FlagsCinematicCamera.CinematicSkip:
+                    flags = instance.get_properties_as(Camera).flags
+                    if flags & CinematicCameraFlags.CinematicSkip:
                         self.cinematic_skips.append(SavedStateDescriptor(instance.id))
 
                 # memory relays
@@ -369,15 +371,15 @@ class Savw(BaseResource):
 
                     match sf_props.function:
                         # system state env vars
-                        case Function.GameStateSysVar:
+                        case Function.SystemStateEnvVarController:
                             self.system_state_env_vars.append(EnvVar(sf_props.string_parm))
 
                         # game state env vars
-                        case Function.GameStateEnvVar:
+                        case Function.GameStateEnvVarController:
                             self.game_state_env_vars.append(EnvVar(sf_props.string_parm))
 
                         # unmappable objects
-                        case Function.TranslatorDoorLocation:
+                        case Function.UnmappableObject:
                             self.unmappable_objects.append(SavedStateDescriptor(instance.id))
 
     def _rebuild_p3(self, mlvl: Mlvl) -> None:
