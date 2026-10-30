@@ -316,14 +316,20 @@ class RuleView:
 class _ViewList[V](collections.abc.Sequence[V]):
     """The items of a raw list as views. Items can be removed, but are added with the owner's `add_*`."""
 
-    def __init__(self, raw: list, view_class: type[V]):
+    def __init__(self, raw: list, view_class: collections.abc.Callable[[construct.Container], V]):
         self._raw = raw
         self._view_class = view_class
 
     def __len__(self) -> int:
         return len(self._raw)
 
-    def __getitem__(self, index):  # noqa: ANN001
+    @typing.overload
+    def __getitem__(self, index: int) -> V: ...
+
+    @typing.overload
+    def __getitem__(self, index: slice) -> list[V]: ...
+
+    def __getitem__(self, index: int | slice) -> V | list[V]:
         if isinstance(index, slice):
             return [self._view_class(r) for r in self._raw[index]]
         return self._view_class(self._raw[index])
