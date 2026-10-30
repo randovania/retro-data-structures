@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import io
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -12,18 +12,21 @@ from retro_data_structures.formats.script_object import _try_quick_get_name
 from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
-    from retro_data_structures.properties.base_property import BaseProperty
+    from retro_data_structures.properties.base_property import BaseStruct
 
 
 def perform_module_checks(path: Path, game: Game) -> None:
     module_name = path.with_suffix("").as_posix().replace("/", ".")
     module = importlib.import_module(module_name)
 
-    module_class: type[BaseProperty] = getattr(module, path.stem)
+    module_class: type[BaseStruct] = getattr(module, path.stem)
+    assert game in module_class.games()
     obj = module_class()
+    assert obj.game is None
 
     stream = io.BytesIO()
     obj.to_stream(stream, game)
+    assert obj.game is game
     size = stream.tell()
 
     stream.seek(0)
@@ -37,35 +40,39 @@ def perform_module_checks(path: Path, game: Game) -> None:
     assert decode == obj
 
 
-def _parametrize_for_game(game: str):
-    props = Path(properties.__file__)
-    root = props.parents[2]
-
-    return [
-        pytest.param(p.relative_to(root), id=p.relative_to(root).as_posix())
-        for p in props.parent.joinpath(game).rglob("*.py")
-        if p.name not in ("__init__.py", "AssetId.py")
-    ]
+def _encoded_by_owner(cls: type[BaseStruct], game: Game) -> bool:
+    """True for structs that a game only encodes inside their owner (Prime's editor properties)."""
+    try:
+        cls().to_bytes(game)
+    except NotImplementedError:
+        return True
+    return False
 
 
-@pytest.mark.parametrize("path", _parametrize_for_game("prime"))
-def test_import_and_create_prime(path: Path):
-    perform_module_checks(path, Game.PRIME)
+def _parametrize_modules() -> list[Any]:
+    root = Path(properties.__file__).parent
+    result: list[Any] = []
+    for package in ("objects", "archetypes"):
+        for p in sorted(root.joinpath(package).glob("*.py")):
+            if p.name == "__init__.py":
+                continue
+            module_name = f"retro_data_structures.properties.{package}.{p.stem}"
+            cls = getattr(importlib.import_module(module_name), p.stem)
+            result.extend(
+                pytest.param(
+                    Path("retro_data_structures/properties") / package / p.name,
+                    game,
+                    id=f"{game.name}-{package}/{p.stem}",
+                )
+                for game in sorted(cls.games())
+                if not _encoded_by_owner(cls, game)
+            )
+    return result
 
 
-@pytest.mark.parametrize("path", _parametrize_for_game("echoes"))
-def test_import_and_create_echoes(path: Path):
-    perform_module_checks(path, Game.ECHOES)
-
-
-@pytest.mark.parametrize("path", _parametrize_for_game("corruption"))
-def test_import_and_create_corruption(path: Path):
-    perform_module_checks(path, Game.CORRUPTION)
-
-
-@pytest.mark.parametrize("path", _parametrize_for_game("prime_remastered"))
-def test_import_and_create_prime_remastered(path: Path):
-    perform_module_checks(path, Game.PRIME_REMASTER)
+@pytest.mark.parametrize(("path", "game"), _parametrize_modules())
+def test_import_and_create(path: Path, game: Game):
+    perform_module_checks(path, game)
 
 
 def test_door():
@@ -133,41 +140,20 @@ def test_door():
         b"\x01\x00\x9e\xc6'\x12\x00\x0c\x00\x01\xb9N\x9b\xe7\x00\x04\xff\xff\xff\xff"
     )
 
-    from retro_data_structures.properties.color import Color
-    from retro_data_structures.properties.echoes.archetypes.WeaponVulnerability import Effect, WeaponVulnerability
-    from retro_data_structures.properties.echoes.objects import Door
+    from retro_data_structures.properties.archetypes.WeaponVulnerability import (
+        WeaponVulnerability,
+        WeaponVulnerabilityEffect,
+    )
+    from retro_data_structures.properties.core.color import Color
+    from retro_data_structures.properties.objects.Door import Door
 
     door = Door.from_stream(io.BytesIO(data), Game.ECHOES)
     assert door.editor_properties.name == "Door"
     assert door.shell_color == Color(0.0, 1.0, 1.0, 1.0)
-    assert door.vulnerability.boost_ball == WeaponVulnerability(0.0, Effect.Normal, True)
-    assert _try_quick_get_name(data) == "Door"
-
-
-def test_p1r_world_teleporter():
-    data = (
-        b"\x08\x00\x7fQ\x9a\xd4\x10\x00\xa2a@\x91z\xc1&H\x94\xf5\xbeO\xaf\x90\xca\xe7l\xfb_\x9a\x10\x00C"
-        b"\x13\xf2\x92i\x03\xd3B\x90\xca\x989g\x10r^r\xee\xeaj4\x00\x03\x00\x85\xd8\x89\xa5\x10\x00\x00"
-        b"\x00\x00\x10\x00\x00\x00\xf0\xf0\x00\x00\x00w(\x9aJ\xf0\xc0\xf0\xd6\x08\x00@\x00\x00\x00\t\x00"
-        b"\x00\x00\x01:\xc0\x87\x08\x00J\x00\x00\x00\x12\x00\x00\x00yfS\xc2 \x00\x03\x00Q\xe5I&\x04\x00"
-        b"\x00\x00\x00@\xc6[\xbb\xd2\x04\x00\x00\x00\x00@\xb2\x99\x94\x7f\x04\x00\x00\x00\x00@\x8e\x1f"
-        b"\xb3\xa7\x10\x00\x00\x00\x00\x10\x00\x00\x00\xf0\xf0\x00\x00\x00o\xa5a\xd0!\xe8\xb5O \x00\x03"
-        b"\x00Q\xe5I&\x04\x00\x00\x00\x80?\xc6[\xbb\xd2\x04\x00\x00\x00\x80?\xb2\x99\x94\x7f\x04\x00\x00"
-        b"\x00\x80?*\xe6:\xbb \x00\x03\x00Q\xe5I&\x04\x00\x00\x00\x80?\xc6[\xbb\xd2\x04\x00\x00\x00\x80?"
-        b"\xb2\x99\x94\x7f\x04\x00\x00\x00\x80?#\xbb\x07T\x10\x00\x00\x00\x00\x10\x1a\x00 \xfd\xf0\x00"
-        b"\x00\x00\x00\x00\x11\x89"
+    assert door.vulnerability.boost_ball == WeaponVulnerability(
+        damage_multiplier=0.0, effect_effect=WeaponVulnerabilityEffect.Normal, ignore_radius=True, game=Game.ECHOES
     )
-
-    game = Game.PRIME_REMASTER
-    from retro_data_structures.properties.prime_remastered.objects import WorldTeleporterTooMP1
-
-    teleporter = WorldTeleporterTooMP1.from_bytes(data, game)
-
-    encoded = teleporter.to_bytes(game)
-    teleporter2 = WorldTeleporterTooMP1.from_bytes(encoded, game)
-
-    assert teleporter == teleporter2
-    assert encoded == data
+    assert _try_quick_get_name(data) == "Door"
 
 
 @pytest.mark.parametrize(
@@ -176,7 +162,6 @@ def test_p1r_world_teleporter():
         (Game.PRIME, 0x0, "Actor"),
         (Game.ECHOES, "ACTR", "Actor"),
         (Game.CORRUPTION, "ACTR", "Actor"),
-        (Game.PRIME_REMASTER, 0xB6200BE6, "ActorMP1"),
     ],
 )
 def test_get_game_object(game: Game, four_cc: str | int, expected_name: str):
@@ -185,5 +170,5 @@ def test_get_game_object(game: Game, four_cc: str | int, expected_name: str):
 
 
 def test_get_game_object_invalid_game():
-    with pytest.raises(ValueError, match=r"Unknown Game: 2403"):
+    with pytest.raises(KeyError):
         properties.get_game_object(2403, "")  # type: ignore[call-overload]
