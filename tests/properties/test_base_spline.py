@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from retro_data_structures.properties.spline import Spline
+from retro_data_structures.properties.core.spline import Spline
 
 
 def test_base_spline_json_roundtrip():

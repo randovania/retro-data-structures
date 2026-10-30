@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import dataclasses
 
+from retro_data_structures.game_check import Game
+from retro_data_structures.properties.archetypes.Vector2f import Vector2f
 from retro_data_structures.properties.base_property import BaseProperty
-from retro_data_structures.properties.echoes.archetypes.Vector2f import Vector2f
 from retro_data_structures.properties.field_reflection import FieldReflection, get_reflection
 
 
@@ -53,7 +54,7 @@ class DummyProperty(BaseProperty):
 
 
 def test_get_reflection():
-    reflection = get_reflection(DummyProperty)
+    reflection = get_reflection(DummyProperty, Game.ECHOES)
 
     assert reflection == {
         "other_property": FieldReflection[Vector2f](

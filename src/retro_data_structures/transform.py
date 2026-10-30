@@ -10,7 +10,7 @@ import numpy as np
 if typing.TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from retro_data_structures.properties.vector import Vector
+    from retro_data_structures.properties.core.vector import Vector
 
 type NDTransformMatrix = np.ndarray[tuple[int, int], np.dtype[np.float32]]
 
@@ -19,7 +19,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
     _data: NDTransformMatrix
 
     def __init__(self, data: NDTransformMatrix) -> None:
-        from retro_data_structures.properties.vector import Vector
+        from retro_data_structures.properties.core.vector import Vector
 
         self._HANDLED_TYPES = (np.ndarray, numbers.Number, list, Vector)
 
@@ -184,7 +184,7 @@ class Transform(np.lib.mixins.NDArrayOperatorsMixin):
         Taken from https://numpy.org/doc/stable/reference/generated/numpy.lib.mixins.NDArrayOperatorsMixin.html
         """
 
-        from retro_data_structures.properties.vector import Vector
+        from retro_data_structures.properties.core.vector import Vector
 
         out: tuple = kwargs.get("out", ())
 

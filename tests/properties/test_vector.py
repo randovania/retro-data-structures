@@ -4,7 +4,7 @@ import re
 
 import pytest
 
-from retro_data_structures.properties.vector import Vector
+from retro_data_structures.properties.core.vector import Vector
 
 
 def test_vector_vector_operations():

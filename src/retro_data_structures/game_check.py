@@ -49,6 +49,16 @@ class Game(Enum):
             return self.value < other.value
         return NotImplemented
 
+    def __or__(self, other):
+        # Lets a set of games be written as `Game.ECHOES | Game.CORRUPTION`
+        if isinstance(other, Game):
+            return frozenset((self, other))
+        if isinstance(other, frozenset) and all(isinstance(g, Game) for g in other):
+            return other | {self}
+        return NotImplemented
+
+    __ror__ = __or__
+
     @property
     def uses_asset_id_32(self) -> bool:
         return self <= Game.ECHOES
