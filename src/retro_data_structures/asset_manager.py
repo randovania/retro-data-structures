@@ -364,7 +364,7 @@ class AssetManager:
     _modified_resources: dict[AssetId, RawResource]
     _memory_files: dict[AssetId, BaseResource]
     _dol: MemoryDol | None = None
-    _tweaks: Ntwk | None = None
+    tweaks: Ntwk | None = None
     _mrea_to_mlvl: dict[AssetId, AssetId] | None = None
     _pak_strategy_factory: PakExportStrategyFactory
     _pak_strategy: dict[str, PakExportStrategy]
