@@ -31,6 +31,7 @@ from retro_data_structures.formats.effect_script import (
 )
 from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.frme import FRME, Frme
+from retro_data_structures.formats.fsm2 import FSM2, Fsm2
 from retro_data_structures.formats.mapa import MAPA, Mapa
 from retro_data_structures.formats.mapu import MAPU, Mapu
 from retro_data_structures.formats.mapw import MAPW, Mapw
@@ -61,6 +62,7 @@ ALL_FORMATS = {
     "DGRP": DGRP,
     "EVNT": EVNT,
     "FRME": FRME,
+    "FSM2": FSM2,
     "MAPA": MAPA,
     "MAPW": MAPW,
     "MAPU": MAPU,
@@ -94,6 +96,7 @@ ALL_RESOURCE_TYPES = {
     "DGRP": Dgrp,
     "EVNT": Evnt,
     "FRME": Frme,
+    "FSM2": Fsm2,
     "MAPA": Mapa,
     "MAPU": Mapu,
     "MAPW": Mapw,
