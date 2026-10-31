@@ -22,6 +22,7 @@ from construct.core import (
 from construct.lib.containers import Container
 
 from retro_data_structures import game_check
+from retro_data_structures.base_resource import merge_dependencies
 from retro_data_structures.common_types import FourCC
 from retro_data_structures.construct_extensions.misc import Skip
 from retro_data_structures.formats.savw import SavedStateDescriptor
@@ -102,17 +103,9 @@ class MultipleInstances(Exception):
 def dependencies_for_layer(
     asset_manager: AssetManager, instances: typing.Iterable[ScriptInstance]
 ) -> typing.Iterator[Dependency]:
-    deps: list[Dependency] = []
-    for instance in instances:
-        deps.extend(instance.mlvl_dependencies_for(asset_manager))
-
-    unique_deps: set[Dependency] = set()
-    for dep in deps:
-        if dep in unique_deps:
-            continue
-        # specifically keep the order of the *first* appearance of the dependency
-        unique_deps.add(dep)
-        yield dep
+    yield from merge_dependencies(
+        dep for instance in instances for dep in instance.mlvl_dependencies_for(asset_manager)
+    )
 
 
 class ScriptLayer:
