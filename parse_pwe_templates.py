@@ -991,18 +991,18 @@ class ClassDefinition:
                 continue
 
             prop_code = prop.dependency_code.format(obj=f"self.{prop_name}")
-            if prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
+            if prop.raw.get("ignore_dependencies_mlvl"):
+                # Packed with the area, but excluded from its dependency table in the MLVL
+                prop_code = f"for it in {prop_code}:\n            yield it._replace(exclude_for_mlvl=True)"
+            elif prop.dependency_code == "{obj}.dependencies_for(asset_manager)":
                 method_name[prop_name] = f"self.{prop_name}.dependencies_for"
+                continue
             else:
-                if prop.raw.get("ignore_dependencies_mlvl"):
-                    self.needed_imports["retro_data_structures.base_resource"] = "Dependency"
-                    prop_code = f"for it in {prop_code}:\n            yield Dependency(it.type, it.id, True)"
-                else:
-                    prop_code = f"return {prop_code}"
+                prop_code = f"return {prop_code}"
 
-                method_name[prop_name] = f"self._dependencies_for_{prop_name}"
+            method_name[prop_name] = f"self._dependencies_for_{prop_name}"
 
-                self.class_code += f"""
+            self.class_code += f"""
     def _dependencies_for_{prop_name}(self, asset_manager: AssetManager) -> Iterator[Dependency]:
         {prop_code}
 """

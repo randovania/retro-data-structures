@@ -10,6 +10,7 @@ from construct import Construct, Container
 from retro_data_structures.exceptions import DependenciesHandledElsewhere
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Iterable
     from typing import Self
 
     from retro_data_structures.asset_manager import AssetManager
@@ -31,6 +32,21 @@ class Dependency(typing.NamedTuple):
         if self.exclude_for_mlvl:
             s += " (non-MLVL)"
         return s
+
+
+def merge_dependencies(dependencies: Iterable[Dependency]) -> list[Dependency]:
+    """
+    Removes duplicates, keeping the order of the first appearance of each asset.
+    An asset is only excluded from the MLVL if every appearance of it is.
+    """
+    merged: dict[tuple[AssetType, AssetId], Dependency] = {}
+    for dep in dependencies:
+        key = (dep.type, dep.id)
+        if key in merged:
+            merged[key] = merged[key]._replace(exclude_for_mlvl=merged[key].exclude_for_mlvl and dep.exclude_for_mlvl)
+        else:
+            merged[key] = dep
+    return list(merged.values())
 
 
 class BaseResource:
