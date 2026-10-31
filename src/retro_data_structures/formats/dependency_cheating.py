@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import bisect
 import re
 import struct
 import typing
@@ -66,7 +67,78 @@ _frme = construct.FocusedSeq(
 )
 
 
+_PRIME_WIDGET_TYPES = re.compile(
+    b"HWIG|BWIG|CAMR|LITE|MODL|TXPN|GRUP|IMGP|ENRG|METR|SLGP|TBGP|PANE|BGND",
+)
+_PRINTABLE = re.compile(rb"[ -~]*")
+_PRIME_FRME_TYPE_ORDER = {"TXTR": 0, "CMDL": 1, "FONT": 2}
+
+
+def _prime_frme_widgets(data: bytes) -> list[tuple[int, str, str]]:
+    """
+    Finds the widgets of a Prime FRME, as (offset, name, parent name).
+    """
+    result = []
+    for match in _PRIME_WIDGET_TYPES.finditer(data):
+        name_end = data.find(b"\0", match.end())
+        parent_end = data.find(b"\0", name_end + 1)
+        if name_end < 0 or parent_end < 0:
+            continue
+        name = data[match.end() : name_end]
+        parent = data[name_end + 1 : parent_end]
+        if name and _PRINTABLE.fullmatch(name) and _PRINTABLE.fullmatch(parent):
+            result.append((match.start(), name.decode("ascii"), parent.decode("ascii")))
+    return result
+
+
+def _prime_frme_dependency_ids(data: bytes, asset_manager: AssetManager) -> list[int]:
+    """
+    Prime's FRME (versions 0 and 1) has no dependency list, so this finds the ids in each widget.
+
+    Retro listed them by going through the widget tree: the dependencies of a widget's children, in order,
+    then each child's own children, starting from the last child. Then grouped by type.
+    """
+    widgets = _prime_frme_widgets(data)
+    widget_offsets = [offset for offset, _, _ in widgets]
+    own: list[list[int]] = [[] for _ in widgets]
+    for offset in range(len(data) - 3):
+        asset_id = struct.unpack_from(">L", data, offset)[0]
+        if asset_manager.target_game.is_valid_asset_id(asset_id) and asset_manager.does_asset_exists(asset_id):
+            index = bisect.bisect_right(widget_offsets, offset) - 1
+            if index >= 0:
+                own[index].append(asset_id)
+
+    index_by_name = {name: index for index, (_, name, _) in enumerate(widgets)}
+    children: list[list[int]] = [[] for _ in widgets]
+    roots = []
+    for index, (_, _, parent) in enumerate(widgets):
+        parent_index = index_by_name.get(parent)
+        if parent_index is not None and parent_index != index:
+            children[parent_index].append(index)
+        else:
+            roots.append(index)
+
+    result: dict[int, None] = {}
+
+    def visit(index: int) -> None:
+        for child in children[index]:
+            result.update(dict.fromkeys(own[child]))
+        for child in reversed(children[index]):
+            visit(child)
+
+    for root in roots:
+        result.update(dict.fromkeys(own[root]))
+        visit(root)
+
+    return sorted(result, key=lambda it: _PRIME_FRME_TYPE_ORDER.get(asset_manager.get_asset_type(it), 3))
+
+
 def frme_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    if struct.unpack_from(">L", asset.data)[0] < 2:
+        for asset_id in _prime_frme_dependency_ids(asset.data, asset_manager):
+            yield from asset_manager.get_dependencies_for_asset(asset_id, must_exist=False)
+        return
+
     for dep in _frme.parse(asset.data):
         try:
             yield from asset_manager.get_dependencies_for_asset(dep.id)
