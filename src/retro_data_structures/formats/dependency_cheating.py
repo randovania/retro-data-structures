@@ -253,11 +253,24 @@ def effect_dependencies(asset: RawResource, asset_manager: AssetManager) -> typi
         raise UnableToCheatError
 
 
+def anim_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    if asset_manager.target_game != Game.PRIME:
+        return
+
+    if struct.unpack_from(">L", asset.data)[0] == 0:
+        # Uncompressed animations have the event at the end, so parse it
+        raise UnableToCheatError
+
+    # Compressed animations: version, scratch size, then the event id
+    yield from asset_manager.get_dependencies_for_asset(struct.unpack_from(">L", asset.data, 8)[0])
+
+
 def no_dependencies(asset: RawResource, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     yield from []
 
 
 _FORMATS_TO_CHEAT = {
+    "ANIM": anim_dependencies,
     "CSNG": csng_dependencies,
     "DUMB": dumb_dependencies,
     "FRME": frme_dependencies,
