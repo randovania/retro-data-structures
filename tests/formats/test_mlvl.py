@@ -206,3 +206,82 @@ def test_compare_p2(prime2_asset_manager, mlvl_asset_id: AssetId):
         mlvl_asset_id,
         Mlvl,
     )
+
+
+# Textures that vanilla lists among those of a model, but that nothing uses. Probably from older versions of the
+# models.
+_PRIME_STALE_MINES_TEXTURES = {
+    ("TXTR", 0x342F5F5B),
+    ("TXTR", 0x34CBBF23),
+    ("TXTR", 0x3C2D48A9),
+    ("TXTR", 0x0469B47D),
+    ("TXTR", 0x58994B6A),
+    ("TXTR", 0x5F56CB9E),
+    ("TXTR", 0x7717E9B7),
+    ("TXTR", 0x86FAB12C),
+    ("TXTR", 0xC4A75BC8),
+}
+
+# For each MREA and layer, the dependencies vanilla lists that aren't found, and the ones found that vanilla doesn't
+# list. The extras are all listed in another layer of the same area.
+_PRIME_EXPECTED_DEPENDENCY = {
+    0xD5CDB809: {"extra": {"Default": {("AFSM", 0xE23DFB53)}, "First Pass": {("AFSM", 0xE23DFB53)}}},
+    0x3C785450: {"extra": {"Default": {("AFSM", 0xE23DFB53)}}},
+    0x8A97BB54: {
+        "missing": {
+            "3rd Pass Elite Bustout": {("TXTR", 0x3901C7C4), ("TXTR", 0xBB9590D9)},
+            "Dummy Elite": {
+                ("TXTR", 0x2AC64BC1),
+                ("TXTR", 0x2BFBDE65),
+                ("TXTR", 0x3901C7C4),
+                ("TXTR", 0x68919D46),
+                ("TXTR", 0xBB9590D9),
+            },
+        }
+    },
+    0x3F375ECC: {"extra": {"Default": {("PART", 0x19723E43)}, "1st Pass enemies": {("PART", 0x19723E43)}}},
+    0xF517A1EA: {
+        "missing": {"!!non_layer!!": {("TXTR", 0x5A369D26)}},
+        "extra": {"Default": {("STRG", 0x0C476789)}},
+    },
+    0x67156A0D: {"missing": {"Default": _PRIME_STALE_MINES_TEXTURES}},
+    0xDADF06C3: {"missing": {"Default": _PRIME_STALE_MINES_TEXTURES}},
+    0x0749DF46: {"missing": {"Default": _PRIME_STALE_MINES_TEXTURES}},
+    0x7A3AD91E: {"missing": {"Default": _PRIME_STALE_MINES_TEXTURES}},
+    0xA7AC009B: {"missing": {"Default": _PRIME_STALE_MINES_TEXTURES}},
+}
+
+# An ActorKeyframe has a FadeOut of 2, which these templates don't accept
+_PRIME_AREAS_THAT_FAIL = {0x956F1552}
+
+
+@pytest.mark.skip_dependency_tests
+def test_prime_mlvl_dependencies(prime1_asset_manager: AssetManager):
+    mlvl_ids = [
+        asset_id
+        for asset_id in prime1_asset_manager.all_asset_ids()
+        if prime1_asset_manager.get_asset_type(asset_id) == "MLVL"
+    ]
+    assert len(mlvl_ids) == 8
+
+    differences = {}
+    for mlvl_id in mlvl_ids:
+        mlvl = prime1_asset_manager.get_file(mlvl_id, Mlvl)
+        for area in mlvl.areas:
+            old = {name: {(dep.type, dep.id) for dep in layer} for name, layer in area.dependencies_by_layer.items()}
+            if area.mrea_asset_id in _PRIME_AREAS_THAT_FAIL:
+                with pytest.raises(ValueError, match="is not a valid FadeOut"):
+                    area.build_mlvl_dependencies()
+                continue
+
+            area.build_mlvl_dependencies()
+            new = {name: {(dep.type, dep.id) for dep in layer} for name, layer in area.dependencies_by_layer.items()}
+
+            missing = {name: old[name] - new[name] for name in old if old[name] - new[name]}
+            extra = {name: new[name] - old[name] for name in old if new[name] - old[name]}
+            if missing or extra:
+                differences[area.mrea_asset_id] = {
+                    key: value for key, value in (("missing", missing), ("extra", extra)) if value
+                }
+
+    assert differences == _PRIME_EXPECTED_DEPENDENCY
