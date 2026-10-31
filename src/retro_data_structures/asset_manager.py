@@ -29,7 +29,14 @@ from retro_data_structures.formats.ntwk import Ntwk
 from retro_data_structures.formats.pak import Pak
 from retro_data_structures.formats.pak_common import PakBody, PakFile
 from retro_data_structures.game_check import Game
+from retro_data_structures.pak_compression import create_pak_file
 from retro_data_structures.pak_group import PakGroup
+from retro_data_structures.pak_layout import (
+    PakLayout,
+    PakLayoutBuilder,
+    find_duplicate_areas,
+    has_compression_exceptions,
+)
 
 if typing.TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -256,15 +263,24 @@ class PakExportStrategyAppend(PakExportStrategy):
 
 class PakExportStrategyCreate(PakExportStrategy):
     """
-    Creates the Paks entirely from scratch, using named resources and their dependencies.
+    Creates the Paks entirely from scratch, using the named resources and their dependencies.
+    The resources are ordered and compressed the same way as Retro's packer did. See `pak_layout` and
+    `pak_compression` for the rules.
     """
 
     named_files: dict[str, AssetId]
+
+    duplicate_areas: dict[AssetId, bool]
+    """
+    For world paks, which areas (by MREA id) include again every resource they need, even those that are already
+    in the pak. Defaults to how the areas are in the original pak. Areas that aren't listed don't.
+    """
 
     def __init__(self, manager: AssetManager, pak_name: str):
         super().__init__(manager, pak_name)
 
         self.named_files = dict(manager.pak_group.get_named_resources_of_pak(pak_name))
+        self.duplicate_areas = find_duplicate_areas(manager.pak_group.get_resources_of_pak(pak_name))
 
     @override
     def ensure_present(self, asset_id: NameOrAssetId, as_named_resource: str | None = None) -> None:
@@ -274,59 +290,86 @@ class PakExportStrategyCreate(PakExportStrategy):
         if as_named_resource is not None:
             self.named_files[as_named_resource] = self.manager.resolve_asset_id(asset_id)
 
-    def _get_pak_file(self, asset_id: AssetId) -> PakFile:
+    def _get_original_pak_file(self, asset_id: AssetId) -> PakFile | None:
         """
+        The entry for the given asset in the original paks, preferring this pak's.
+        Paks with exceptions to the compression rules are used last.
+        """
+        pak_group = self.manager.pak_group
 
-        :param asset_id:
-        :return:
-        """
+        def priority(pak_name: str) -> tuple[bool, bool, str]:
+            return pak_name != self.pak_name, has_compression_exceptions(self.manager.target_game, pak_name), pak_name
+
+        for pak_name in sorted(pak_group.find_paks(asset_id), key=priority):
+            return pak_group.get_pak(pak_name).get_pak_file_with_id(asset_id)
+
+        return None
+
+    def _get_pak_file(self, asset_id: AssetId, force_uncompressed: bool) -> PakFile:
+        game = self.manager.target_game
+        original = self._get_original_pak_file(asset_id)
 
         if asset_id in self.manager._modified_resources:
-            # This file was changed, create PakFile entry from scratch.
             raw = self.manager._modified_resources[asset_id]
+            # Vanilla has resources that are uncompressed against the rules, so keep these uncompressed
+            return create_pak_file(
+                game,
+                asset_id,
+                raw.type,
+                raw.data,
+                force_uncompressed=force_uncompressed or (original is not None and not original.should_compress),
+            )
 
-            # FIXME: handle should_compress better
+        if original is None:
+            raise KeyError(f"Unknown asset_id: {asset_id}")
 
+        if force_uncompressed and original.should_compress:
             return PakFile(
                 asset_id=asset_id,
-                asset_type=raw.type,
+                asset_type=original.asset_type,
                 should_compress=False,
-                uncompressed_data=raw.data,
+                uncompressed_data=original.get_decompressed(game),
                 compressed_data=None,
             )
-        else:
-            pak_group = self.manager.pak_group
-            for pak_name in pak_group.find_paks(asset_id):
-                pak = pak_group.get_pak(pak_name)
-                return pak.get_pak_file_with_id(asset_id)
 
-        raise KeyError(f"Unknown asset_id: {asset_id}")
+        return original
 
     @override
     def should_export(self) -> bool:
         # TODO: figure out if the dependencies changed
         return True
 
-    @override
-    def export(self, output: FileWriter) -> None:
-        manager = self.manager
-
-        # Create the order of assets in the pak
-        # FIXME: this is wrong for mlvl paks
+    def _dependency_order(self) -> list[AssetId]:
+        """Each named resource, preceded by its dependencies."""
         id_order = []
         seen = set()
-        for name, asset_id in self.named_files.items():
+        for asset_id in self.named_files.values():
             seen.add(asset_id)
             for dep in self.manager.get_dependencies_for_asset(asset_id):
                 if dep.id not in seen:
                     seen.add(dep.id)
                     id_order.append(dep.id)
             id_order.append(asset_id)
+        return id_order
+
+    @override
+    def export(self, output: FileWriter) -> None:
+        manager = self.manager
+
+        if manager.target_game > Game.ECHOES:
+            # The layout rules were only checked for Prime and Echoes, so keep the simple order for later games
+            layout = PakLayout(self._dependency_order())
+        else:
+            layout = manager.get_pak_layout_builder().pak_layout(
+                self.pak_name,
+                self.named_files.items(),
+                lambda mlvl_id, mrea_id: self.duplicate_areas.get(mrea_id, False),
+            )
 
         files_by_id = {}
-        for asset_id in id_order:
+        for asset_id in layout.asset_ids:
             if asset_id not in files_by_id:
-                files_by_id[asset_id] = self._get_pak_file(asset_id)
+                files_by_id[asset_id] = self._get_pak_file(asset_id, asset_id in layout.uncompressed)
 
         # Create the new Pak
         body = PakBody(
@@ -334,7 +377,7 @@ class PakExportStrategyCreate(PakExportStrategy):
                 (name, Dependency(self.manager.get_asset_type(asset_id), asset_id))
                 for name, asset_id in self.named_files.items()
             ],
-            files=[files_by_id[asset_id] for asset_id in id_order],
+            files=[files_by_id[asset_id] for asset_id in layout.asset_ids],
         )
 
         # Write the data
@@ -368,6 +411,7 @@ class AssetManager:
     _mrea_to_mlvl: dict[AssetId, AssetId] | None = None
     _pak_strategy_factory: PakExportStrategyFactory
     _pak_strategy: dict[str, PakExportStrategy]
+    _pak_layout_builder: PakLayoutBuilder | None = None
 
     _custom_asset_ids: dict[str, AssetId]
     _audio_group_dependency: tuple[Dgrp, ...] | None = None
@@ -852,13 +896,25 @@ class AssetManager:
 
         self._memory_files.clear()
 
+    def get_pak_layout_builder(self) -> PakLayoutBuilder:
+        """
+        A PakLayoutBuilder for the current assets. While exporting, the same one is shared by all paks.
+        """
+        if self._pak_layout_builder is not None:
+            return self._pak_layout_builder
+        return PakLayoutBuilder(self)
+
     def _export_paks(self, output: FileWriter, status_update: StatusUpdate) -> None:
         strategies = {name: strategy for name, strategy in self._pak_strategy.items() if strategy.should_export()}
         num_strategies = len(strategies)
 
-        for i, (name, strategy) in enumerate(strategies.items()):
-            status_update(f"Building {name}", i / num_strategies)
-            strategy.export(output)
+        self._pak_layout_builder = PakLayoutBuilder(self)
+        try:
+            for i, (name, strategy) in enumerate(strategies.items()):
+                status_update(f"Building {name}", i / num_strategies)
+                strategy.export(output)
+        finally:
+            self._pak_layout_builder = None
         status_update("Built PAKs", 1.0)
 
     def _save_dol(self, output: FileWriter) -> None:
