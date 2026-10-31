@@ -131,7 +131,10 @@ AnimationSet = Struct(
         ),
     ),
     half_transitions=If(construct.this.table_count >= 3, PrefixedArray(Int32ub, HalfTransitions)),
-    animation_resources=If(game_check.is_prime1, PrefixedArray(Int32ub, AnimationResourcePair)),
+    animation_resources=If(
+        lambda this: game_check.is_prime1(this) and this.table_count >= 4,
+        PrefixedArray(Int32ub, AnimationResourcePair),
+    ),
     event_sets=If(game_check.is_prime2, PrefixedArray(Int32ub, EVNT)),
 )
 
@@ -221,23 +224,29 @@ class Ancs(BaseResource):
             for anim_name in char.animation_names:
                 yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
 
+        game = self.asset_manager.target_game
+        animation_resources = self.raw.animation_set.animation_resources
+
+        # Prime pairs every primitive ANIM with an EVNT, listed separately from the meta animations.
+        events = {res.anim_id: res.event_id for res in animation_resources} if animation_resources is not None else {}
+
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager)
 
             for anim_index, anim in char_anims(char):
+                if animation_resources is not None:
+                    for _, anim_id in meta_animation.legacy_dependencies(anim.meta, game):
+                        event_id = events.get(anim_id)
+                        if event_id is not None and game.is_valid_asset_id(event_id):
+                            evnt_file = self.asset_manager.get_parsed_asset(event_id)
+                            yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
+                            yield Dependency("EVNT", event_id)
+                        yield from self.asset_manager.get_dependencies_for_asset(anim_id)
+                    continue
+
                 yield from meta_animation.dependencies_for(anim.meta, self.asset_manager)
 
-                if self.raw.animation_set.animation_resources is not None:
-                    res = self.raw.animation_set.animation_resources[anim_index]
-                    yield from self.asset_manager.get_dependencies_for_asset(res.anim_id)
-
-                    if not self.asset_manager.target_game.is_valid_asset_id(res.event_id):
-                        continue
-                    yield Dependency("EVNT", res.event_id)
-                    evnt_file = self.asset_manager.get_parsed_asset(res.event_id)
-                    yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
-
-                elif self.raw.animation_set.event_sets is not None:
+                if self.raw.animation_set.event_sets is not None:
                     yield from evnt.dependencies_for(
                         self.raw.animation_set.event_sets[anim_index], self.asset_manager, char_index
                     )
