@@ -10,6 +10,7 @@ import enum
 import hashlib
 import io
 import itertools
+import logging
 import typing
 from enum import IntEnum
 from functools import cached_property
@@ -29,7 +30,13 @@ from construct.core import (
 from construct.lib.containers import Container, ListContainer
 
 from retro_data_structures import game_check
-from retro_data_structures.base_resource import AssetId, AssetType, BaseResource, Dependency
+from retro_data_structures.base_resource import (
+    AssetId,
+    AssetType,
+    BaseResource,
+    Dependency,
+    merge_dependencies,
+)
 from retro_data_structures.common_types import AssetId32, AssetId64, FourCC, String, Transform4f
 from retro_data_structures.compression import LZOCompressedBlock
 from retro_data_structures.construct_extensions.alignment import AlignTo, PrefixedWithPaddingBefore
@@ -970,7 +977,7 @@ class Area:
             if not only_modified or layers[inst_layer].is_modified:
                 layer_deps[inst_layer].extend(instance.mlvl_dependencies_for(self.asset_manager))
 
-        return [list(dict.fromkeys(deps)) for deps in layer_deps]
+        return [merge_dependencies(deps) for deps in layer_deps]
 
     def build_mlvl_dependencies(self, only_modified: bool = False):
         layer_deps = [
@@ -1005,8 +1012,28 @@ class Area:
 
         self.dependencies = AreaDependencies.from_iterables(layer_deps, non_layer)
 
+    def build_non_mlvl_dependencies(self) -> Iterator[Dependency]:
+        """
+        What the objects need that's packed with the area, but excluded from its dependency table in the MLVL.
+        The table doesn't keep these, so they're always found from the objects.
+        """
+        instances = [instance for layer in self.layers for instance in layer.instances]
+        if self.asset_manager.target_game >= Game.ECHOES:
+            instances.extend(self.generated_objects_layer.instances)
+
+        def instance_dependencies(instance: ScriptInstance) -> Iterator[Dependency]:
+            try:
+                yield from instance.mlvl_dependencies_for(self.asset_manager)
+            except Exception as e:
+                logging.warning("Unable to get dependencies of %s in %s: %s", instance, self.internal_name, e)
+
+        for dep in merge_dependencies(dep for instance in instances for dep in instance_dependencies(instance)):
+            if dep.exclude_for_mlvl:
+                yield dep
+
     def dependencies_for(self):
         yield from self.dependencies.all_dependencies
+        yield from self.build_non_mlvl_dependencies()
         yield from self.asset_manager.get_dependencies_for_asset(self.mrea_asset_id)
         yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
 
