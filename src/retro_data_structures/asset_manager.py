@@ -792,6 +792,10 @@ class AssetManager:
                 self._sound_id_to_agsc[sound_id] = define_id_to_agsc[define_id]
 
     def get_audio_group_dependency(self, sound_id: int) -> Iterator[Dependency]:
+        if self.target_game == Game.PRIME:
+            # Prime keeps every AGSC in AudioGrp.pak
+            return
+
         if self._sound_id_to_agsc is None:
             self._build_audio_group_dependency_table()
 
