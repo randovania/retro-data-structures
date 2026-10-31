@@ -5,13 +5,16 @@ import logging
 from typing import TYPE_CHECKING
 
 from retro_data_structures.formats.pak import Pak
+from retro_data_structures.formats.pak_common import PakFile
+from retro_data_structures.game_check import Game
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Mapping, Sequence
 
+    import construct
+
     from retro_data_structures.base_resource import AssetId, AssetType, RawResource
     from retro_data_structures.file_provider import FileProvider
-    from retro_data_structures.game_check import Game
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +24,8 @@ class PakGroup:
     _types_for_asset_id: dict[AssetId, AssetType]
     _in_memory_paks: dict[str, Pak]
     _named_resources_per_pak: dict[str, dict[str, AssetId]]
+    _resources_per_pak: dict[str, list[tuple[AssetType, AssetId]]]
+    _resource_locations: dict[tuple[str, AssetId], construct.Container]
 
     def __init__(self, provider: FileProvider, pak_list: Sequence[str], target_game: Game):
         self.provider = provider
@@ -31,6 +36,8 @@ class PakGroup:
         self._types_for_asset_id = {}
         self._in_memory_paks = {}
         self._named_resources_per_pak = {}
+        self._resources_per_pak = {}
+        self._resource_locations = {}
 
         for name in self.pak_list:
             with self.provider.open_binary(name) as f:
@@ -41,6 +48,10 @@ class PakGroup:
                 for named_resource in pak_no_data.named_resources:
                     self._named_resources_per_pak[name][named_resource.name] = named_resource.asset_id
 
+            self._resources_per_pak[name] = [(entry.asset_type, entry.asset_id) for entry in pak_no_data.resources]
+            if target_game <= Game.ECHOES:
+                for entry in pak_no_data.resources:
+                    self._resource_locations.setdefault((name, entry.asset_id), entry)
             for entry in pak_no_data.resources:
                 self._paks_for_asset_id[entry.asset_id].add(name)
                 self._types_for_asset_id[entry.asset_id] = entry.asset_type
@@ -56,6 +67,12 @@ class PakGroup:
         Find all paks that contains the given asset id
         """
         yield from self._paks_for_asset_id[asset_id]
+
+    def get_resources_of_pak(self, pak_name: str) -> Sequence[tuple[AssetType, AssetId]]:
+        """
+        The type and id of each resource in the given pak, in order, as it was when read.
+        """
+        return self._resources_per_pak[pak_name]
 
     def does_pak_contains_id(self, pak_name: str, asset_id: AssetId) -> bool:
         """
@@ -79,20 +96,41 @@ class PakGroup:
         """
         return self._types_for_asset_id[asset_id]
 
-    def get_raw_asset(self, asset_id: AssetId) -> RawResource | None:
+    def get_raw_asset(self, asset_id: AssetId, pak_name: str | None = None) -> RawResource | None:
         """
         Gets the unparsed resource with the given id.
         :param asset_id:
+        :param pak_name: If set, the resource as it's in this pak.
         :return: None, if the id doesn't exist.
         """
+        if pak_name is not None:
+            return self._get_raw_asset_from_pak(pak_name, asset_id)
 
-        for pak_name in self._paks_for_asset_id[asset_id]:
-            pak = self.get_pak(pak_name)
+        for name in self._paks_for_asset_id[asset_id]:
+            pak = self.get_pak(name)
             result = pak.get_asset(asset_id)
             if result is not None:
                 return result
 
         return None
+
+    def _get_raw_asset_from_pak(self, pak_name: str, asset_id: AssetId) -> RawResource | None:
+        location = self._resource_locations.get((pak_name, asset_id))
+        if pak_name in self._in_memory_paks or location is None:
+            return self.get_pak(pak_name).get_asset(asset_id)
+
+        with self.provider.open_binary(pak_name) as f:
+            f.seek(location.offset)
+            data = f.read(location.size)
+
+        compressed = bool(location.compressed)
+        return PakFile(
+            asset_id=asset_id,
+            asset_type=location.asset_type,
+            should_compress=compressed,
+            uncompressed_data=None if compressed else data,
+            compressed_data=data if compressed else None,
+        ).as_raw_resource(self.target_game)
 
     def get_pak(self, pak_name: str) -> Pak:
         """

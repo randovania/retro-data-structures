@@ -90,9 +90,8 @@ class Pak:
             raise ValueError(f"Unknown asset id: {asset_id}")
 
     def get_pak_file_with_id(self, asset_id: AssetId) -> PakFile:
-        for file in self._raw.files:
-            if file.asset_id == asset_id:
-                return file
+        for index in self._file_indices_by_id.get(asset_id, []):
+            return self._raw.files[index]
         raise KeyError(f"Unknown asset id: {asset_id}")
 
     def add_asset(self, asset_id: AssetId, asset: RawResource) -> None:
