@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tests import test_lib
 
+from retro_data_structures.base_resource import Dependency
 from retro_data_structures.formats.ancs import Ancs
 
 
@@ -36,3 +37,11 @@ def test_dependencies_all_p1(prime1_pwe_project):
         for asset_type, asset_id in dependencies.recursive_dependencies_for(asset_provider, asset_ids):
             print("{}: {}".format(asset_type, hex(asset_id)))
             """
+
+
+def test_prime_character_dependencies(prime1_asset_manager):
+    # Space pirate, character 1: its animations come with their events, which Prime keeps apart from the
+    # animations in the ANCS
+    deps = list(prime1_asset_manager.get_dependencies_for_ancs(0x8169653A, 1))
+    assert Dependency("EVNT", 0x5944525B) in deps
+    assert Dependency("ANIM", 0xEC19E92E) in deps

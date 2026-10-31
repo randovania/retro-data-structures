@@ -79,10 +79,10 @@ class Scan(BaseResource):
 
     def _internal_dependencies_for(self) -> typing.Iterator[Dependency]:
         if self.target_game == Game.PRIME:
-            yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
             yield from self.asset_manager.get_dependencies_for_asset(self.raw.text_id)
             for image in self.raw.scan_images:
                 yield from self.asset_manager.get_dependencies_for_asset(image.texture)
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.frame_id)
         else:
             scan_info = self.scannable_object_info.get_properties()
             yield from scan_info.dependencies_for(self.asset_manager)
