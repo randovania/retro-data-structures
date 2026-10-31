@@ -225,23 +225,33 @@ class Ancs(BaseResource):
                 yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
 
         game = self.asset_manager.target_game
+        is_prime = game == game_check.Game.PRIME
         animation_resources = self.raw.animation_set.animation_resources
 
         # Prime pairs every primitive ANIM with an EVNT, listed separately from the meta animations.
         events = {res.anim_id: res.event_id for res in animation_resources} if animation_resources is not None else {}
 
+        def prime_animation(anim_id: int) -> typing.Iterator[Dependency]:
+            # The ANIM's own dependencies would include the particles of every character
+            if not (game.is_valid_asset_id(anim_id) and self.asset_manager.does_asset_exists(anim_id)):
+                return
+            event_id = events.get(anim_id)
+            if event_id is None:
+                # Some animations are missing from the table, and older ANCS have no table
+                event_id = self.asset_manager.get_parsed_asset(anim_id).raw.anim.event_id
+            if game.is_valid_asset_id(event_id):
+                evnt_file = self.asset_manager.get_parsed_asset(event_id)
+                yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
+                yield Dependency("EVNT", event_id)
+            yield Dependency("ANIM", anim_id)
+
         def char_deps(char):
             yield from char_dependencies_for(char, self.asset_manager)
 
             for anim_index, anim in char_anims(char):
-                if animation_resources is not None:
+                if is_prime:
                     for _, anim_id in meta_animation.legacy_dependencies(anim.meta, game):
-                        event_id = events.get(anim_id)
-                        if event_id is not None and game.is_valid_asset_id(event_id):
-                            evnt_file = self.asset_manager.get_parsed_asset(event_id)
-                            yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
-                            yield Dependency("EVNT", event_id)
-                        yield from self.asset_manager.get_dependencies_for_asset(anim_id)
+                        yield from prime_animation(anim_id)
                     continue
 
                 yield from meta_animation.dependencies_for(anim.meta, self.asset_manager)
@@ -259,8 +269,21 @@ class Ancs(BaseResource):
         for char in chars:
             yield from char_deps(char)
 
+        if not is_prime:
+            for transition in self.raw.animation_set.transitions:
+                yield from meta_transition.dependencies_for(transition.transition, self.asset_manager)
+            return
+
+        # Prime only includes the transitions from or to an animation of the character
+        char_anim_indices = {anim_index for char in chars for anim_index, _ in char_anims(char)}
         for transition in self.raw.animation_set.transitions:
-            yield from meta_transition.dependencies_for(transition.transition, self.asset_manager)
+            if char_index is not None and not (
+                transition.animation_id_a in char_anim_indices or transition.animation_id_b in char_anim_indices
+            ):
+                continue
+            if transition.transition.type == meta_transition.MetaTransitionType.Animation:
+                for _, anim_id in meta_animation.legacy_dependencies(transition.transition.body, game):
+                    yield from prime_animation(anim_id)
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
         yield from self.ancs_dependencies_for(None)

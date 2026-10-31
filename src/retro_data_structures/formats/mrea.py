@@ -961,6 +961,11 @@ class Area:
                 yield from dependencies_for_material_set(geometry[0].materials, self.asset_manager)
 
         valid_asset = self.asset_manager.target_game.is_valid_asset_id
+        if self.asset_manager.target_game == Game.PRIME:
+            # Prime has no portal area or static geometry map
+            if valid_asset(path := self.mrea.get_path()):
+                yield Dependency("PATH", path)
+            return
         if valid_asset(portal_area := self.mrea.get_portal_area()):
             yield Dependency("PTLA", portal_area)
         if valid_asset(static_geometry_map := self.mrea.get_static_geometry_map()):
@@ -970,6 +975,9 @@ class Area:
 
     def build_scgn_dependencies(self, layer_deps: list[list[Dependency]], only_modified: bool = False):
         layer_deps = list(layer_deps)
+        if self.asset_manager.target_game == Game.PRIME:
+            # Prime has no generated objects
+            return [merge_dependencies(deps) for deps in layer_deps]
 
         layers = list(self.layers)
         for instance in self.generated_objects_layer.instances:
