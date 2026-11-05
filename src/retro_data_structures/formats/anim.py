@@ -29,9 +29,7 @@ from retro_data_structures import game_check
 from retro_data_structures.base_resource import AssetType, BaseResource, Dependency
 from retro_data_structures.common_types import CharAnimTime
 from retro_data_structures.construct_extensions.misc import BitwiseWith32Blocks
-
-if typing.TYPE_CHECKING:
-    from retro_data_structures.game_check import Game
+from retro_data_structures.game_check import Game
 
 UncompressedAnimation = Struct(
     duration=CharAnimTime,
@@ -174,4 +172,5 @@ class Anim(BaseResource):
         return ANIM
 
     def dependencies_for(self) -> typing.Iterator[Dependency]:
-        yield from []
+        if self.target_game == Game.PRIME:
+            yield from self.asset_manager.get_dependencies_for_asset(self.raw.anim.event_id)

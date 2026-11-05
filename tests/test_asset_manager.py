@@ -89,3 +89,10 @@ def test_save_modifications(prime2_iso_provider, tmp_path):
     assert file_count == 1996
 
     assert writer.get_data("GGuiSys.pak") is not None
+
+
+def test_prime_sounds_are_not_dependencies(prime1_asset_manager):
+    # Prime keeps every AGSC in AudioGrp.pak. This EVNT plays sound 1342.
+    assert list(prime1_asset_manager.get_audio_group_dependency(1342)) == []
+    deps = list(prime1_asset_manager.get_dependencies_for_asset(0x5944525B))
+    assert not [dep for dep in deps if dep.type == "AGSC"]

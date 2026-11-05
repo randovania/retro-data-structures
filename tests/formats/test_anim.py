@@ -60,3 +60,16 @@ def test_missile_launcher(prime1_asset_manager, prime2_asset_manager):
 def test_no_dependencies(prime2_asset_manager):
     result = list(prime2_asset_manager.get_dependencies_for_asset(0x5E2F550E))
     assert result == [Dependency(type="ANIM", id=0x5E2F550E)]
+
+
+def test_prime_depends_on_event(prime1_asset_manager):
+    # B_intoseatedActiveReady_pirate: Prime's ANIM references its EVNT, which has particles
+    deps = list(prime1_asset_manager.get_dependencies_for_asset(0xEC19E92E))
+    assert deps[-2:] == [Dependency("EVNT", 0x5944525B), Dependency("ANIM", 0xEC19E92E)]
+    assert Dependency("PART", 0x4A9124A3) in deps
+
+
+def test_prime_parsed_depends_on_event(prime1_asset_manager):
+    # Usually the dependencies are read without parsing, but not when the ANIM is being edited
+    anim = prime1_asset_manager.get_parsed_asset(0xEC19E92E, type_hint=Anim)
+    assert list(anim.dependencies_for())[-1] == Dependency("EVNT", 0x5944525B)
