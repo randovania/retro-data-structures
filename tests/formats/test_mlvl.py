@@ -190,6 +190,18 @@ def test_compare_mlvl(prime2_asset_manager: AssetManager):
     assert set(old_deps.all_dependencies) == set(new_deps.all_dependencies)
 
 
+def test_area_dependencies_after_rebuild(prime2_asset_manager: AssetManager):
+    # Once rebuilt, the area's table also has what the MLVL excludes, which the area must give only once
+    mlvl = prime2_asset_manager.get_file(0x3BFA3EFF, type_hint=Mlvl)
+    area = next(iter(mlvl.areas))
+    area.build_mlvl_dependencies()
+
+    excluded = [(dep.type, dep.id) for dep in area.dependencies_for() if dep.exclude_for_mlvl]
+    assert excluded
+    assert len(excluded) == len(set(excluded))
+    assert not any(dep.exclude_for_mlvl for dep in area.dependencies.mlvl_dependencies)
+
+
 def test_compare_p1(prime1_asset_manager, mlvl_asset_id: AssetId):
     # FIXME: what's actually wrong here?
     with pytest.raises(KeyError):
