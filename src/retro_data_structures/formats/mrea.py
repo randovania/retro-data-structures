@@ -10,7 +10,6 @@ import enum
 import hashlib
 import io
 import itertools
-import logging
 import typing
 from enum import IntEnum
 from functools import cached_property
@@ -731,6 +730,13 @@ class AreaDependencies:
         for layer in self.layers:
             yield from layer
 
+    @property
+    def mlvl_dependencies(self) -> Iterator[Dependency]:
+        """Only the dependencies the MLVL lists."""
+        for dep in self.all_dependencies:
+            if not dep.exclude_for_mlvl:
+                yield dep
+
     @cached_property
     def _comparison_tuple(self) -> tuple[frozenset[Dependency], ...]:
         return (frozenset(self.non_layer), *[frozenset(layer) for layer in self.layers])
@@ -1021,18 +1027,14 @@ class Area:
         if self.asset_manager.target_game >= Game.ECHOES:
             instances.extend(self.generated_objects_layer.instances)
 
-        def instance_dependencies(instance: ScriptInstance) -> Iterator[Dependency]:
-            try:
-                yield from instance.mlvl_dependencies_for(self.asset_manager)
-            except Exception as e:
-                logging.warning("Unable to get dependencies of %s in %s: %s", instance, self.internal_name, e)
-
-        for dep in merge_dependencies(dep for instance in instances for dep in instance_dependencies(instance)):
+        for dep in merge_dependencies(
+            dep for instance in instances for dep in instance.mlvl_dependencies_for(self.asset_manager)
+        ):
             if dep.exclude_for_mlvl:
                 yield dep
 
     def dependencies_for(self):
-        yield from self.dependencies.all_dependencies
+        yield from self.dependencies.mlvl_dependencies
         yield from self.build_non_mlvl_dependencies()
         yield from self.asset_manager.get_dependencies_for_asset(self.mrea_asset_id)
         yield from self.asset_manager.get_dependencies_for_asset(self._raw.area_name_id)
