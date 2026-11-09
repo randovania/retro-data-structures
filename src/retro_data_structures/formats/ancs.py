@@ -14,7 +14,7 @@ from retro_data_structures.base_resource import AssetType, BaseResource, Depende
 from retro_data_structures.common_types import AABox, AssetId32, ObjectTag_32, String
 from retro_data_structures.construct_extensions.version import BeforeVersion, WithVersion
 from retro_data_structures.formats import evnt, meta_animation, meta_transition
-from retro_data_structures.formats.evnt import EVNT
+from retro_data_structures.formats.evnt import EVNT, Evnt
 from retro_data_structures.formats.meta_animation import MetaAnimation_AssetId32
 from retro_data_structures.formats.meta_transition import MetaTransition_v1
 from retro_data_structures.formats.pas_database import PASDatabase
@@ -145,19 +145,21 @@ ANCS = Struct(
 )
 
 
-def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game):
+def _yield_dependency_if_valid(asset_id: int | None, asset_type: str, game: Game) -> typing.Iterator[tuple[str, int]]:
     if asset_id is not None and game.is_valid_asset_id(asset_id):
         yield asset_type, asset_id
 
 
-def _yield_dependency_array(asset_ids: list[int] | None, asset_type: str, game: Game):
+def _yield_dependency_array(
+    asset_ids: list[int] | None, asset_type: str, game: Game
+) -> typing.Iterator[tuple[str, int]]:
     if asset_ids is not None:
         for asset_id in asset_ids:
             yield from _yield_dependency_if_valid(asset_id, asset_type, game)
 
 
-def char_dependencies_for(character, asset_manager: AssetManager):
-    def _array(asset_ids: Iterable[int] | None):
+def char_dependencies_for(character, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
+    def _array(asset_ids: Iterable[int] | None) -> typing.Iterator[Dependency]:
         if asset_ids is not None:
             for asset_id in asset_ids:
                 yield from asset_manager.get_dependencies_for_asset(asset_id, must_exist=False)
@@ -181,7 +183,7 @@ def char_dependencies_for(character, asset_manager: AssetManager):
     yield from _array(psd.spawn_particles)
 
 
-def legacy_dependencies(obj, target_game: Game):
+def legacy_dependencies(obj, target_game: Game) -> typing.Iterator[tuple[str, int]]:
     for character in obj.character_set.characters:
         yield from _yield_dependency_if_valid(character.model_id, "CMDL", target_game)
         yield from _yield_dependency_if_valid(character.skin_id, "CSKR", target_game)
@@ -220,8 +222,8 @@ class Ancs(BaseResource):
         return ANCS
 
     def ancs_dependencies_for(self, char_index: int | None) -> typing.Iterator[Dependency]:
-        def char_anims(char) -> typing.Iterator[tuple[int, str]]:
-            for anim_name in char.animation_names:
+        def char_anims(char_obj: construct.Container) -> typing.Iterator[tuple[int, construct.Container]]:
+            for anim_name in char_obj.animation_names:
                 yield next((i, a) for i, a in enumerate(self.raw.animation_set.animations) if a.name == anim_name.name)
 
         game = self.asset_manager.target_game
@@ -229,7 +231,9 @@ class Ancs(BaseResource):
         animation_resources = self.raw.animation_set.animation_resources
 
         # Prime pairs every primitive ANIM with an EVNT, listed separately from the meta animations.
-        events = {res.anim_id: res.event_id for res in animation_resources} if animation_resources is not None else {}
+        events: dict[int, int] = (
+            {res.anim_id: res.event_id for res in animation_resources} if animation_resources is not None else {}
+        )
 
         def prime_animation(anim_id: int) -> typing.Iterator[Dependency]:
             # The ANIM's own dependencies would include the particles of every character
@@ -240,12 +244,12 @@ class Ancs(BaseResource):
                 # Some animations are missing from the table, and older ANCS have no table
                 event_id = self.asset_manager.get_parsed_asset(anim_id).raw.anim.event_id
             if game.is_valid_asset_id(event_id):
-                evnt_file = self.asset_manager.get_parsed_asset(event_id)
+                evnt_file = self.asset_manager.get_parsed_asset(event_id, type_hint=Evnt)
                 yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
                 yield Dependency("EVNT", event_id)
             yield Dependency("ANIM", anim_id)
 
-        def char_deps(char):
+        def char_deps(char) -> typing.Iterator[Dependency]:
             yield from char_dependencies_for(char, self.asset_manager)
 
             for anim_index, anim in char_anims(char):
