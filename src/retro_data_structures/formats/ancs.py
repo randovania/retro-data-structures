@@ -243,10 +243,13 @@ class Ancs(BaseResource):
             if event_id is None:
                 # Some animations are missing from the table, and older ANCS have no table
                 event_id = self.asset_manager.get_parsed_asset(anim_id).raw.anim.event_id
+
             if game.is_valid_asset_id(event_id):
+                # Evnt.dependencies_for, but with char_index set.
                 evnt_file = self.asset_manager.get_parsed_asset(event_id, type_hint=Evnt)
                 yield from evnt.dependencies_for(evnt_file.raw, self.asset_manager, char_index)
                 yield Dependency("EVNT", event_id)
+
             yield Dependency("ANIM", anim_id)
 
         def char_deps(char) -> typing.Iterator[Dependency]:
