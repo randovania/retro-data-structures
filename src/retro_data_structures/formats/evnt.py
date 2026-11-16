@@ -137,7 +137,7 @@ def legacy_dependencies(obj, target_game):
         yield particle_poi.particle.type, particle_poi.particle.id
 
 
-def dependencies_for(obj, asset_manager: AssetManager, char_id: int | None = None):
+def dependencies_for(obj, asset_manager: AssetManager, char_id: int | None = None) -> typing.Iterator[Dependency]:
     def is_for_character(poi, generic_ok):
         # return True
         ids = (-1, char_id) if generic_ok else (char_id,)

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
 import enum
+import typing
 
 import construct
 from construct import Byte, Float32b, Int32ub, Int64ub, PrefixedArray, Struct, Switch
 
 from retro_data_structures.adapters.enum_adapter import EnumAdapter
 from retro_data_structures.common_types import AssetId32, AssetId64, String
+
+if typing.TYPE_CHECKING:
+    from retro_data_structures.asset_manager import AssetManager
+    from retro_data_structures.base_resource import Dependency
+    from retro_data_structures.game_check import Game
 
 
 class MetaAnimationType(enum.IntEnum):
@@ -67,7 +73,7 @@ by_asset_type = {
 }
 
 
-def legacy_dependencies(obj, target_game):
+def legacy_dependencies(obj, target_game: Game) -> typing.Iterator[tuple[str, int]]:
     if obj.type == MetaAnimationType.Play:
         yield "ANIM", obj.body.asset_id
 
@@ -84,7 +90,7 @@ def legacy_dependencies(obj, target_game):
             yield from legacy_dependencies(item, target_game)
 
 
-def dependencies_for(obj, asset_manager):
+def dependencies_for(obj, asset_manager: AssetManager) -> typing.Iterator[Dependency]:
     if obj.type == MetaAnimationType.Play:
         yield from asset_manager.get_dependencies_for_asset(obj.body.asset_id)
 

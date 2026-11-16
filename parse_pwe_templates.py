@@ -290,6 +290,9 @@ def _parse_single_property(element: Element, game_id: str, path: Path, include_i
     if ignore_dependencies_mlvl:
         parsed["ignore_dependencies_mlvl"] = True
 
+    if element.attrib.get("IgnoreDependencies", "False").lower() != "false":
+        parsed["ignore_dependencies"] = True
+
     property_type_extras = {
         "Struct": _prop_struct,
         "Asset": _prop_asset,
@@ -1435,7 +1438,9 @@ def parse_game(templates_path: Path, game_xml: Path, game_id: str) -> dict:
             prop_type = "AssetId"
             needed_imports[f"{import_base}.core.AssetId"] = "AssetId, default_asset_id"
             dataclass_metadata["asset_types"] = prop["type_filter"]
-            if not any(asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")):
+            if not prop.get("ignore_dependencies") and not any(
+                asset_type in prop["type_filter"] for asset_type in ("MLVL", "MREA")
+            ):
                 dependency_code = "asset_manager.get_dependencies_for_asset({obj})"
 
             if "ignore_dependencies_mlvl" in prop:
