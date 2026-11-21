@@ -237,6 +237,9 @@ class Strg(BaseResource):
     # Building
 
     def _build_v1(self, header: Container) -> bytes:
+        return STRG_V1.build(self._v1_container(header))
+
+    def _v1_container(self, header: Container) -> Container:
         languages = []
         string_tables = []
 
@@ -268,13 +271,11 @@ class Strg(BaseResource):
                 )
             )
 
-        return STRG_V1.build(
-            Container(
-                header=header,
-                language_table=languages,
-                name_table=self._raw.name_table,
-                string_tables=string_tables,
-            )
+        return Container(
+            header=header,
+            language_table=languages,
+            name_table=self._raw.name_table,
+            string_tables=string_tables,
         )
 
     def _build_v3(self, header: Container) -> bytes:
@@ -316,7 +317,7 @@ class Strg(BaseResource):
             )
         )
 
-    def build(self) -> bytes:
+    def _header(self) -> Container:
         string_count = None
         for language_id, language_strings in self._raw.languages.items():
             if string_count is None:
@@ -332,16 +333,23 @@ class Strg(BaseResource):
             Game.ECHOES: "prime2",
             Game.CORRUPTION: "prime3",
         }
-        header = Container(
+        return Container(
             version=game_to_version[self.target_game],
             language_count=len(self._raw.languages),
             string_count=string_count,
         )
 
+    def build(self) -> bytes:
+        header = self._header()
         if self.target_game <= Game.ECHOES:
             return self._build_v1(header)
         else:
             return self._build_v3(header)
+
+    def build_construct_container(self) -> Container:
+        """The data that `STRG` (the construct) builds, for Prime and Echoes."""
+        assert self.target_game <= Game.ECHOES
+        return self._v1_container(self._header())
 
     # Methods
 
