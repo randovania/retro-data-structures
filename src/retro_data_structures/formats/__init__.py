@@ -10,6 +10,7 @@ from retro_data_structures.formats.cinf import CINF, Cinf
 from retro_data_structures.formats.cmdl import CMDL, Cmdl
 from retro_data_structures.formats.cskr import CSKR, Cskr
 from retro_data_structures.formats.cspp import CSPP, Cspp
+from retro_data_structures.formats.dcln import DCLN, Dcln
 from retro_data_structures.formats.dgrp import DGRP, Dgrp
 from retro_data_structures.formats.effect_script import (
     CRSC,
@@ -58,6 +59,7 @@ ALL_FORMATS = {
     "CMDL": CMDL,
     "CSKR": CSKR,
     "CSPP": CSPP,
+    "DCLN": DCLN,
     "DGRP": DGRP,
     "EVNT": EVNT,
     "FRME": FRME,
@@ -91,6 +93,7 @@ ALL_RESOURCE_TYPES = {
     "CMDL": Cmdl,
     "CSKR": Cskr,
     "CSPP": Cspp,
+    "DCLN": Dcln,
     "DGRP": Dgrp,
     "EVNT": Evnt,
     "FRME": Frme,
